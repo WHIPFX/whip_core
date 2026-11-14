@@ -16,19 +16,18 @@
 local WhipSatellite = {}
 
 --- Run `fn` when whip_core is ready (whichever of you started first), and again every time
---- whip_core restarts. Put everything you register with whip in it, or declare it one call at a time through
---- Whip.declare. Not re-run when some other resource starts.
+--- whip_core restarts. Put everything you register with whip in it, called through Whip.core. Not re-run when
+--- some other resource starts.
+---
+---     Whip.register(function()
+---         Whip.core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+---     end)
+---
+--- While `fn` runs, a declaring call through Whip.core or Whip.call that whip_core refuses (`false, why`) is
+--- printed in your console: Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. A call
+--- straight through exports.whip_core is not.
 ---@param fn fun()
 function WhipSatellite.register(fn) end
-
---- whip_core's declaring exports, each remembered and made again whenever whip_core needs it, with no function
---- around it: `Whip.declare:RegisterItem('lemonade', { ... })` is `RegisterItem` inside Whip.register, with a
---- refusal printed in your console. Only declarations: Register…, Ensure…, On… and Watch… exports, SecureEvent,
---- SecureCallback, AddAction, AddItemOption, AddPoint and AddWeapons; anything else is refused. The arguments are
---- taken once, as you call it, and the call answers only true (taken) or false (refused): for a value that changes
---- (a Config value on your settings page) or an answer you keep (an AddAction id), use Whip.register.
----@type WhipCoreServerExports|WhipCoreClientExports
-WhipSatellite.declare = {}
 
 --- Only for a resource WITHOUT `dependency 'whip_core'` (with it, your resource is stopped first and this
 --- never runs). Run `fn` when whip_core stops — to let go of something that only made sense while it ran.

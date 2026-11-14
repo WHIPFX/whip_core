@@ -1439,10 +1439,10 @@ game 'gta5'
 lua54 'yes'
 
 dependency 'whip_core'
-whip_requires '1.1'   -- the WHIP that has Whip.declare
+whip_requires '1.1'
 
 shared_scripts {
-    '@whip_core/lib/satellite.lua',   -- WHIP's helper: gives you Whip.declare
+    '@whip_core/lib/satellite.lua',   -- WHIP's helper: gives you Whip.register and Whip.core
     'shared.lua',
 }
 server_script 'server.lua'
@@ -1459,56 +1459,62 @@ client_script 'client.lua'</code></pre>
 <p>For your own spot, stand there in game, open <code>/w</code> → <strong>Coords</strong> and press <kbd>G</kbd> to copy <code>vector4(x, y, z, heading)</code>.</p>
 
 <h3 id="quickstart-satellite">3. The item, and the one rule</h3>
-<p>whip_core keeps everything you declare (items, use handlers, events, prompts) in memory, and forgets it when it restarts. So <strong>declare through <code>Whip.declare</code></strong>, which makes the call once whip_core is ready and again after every restart. In <code>server.lua</code>:</p>
-<pre><code class="lang-lua">Whip.declare:RegisterItem('mycafe_coffee', {
-    name     = 'Coffee',
-    desc     = 'Hot and black. Quenches thirst.',
-    weight   = 0.3,
-    type     = 'consumable',
-    stack    = true,
-    maxStack = 10,
-    usable   = true,
-})</code></pre>
+<p>whip_core keeps everything you declare (items, use handlers, events, prompts) in memory, and forgets it when it restarts. So <strong>declare in <code>Whip.register</code></strong>: it runs your function once whip_core is ready and again after every restart. In <code>server.lua</code>:</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterItem('mycafe_coffee', {
+        name     = 'Coffee',
+        desc     = 'Hot and black. Quenches thirst.',
+        weight   = 0.3,
+        type     = 'consumable',
+        stack    = true,
+        maxStack = 10,
+        usable   = true,
+    })
+end)</code></pre>
 <p>Running it twice is safe: registering the same thing again changes nothing (<a href="#patterns-registering">the registration rule</a>). Every item field is under <a href="#item-schema">Item Definition</a>. A refusal is printed in the server console, with the reason.</p>
-<p><code>Whip.declare</code> takes WHIP's declaring calls: <code>Register…</code>, <code>Ensure…</code>, <code>On…</code>, <code>SecureEvent</code>, <code>AddAction</code> and a few more. For anything more than one call, such as a loop over your <code>Config</code>, hand a function to <code>Whip.register</code> instead (<a href="#patterns-satellite">The satellite helper</a>).</p>
-<div class="info-box warn"><strong>Don't wait and hope.</strong> <code>CreateThread(function() Wait(1000) … end)</code> registers once, so a whip_core restart silently strips your items. Watching <code>onResourceStart</code> misses the first start. Use <code>Whip.declare</code> or <code>Whip.register</code>.</div>
+<p>Call whip_core through <code>Whip.core</code> in there, so a refusal is printed for you. One function can hold every declaration, a loop over your <code>Config</code> too (<a href="#patterns-satellite">The satellite helper</a>).</p>
+<div class="info-box warn"><strong>Don't wait and hope.</strong> <code>CreateThread(function() Wait(1000) … end)</code> registers once, so a whip_core restart silently strips your items. Watching <code>onResourceStart</code> misses the first start. Use <code>Whip.register</code>.</div>
 
 <h3>4. Drinking it</h3>
 <p>Below it, say what using the coffee does. Passing <code>RegisterUseHandler</code> a <strong>table</strong> makes it a timed use: WHIP shows the bar, plays the animation and props, and times it on the server so a modified client can't skip it. When the bar ends, WHIP takes the coffee and runs <code>onComplete</code>.</p>
-<pre><code class="lang-lua">Whip.declare:RegisterUseHandler('mycafe_coffee', {
-    label    = 'Drinking coffee...',
-    duration = 4000,
-    anim     = { dict = 'amb@world_human_drinking@coffee@male@idle_a', clip = 'idle_c' },
-    prop     = { model = 'p_amb_coffeecup_01', bone = 28422 },
-    disable  = { move = false },
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterUseHandler('mycafe_coffee', {
+        label    = 'Drinking coffee...',
+        duration = 4000,
+        anim     = { dict = 'amb@world_human_drinking@coffee@male@idle_a', clip = 'idle_c' },
+        prop     = { model = 'p_amb_coffeecup_01', bone = 28422 },
+        disable  = { move = false },
 
-    -- Return AddStat's result: if it fails, WHIP gives the coffee back
-    onComplete = function(source)
-        return exports.whip_core:AddStat(source, 'thirst', 20, 'item:mycafe_coffee')
-    end,
-})</code></pre>
+        -- Return AddStat's result: if it fails, WHIP gives the coffee back
+        onComplete = function(source)
+            return exports.whip_core:AddStat(source, 'thirst', 20, 'item:mycafe_coffee')
+        end,
+    })
+end)</code></pre>
 <p>Thirst runs from 100 (full) down to 0, and new characters start full (<a href="#guide-stats">Stats &amp; Effects</a>). Every field is on the <a href="#declared-use">timed use card</a>.</p>
 <p><strong>Try it:</strong> in the server console, <code>refresh</code> then <code>ensure mycafe</code> (later, <code>restart mycafe</code>). In game, <code>/whip</code> → Economy → <strong>Items</strong>, give yourself a coffee, press <kbd>F2</kbd>, right-click it and choose Use.</p>
 
 <h3>5. Selling it</h3>
 <p>A <code>SecureEvent</code> is <code>RegisterNetEvent</code> with the checks built in. Also in <code>server.lua</code>:</p>
 <pre><code class="lang-lua">-- The client sends nothing: not the price, not the item
-Whip.declare:SecureEvent('mycafe:buy', {
-    rateLimit = 1000,   -- one purchase a second per player
-    near = { at = Config.Counter, range = 3.0, message = 'Walk up to the counter' },
-}, function(source)
-    local receipt, err = exports.whip_core:ChargePlayer(source, Config.Price, { reason = 'Coffee' })
-    if not receipt then
-        return false, err            -- couldn't pay: WHIP shows them why
-    end
+Whip.register(function()
+    Whip.core:SecureEvent('mycafe:buy', {
+        rateLimit = 1000,   -- one purchase a second per player
+        near = { at = Config.Counter, range = 3.0, message = 'Walk up to the counter' },
+    }, function(source)
+        local receipt, err = exports.whip_core:ChargePlayer(source, Config.Price, { reason = 'Coffee' })
+        if not receipt then
+            return false, err            -- couldn't pay: WHIP shows them why
+        end
 
-    local given, why = exports.whip_core:AddItem(source, 'mycafe_coffee', 1)
-    if not given then
-        exports.whip_core:RefundPlayer(receipt)   -- paid but got nothing: money back
-        return false, why
-    end
+        local given, why = exports.whip_core:AddItem(source, 'mycafe_coffee', 1)
+        if not given then
+            exports.whip_core:RefundPlayer(receipt)   -- paid but got nothing: money back
+            return false, why
+        end
 
-    exports.whip_core:NotifyPlayer(source, 'Enjoy your coffee', 'success')
+        exports.whip_core:NotifyPlayer(source, 'Enjoy your coffee', 'success')
+    end)
 end)</code></pre>
 <ul>
   <li><strong>The client sends nothing.</strong> A client that could send the price could send <code>0</code>.</li>
@@ -1521,15 +1527,17 @@ end)</code></pre>
 
 <h3>6. The counter</h3>
 <p>In <code>client.lua</code>, put a prompt at the counter. Walk up and press <kbd>E</kbd> to send the event:</p>
-<pre><code class="lang-lua">Whip.declare:AddAction({
-    id       = 'counter',
-    at       = { coords = Config.Counter },
-    label    = ('Buy coffee ($%d)'):format(Config.Price),
-    icon     = 'cash',
-    onSelect = function()
-        TriggerServerEvent('mycafe:buy')
-    end,
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:AddAction({
+        id       = 'counter',
+        at       = { coords = Config.Counter },
+        label    = ('Buy coffee ($%d)'):format(Config.Price),
+        icon     = 'cash',
+        onSelect = function()
+            TriggerServerEvent('mycafe:buy')
+        end,
+    })
+end)</code></pre>
 <p>The same call puts an option on an entity, a car part or the F1 wheel (<a href="#interactions">AddAction</a>). It's removed automatically when your resource stops.</p>
 
 <h3>7. Try it</h3>
@@ -1554,64 +1562,70 @@ end)</code></pre>
 
 <h3>1. The job</h3>
 <p>In <code>server.lua</code>, declare the job. The first start creates it; later starts find it again.</p>
-<pre><code class="lang-lua">Whip.declare:EnsureJob('mycafe', {
-    name  = 'Bean Machine',
-    roles = {
-        { name = 'Owner',   level = 100 },
-        { name = 'Barista', level = 1 },
-    },
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:EnsureJob('mycafe', {
+        name  = 'Bean Machine',
+        roles = {
+            { name = 'Owner',   level = 100 },
+            { name = 'Barista', level = 1 },
+        },
+    })
+end)</code></pre>
 <p>Hire yourself in <code>/whip</code> → Economy → <strong>Jobs</strong> → <em>Bean Machine</em> → <strong>Change</strong>. (From code, use <code>HirePlayer</code>.)</p>
 
 <h3>2. One counter, several options</h3>
 <p>Customers buy; baristas clock on, brew and clock off. One prompt carries them all as <code>options</code>, and each option's <code>require</code> decides who sees it. In <code>client.lua</code>, replace the counter's <code>AddAction</code>:</p>
-<pre><code class="lang-lua">Whip.declare:AddAction({
-    id      = 'counter',
-    at      = { coords = Config.Counter },
-    options = {
-        { id = 'buy', label = ('Buy coffee ($%d)'):format(Config.Price), icon = 'cash',
-          onSelect = function() TriggerServerEvent('mycafe:buy') end },
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:AddAction({
+        id      = 'counter',
+        at      = { coords = Config.Counter },
+        options = {
+            { id = 'buy', label = ('Buy coffee ($%d)'):format(Config.Price), icon = 'cash',
+              onSelect = function() TriggerServerEvent('mycafe:buy') end },
 
-        -- Staff only. whipJob is the job they're on duty at (false when off duty)
-        { id = 'clockon', label = 'Clock on', require = { job = 'mycafe' },
-          canInteract = function() return LocalPlayer.state.whipJob ~= 'mycafe' end,
-          onSelect = function(ctx)
-              local ok, why = exports.whip_core:ClockOn('mycafe')
-              if not ok then ctx.refuse(why) end
-          end },
+            -- Staff only. whipJob is the job they're on duty at (false when off duty)
+            { id = 'clockon', label = 'Clock on', require = { job = 'mycafe' },
+              canInteract = function() return LocalPlayer.state.whipJob ~= 'mycafe' end,
+              onSelect = function(ctx)
+                  local ok, why = exports.whip_core:ClockOn('mycafe')
+                  if not ok then ctx.refuse(why) end
+              end },
 
-        { id = 'brew', label = 'Brew a coffee', require = { job = 'mycafe', onDuty = true },
-          onSelect = function() TriggerServerEvent('mycafe:brew') end },
+            { id = 'brew', label = 'Brew a coffee', require = { job = 'mycafe', onDuty = true },
+              onSelect = function() TriggerServerEvent('mycafe:brew') end },
 
-        { id = 'clockoff', label = 'Clock off', require = { job = 'mycafe', onDuty = true },
-          onSelect = function() exports.whip_core:ClockOff('mycafe') end },
-    },
-})</code></pre>
+            { id = 'clockoff', label = 'Clock off', require = { job = 'mycafe', onDuty = true },
+              onSelect = function() exports.whip_core:ClockOff('mycafe') end },
+        },
+    })
+end)</code></pre>
 <div class="info-box warn"><strong><code>require</code> only decides what's offered.</strong> Anything that matters is checked again on the server, as the brew below is.</div>
 
 <h3>3. Brewing, and pay</h3>
 <p>Add <code>BrewPay = 5</code> to <code>Config</code> in <code>shared.lua</code>. Then, in <code>server.lua</code>:</p>
-<pre><code class="lang-lua">Whip.declare:SecureEvent('mycafe:brew', {
-    rateLimit = 2000,
-    near = { at = Config.Counter, range = 3.0, message = 'Stand at the counter' },
-}, function(source, player)
-    if not exports.whip_core:IsPlayerClockedOn(source, 'mycafe') then
-        return false, 'Clock on first'
-    end
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:SecureEvent('mycafe:brew', {
+        rateLimit = 2000,
+        near = { at = Config.Counter, range = 3.0, message = 'Stand at the counter' },
+    }, function(source, player)
+        if not exports.whip_core:IsPlayerClockedOn(source, 'mycafe') then
+            return false, 'Clock on first'
+        end
 
-    local done, reason = exports.whip_core:Progress(source, {
-        label    = 'Brewing...',
-        duration = 6000,
-        near     = { coords = Config.Counter, range = 3.0 },   -- still at the counter when it ends
-    })
-    if not done then return false, reason end
+        local done, reason = exports.whip_core:Progress(source, {
+            label    = 'Brewing...',
+            duration = 6000,
+            near     = { coords = Config.Counter, range = 3.0 },   -- still at the counter when it ends
+        })
+        if not done then return false, reason end
 
-    -- Six seconds went by: still the same character?
-    if not exports.whip_core:IsSessionCurrent(source, player.session) then return end
+        -- Six seconds went by: still the same character?
+        if not exports.whip_core:IsSessionCurrent(source, player.session) then return end
 
-    local given, gwhy = exports.whip_core:AddItem(source, 'mycafe_coffee', 1, nil, 'brewed')
-    if not given then return false, gwhy end
-    exports.whip_core:PayPlayer(source, Config.BrewPay, { reason = 'Brewed a coffee' })
+        local given, gwhy = exports.whip_core:AddItem(source, 'mycafe_coffee', 1, nil, 'brewed')
+        if not given then return false, gwhy end
+        exports.whip_core:PayPlayer(source, Config.BrewPay, { reason = 'Brewed a coffee' })
+    end)
 end)</code></pre>
 <ul>
   <li><strong>The server checks duty</strong>; the client's <code>require</code> only chose what to show.</li>
@@ -1632,7 +1646,7 @@ end)</code></pre>
 
 <table class="event-table">
 <tr><th>To</th><th>Call</th><th>Side</th></tr>
-<tr><td colspan="3"><strong>Declare</strong> (through <code>Whip.declare</code>)</td></tr>
+<tr><td colspan="3"><strong>Declare</strong> (in <code>Whip.register</code>)</td></tr>
 <tr><td>Make an item, and what using it does</td><td><a href="#registeritem"><code>RegisterItem</code></a>, <a href="#registerusehandler"><code>RegisterUseHandler</code></a></td><td>Server</td></tr>
 <tr><td>Accept a message from a player's game, checked</td><td><a href="#secureevent"><code>SecureEvent</code></a></td><td>Server</td></tr>
 <tr><td>Answer a question from a player's game, checked</td><td><a href="#securecallback"><code>SecureCallback</code></a>; ask it with <a href="#callback"><code>Callback</code></a></td><td>Server; client</td></tr>
@@ -1667,7 +1681,7 @@ end)</code></pre>
 <tr><td>Hear a value change</td><td>A listener: <code>OnStatChange</code>, <code>OnVehicleStatChange</code>, <code>WatchVehicleStat</code>. Only WHIP calls it, and it's removed when your resource stops</td><td>A HUD that follows hunger</td></tr>
 <tr><td>Act just before WHIP does something on the player's game</td><td>A client hook: <a href="#registerclienthook"><code>RegisterClientHook</code></a>. WHIP waits for it (up to a second) but it can't refuse</td><td>Put the phone away before a gun is drawn</td></tr>
 <tr><td>Refuse something of your own</td><td>A check you pass in: <code>canUse</code>, <code>canInteract</code>, a panel's <code>onValidate</code></td><td>No drinking in a car</td></tr>
-<tr><td>Add something to WHIP</td><td><code>Register…</code>, <code>Add…</code>, <code>Ensure…</code>, through <code>Whip.declare</code></td><td><code>RegisterItem</code>, <code>AddAction</code></td></tr>
+<tr><td>Add something to WHIP</td><td><code>Register…</code>, <code>Add…</code>, <code>Ensure…</code>, in <code>Whip.register</code></td><td><code>RegisterItem</code>, <code>AddAction</code></td></tr>
 </table>
 <h2 id="coming-from">Coming from QBCore, ESX or ox</h2>
 <p class="lede">WHIP is a framework of its own, with no bridge from QBCore, ESX or ox: a resource written for one of them won't run unchanged. Porting a small job means rewriting its glue code (about a day), and most of what it did by hand becomes one WHIP call.</p>
@@ -1718,7 +1732,7 @@ end)</code></pre>
 
 <h3>What will surprise you</h3>
 <ul>
-  <li><strong>Declarations go through <code>Whip.declare</code></strong> (or in <code>Whip.register</code>), not straight to whip_core at the top of a file (<a href="#quickstart-satellite">the one rule</a>).</li>
+  <li><strong>Declarations go in <code>Whip.register</code></strong>, not straight to whip_core at the top of a file (<a href="#quickstart-satellite">the one rule</a>).</li>
   <li><strong>"Their job" means on duty.</strong> <code>GetPlayerJob</code> is <code>nil</code> off duty; <code>GetPlayerRole</code> answers "works there at all". Players clock on in the phone's Business app, or your resource calls <code>ClockOn</code>.</li>
   <li><strong>Pay with <code>PayPlayer</code>, charge with <code>ChargePlayer</code>.</strong> There is no lower-level cash call.</li>
   <li><strong>A receipt lasts 30 minutes.</strong> After that, give money back with <code>PayPlayer</code>.</li>
@@ -1729,7 +1743,7 @@ end)</code></pre>
 <h3>A qb delivery job, call by call</h3>
 <table class="event-table">
 <tr><th>The qb job does</th><th>The WHIP version does</th></tr>
-<tr><td>A job in <code>shared/jobs.lua</code></td><td><code>Whip.declare:EnsureJob('delivery', { … })</code></td></tr>
+<tr><td>A job in <code>shared/jobs.lua</code></td><td><code>Whip.core:EnsureJob('delivery', { … })</code> in <code>Whip.register</code></td></tr>
 <tr><td>qb-target box at the depot, <code>job = 'delivery'</code></td><td><code>AddAction({ at = { coords = DEPOT }, require = { job = 'delivery', onDuty = true }, … })</code></td></tr>
 <tr><td>Van deposit: <code>RemoveMoney('bank', 500)</code></td><td><code>ChargePlayer(source, 500, { method = 'bank' })</code>; keep the receipt</td></tr>
 <tr><td><code>CreateVehicle</code> + vehiclekeys + <code>SetFuel</code></td><td><code>SpawnTempVehicle</code>: the driver gets a key, and the van goes when you despawn it, after <code>despawnAfter</code>, or when your resource stops</td></tr>
@@ -1763,7 +1777,7 @@ end)</code></pre>
 <p>WHIP changes its memory at once and writes the changes within about a second. Everything one player action changes is written in one transaction, so a crash never leaves half of it (<a href="#save-system">Save System</a>).</p>
 
 <h3>4. Declarations live in whip_core's memory</h3>
-<p>Items, use handlers, prompts and secure events are forgotten when whip_core restarts. So they go through <code>Whip.declare</code> or <code>Whip.register</code>, which declare them again (<a href="#quickstart-satellite">the one rule</a>).</p>
+<p>Items, use handlers, prompts and secure events are forgotten when whip_core restarts. So they go in <code>Whip.register</code>, which declares them again (<a href="#quickstart-satellite">the one rule</a>).</p>
 
 <h3>5. The server decides</h3>
 <p>A player's game only asks. A <code>SecureEvent</code> checks who asked, how often, from where and every value before your handler runs. What the client is shown (an action's <code>require</code>) is a courtesy, never the check.</p>
@@ -1791,18 +1805,20 @@ end)</code></pre>
   <tr><td>createSql</td><td>string</td><td>The table as it is now, complete</td></tr>
   <tr><td>migrations</td><td>table?</td><td>Changes made after release, in order, only ever appended. Each runs once per database, recorded as <code>'&lt;resource&gt;:&lt;id&gt;'</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code>: a bad name or statement, or the first migration that failed (later ones wait for the next start)</div>
-<pre><code class="lang-lua">Whip.declare:EnsureTable('mycafe_orders', [[
-    CREATE TABLE IF NOT EXISTS `mycafe_orders` (
-        `id`     INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        `charId` INT          NOT NULL,
-        `note`   VARCHAR(200) NULL,
-        PRIMARY KEY (`id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4]], {
-    { id = '002_note', statements = {
-        { sql = 'ALTER TABLE `mycafe_orders` ADD COLUMN `note` VARCHAR(200) NULL',
-          unless = { column = { 'mycafe_orders', 'note' } } },
-    } },
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:EnsureTable('mycafe_orders', [[
+        CREATE TABLE IF NOT EXISTS `mycafe_orders` (
+            `id`     INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `charId` INT          NOT NULL,
+            `note`   VARCHAR(200) NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4]], {
+        { id = '002_note', statements = {
+            { sql = 'ALTER TABLE `mycafe_orders` ADD COLUMN `note` VARCHAR(200) NULL',
+              unless = { column = { 'mycafe_orders', 'note' } } },
+        } },
+    })
+end)</code></pre>
   <div class="info-box tip"><strong>Put each change in both places.</strong> The <code>CREATE</code> for a new server, a migration for one that has the table. When this call creates the table, migrations are recorded as done without running. Guard a statement with <code>unless</code> or <code>onlyIf</code> and <code>{ column = { table, name } }</code>, <code>{ index = … }</code> or <code>{ constraint = … }</code>; or give a migration a <code>run</code> function that returns <code>false</code> to be retried next start.</div>
 </div></div>
 
@@ -1936,7 +1952,7 @@ local ok, count = exports.whip_core:ReleaseTag(tag)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>table[]</code>: <code>{ { registry, key }, … }</code>; empty for an unknown or bad tag</div>
 </div></div>
 <h2 id="patterns-satellite">The satellite helper</h2>
-<p class="lede"><code>@whip_core/lib/satellite.lua</code> is a file your resource loads, giving you <code>Whip.declare</code>, <code>Whip.register</code>, safe calls to whip_core and a few tools. It runs inside your resource so it can remember your registrations across a whip_core restart.</p>
+<p class="lede"><code>@whip_core/lib/satellite.lua</code> is a file your resource loads, giving you <code>Whip.register</code>, safe calls to whip_core and a few tools. It runs inside your resource so it can remember your registrations across a whip_core restart.</p>
 
 <pre><code class="lang-lua">-- fxmanifest.lua
 dependency 'whip_core'
@@ -1944,8 +1960,7 @@ shared_script '@whip_core/lib/satellite.lua'</code></pre>
 
 <table class="event-table">
 <tr><th>Call</th><th>What it does</th></tr>
-<tr><td><code>Whip.declare:Name(…)</code></td><td>Makes one declaring call once whip_core is ready (whichever started first) and again after every whip_core restart: <code>Whip.declare:RegisterItem('mycafe_cup', { … })</code>. Takes <code>Register…</code>, <code>Ensure…</code>, <code>On…</code> and <code>Watch…</code> exports, <code>SecureEvent</code>, <code>SecureCallback</code>, <code>AddAction</code>, <code>AddItemOption</code>, <code>AddPoint</code> and <code>AddWeapons</code>, and refuses anything else. whip_core's refusals are printed in your console. Server and client.</td></tr>
-<tr><td><code>Whip.register(fn)</code></td><td>The same for a function: runs <code>fn</code> once whip_core is ready and again after every restart. For more than one call (<a href="#declare-or-register">when</a>). Server and client.</td></tr>
+<tr><td><code>Whip.register(fn)</code></td><td>Runs <code>fn</code> once whip_core is ready (whichever started first) and again after every whip_core restart. Your declarations go in it, through <code>Whip.core</code>, and a refusal is printed (<a href="#register-refusals">what it prints</a>). Server and client.</td></tr>
 <tr><td><code>Whip.core:Name(…)</code></td><td>Calls an export safely, with its types in your editor: <code>Whip.core:AddItem(source, 'cookie', 1)</code>. Returns what the export returns, or <code>false, why</code> when whip_core is down or the call errored.</td></tr>
 <tr><td><code>Whip.call(name, …)</code></td><td>The same, by name: <code>Whip.call('AddItem', source, 'cookie', 1)</code>. If whip_core stops during a wait it returns <code>false, 'whip_core stopped'</code>, meaning "no answer", not "didn't happen": a charge already sent may still land.</td></tr>
 <tr><td><code>Whip.ready(timeoutMs?)</code></td><td>Waits (in a thread) until whip_core is ready. <code>false</code> on timeout.</td></tr>
@@ -1958,27 +1973,19 @@ shared_script '@whip_core/lib/satellite.lua'</code></pre>
 <tr><td><code>Whip.voice(name, …)</code> · <code>Whip.voiceSystem()</code></td><td>Calls whichever voice system runs (<a href="#voice-api">Voice for other resources</a>).</td></tr>
 </table>
 
-<h3 id="declare-or-register">Whip.declare or Whip.register</h3>
-<p><code>Whip.declare:RegisterItem(…)</code> is <code>RegisterItem</code> inside <code>Whip.register</code>, with the refusal printed for you. Use <code>Whip.register</code> when one call isn't enough:</p>
-<ul>
-  <li><strong>You need the answer.</strong> <code>Whip.declare</code> returns only whether it took the call, so <code>EnsureDoors</code>' list of failures, or an <code>AddAction</code> id you keep, needs <code>Whip.register</code>.</li>
-  <li><strong>There's more than calls.</strong> A loop over your <code>Config</code>, or state of your own to reset when whip_core restarts.</li>
-  <li><strong>A value can change.</strong> <code>Whip.declare</code> takes its arguments once, when you call it, so define a function you pass it above the call. A <code>Config</code> value on your <a href="#resource-settings">settings page</a> is written in when whip_core is ready, so build a call that reads one inside <code>Whip.register</code>.</li>
-</ul>
-<pre><code class="lang-lua">-- One call: declare it
-Whip.declare:RegisterItem('mycafe_cup', { name = 'Cup', weight = 0.1 })
-
--- More than one: a function
-Whip.register(function()
+<h3 id="register-refusals">Declaring in Whip.register</h3>
+<p>One function can hold every declaration: a loop over your <code>Config</code>, an answer you keep (an <code>AddAction</code> id), state of your own to reset. It runs again after each whip_core restart, so it reads <code>Config</code> as it is then, settings-page values included.</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterItem('mycafe_cup', { name = 'Cup', weight = 0.1 })
     for key, drink in pairs(Config.Drinks) do
-        exports.whip_core:RegisterItem(key, drink)
+        Whip.core:RegisterItem(key, drink)
     end
 end)</code></pre>
-<p>Used inside <code>Whip.register</code>, <code>Whip.declare</code> makes its call once each time the function runs, so the two mix.</p>
+<p>While it runs, a declaring call that whip_core refuses prints one line in your console, naming your resource, the export and the reason: <code>Register…</code>, <code>Ensure…</code>, <code>Add…</code>, <code>On…</code>, <code>Watch…</code>, <code>SecureEvent</code> and <code>SecureCallback</code>, called through <code>Whip.core</code> or <code>Whip.call</code>. A call straight through <code>exports.whip_core</code> isn't printed: check its return yourself.</p>
 
 <h3>What else it does</h3>
 <ul>
-  <li><strong>With <code>dependency 'whip_core'</code></strong>, a whip_core restart stops and restarts your resource, so you start fresh and there's nothing to clean up. Without it, your resource keeps running: <code>Whip.onCoreLost</code> runs, then your <code>Whip.declare</code> calls and <code>Whip.register</code> functions run again when whip_core is back.</li>
+  <li><strong>With <code>dependency 'whip_core'</code></strong>, a whip_core restart stops and restarts your resource, so you start fresh and there's nothing to clean up. Without it, your resource keeps running: <code>Whip.onCoreLost</code> runs, then your <code>Whip.register</code> functions run again when whip_core is back.</li>
   <li><strong>It reports your errors to WHIP's tools</strong> (<a href="#geterrorlog"><code>GetErrorLog</code></a>, the Monitor) by wrapping <code>CreateThread</code>, <code>SetTimeout</code>, <code>RegisterCommand</code>, <code>AddStateBagChangeHandler</code>, <code>RegisterNUICallback</code> and <code>print</code>. They behave as before, at about half a microsecond per handler. Opt out with <code>whip_error_tap 'no'</code> in your fxmanifest.</li>
   <li><strong>Autocomplete:</strong> copy <code>whip_core/types/luarc.template.json</code> to your resource as <code>.luarc.json</code>. It finds WHIP's types next to your resource (<code>../whip_core/types</code>) or next to a <code>[whip]</code> folder; edit the path for any other layout.</li>
 </ul>
@@ -1986,8 +1993,8 @@ end)</code></pre>
 <h3 id="patterns-calling">Calling whip_core</h3>
 <table class="event-table">
 <tr><th>Where the call is</th><th>Call</th><th>Why</th></tr>
-<tr><td>Inside a handler whip_core runs: <code>SecureEvent</code>, <code>SecureCallback</code>, a use handler, a right-click action, a hook, <code>Whip.register</code></td><td><code>exports.whip_core:Name(…)</code></td><td>whip_core is up while it runs, and a payment and what it pays for are written together</td></tr>
-<tr><td>Your own code: a thread, a command, a timer, an NUI callback, your own net event, a key press</td><td><code>Whip.core:Name(…)</code></td><td>whip_core may not be ready yet (early in a start, or while a player's game loads); this returns <code>false, why</code> where a direct call would throw</td></tr>
+<tr><td>Inside a handler whip_core runs: <code>SecureEvent</code>, <code>SecureCallback</code>, a use handler, a right-click action, a hook</td><td><code>exports.whip_core:Name(…)</code></td><td>whip_core is up while it runs, and a payment and what it pays for are written together</td></tr>
+<tr><td>Your own code: <code>Whip.register</code>, a thread, a command, a timer, an NUI callback, your own net event, a key press</td><td><code>Whip.core:Name(…)</code></td><td>whip_core may not be ready yet (early in a start, or while a player's game loads); this returns <code>false, why</code> where a direct call would throw. In <code>Whip.register</code>, a refused declaration is printed</td></tr>
 <tr><td>Code that runs every frame</td><td><code>exports.whip_core:Name(…)</code> behind <code>Whip.isReady()</code>, quick exports only</td><td><code>Whip.core</code> starts a thread per call: too much at 60 a second</td></tr>
 </table>
 <p>A card marked <span class="export-side side-waits">WAITS</span> can wait on the database or the player. Call it from a thread or handler, never at file scope, and afterwards re-read anything that may have changed meanwhile. Your editor shows these as <code>async</code>.</p>
@@ -1996,7 +2003,7 @@ end)</code></pre>
 
 <table class="event-table">
 <tr><th>Rule</th><th>Because</th></tr>
-<tr><td><strong>Declare through <code>Whip.declare</code></strong>: items, events, actions, jobs</td><td>whip_core forgets them when it restarts (<a href="#quickstart-satellite">the one rule</a>)</td></tr>
+<tr><td><strong>Declare in <code>Whip.register</code></strong>: items, events, actions, jobs</td><td>whip_core forgets them when it restarts (<a href="#quickstart-satellite">the one rule</a>)</td></tr>
 <tr><td><strong>The server decides.</strong> Every message from a game is a <code>SecureEvent</code> or <code>SecureCallback</code> that names its values, with <code>near</code> where it matters</td><td>A modified game can send anything, from anywhere (<a href="#guide-secure">Secure Events</a>)</td></tr>
 <tr><td><strong>Return <code>false, 'why'</code></strong>; never throw or return a bare <code>nil</code></td><td>Callers can tell a refusal from a bug, and players can read why (<a href="#patterns">Return values</a>)</td></tr>
 <tr><td><strong>Save a <code>charId</code>, never a server id</strong></td><td>Server ids are reused by the next player to join</td></tr>
@@ -2062,8 +2069,7 @@ end)</code></pre>
 <tr><td>Vehicle stat</td><td>A gauge on a car that WHIP keeps, syncs and saves: fuel, nitrous, boost (<a href="#registervehiclestat">RegisterVehicleStat</a>)</td></tr>
 <tr><td>vehicleId</td><td>WHIP's id for a car: the database id when owned, 1,000,000,000 and up otherwise. Not the entity or netId</td></tr>
 <tr><td>Watcher</td><td><code>WatchVehicleStat</code> / <code>WatchVehicleData</code>: your code runs while a car nearby has a stat (<a href="#guide-watch-stats">Watching stats</a>)</td></tr>
-<tr><td><code>Whip.declare</code></td><td>Makes one declaring call (<code>Whip.declare:RegisterItem(…)</code>) once whip_core is ready and again after every restart (<a href="#quickstart-satellite">the one rule</a>)</td></tr>
-<tr><td><code>Whip.register</code></td><td>The function you hand declarations to when one call isn't enough, so WHIP can run it again after a restart (<a href="#quickstart-satellite">the one rule</a>)</td></tr>
+<tr><td><code>Whip.register</code></td><td>The function you hand declarations to, so WHIP can run it again after a restart (<a href="#quickstart-satellite">the one rule</a>)</td></tr>
 </table>
 <h2 id="what-you-can-change">What a resource can change</h2>
 <p class="lede">Almost everything is done from your own resource, without editing whip_core, so WHIP's updates never undo your work. Here's where the line is.</p>
@@ -2071,7 +2077,7 @@ end)</code></pre>
 <h3>Without touching whip_core</h3>
 <table class="event-table">
 <tr><th>You can</th><th>With</th></tr>
-<tr><td>Add items, stats, prompts, jobs, shops, stashes, store kinds, item windows, settings pages, Director cards, <code>/w</code> pages, skill check games, a voice system</td><td><code>Register…</code>, <code>Add…</code>, <code>Ensure…</code>, through <code>Whip.declare</code> (<a href="#common-calls">The calls you'll use</a>)</td></tr>
+<tr><td>Add items, stats, prompts, jobs, shops, stashes, store kinds, item windows, settings pages, Director cards, <code>/w</code> pages, skill check games, a voice system</td><td><code>Register…</code>, <code>Add…</code>, <code>Ensure…</code>, in <code>Whip.register</code> (<a href="#common-calls">The calls you'll use</a>)</td></tr>
 <tr><td>Change WHIP's own rules: the respawn wait, hospitals, hunger, the lockpick game, and some 200 more</td><td><code>/whip</code> → Settings → Config, or <code>config.lua</code> (<a href="#configuration">Configuration</a>)</td></tr>
 <tr><td>Hold one of WHIP's things for a while</td><td><a href="#holdrespawn"><code>HoldRespawn</code></a> (a dead player waits for a medic), <code>HoldVehicleEngine</code>, <code>BlockControls</code>, <code>BlockHands</code>, <code>HoldPlayerPed</code></td></tr>
 <tr><td>Refuse something of yours</td><td><code>canUse</code>, <code>canInteract</code>, a panel's <code>onValidate</code> (<a href="#hear-ask-refuse">How WHIP talks to your resource</a>)</td></tr>
@@ -2222,20 +2228,22 @@ end)</code></pre>
 <h3 id="guide-secure-writing">Writing one</h3>
 <p>Pass the event's name, its rules (the <em>schema</em>) and your handler. A tip jar for the coffee stand from <a href="#first-resource">Your First Resource</a>:</p>
 <pre><code class="lang-lua">-- server.lua
-Whip.declare:SecureEvent('mycafe:tip', {
-    rateLimit = 2000,                                   -- one tip every 2 seconds
-    params    = { {'amount', 'amount', 500} },          -- $1 to $500
-    near      = { at = Config.Counter, range = 3.0 },
-}, function(source, player, amount)
-    local receipt, err = exports.whip_core:ChargePlayer(source, amount, { reason = 'Tip' })
-    if not receipt then return false, err end          -- refused: they are shown why
-    exports.whip_core:NotifyPlayer(source, ('Thanks for the tip, %s'):format(player.firstName), 'success')
+Whip.register(function()
+    Whip.core:SecureEvent('mycafe:tip', {
+        rateLimit = 2000,                                   -- one tip every 2 seconds
+        params    = { {'amount', 'amount', 500} },          -- $1 to $500
+        near      = { at = Config.Counter, range = 3.0 },
+    }, function(source, player, amount)
+        local receipt, err = exports.whip_core:ChargePlayer(source, amount, { reason = 'Tip' })
+        if not receipt then return false, err end          -- refused: they are shown why
+        exports.whip_core:NotifyPlayer(source, ('Thanks for the tip, %s'):format(player.firstName), 'success')
+    end)
 end)
 
 -- client.lua: sent like any other event
 TriggerServerEvent('mycafe:tip', 20)</code></pre>
 <ul>
-  <li><strong>Declare it through <code>Whip.declare</code></strong>, so it survives a whip_core restart (<a href="#quickstart-satellite">Your First Resource, step 3</a>). Later examples show the call alone.</li>
+  <li><strong>Declare it in <code>Whip.register</code></strong>, so it survives a whip_core restart (<a href="#quickstart-satellite">Your First Resource, step 3</a>).</li>
   <li><strong>Start the name with your resource's</strong> and no other resource can take it.</li>
   <li><strong>The handler gets <code>source</code>, <code>player</code>, then your values</strong> in <code>params</code> order. Use this <code>source</code>, not the global. <code>player</code> is a copy of the <a href="#whipplayer">player sheet</a>.</li>
 </ul>
@@ -2341,7 +2349,7 @@ if not price then return exports.whip_core:Notify(why, 'error') end</code></pre>
 
 <h3 id="guide-secure-mistakes">Common mistakes</h3>
 <ul>
-  <li><strong>Registering straight from the top of a file</strong>, not through <code>Whip.declare</code> or <code>Whip.register</code>: it can run before whip_core is ready, and a whip_core restart forgets it.</li>
+  <li><strong>Registering straight from the top of a file</strong>, not in <code>Whip.register</code>: it can run before whip_core is ready, and a whip_core restart forgets it.</li>
   <li><strong>Using the global <code>source</code></strong> in a handler or its helpers.</li>
   <li><strong><code>int</code> or <code>number</code> for money or a count:</strong> they pull <code>-50</code> into range. Use <code>amount</code> with a <code>max</code>.</li>
   <li><strong>A callback returning <code>nil</code> to refuse:</strong> return <code>false, 'why'</code>.</li>
@@ -2354,7 +2362,7 @@ if not price then return exports.whip_core:Notify(why, 'error') end</code></pre>
 <tr><td><code>ESX.RegisterServerCallback</code>, <code>QBCore.Functions.CreateCallback</code>, <code>lib.callback.register</code></td><td><code>SecureCallback</code>: <em>return</em> the answer, no <code>cb</code></td></tr>
 <tr><td><code>ESX.TriggerServerCallback</code>, <code>QBCore.Functions.TriggerCallback</code>, <code>lib.callback.await</code></td><td><code>Callback</code>: waits, and returns the answer</td></tr>
 </table>
-<p>Moving an event over: swap the call, list its values in <code>params</code>, delete your own checks, declare it through <code>Whip.declare</code>, and treat <code>return false</code> as "refused". You can move one event at a time. The rest: <a href="#coming-from">Coming from QBCore, ESX or ox</a>.</p>
+<p>Moving an event over: swap the call, list its values in <code>params</code>, delete your own checks, declare it in <code>Whip.register</code>, and treat <code>return false</code> as "refused". You can move one event at a time. The rest: <a href="#coming-from">Coming from QBCore, ESX or ox</a>.</p>
 <h2 id="secure-events">SecureEvent &amp; SecureCallback</h2>
 <p class="lede">Server exports for checked events and callbacks, and the client's <code>Callback</code>. New to them? Read <a href="#guide-secure">Secure Events</a> first.</p>
 
@@ -2535,13 +2543,15 @@ exports.whip_core:SentinelSetEntityKey(veh, 'mytune_data', t)   -- then the key<
 </table>
 
 <h3>Using one</h3>
-<pre><code class="lang-lua">Whip.declare:RegisterPermission('mygarage.manage', { label = 'Garage manager' })
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterPermission('mygarage.manage', { label = 'Garage manager' })
 
-Whip.declare:SecureEvent('mygarage:remove', {
-    permission = 'mygarage.manage',     -- or a list: any one of them
-    params     = { {'garageId', 'id'} },
-}, function(source, player, garageId)
-    -- only a garage manager, or a full admin, gets here
+    Whip.core:SecureEvent('mygarage:remove', {
+        permission = 'mygarage.manage',     -- or a list: any one of them
+        params     = { {'garageId', 'id'} },
+    }, function(source, player, garageId)
+        -- only a garage manager, or a full admin, gets here
+    end)
 end)
 
 -- from a command or screen of yours
@@ -2673,7 +2683,7 @@ if not player then return end
 <div class="export-card" data-search="isready ready loaded startup register core">
 <div class="export-header"><span class="export-name">IsReady()</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Whether whip_core has finished starting. <code>Whip.declare</code> and <code>Whip.register</code> don't need it (<a href="#quickstart-satellite">Your First Resource, step 3</a>).</p>
+  <p>Whether whip_core has finished starting. <code>Whip.register</code> doesn't need it (<a href="#quickstart-satellite">Your First Resource, step 3</a>).</p>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
@@ -2906,7 +2916,7 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
 <div class="export-card" data-search="isready ready loaded startup register core client">
 <div class="export-header"><span class="export-name">IsReady()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Whether whip_core's client has loaded (not a character: that's <code>IsPlayerLoaded</code>). <code>Whip.declare</code> and <code>Whip.register</code> already wait for it.</p>
+  <p>Whether whip_core's client has loaded (not a character: that's <code>IsPlayerLoaded</code>). <code>Whip.register</code> already waits for it.</p>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
@@ -3079,15 +3089,17 @@ end)</code></pre>
 <p>Hunger and thirst are on by default: <code>100</code> is full, <code>0</code> is starving, and at 10 or below each costs 1 health per decay tick. <code>Config.Hunger</code> / <code>Config.Thirst</code> turn one off (also in <code>/whip</code> → Settings → Config → Hunger, thirst and breath). One that's off has no gauge, doesn't drain or save, and reads 100, so food and drink still work. <code>Config.StatOrder</code> sets the gauges' order.</p>
 
 <h3>Registering a stat</h3>
-<p>Declare <a href="#registerstat"><code>RegisterStat</code></a> from your server code, through <code>Whip.declare</code> (<a href="#patterns-registering">why</a>). Decay, thresholds, saving and client sync come with it. A <code>hud</code> block draws a ring on every player's HUD (<a href="#guide-hud">HUD Framework</a>); leave it out for a server-only stat such as reputation.</p>
-<pre><code class="lang-lua">Whip.declare:RegisterStat('stress', {
-    type = 'custom',
-    default = 0, min = 0, max = 100,
-    persist = true,
-    decay = -0.5,          -- eases off half a point...
-    decayInterval = 15,    -- ...every 15 seconds
-    hud = { icon = 'M12 2C6.48 2 2 6.48 2 12...', color = '#e879f9', order = 5 },
-})</code></pre>
+<p>Declare <a href="#registerstat"><code>RegisterStat</code></a> from your server code, in <code>Whip.register</code> (<a href="#patterns-registering">why</a>). Decay, thresholds, saving and client sync come with it. A <code>hud</code> block draws a ring on every player's HUD (<a href="#guide-hud">HUD Framework</a>); leave it out for a server-only stat such as reputation.</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterStat('stress', {
+        type = 'custom',
+        default = 0, min = 0, max = 100,
+        persist = true,
+        decay = -0.5,          -- eases off half a point...
+        decayInterval = 15,    -- ...every 15 seconds
+        hud = { icon = 'M12 2C6.48 2 2 6.48 2 12...', color = '#e879f9', order = 5 },
+    })
+end)</code></pre>
 
 <h3>Reading and changing stats</h3>
 <p>Change stats on the server; the player's game follows. The client can only read.</p>
@@ -3104,14 +3116,16 @@ local hunger = exports.whip_core:GetStat('hunger')</code></pre>
 <h3>A consumable item</h3>
 <p>The item's use handler calls <code>AddStat</code>. Return its refusal and the player keeps the item. whip_core's own <code>food</code> item (<code>server/items/food.lua</code>) works this way.</p>
 <pre><code class="lang-lua">-- after RegisterItem('mycafe_sandwich', { type = 'consumable', usable = true, ... })
-Whip.declare:RegisterUseHandler('mycafe_sandwich', function(source, player, slotData)
-    local ok, why = exports.whip_core:AddStat(source, 'hunger', 25, 'item:sandwich')
-    if not ok then return false, why end   -- refused: they keep it
-    return true                            -- consume one
+Whip.register(function()
+    Whip.core:RegisterUseHandler('mycafe_sandwich', function(source, player, slotData)
+        local ok, why = exports.whip_core:AddStat(source, 'hunger', 25, 'item:sandwich')
+        if not ok then return false, why end   -- refused: they keep it
+        return true                            -- consume one
+    end)
 end)</code></pre>
 
 <h3>Listening for changes</h3>
-<p><code>OnStatChange</code> works on both sides and hears every change: decay, items, effects, combat damage and other resources' writes. On the server the callback gets the player's <code>source</code> first and the <code>reason</code> last. Declare it through <code>Whip.declare</code>: running it again replaces it, and it goes when your resource stops.</p>
+<p><code>OnStatChange</code> works on both sides and hears every change: decay, items, effects, combat damage and other resources' writes. On the server the callback gets the player's <code>source</code> first and the <code>reason</code> last. Declare it in <code>Whip.register</code>: running it again replaces it, and it goes when your resource stops.</p>
 <pre><code class="lang-lua">-- server: every player
 exports.whip_core:OnStatChange('hunger', function(source, value, old, reason)
     if value &lt;= 0 then --[[ starving ]] end
@@ -3168,7 +3182,7 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 <div class="export-card" id="registerstat" data-search="registerstat register stat custom need decay threshold hud dynamic satellite stress reputation">
 <div class="export-header"><span class="export-name">RegisterStat(name, config)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Registers the stat <code>name</code>; a <code>hud</code> block puts a ring on every player's HUD as the call returns. The config is copied. Declare it through <code>Whip.declare</code>: it's dropped when your resource stops, though values stay.</p>
+<p>Registers the stat <code>name</code>; a <code>hud</code> block puts a ring on every player's HUD as the call returns. The config is copied. Declare it in <code>Whip.register</code>: it's dropped when your resource stops, though values stay.</p>
 <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
 <tr><td>type</td><td>string?</td><td><code>'need'</code> or <code>'custom'</code> (default). Vitals are WHIP's own; anything else is refused</td></tr>
 <tr><td>default</td><td>number?</td><td>What a character starts on (default 0)</td></tr>
@@ -3219,7 +3233,7 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 <div class="export-card" data-search="onstatchange server stat change listener hunger health decay combat watch subscribe">
 <div class="export-header"><span class="export-name">OnStatChange(name, callback, id?, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Calls you when any player's stat changes, by any path. Declare it through <code>Whip.declare</code>: it's keyed by your resource and <code>id</code>, so running it again replaces it, and it goes when your resource stops.</p>
+<p>Calls you when any player's stat changes, by any path. Declare it in <code>Whip.register</code>: it's keyed by your resource and <code>id</code>, so running it again replaces it, and it goes when your resource stops.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>name</td><td>string</td><td>A stat name, or <code>'*'</code> for every stat</td></tr>
 <tr><td>callback</td><td>function</td><td><code>(source, value, old, reason)</code>, or <code>(source, name, value, old, reason)</code> for <code>'*'</code>. <code>reason</code>: <code>'decay'</code>, <code>'item:food'</code>, <code>'combat (reported): Pistol'</code>, <code>'by my_resource'</code></td></tr>
@@ -3307,33 +3321,35 @@ exports.whip_core:AddStat(source, 'health', -25 * exports.whip_core:GetDamageMod
 <h3>Example: a drunk effect</h3>
 <p>A beer that makes the player drunk: a stat, a ring and an item. Drinking takes 5 seconds, adds 20 drunk and changes their walk; the ring shows only above 0 and never turns red. Put both files beside an <code>fxmanifest.lua</code> that loads <code>@whip_core/lib/satellite.lua</code> as a shared script.</p>
 <pre><code class="lang-lua">-- server.lua
-Whip.declare:RegisterStat('drunk', {
-    default = 0, min = 0, max = 100,
-    persist = false,                -- sober again after a restart
-    decay = -1, decayInterval = 2,  -- sobers up 1 point every 2 seconds
-    hud = {
-        icon = 'M10 1h4v1.5h-1v3h.5c1.5 0 2.5 1.5 2.5 3V21a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8.5c0-1.5 1-3 2.5-3h.5v-3H10V1z',
-        color = '#b8860b',          -- beer brown
-        order = 5,
-        noCritical = true,          -- low drunk isn't urgent: no red warning
-        showAboveZero = true,       -- hidden when sober, slides in above 0
-    },
-})
+Whip.register(function()
+    Whip.core:RegisterStat('drunk', {
+        default = 0, min = 0, max = 100,
+        persist = false,                -- sober again after a restart
+        decay = -1, decayInterval = 2,  -- sobers up 1 point every 2 seconds
+        hud = {
+            icon = 'M10 1h4v1.5h-1v3h.5c1.5 0 2.5 1.5 2.5 3V21a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8.5c0-1.5 1-3 2.5-3h.5v-3H10V1z',
+            color = '#b8860b',          -- beer brown
+            order = 5,
+            noCritical = true,          -- low drunk isn't urgent: no red warning
+            showAboveZero = true,       -- hidden when sober, slides in above 0
+        },
+    })
 
-Whip.declare:RegisterItem('alcohol', { name = 'Beer', weight = 0.5, type = 'consumable', usable = true })
+    Whip.core:RegisterItem('alcohol', { name = 'Beer', weight = 0.5, type = 'consumable', usable = true })
 
--- A timed use (a table, not a function): WHIP runs the bar and takes the beer, then onComplete
-Whip.declare:RegisterUseHandler('alcohol', {
-    label = 'Drinking...',
-    duration = 5000,
-    anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle', flag = 49 },  -- upper body
-    prop = { model = 'prop_amb_beer_bottle', bone = 18905 },                 -- left hand
-    disable = { move = false },   -- they can walk while they drink
-    reason = 'drunk',             -- for the item log
-    onComplete = function(source)   -- false, why gives the beer back
-        return exports.whip_core:AddStat(source, 'drunk', 20, 'item:alcohol')
-    end,
-})</code></pre>
+    -- A timed use (a table, not a function): WHIP runs the bar and takes the beer, then onComplete
+    Whip.core:RegisterUseHandler('alcohol', {
+        label = 'Drinking...',
+        duration = 5000,
+        anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle', flag = 49 },  -- upper body
+        prop = { model = 'prop_amb_beer_bottle', bone = 18905 },                 -- left hand
+        disable = { move = false },   -- they can walk while they drink
+        reason = 'drunk',             -- for the item log
+        onComplete = function(source)   -- false, why gives the beer back
+            return exports.whip_core:AddStat(source, 'drunk', 20, 'item:alcohol')
+        end,
+    })
+end)</code></pre>
 <pre><code class="lang-lua">-- client.lua: the walk, one clipset per tier. No drinking code: the bar is whip_core's.
 local walk
 local function setWalk(value)
@@ -3348,7 +3364,9 @@ local function setWalk(value)
 end
 
 -- a listener is a registration; now = true calls it at once
-Whip.declare:OnStatChange('drunk', setWalk, nil, { now = true })
+Whip.register(function()
+    Whip.core:OnStatChange('drunk', setWalk, nil, { now = true })
+end)
 AddEventHandler('whip_core:player:logout', function() setWalk(0) end)   -- logging out ends the night</code></pre>
 <h2 id="guide-death">Death &amp; Revive</h2>
 <p class="lede">When a player dies, WHIP puts them in the death state and shows the death screen until they respawn at a hospital or are revived. Your resource can hold a respawn while a medic is on the way, draw its own death screen, and react to deaths and revives.</p>
@@ -3871,10 +3889,12 @@ if found then exports.whip_core:SetItemMetadata(found.addr, { fuel = 50 }) end  
 <h3>Registering an item</h3>
 <p>whip_core's own items are in <code>Config.Items</code>. Register yours with <a href="#registeritem"><code>RegisterItem</code></a>; every field is under <a href="#item-schema">Item definition</a> below.</p>
 <pre><code class="lang-lua">-- server.lua (fxmanifest.lua: shared_script '@whip_core/lib/satellite.lua')
-Whip.declare:RegisterItem('myems_medkit', {
-    name = 'Medical Kit', desc = 'Heals injuries', weight = 0.5, type = 'medical',
-    stack = true, maxStack = 5, usable = true, cooldown = 10, prop = 'prop_ld_health_pack',
-})</code></pre>
+Whip.register(function()
+    Whip.core:RegisterItem('myems_medkit', {
+        name = 'Medical Kit', desc = 'Heals injuries', weight = 0.5, type = 'medical',
+        stack = true, maxStack = 5, usable = true, cooldown = 10, prop = 'prop_ld_health_pack',
+    })
+end)</code></pre>
 <p>It works everywhere at once.</p>
 
 <h3 id="item-icons">Item icons</h3>
@@ -3949,14 +3969,16 @@ images = {                                                   -- by the slot's co
 <h3 id="item-settings">Item settings</h3>
 <p>Admins can change any item's <strong>name, description and weight</strong> on the Items page; your definition is the default, and an admin's change stays until Reset.</p>
 <p>An item can declare <strong>its own settings</strong> too (a magazine's size, a gun's reload time), shown on its Items page. Each entry in its <code>settings</code> list is a <a href="#resource-settings"><code>RegisterSettings</code></a> entry: <code>key</code>, <code>type</code> (<code>'int'</code>, <code>'number'</code>, <code>'bool'</code>, <code>'string'</code> or <code>'enum'</code>), <code>default</code>, <code>label</code>, and the <code>min</code>, <code>max</code>, <code>step</code>, <code>unit</code>, <code>maxLen</code>, <code>nullable</code>, <code>options</code> or <code>help</code> its type takes.</p>
-<pre><code class="lang-lua">Whip.declare:RegisterItem('my_guns_mag', {
-    name = 'Pistol Magazine', weight = 0.2, stack = false,
-    settings = {
-        { key = 'capacity', type = 'int', min = 1, max = 100, default = 12, label = 'Rounds it holds' },
-    },
-})
-Whip.declare:OnItemSettingChanged('my_guns_mag', 'capacity', function(value, old)
-    Config.Magazines.my_guns_mag.capacity = value   -- at once, on server and clients; Reset too
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterItem('my_guns_mag', {
+        name = 'Pistol Magazine', weight = 0.2, stack = false,
+        settings = {
+            { key = 'capacity', type = 'int', min = 1, max = 100, default = 12, label = 'Rounds it holds' },
+        },
+    })
+    Whip.core:OnItemSettingChanged('my_guns_mag', 'capacity', function(value, old)
+        Config.Magazines.my_guns_mag.capacity = value   -- at once, on server and clients; Reset too
+    end)
 end)
 local capacity = exports.whip_core:GetItemSetting('my_guns_mag', 'capacity')   -- server or client</code></pre>
 <ul>
@@ -4115,7 +4137,7 @@ if found then exports.whip_core:StoreTake(found.addr, 1, { reason = 'lockpick sn
 <div class="export-card" id="registeritem" data-search="registeritem register item definition runtime">
 <div class="export-header"><span class="export-name">RegisterItem(key, definition)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Registers an item; it joins <code>Config.Items</code>. Declare it through <code>Whip.declare</code>: the same definition again changes nothing, and another running resource can't redefine your key.</p>
+<p>Registers an item; it joins <code>Config.Items</code>. Declare it in <code>Whip.register</code>: the same definition again changes nothing, and another running resource can't redefine your key.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>key</td><td>string</td><td>Letters, digits, <code>_</code> and <code>-</code>, 50 at most. <strong>No colon</strong>, unlike container, door and event names: prefix with an underscore (<code>'mypd_evidence'</code>)</td></tr>
 <tr><td>definition</td><td>table</td><td>See <a href="#item-schema">Item definition</a></td></tr></table>
@@ -4282,7 +4304,9 @@ end)</code></pre>
 <tr><td>def.iconSvg</td><td>string?</td><td>Inline SVG, over <code>icon</code>. Never from player input</td></tr>
 <tr><td>def.tag</td><td>string?</td><td>A run tag (<code>'run:42'</code>): <code>ReleaseTag(tag)</code> restores WHIP's slot. Use a new tag each run</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool ok, string|nil err</code>: check it, as a refusal leaves the strip unchanged</div>
-<pre><code class="lang-lua">Whip.declare:RegisterAccessorySlot({ slot = 4, accepts = 'bandage', label = 'Medkit' })</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterAccessorySlot({ slot = 4, accepts = 'bandage', label = 'Medkit' })
+end)</code></pre>
 </div></div>
 
 <div class="export-card" data-search="getaccessoryslots accessory strip read slots which free">
@@ -4295,7 +4319,7 @@ end)</code></pre>
 <div class="export-card" data-search="registerignitionkey ignition key register vehicle custom key item nui">
 <div class="export-header"><span class="export-name">RegisterIgnitionKey(itemName)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Makes an item an ignition key, for the ignition slot, the key checks and key sweeps; its <code>metadata.vehicleId</code> must still match the car. Declare it through <code>Whip.declare</code>. It stays a key until the last resource that registered it stops.</p>
+<p>Makes an item an ignition key, for the ignition slot, the key checks and key sweeps; its <code>metadata.vehicleId</code> must still match the car. Declare it in <code>Whip.register</code>. It stays a key until the last resource that registered it stops.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>itemName</td><td>string</td><td>A registered item key</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool ok, string|nil err</code></div>
@@ -4492,7 +4516,7 @@ end)</code></pre>
 <div class="export-card" data-search="registeritemflag item flag register track inventory has check">
 <div class="export-header"><span class="export-name">RegisterItemFlag(flagName, [itemOrFilter], [filter])</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Registers a flag; declare it through <code>Whip.declare</code>. Yours go when your resource stops; a filter that errors counts as "no" and is reported once in F8.</p>
+<p>Registers a flag; declare it in <code>Whip.register</code>. Yours go when your resource stops; a filter that errors counts as "no" and is reported once in F8.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>flagName</td><td>string</td><td>Your name for it; also the item key unless <code>itemOrFilter</code> names one</td></tr>
 <tr><td>itemOrFilter</td><td>string|function?</td><td>The item key, or a metadata filter</td></tr>
@@ -4512,14 +4536,16 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
 </div></div>
 
-<pre><code class="lang-lua">Whip.declare:RegisterItemFlag('my_crowbar', 'crowbar')
-Whip.declare:AddAction({
-    id = 'crowbar', at = { vehiclePart = 'door_dside_f' }, label = 'Pry Open',
-    canInteract = function(ctx)
-        return exports.whip_core:HasItemFlag('my_crowbar') and GetVehicleDoorLockStatus(ctx.entity) == 2
-    end,
-    onSelect = function(ctx) TriggerServerEvent('my_resource:pry', VehToNet(ctx.entity)) end,
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterItemFlag('my_crowbar', 'crowbar')
+    Whip.core:AddAction({
+        id = 'crowbar', at = { vehiclePart = 'door_dside_f' }, label = 'Pry Open',
+        canInteract = function(ctx)
+            return exports.whip_core:HasItemFlag('my_crowbar') and GetVehicleDoorLockStatus(ctx.entity) == 2
+        end,
+        onSelect = function(ctx) TriggerServerEvent('my_resource:pry', VehToNet(ctx.entity)) end,
+    })
+end)</code></pre>
 
 <h3 id="inventory-renderer">Replacing the inventory UI</h3>
 <p>To restyle the inventory or draw a different screen, set <code>Config.InventoryRenderer</code> to your resource. It draws, and WHIP keeps running the inventory: your UI needs one function, <code>render()</code>, and each move is one call, checked like WHIP's own. Nothing in whip_core is edited, so it survives updates.</p>
@@ -4787,12 +4813,14 @@ end</code></pre>
   <tr><td>data.requirements</td><td>table?</td><td><code>{ jobs?, onDuty?, charIds?, items?, ace?, property? }</code>, any one lets a player in; checked on open and every move</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>table</code> with <code>containerId</code>, <code>key</code> and <code>declared</code> (your declaration), or <code>false, reason</code>. While whip_core starts it waits up to 60 s, then returns <code>false, 'whip_core has not finished starting …'</code> (so do <code>EnsureZone</code>, <code>EnsureDoors</code>, <code>EnsureJob</code>).</div>
 <pre><code class="lang-lua">-- Officers on duty only. Without `requirements` anyone could loot it.
-Whip.declare:EnsureContainer('pd:weapon_locker', {
-    name = 'Weapon Locker', slots = 30, maxWeight = 200.0,
-    x = 441.5, y = -982.3, z = 30.7, heading = 90.0,
-    allowedItems = { gunny_pistol = true, gunny_mag_pistol = true },
-    requirements = { jobs = 'police', onDuty = true },
-})</code></pre>
+Whip.register(function()
+    Whip.core:EnsureContainer('pd:weapon_locker', {
+        name = 'Weapon Locker', slots = 30, maxWeight = 200.0,
+        x = 441.5, y = -982.3, z = 30.7, heading = 90.0,
+        allowedItems = { gunny_pistol = true, gunny_mag_pistol = true },
+        requirements = { jobs = 'police', onDuty = true },
+    })
+end)</code></pre>
   <div class="info-box tip"><strong>Door and action rules.</strong> A door's <code>lockpick</code> is refused. An action's <code>require</code> is taken when it names one rule and refused when it names more: containers, like <a href="#server-doors">doors</a>, read rules as any one, actions as all.</div>
 </div></div>
 
@@ -4877,18 +4905,20 @@ exports.whip_core:UpdateContainer(containerId, { accessCharId = player.charId, l
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>. Never throws, so a malformed definition can't kill your resource.</div>
 <pre><code class="lang-lua">local lockers = { [3] = { slots = {} } }   -- yours, in memory; save it from persist
 
-Whip.declare:RegisterStoreKind('my_locker', {
-    resolve    = function(key) return lockers[key.id] and { id = key.id } or nil end,
-    instanceId = function(key, h) return 'my_locker:' .. h.id end,
-    slots      = function(h) return 20 end,
-    maxWeight  = function(h) return 100.0 end,
-    get        = function(h, slot) return lockers[h.id].slots[slot] end,
-    set        = function(h, slot, item, amount, metadata)
-        lockers[h.id].slots[slot] = { item = item, amount = amount, metadata = metadata }
-        return true
-    end,
-    clear      = function(h, slot) lockers[h.id].slots[slot] = nil; return true end,
-})
+Whip.register(function()
+    Whip.core:RegisterStoreKind('my_locker', {
+        resolve    = function(key) return lockers[key.id] and { id = key.id } or nil end,
+        instanceId = function(key, h) return 'my_locker:' .. h.id end,
+        slots      = function(h) return 20 end,
+        maxWeight  = function(h) return 100.0 end,
+        get        = function(h, slot) return lockers[h.id].slots[slot] end,
+        set        = function(h, slot, item, amount, metadata)
+            lockers[h.id].slots[slot] = { item = item, amount = amount, metadata = metadata }
+            return true
+        end,
+        clear      = function(h, slot) lockers[h.id].slots[slot] = nil; return true end,
+    })
+end)
 
 exports.whip_core:OpenStore(source, { kind = 'my_locker', id = 3 })   -- beside their pockets</code></pre>
   <div class="info-box warn"><strong>A handle carries an id, never a live table.</strong> FiveM copies what <code>resolve</code> returns, so a <code>set</code> on a handle holding your rows writes into a copy: the move succeeds, the item leaves the player and never arrives. Return <code>{ id = id }</code> and look your storage up in <code>get</code>, <code>set</code> and <code>clear</code>.</div>
@@ -4973,14 +5003,16 @@ exports.whip_core:ClosePanel(source, 'refine:output_1')</code></pre>
 <h3>Items that hold items</h3>
 <p>The panel hangs off the item's <code>defaultAction</code>, or the context action named in <code>action</code>, which <code>RegisterPanelItem</code> registers for you. Contents live in <code>metadata.slots</code> (or <code>storageKey</code>), so they travel with the item.</p>
 <pre><code class="lang-lua">-- The item first: a panel for an item whip_core doesn't know is refused
-Whip.declare:RegisterItem('mymech_toolbox', {
-    name = 'Toolbox', weight = 2.0, stack = false,
-    defaultAction  = 'mytools:open_toolbox',
-    contextOptions = { { action = 'mytools:open_toolbox', label = 'Open' } },
-})
-Whip.declare:RegisterPanelItem('mymech_toolbox', {
-    slots = 6, label = 'Toolbox', allowedItems = { 'wrench', 'screwdriver' },
-})</code></pre>
+Whip.register(function()
+    Whip.core:RegisterItem('mymech_toolbox', {
+        name = 'Toolbox', weight = 2.0, stack = false,
+        defaultAction  = 'mytools:open_toolbox',
+        contextOptions = { { action = 'mytools:open_toolbox', label = 'Open' } },
+    })
+    Whip.core:RegisterPanelItem('mymech_toolbox', {
+        slots = 6, label = 'Toolbox', allowedItems = { 'wrench', 'screwdriver' },
+    })
+end)</code></pre>
 <p>whip_core's wallet is the same declaration: 3 slots, <code>allowedItems = { 'cash', 'id_card' }</code>.</p>
 
 <h3>Custom storage shapes</h3>
@@ -5190,18 +5222,20 @@ exports.whip_core:OpenPanel(source, {
 <h3>Writing a vehicle script</h3>
 <p>On the client, <code>GetVehicleId(entity)</code> returns a car's id from the cache, or <code>nil</code> for a car WHIP hasn't met; <code>ResolveVehicle(entity)</code> then registers it. Send the id to the server. This tow hook works on any car:</p>
 <pre><code class="lang-lua">-- client.lua
-Whip.declare:AddAction({
-    id    = 'hook',
-    at    = { vehiclePart = 'trunk' },
-    label = 'Hook Vehicle',
-    canInteract = function(ctx) return exports.whip_core:HasItemFlag('tow_hook') end,
-    onSelect = function(ctx)   -- runs once, in its own thread: may wait
-        local vehicleId, why = exports.whip_core:GetVehicleId(ctx.entity), nil
-        if not vehicleId then vehicleId, why = exports.whip_core:ResolveVehicle(ctx.entity) end
-        if not vehicleId then return ctx.refuse(why) end
-        TriggerServerEvent('tow:hookVehicle', vehicleId)
-    end,
-})
+Whip.register(function()
+    Whip.core:AddAction({
+        id    = 'hook',
+        at    = { vehiclePart = 'trunk' },
+        label = 'Hook Vehicle',
+        canInteract = function(ctx) return exports.whip_core:HasItemFlag('tow_hook') end,
+        onSelect = function(ctx)   -- runs once, in its own thread: may wait
+            local vehicleId, why = exports.whip_core:GetVehicleId(ctx.entity), nil
+            if not vehicleId then vehicleId, why = exports.whip_core:ResolveVehicle(ctx.entity) end
+            if not vehicleId then return ctx.refuse(why) end
+            TriggerServerEvent('tow:hookVehicle', vehicleId)
+        end,
+    })
+end)
 
 -- server.lua, inside Whip.register
 exports.whip_core:SecureEvent('tow:hookVehicle', {
@@ -5656,9 +5690,11 @@ if ok then exports.whip_core:SpawnVehicle(vehicleId, x, y, z, heading) end</code
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>list</td><td>table[]</td><td><code>{ model, name, class, image }</code>; <code>class</code> is a name below or <code>GetVehicleClass</code>'s number</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code> and nothing added (missing model, unknown class, picture not in your resource, another pack's model)</div>
-<pre><code class="lang-lua">Whip.declare:RegisterVehicles({
-    { model = 'mypack_gt', name = 'Velo GT', class = 'sports', image = 'img/mypack_gt.webp' },
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterVehicles({
+        { model = 'mypack_gt', name = 'Velo GT', class = 'sports', image = 'img/mypack_gt.webp' },
+    })
+end)</code></pre>
   <p>Classes: <code>compacts sedans suvs coupes muscle sportsclassics sports super motorcycles offroad industrial utility vans cycles boats helicopters planes service emergency military commercial trains openwheel</code>.</p>
 </div></div>
 
@@ -5867,9 +5903,11 @@ end)</code></pre>
   <tr><td>id</td><td>string?</td><td>Only for two listeners on one key; the same id replaces</td></tr>
   <tr><td>opts</td><td>table?</td><td><code>{ table = true, now = true }</code>; may go third, in place of <code>id</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code> registered</div>
-<pre><code class="lang-lua">Whip.declare:OnVehicleDataChange('kit', function(change)
-    if change.cleared then --[[ the kit came off; change.old is what it was ]] end
-end, { table = true, now = true })</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:OnVehicleDataChange('kit', function(change)
+        if change.cleared then --[[ the kit came off; change.old is what it was ]] end
+    end, { table = true, now = true })
+end)</code></pre>
   <div class="info-box tip"><strong>Use <code>table = true</code></strong>: <code>{ vehicleId, key, value, old, cleared, resource }</code> (plus <code>entity</code> on the client). Positional order differs: the client's callback gets <code>(vehicleId, value, old, entity)</code>, and <code>OnVehicleStatChange</code>'s <code>(vehicleId, value, previous, cleared, source)</code>. <code>now = true</code> also calls it at once for every car with the key.</div>
 </div></div>
 
@@ -5991,10 +6029,12 @@ exports.whip_core:ClearVehicleHandlingLayer('tune')</code></pre>
   <tr><td>live</td><td>table?</td><td><code>{ maxRate, driverOnly, interval, slack }</code>: the client reports the current value</td></tr>
   <tr><td>display</td><td>table?</td><td>How the value reads on its gauge and in /whip, instead of a percentage: <code>{ unit = 'psi', range = { -3, 30 } }</code> (what min and max read); <code>{ unit = '°C', points = { { 0, 20 }, { 50, 90 }, { 100, 130 } } }</code> (a curve, percent of range to reading); <code>{ ends = { 'E', 'F' } }</code> (end labels, no number); <code>decimals</code> 0-2. The stat's range is unchanged</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: ok, and why not</div>
-<pre><code class="lang-lua">Whip.declare:RegisterVehicleStat('nos', {
-    default = 0, min = 0, max = 100,
-    hud = { label = 'NOS', icon = 'M6 2h6v20H6z', color = '#60a5fa', order = 2 },
-})
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterVehicleStat('nos', {
+        default = 0, min = 0, max = 100,
+        hud = { label = 'NOS', icon = 'M6 2h6v20H6z', color = '#60a5fa', order = 2 },
+    })
+end)
 -- later, once a car has a bottle fitted
 exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></pre>
   <div class="info-box warn"><strong><code>clearAtMin</code> requires <code>default == min</code></strong>, or registration is refused: a cleared stat reads as its default, so it would refill itself by running out. Use it for installables, not for something every car has, like <code>fuel</code>.</div>
@@ -6086,7 +6126,7 @@ exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></p
 <div class="export-card" id="onvehiclestatchange" data-search="onvehiclestatchange onvehiclestatchanged server per stat subscription listen any stat wildcard statschanged">
 <div class="export-header"><span class="export-name">OnVehicleStatChange(name, callback, id, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Be called when <em>one</em> stat changes, on any car, yours or another resource's. Declare it through <code>Whip.declare</code> with your stats, so it comes back after a whip_core restart; it's dropped when your resource stops.</p>
+  <p>Be called when <em>one</em> stat changes, on any car, yours or another resource's. Declare it in <code>Whip.register</code> with your stats, so it comes back after a whip_core restart; it's dropped when your resource stops.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>name</td><td>string</td><td>A stat's name, or <code>'*'</code> for every stat (server only, and the costly one)</td></tr>
   <tr><td>callback</td><td>function</td><td><code>(vehicleId, value, previous, cleared, source)</code>; for <code>'*'</code>, <code>(vehicleId, name, value, previous, cleared, source)</code>; or one table with <code>table = true</code> (<code>change.key</code> is the stat)</td></tr>
@@ -6415,18 +6455,20 @@ exports.whip_core:SetVehicleGarage(vehicleId, garageKey)</code></pre>
 <p class="lede">A job is a business with ranks, staff and a bank account. Players clock on and off; your resource declares the job and checks duty and permissions.</p>
 
 <h3>Declaring a job</h3>
-<p>A job has a key, roles with levels and permissions, and employees; its owner holds the top role and the business account. Declare it with <a href="#ensurejob"><code>EnsureJob</code></a>, through <code>Whip.declare</code>:</p>
-<pre><code class="lang-lua">Whip.declare:EnsureJob('police', {
-    name  = 'Police Department',
-    icon  = 'shield',
-    roles = {
-        { name = 'Chief',    level = 100 },
-        { name = 'Sergeant', level = 50, permissions = { canHire = true, canFire = true, cuff = true } },
-        { name = 'Officer',  level = 20, permissions = { cuff = true, bankAccess = 'view' } },
-        { name = 'Cadet',    level = 1 },
-    },
-    permissions = { cuff = 'Cuff suspects' },   -- the job's own, beside the built-ins
-})</code></pre>
+<p>A job has a key, roles with levels and permissions, and employees; its owner holds the top role and the business account. Declare it with <a href="#ensurejob"><code>EnsureJob</code></a>, in <code>Whip.register</code>:</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:EnsureJob('police', {
+        name  = 'Police Department',
+        icon  = 'shield',
+        roles = {
+            { name = 'Chief',    level = 100 },
+            { name = 'Sergeant', level = 50, permissions = { canHire = true, canFire = true, cuff = true } },
+            { name = 'Officer',  level = 20, permissions = { cuff = true, bankAccess = 'view' } },
+            { name = 'Cadet',    level = 1 },
+        },
+        permissions = { cuff = 'Cuff suspects' },   -- the job's own, beside the built-ins
+    })
+end)</code></pre>
 <p>The first call makes the job, with your <code>roles</code> or <code>Config.JobDefaultRoles</code>. Later calls update the name, icon, permissions and <code>selfClockOn</code>, and add new roles; a role that exists (a server owner may have edited it) and the owner are never changed.</p>
 
 <h3>Roles and permissions</h3>
@@ -6507,7 +6549,7 @@ exports.whip_core:ClockOn('burgershot')                -- client, from a thread:
 <div class="export-card" id="ensurejob" data-search="ensurejob job create ensure idempotent setup roles permissions declare">
 <div class="export-header"><span class="export-name">EnsureJob(key, data)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Finds or creates your job; declare it through <code>Whip.declare</code> (<a href="#guide-jobs">example</a>). Later calls update the name, icon, permissions and <code>selfClockOn</code> and add new roles; existing roles and the owner stay (<code>UpdateJob</code> changes the owner). Another running resource's key is refused. While whip_core starts, it waits up to 60 seconds.</p>
+  <p>Finds or creates your job; declare it in <code>Whip.register</code> (<a href="#guide-jobs">example</a>). Later calls update the name, icon, permissions and <code>selfClockOn</code> and add new roles; existing roles and the owner stay (<code>UpdateJob</code> changes the owner). Another running resource's key is refused. While whip_core starts, it waits up to 60 seconds.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>key</td><td>string</td><td>Letters, numbers and <code>_</code> (<code>'police'</code>)</td></tr>
   <tr><td>data.name</td><td>string</td><td>Display name</td></tr>
@@ -6783,13 +6825,15 @@ if not ok then return false, why end   -- say why now, before asking them</code>
 </table>
 
 <h3>Declaring a shop</h3>
-<p>Declare a shop your resource always has with <code>EnsureShop</code>, through <code>Whip.declare</code>: it's made once and found on every start. The other calls are in the <a href="#shops">Shops API</a>.</p>
-<pre><code class="lang-lua">Whip.declare:EnsureShop('my_gunshop', {
-    name = 'Ammu-Nation', mode = 'npc', npcModel = 's_m_m_ammucountry',
-    x = -330.2, y = 6084.3, z = 31.5, heading = 228.0,
-    blipSprite = 110,
-    catalog = { gunny_pistol = 2500, gunny_mag_pistol = 150 },
-})
+<p>Declare a shop your resource always has with <code>EnsureShop</code>, in <code>Whip.register</code>: it's made once and found on every start. The other calls are in the <a href="#shops">Shops API</a>.</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:EnsureShop('my_gunshop', {
+        name = 'Ammu-Nation', mode = 'npc', npcModel = 's_m_m_ammucountry',
+        x = -330.2, y = 6084.3, z = 31.5, heading = 228.0,
+        blipSprite = 110,
+        catalog = { gunny_pistol = 2500, gunny_mag_pistol = 150 },
+    })
+end)
 
 -- Hear every sale
 AddEventHandler('whip_core:shop:purchased', function(e)
@@ -7588,15 +7632,17 @@ AddEventHandler('whip_core:zone:exited', function(zone) end)</code></pre>
 <div class="export-card" data-search="ensurezone zone ensure saved key declare database">
 <div class="export-header"><span class="export-name">EnsureZone(key, data)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>A saved zone declared by your key; declare it through <code>Whip.declare</code>, so it runs at every start. It's made once and updated only when your declaration changes, so an admin's edits stand until then. A different <code>type</code> makes a new zone under the key.</p>
+<p>A saved zone declared by your key; declare it in <code>Whip.register</code>, so it runs at every start. It's made once and updated only when your declaration changes, so an admin's edits stand until then. A different <code>type</code> makes a new zone under the key.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>key</td><td>string</td><td>Letters, digits, <code>_ - . :</code>, at most 60. Refused if another running resource declared it</td></tr>
 <tr><td>data</td><td>table</td><td><code>type</code> (<code>'box'</code> | <code>'sphere'</code> | <code>'poly'</code>), <code>pos</code>, <code>size</code> + <code>heading</code> (box), <code>radius</code> (sphere), <code>points</code> (poly, 3+), <code>minZ</code>, <code>maxZ</code>, <code>label</code>, <code>group</code>, <code>priority</code>, <code>rules</code>, <code>notify</code>, <code>trackVehicles</code>, <code>trackPlayers</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>zone</code>, or <code>false, reason</code></div>
-<pre><code class="lang-lua">Whip.declare:EnsureZone('mrpd', {
-    type = 'box', pos = vector3(441.0, -982.0, 30.7), size = vector3(60, 50, 20), heading = 0,
-    label = 'Mission Row PD', trackPlayers = true,
-})</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:EnsureZone('mrpd', {
+        type = 'box', pos = vector3(441.0, -982.0, 30.7), size = vector3(60, 50, 20), heading = 0,
+        label = 'Mission Row PD', trackPlayers = true,
+    })
+end)</code></pre>
 </div></div>
 
 <div class="export-card" data-search="deletezone zone delete saved key remove database">
@@ -8161,15 +8207,17 @@ end)</code></pre>
 <p class="lede">Everything a player does with <kbd>E</kbd>, a car part's prompt or the F1 wheel is one client call: <code>AddAction</code>. Server code adds prompts with <code>AddPoint</code> and NPC conversations with <code>StartConversation</code>.</p>
 
 <h3 id="guide-interactions">A first prompt</h3>
-<p>Declare actions through <code>Whip.declare</code>, so they come back when whip_core restarts. An action is yours by <code>id</code>: the same id again replaces it, and it goes when your resource stops.</p>
-<pre><code class="lang-lua">Whip.declare:AddAction({
-    id = 'stash',
-    at = { coords = vector3(200.0, -800.0, 30.0) },
-    label = 'Open Stash',
-    onSelect = function(ctx)
-        TriggerServerEvent('myres:openStash')   -- its own thread: waiting is fine
-    end,
-})</code></pre>
+<p>Declare actions in <code>Whip.register</code>, so they come back when whip_core restarts. An action is yours by <code>id</code>: the same id again replaces it, and it goes when your resource stops.</p>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:AddAction({
+        id = 'stash',
+        at = { coords = vector3(200.0, -800.0, 30.0) },
+        label = 'Open Stash',
+        onSelect = function(ctx)
+            TriggerServerEvent('myres:openStash')   -- its own thread: waiting is fine
+        end,
+    })
+end)</code></pre>
 <p>A prompt shows within <code>Config.InteractVisibleRange</code> (5 m) and works within <code>Config.InteractActiveRange</code> (2 m); <kbd>E</kbd> acts on the one nearest the centre of view, inside <code>Config.InteractFocusCone</code> (40°). Prompts hide while a screen or bar has the input, and while the player is dead or in a vehicle unless <code>require</code> says <code>alive = false</code> or <code>vehicle = 'in'</code>. Ground items, containers and doors make their own. Later examples show <code>AddAction</code> alone.</p>
 
 <h3>AddAction</h3>
@@ -8944,7 +8992,9 @@ exports.whip_core:UnblockControls('shop')</code></pre>
   <tr><td>def.menus</td><td>boolean?</td><td><code>true</code>: works with a screen open (talk). Otherwise it waits for <code>IsGameInputFree</code></td></tr>
   <tr><td>def.ready</td><td>boolean?</td><td>Default <code>true</code>; see <code>SetPadActionReady</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code> ok, <code>string?</code> why: a bad field (named), one of WHIP's ids, or an id another resource holds</div>
-<pre><code class="lang-lua">Whip.declare:RegisterPadAction('mycafe_menu', { label = 'Cafe menu', command = 'mycafe_menu', slot = 'lb_y' })</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterPadAction('mycafe_menu', { label = 'Cafe menu', command = 'mycafe_menu', slot = 'lb_y' })
+end)</code></pre>
   <p><code>Config.Controller.Layout</code> holds WHIP's own (D-pad up phone, LB + A talk, LB + B Gunny ammo check, LB + X radio, A in a vehicle nitrous, B on foot Gunny reload), so LB + Y and LB + D-pad are yours. A taken slot leaves the action registered on no button, and F8 says once what has it. Two resources asking for one free button: the id first alphabetically wins.</p>
 </div></div>
 
@@ -9436,7 +9486,7 @@ end</code></pre>
 <div class="info-box warn"><strong>Keep an atlas inside the game's limit.</strong> <code>CreateDui</code> throws for a page wider than the game allows: 8192 pixels on GTA V Enhanced. Pack cells into more rows rather than one long strip.</div>
 <h2 id="resource-settings">Settings pages for your resource</h2>
 <p class="lede">Put your resource's settings in <code>/whip</code> → Settings beside Config, so server owners never open your config file. You declare the settings; WHIP builds the page, checks and saves values, sends changes to every player and calls you back.</p>
-<p>The page is named by your <code>label</code>, and only permanent admins see it. Declare it on <strong>both sides</strong>, in a shared script, through <code>Whip.declare</code>: the server checks and saves, and each player's game needs your defaults and callbacks.</p>
+<p>The page is named by your <code>label</code>, and only permanent admins see it. Declare it on <strong>both sides</strong>, in a shared script, in <code>Whip.register</code>: the server checks and saves, and each player's game needs your defaults and callbacks.</p>
 <div class="info-box warn"><strong>Values follow the folder name.</strong> Saved values are kept under the name the server runs your resource by. Renaming the folder (<code>mycafe</code> to <code>mycafe-v2</code>) starts from your defaults again, so tell owners to keep the name across updates.</div>
 
 <h3>Declaring a page</h3>
@@ -9474,18 +9524,20 @@ end</code></pre>
   <tr><td>keyKind / keyPattern / keyWhy</td><td>string|nil</td><td><code>map</code>: <code>keyKind = 'hash'</code> takes a model name and keeps its hash (as <code>GetEntityModel</code> returns). <code>'number'</code> keeps a digits-only key as a number (a mod slot, a wheel type). Name keys are checked against <code>keyPattern</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: ok, and why not, naming the entry</div>
 <pre><code class="lang-lua">-- shared.lua (shared_script, after WHIP's helper)
-Whip.declare:RegisterSettings({
-    label = 'My Cafe',
-    settings = {
-        { key = 'price', type = 'int', min = 1, max = 500, unit = '$', default = 5,
-          label = 'Coffee price', help = 'What one coffee costs at the counter.' },
-        { key = 'open', type = 'bool', default = true,
-          label = 'Counter open', help = 'Off: the counter sells nothing.' },
-        { key = 'size', type = 'enum', default = 'regular', label = 'Cup size',
-          options = { { value = 'small', label = 'Small' }, { value = 'regular', label = 'Regular' } } },
-    },
-})</code></pre>
-  <div class="info-box warn"><strong>Declare before you read.</strong> Until <code>RegisterSettings</code> runs, <code>GetSetting</code> returns <code>nil</code>. Declare it before anything that reads it, through <code>Whip.declare</code> or <code>Whip.register</code>: on the server, a page declared before whip_core has finished starting is refused. Declared on the server only, players' games have no defaults.</div>
+Whip.register(function()
+    Whip.core:RegisterSettings({
+        label = 'My Cafe',
+        settings = {
+            { key = 'price', type = 'int', min = 1, max = 500, unit = '$', default = 5,
+              label = 'Coffee price', help = 'What one coffee costs at the counter.' },
+            { key = 'open', type = 'bool', default = true,
+              label = 'Counter open', help = 'Off: the counter sells nothing.' },
+            { key = 'size', type = 'enum', default = 'regular', label = 'Cup size',
+              options = { { value = 'small', label = 'Small' }, { value = 'regular', label = 'Regular' } } },
+        },
+    })
+end)</code></pre>
+  <div class="info-box warn"><strong>Declare before you read.</strong> Until <code>RegisterSettings</code> runs, <code>GetSetting</code> returns <code>nil</code>. Declare it before anything that reads it, in <code>Whip.register</code> or <code>Whip.register</code>: on the server, a page declared before whip_core has finished starting is refused. Declared on the server only, players' games have no defaults.</div>
 </div></div>
 
 <h3>Reading and reacting</h3>
@@ -9514,14 +9566,16 @@ print(s.price, s.size, s.open)</code></pre>
 <div class="export-card" id="onsettingchanged" data-search="onsettingchanged setting changed callback hook config panel satellite live">
 <div class="export-header"><span class="export-name">OnSettingChanged(key, fn)</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Calls <code>fn</code> after a <code>'live'</code> setting changes on this side: on the server when an admin applies it, on each game when the change arrives. Use it for what you set up once (a blip, a loop's timing). One function per key; declare it through <code>Whip.declare</code>.</p>
+  <p>Calls <code>fn</code> after a <code>'live'</code> setting changes on this side: on the server when an admin applies it, on each game when the change arrives. Use it for what you set up once (a blip, a loop's timing). One function per key; declare it in <code>Whip.register</code>.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>key</td><td>string</td><td>The entry's <code>key</code></td></tr>
   <tr><td>fn</td><td>function</td><td><code>function(value, old, key)</code>. Mustn't wait: start a thread for anything slow</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code></div>
 <pre><code class="lang-lua">-- client.lua: hide the counter's blip while it's closed
-Whip.declare:OnSettingChanged('open', function(open)
-    SetBlipAlpha(counterBlip, open and 255 or 0)
+Whip.register(function()
+    Whip.core:OnSettingChanged('open', function(open)
+        SetBlipAlpha(counterBlip, open and 255 or 0)
+    end)
 end)</code></pre>
 </div></div>
 
@@ -9604,9 +9658,11 @@ Whip.playerSetting({
 <div class="export-card" id="registerplayersetting" data-search="registerplayersetting player setting export pause menu server settings">
 <div class="export-header"><span class="export-name">RegisterPlayerSetting(def)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>The export behind <code>Whip.playerSetting</code>, which calls it for you. Same <code>def</code>; called yourself, declare it through <code>Whip.declare</code> or the row is lost on a whip_core restart. Refused for a key another running resource holds, one of whip_core's, or a row with no default.</p>
+  <p>The export behind <code>Whip.playerSetting</code>, which calls it for you. Same <code>def</code>; called yourself, declare it in <code>Whip.register</code> or the row is lost on a whip_core restart. Refused for a key another running resource holds, one of whip_core's, or a row with no default.</p>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
-<pre><code class="lang-lua">Whip.declare:RegisterPlayerSetting(soundsRow)</code></pre>
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:RegisterPlayerSetting(soundsRow)
+end)</code></pre>
 </div></div>
 
 <div class="export-card" id="getplayersetting" data-search="getplayersetting player setting read value preference speed unit">
@@ -9721,7 +9777,7 @@ end)</code></pre>
 <div class="export-card" id="registerdevpage" data-search="registerdevpage dev page /w menu tool page rows onselect onback developer satellite panel">
 <div class="export-header"><span class="export-name">RegisterDevPage(id, def)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Adds your page to <code>/w</code>, or replaces yours with this <code>id</code>. Declare it through <code>Whip.declare</code>: whip_core forgets every page when it restarts. The page goes when your resource stops, and <code>/w</code> reopens on the page it was shut on with Escape.</p>
+  <p>Adds your page to <code>/w</code>, or replaces yours with this <code>id</code>. Declare it in <code>Whip.register</code>: whip_core forgets every page when it restarts. The page goes when your resource stops, and <code>/w</code> reopens on the page it was shut on with Escape.</p>
   <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
   <tr><td>id</td><td>string</td><td>Letters, digits, <code>_</code> and <code>-</code>; another resource's page with the same id is another page</td></tr>
   <tr><td>label</td><td>string</td><td>The row in <code>/w</code> and the page's title</td></tr>
@@ -9742,25 +9798,27 @@ end)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code> (a bad id, no label, no <code>rows</code> or <code>onSelect</code>)</div>
 <pre><code class="lang-lua">local open, level = false, 'top'
 
-Whip.declare:RegisterDevPage('cafe', {
-    label = 'Café',
-    rows = function()
-        if level == 'menu' then
-            return { title = 'Menu', back = 'Café', rows = { { id = 'coffee', label = 'Coffee' } } }
-        end
-        return { rows = {
-            { id = 'open', label = 'Open', kind = 'toggle', active = open },
-            { id = 'restock', label = 'Restock', desc = 'Fills every shelf.' },
-            { id = 'menu', label = 'Menu', kind = 'open' },
-        } }
-    end,
-    onSelect = function(rowId)
-        if rowId == 'open' then open = not open
-        elseif rowId == 'menu' then level = 'menu'
-        else TriggerServerEvent('mycafe:devAction', rowId) end   -- the server checks HasDevTools
-    end,
-    onBack = function() level = 'top' end,
-})</code></pre>
+Whip.register(function()
+    Whip.core:RegisterDevPage('cafe', {
+        label = 'Café',
+        rows = function()
+            if level == 'menu' then
+                return { title = 'Menu', back = 'Café', rows = { { id = 'coffee', label = 'Coffee' } } }
+            end
+            return { rows = {
+                { id = 'open', label = 'Open', kind = 'toggle', active = open },
+                { id = 'restock', label = 'Restock', desc = 'Fills every shelf.' },
+                { id = 'menu', label = 'Menu', kind = 'open' },
+            } }
+        end,
+        onSelect = function(rowId)
+            if rowId == 'open' then open = not open
+            elseif rowId == 'menu' then level = 'menu'
+            else TriggerServerEvent('mycafe:devAction', rowId) end   -- the server checks HasDevTools
+        end,
+        onBack = function() level = 'top' end,
+    })
+end)</code></pre>
 </div></div>
 
 <div class="export-card" id="refreshdevpage" data-search="refreshdevpage dev page /w menu redraw rows changed">
@@ -9783,7 +9841,7 @@ Whip.declare:RegisterDevPage('cafe', {
 <div class="export-card" id="registerdebugtool" data-search="registerdebugtool debug tool switch /w menu developer overlay">
 <div class="export-header"><span class="export-name">RegisterDebugTool(id, def)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>A switch of your own among <code>/w</code>'s debug tools, shown while its <em>Debug</em> row is on, after WHIP's own, by label. Turning it on checks with the server, as any dev tool does; the same id again replaces it. Declare it through <code>Whip.declare</code>; it goes when your resource stops.</p>
+  <p>A switch of your own among <code>/w</code>'s debug tools, shown while its <em>Debug</em> row is on, after WHIP's own, by label. Turning it on checks with the server, as any dev tool does; the same id again replaces it. Declare it in <code>Whip.register</code>; it goes when your resource stops.</p>
   <table class="param-table">
   <tr><th>Field</th><th>Type</th><th>Description</th></tr>
   <tr><td>label</td><td>string</td><td>Its row in <code>/w</code> (40 characters at most)</td></tr>
@@ -11488,7 +11546,7 @@ end</code></pre>
 <tr><td><code>EnableTestSeams</code></td><td>off</td><td>Lets a test resource inject database failures. Needs <code>set whip_test_seams true</code>; never on a live server</td></tr>
 <tr><td><code>ShowPlayerNames</code></td><td><code>'nearby'</code></td><td>Who sees another player's character name (<a href="#getplayerfullname-client"><code>GetPlayerFullName</code></a>, the phone, the Director; <a href="#canseeplayername"><code>CanSeePlayerName</code></a>): <code>'nearby'</code>, <code>'always'</code> or <code>'never'</code></td></tr>
 <tr><td><code>PlayerNameRange</code></td><td><code>25.0</code></td><td>Metres, for <code>'nearby'</code></td></tr>
-<tr><td><code>DependentResources</code></td><td><code>{}</code></td><td>Resources to restart with whip_core. Leave empty; use <a href="#quickstart-satellite"><code>Whip.declare</code></a></td></tr>
+<tr><td><code>DependentResources</code></td><td><code>{}</code></td><td>Resources to restart with whip_core. Leave empty; use <a href="#quickstart-satellite"><code>Whip.register</code></a></td></tr>
 <tr><td><code>PlaceItemRange</code></td><td><code>10.5</code></td><td>Metres from the camera an item can be set down</td></tr>
 <tr><td><code>GiveModeStyle</code></td><td><code>{ walk = 'trash', speed = 'jog' }</code></td><td>Movement while holding an item out: <code>walk</code> (a /walk name; nil: own), <code>speed</code> (<code>'jog'</code>, <code>'walk'</code> or nil). <a href="#client-inventory"><code>SetGiveModeStyle</code></a> overrides it</td></tr>
 <tr><td><code>ThrowKnockdown.Enabled</code></td><td><code>true</code></td><td>A thrown item knocks a person down and bounces off. Never in a no-PvP zone or on god mode</td></tr>
@@ -11935,7 +11993,7 @@ end)</code></pre>
 <h3>Players and characters</h3>
 <table class="event-table">
 <tr><th>Event</th><th>Payload</th><th>When</th></tr>
-<tr><td>whip_core:onReady</td><td><code>{ reason, resources? }</code></td><td>whip_core is ready for registrations. <code>reason</code>: <code>'coreStarted'</code> (it remembers nothing: register everything) or <code>'resourceStarted'</code> with the <code>resources</code> that just started. Also on the client. Use <a href="#patterns-satellite"><code>Whip.declare</code></a> or <code>Whip.register</code> instead</td></tr>
+<tr><td>whip_core:onReady</td><td><code>{ reason, resources? }</code></td><td>whip_core is ready for registrations. <code>reason</code>: <code>'coreStarted'</code> (it remembers nothing: register everything) or <code>'resourceStarted'</code> with the <code>resources</code> that just started. Also on the client. Use <a href="#patterns-satellite"><code>Whip.register</code></a> instead</td></tr>
 <tr><td>whip_core:player:loaded</td><td><code>{ source, charId, name, newCharacter, player }</code></td><td>Character fully loaded. <code>player</code> is the data sheet, <code>name</code> the full name, <code>newCharacter</code> true on a first load. The client gets the same table</td></tr>
 <tr><td>whip_core:player:logout</td><td><code>{ source, charId, player, why }</code></td><td>The character is leaving: <code>why</code> is <code>'logout'</code> or <code>'disconnect'</code></td></tr>
 <tr><td>whip_core:player:died</td><td><code>{ source, charId, killer, reported }</code></td><td>The server accepted a death. <code>killer</code>: the server id when the server saw a player do it (a car's driver counts), else nil. <code>reported</code>: the victim's game's account, for display only</td></tr>
@@ -12030,7 +12088,7 @@ end)</code></pre>
 <h3>Loading and life</h3>
 <table class="event-table">
 <tr><th>Event</th><th>Payload</th><th>When</th></tr>
-<tr><td>whip_core:onReady</td><td><code>{ reason, resources? }</code></td><td>whip_core's client is ready for registrations (as on the server). Use <code>Whip.declare</code> or <code>Whip.register</code></td></tr>
+<tr><td>whip_core:onReady</td><td><code>{ reason, resources? }</code></td><td>whip_core's client is ready for registrations (as on the server). Use <code>Whip.register</code></td></tr>
 <tr><td>whip_core:player:loaded</td><td><code>{ source, charId, name, newCharacter, player }</code></td><td>The character is in the world and the picture is back. <strong>The safe "player is ready" hook</strong>: <code>PlayerData</code> and inventory are populated. Same table as the server's</td></tr>
 <tr><td>whip_core:player:spawned</td><td><code>{}</code></td><td>Just put into the world. After every load, and again for a new character when the creator closes</td></tr>
 <tr><td>whip_core:player:died</td><td><code>{ reconnected, respawnRefused }</code></td><td>Died. <code>reconnected</code>: loaded in already dead. <code>respawnRefused</code>: a respawn came too soon, so the same death is back after a <code>revived</code></td></tr>
@@ -12157,19 +12215,21 @@ end)</code></pre>
 -- fromOwnerCharId, fromAccountType, fromLabel, toOwnerCharId, toAccountType, toLabel</code></pre>
 <h2 id="examples">Examples</h2>
 <p class="lede">Short recipes for patterns the tutorials and guides don't show: repairing on the client after the server agrees, refunding a failed sale, vehicle parameters, reacting to shop events, and calling another WHIP resource.</p>
-<div class="info-box tip"><strong>Declare through <code>Whip.declare</code>.</strong> Secure events, callbacks, actions and items registered straight from the top of a file vanish when whip_core restarts (<a href="#patterns-satellite">the satellite helper</a>). <code>AddEventHandler</code> needs neither. Items such as <code>repair_kit</code> aren't shipped: define them first with <a href="#registeritem"><code>RegisterItem</code></a> or <code>Config.Items</code>.</div>
+<div class="info-box tip"><strong>Declare in <code>Whip.register</code>.</strong> Secure events, callbacks, actions and items registered straight from the top of a file vanish when whip_core restarts (<a href="#patterns-satellite">the satellite helper</a>). <code>AddEventHandler</code> needs neither. Items such as <code>repair_kit</code> aren't shipped: define them first with <a href="#registeritem"><code>RegisterItem</code></a> or <code>Config.Items</code>.</div>
 
 <h3>Mechanic: repair on the client</h3>
 <p>A choice on the bonnet's prompt. The server checks and takes the kit; the mechanic's own game repairs, because engine health is a client native that needs network control.</p>
 <pre><code class="lang-lua">-- client.lua
-Whip.declare:AddAction({
-    id          = 'repair',
-    at          = { vehiclePart = 'hood' },      -- shows while the bonnet is open
-    label       = 'Repair Engine',
-    require     = { item = 'repair_kit' },       -- only offered to someone carrying one
-    canInteract = function(ctx) return GetVehicleEngineHealth(ctx.entity) &lt; 900.0 end,
-    onSelect    = function(ctx) TriggerServerEvent('mechanic:repair', VehToNet(ctx.entity)) end,
-})
+Whip.register(function()
+    Whip.core:AddAction({
+        id          = 'repair',
+        at          = { vehiclePart = 'hood' },      -- shows while the bonnet is open
+        label       = 'Repair Engine',
+        require     = { item = 'repair_kit' },       -- only offered to someone carrying one
+        canInteract = function(ctx) return GetVehicleEngineHealth(ctx.entity) &lt; 900.0 end,
+        onSelect    = function(ctx) TriggerServerEvent('mechanic:repair', VehToNet(ctx.entity)) end,
+    })
+end)
 
 RegisterNetEvent('mechanic:client:repair', function(netId)
     local veh = NetToVeh(netId)
@@ -12179,21 +12239,23 @@ RegisterNetEvent('mechanic:client:repair', function(netId)
 end)
 
 -- server.lua
-Whip.declare:SecureEvent('mechanic:repair', {
-    rateLimit = 2000,
-    params = { {'netId', 'id'} },               -- refused if bad, never clamped
-    near = {                                    -- beside that car: naming it proves nothing
-        at = function(source, player, netId)
-            local veh = NetworkGetEntityFromNetworkId(netId)
-            if DoesEntityExist(veh) then return GetEntityCoords(veh) end
-        end,
-        range = 6.0,
-    },
-}, function(source, player, netId)
-    if not exports.whip_core:RemoveItem(source, 'repair_kit', 1, 'repair') then
-        return false, 'No repair kit!'          -- shown to the player, logged as refused
-    end
-    TriggerClientEvent('mechanic:client:repair', source, netId)
+Whip.register(function()
+    Whip.core:SecureEvent('mechanic:repair', {
+        rateLimit = 2000,
+        params = { {'netId', 'id'} },               -- refused if bad, never clamped
+        near = {                                    -- beside that car: naming it proves nothing
+            at = function(source, player, netId)
+                local veh = NetworkGetEntityFromNetworkId(netId)
+                if DoesEntityExist(veh) then return GetEntityCoords(veh) end
+            end,
+            range = 6.0,
+        },
+    }, function(source, player, netId)
+        if not exports.whip_core:RemoveItem(source, 'repair_kit', 1, 'repair') then
+            return false, 'No repair kit!'          -- shown to the player, logged as refused
+        end
+        TriggerClientEvent('mechanic:client:repair', source, netId)
+    end)
 end)</code></pre>
 
 <h3>Dealership: refund a failed sale</h3>
@@ -12215,41 +12277,45 @@ end</code></pre>
 <p>There's no <code>SetVehicleFuel</code>: fuel is a vehicle stat registered by <code>whip_fuel</code> (which must be running), read and written like any other. The <code>'vehicle'</code> parameter resolves the id and checks the player owns the car.</p>
 <pre><code class="lang-lua">local PUMPS = { vector3(49.4, 2778.8, 58.0), vector3(263.9, 2606.5, 44.9) }
 
-Whip.declare:SecureEvent('gasstation:refuel', {
-    rateLimit = 2000,
-    params = { {'vehicle', 'vehicle'} },
-    near = { at = 'vehicle', range = 5.0 },     -- at (or in) that car
-}, function(source, player, v)
-    local atPump = false
-    for _, pump in ipairs(PUMPS) do
-        if #(v.coords - pump) &lt; 12.0 then atPump = true break end
-    end
-    if not atPump then return false, 'Drive up to a pump first' end
+Whip.register(function()
+    Whip.core:SecureEvent('gasstation:refuel', {
+        rateLimit = 2000,
+        params = { {'vehicle', 'vehicle'} },
+        near = { at = 'vehicle', range = 5.0 },     -- at (or in) that car
+    }, function(source, player, v)
+        local atPump = false
+        for _, pump in ipairs(PUMPS) do
+            if #(v.coords - pump) &lt; 12.0 then atPump = true break end
+        end
+        if not atPump then return false, 'Drive up to a pump first' end
 
-    local fuel = exports.whip_core:GetVehicleStat(v.vehicleId, 'fuel')
-    local cost = math.ceil((100 - fuel) * 5)    -- $5 per percent
-    if cost &lt; 1 then return false, 'The tank is already full' end
+        local fuel = exports.whip_core:GetVehicleStat(v.vehicleId, 'fuel')
+        local cost = math.ceil((100 - fuel) * 5)    -- $5 per percent
+        if cost &lt; 1 then return false, 'The tank is already full' end
 
-    local receipt, err = exports.whip_core:ChargePlayer(source, cost, { method = 'cash', reason = 'Fuel' })
-    if not receipt then return false, err end
+        local receipt, err = exports.whip_core:ChargePlayer(source, cost, { method = 'cash', reason = 'Fuel' })
+        if not receipt then return false, err end
 
-    -- The last argument is the change's source, shown in Vehicle Stats Debug
-    exports.whip_core:SetVehicleStat(v.vehicleId, 'fuel', 100.0, 'gasstation:refuel')
+        -- The last argument is the change's source, shown in Vehicle Stats Debug
+        exports.whip_core:SetVehicleStat(v.vehicleId, 'fuel', 100.0, 'gasstation:refuel')
+    end)
 end)</code></pre>
 
 <h3>Impound: anyone's car, and lockpick alerts</h3>
 <p><code>{ anyOwner = true, session = true }</code> lets the <code>'vehicle'</code> parameter take any car, street cars included. <code>near = { at = 'vehicle' }</code> checks where the car is now, not its last saved spot.</p>
-<pre><code class="lang-lua">Whip.declare:SecureEvent('impound:seize', {
-    rateLimit = 2000,
-    params = { {'vehicle', 'vehicle', { anyOwner = true, session = true }} },
-    near = { at = 'vehicle', range = 8.0 },
-}, function(source, player, v)
-    if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
-        return false, 'Only on-duty police can impound'
-    end
-    local owner = v.owner.charId and exports.whip_core:GetPlayer({ charId = v.owner.charId })
-    if owner then exports.whip_core:RemoveVehicleKey(owner.source, v.vehicleId) end
-    exports.whip_core:SetVehicleLocked(v.vehicleId, true)
+<pre><code class="lang-lua">Whip.register(function()
+    Whip.core:SecureEvent('impound:seize', {
+        rateLimit = 2000,
+        params = { {'vehicle', 'vehicle', { anyOwner = true, session = true }} },
+        near = { at = 'vehicle', range = 8.0 },
+    }, function(source, player, v)
+        if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
+            return false, 'Only on-duty police can impound'
+        end
+        local owner = v.owner.charId and exports.whip_core:GetPlayer({ charId = v.owner.charId })
+        if owner then exports.whip_core:RemoveVehicleKey(owner.source, v.vehicleId) end
+        exports.whip_core:SetVehicleLocked(v.vehicleId, true)
+    end)
 end)
 
 AddEventHandler('whip_core:vehicle:lockpicked', function(e)
@@ -12260,23 +12326,27 @@ end)</code></pre>
 <h3>Plate check: re-check the job on the server</h3>
 <p>An action's <code>require</code> only decides what's offered. The server checks duty again before answering.</p>
 <pre><code class="lang-lua">-- client.lua: on any car's boot prompt (the plate is at the back)
-Whip.declare:AddAction({
-    id = 'run_plate', at = { vehiclePart = 'trunk' }, label = 'Run Plate', icon = 'P',
-    require  = { job = 'police', onDuty = true },
-    onSelect = function(ctx) TriggerServerEvent('police:runPlate', GetVehicleNumberPlateText(ctx.entity)) end,
-})
+Whip.register(function()
+    Whip.core:AddAction({
+        id = 'run_plate', at = { vehiclePart = 'trunk' }, label = 'Run Plate', icon = 'P',
+        require  = { job = 'police', onDuty = true },
+        onSelect = function(ctx) TriggerServerEvent('police:runPlate', GetVehicleNumberPlateText(ctx.entity)) end,
+    })
+end)
 
 -- server.lua
-Whip.declare:SecureEvent('police:runPlate', {
-    rateLimit = 2000,
-    params = { {'plate', 'string', 8} },
-}, function(source, player, plate)
-    if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
-        return false, 'On-duty police only'
-    end
-    local v = exports.whip_core:GetVehicle({ plate = plate })
-    if not v or v.session then return false, plate .. ': no record' end   -- street car or rental
-    exports.whip_core:NotifyPlayer(source, ('%s (%s) is registered to character #%d'):format(plate, v.model, v.owner.charId))
+Whip.register(function()
+    Whip.core:SecureEvent('police:runPlate', {
+        rateLimit = 2000,
+        params = { {'plate', 'string', 8} },
+    }, function(source, player, plate)
+        if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
+            return false, 'On-duty police only'
+        end
+        local v = exports.whip_core:GetVehicle({ plate = plate })
+        if not v or v.session then return false, plate .. ': no record' end   -- street car or rental
+        exports.whip_core:NotifyPlayer(source, ('%s (%s) is registered to character #%d'):format(plate, v.model, v.owner.charId))
+    end)
 end)</code></pre>
 
 <h3>Shops: react to purchases and visits</h3>
@@ -12313,27 +12383,31 @@ end)</code></pre>
 <pre><code class="lang-lua">local COUNTER = vector3(21.6, -1106.5, 29.8)
 
 -- client.lua
-Whip.declare:AddAction({
-    id = 'buy_pistol', at = { coords = COUNTER }, label = 'Buy Pistol ($5000)',
-    onSelect = function() TriggerServerEvent('gunshop:buyPistol') end,
-})
+Whip.register(function()
+    Whip.core:AddAction({
+        id = 'buy_pistol', at = { coords = COUNTER }, label = 'Buy Pistol ($5000)',
+        onSelect = function() TriggerServerEvent('gunshop:buyPistol') end,
+    })
+end)
 
 -- server.lua
-Whip.declare:SecureEvent('gunshop:buyPistol', {
-    rateLimit = 3000,
-    near = { at = COUNTER, range = 3.0 },
-}, function(source, player)
-    local receipt, err = exports.whip_core:ChargePlayer(source, 5000, { method = 'cash', reason = 'Pistol' })
-    if not receipt then return false, err end
+Whip.register(function()
+    Whip.core:SecureEvent('gunshop:buyPistol', {
+        rateLimit = 3000,
+        near = { at = COUNTER, range = 3.0 },
+    }, function(source, player)
+        local receipt, err = exports.whip_core:ChargePlayer(source, 5000, { method = 'cash', reason = 'Pistol' })
+        if not receipt then return false, err end
 
-    local ok, why = exports.whip_gunny:GiveWeapon(source, 'gunny_pistol', nil, 'Pistol purchase')
-    if not ok then
-        Whip.call('RefundPlayer', receipt)
-        return false, why
-    end
-    exports.whip_gunny:GiveMagazine(source, 'gunny_mag_pistol', 12, 'Pistol purchase')
-    Whip.call('AddItem', source, 'ammo_9mm', 24, nil, 'Pistol purchase')
-    Whip.call('NotifyPlayer', source, 'Pistol purchased!', 'success')
+        local ok, why = exports.whip_gunny:GiveWeapon(source, 'gunny_pistol', nil, 'Pistol purchase')
+        if not ok then
+            Whip.call('RefundPlayer', receipt)
+            return false, why
+        end
+        exports.whip_gunny:GiveMagazine(source, 'gunny_mag_pistol', 12, 'Pistol purchase')
+        Whip.call('AddItem', source, 'ammo_9mm', 24, nil, 'Pistol purchase')
+        Whip.call('NotifyPlayer', source, 'Pistol purchased!', 'success')
+    end)
 end)</code></pre>
 <h2 id="credits">Credits</h2>
 <p class="lede">The people whose work WHIP builds on.</p>

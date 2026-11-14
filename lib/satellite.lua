@@ -3,20 +3,16 @@
 --     dependency 'whip_core'
 --     shared_script '@whip_core/lib/satellite.lua'
 --
--- Then, on either side (server or client), declare what your resource adds:
---
---     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---     Whip.declare:RegisterUseHandler('lemonade', drinkLemonade)
---
--- or, for more than one call (a loop over your Config, an answer you keep), a function:
+-- Then, on either side (server or client), declare what your resource adds in a function:
 --
 --     Whip.register(function()
---         for key, def in pairs(Config.Drinks) do exports.whip_core:RegisterItem(key, def) end
+--         Whip.core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+--         Whip.core:RegisterUseHandler('lemonade', drinkLemonade)
 --     end)
 --
--- Each runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what you
--- registered). It is a file you include, not an export, because the registration list has to live in your
--- resource's Lua state.
+-- It runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what you
+-- registered). A declaring call that whip_core refuses is printed in your console. It is a file you include, not an
+-- export, because the registration list has to live in your resource's Lua state.
 
 Whip = Whip or {}
 
@@ -218,21 +214,6 @@ end
 --- Calls still waiting on whip_core, answered if it stops first. [promise] = the export's name.
 local _waiting = {}
 
---- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
---- whip_core is not running or the call threw — never an error in your code.
----
----     local ok, err = Whip.call('AddItem', source, 'lemonade', 1, nil, 'bought at the stand')   -- nil: no metadata
----
---- AN EXPORT THAT WAITS IS ANSWERED IF whip_core STOPS. Progress and SkillCheck
---- wait for the player; anything that reads the database waits for it. That wait lives in
---- whip_core, and when whip_core stops it is gone with it — the call never returns, and your
---- handler stays stuck holding whatever it held (a "busy" latch, a half-done flow) until your
---- resource restarts. Called through here, it answers `false, 'whip_core stopped'` instead.
---- `exports.whip_core:Progress(...)` straight gets no such answer. (With `dependency 'whip_core'`
---- your resource stops with whip_core and starts fresh, so nothing stays stuck either way.)
----
---- 'whip_core stopped' MEANS "NO ANSWER", NOT "DID NOT HAPPEN": a charge whose write had already gone
---- to the database lands anyway. Treat it like a lost connection — check, do not repeat blindly.
 -- The exports that can wait, on each side: dev/waits.js finds them, its --write writes this list and the docs' WAITS
 -- list, and its --check keeps both the same as the stubs' ---@async marks. Only these get Whip.call's thread and
 -- promise; every other call goes straight through (cheap enough for a loop).
@@ -240,9 +221,13 @@ local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptOrCreate
 local WAITS_HERE = {}
 for _, n in ipairs(WAITS[IsDuplicityVersion() and 'server' or 'client'] or {}) do WAITS_HERE[n] = true end
 
+--- The coroutine running the registrations right now, if any (see Whip.register).
+local _runningCo = nil
+
+--- One call into whip_core: Whip.call without its refusal line.
 ---@param name string  the export's name
 ---@return any ...
-function Whip.call(name, ...)
+local function callCore(name, ...)
     if GetResourceState(CORE) ~= 'started' then
         return false, 'whip_core is not running'
     end
@@ -296,6 +281,55 @@ function Whip.call(name, ...)
     return table.unpack(packed, 2, packed.n)
 end
 
+--- Does `name` declare something (what a Whip.register function is for)? Its refusal there is printed.
+---@param name string
+---@return boolean
+local function declares(name)
+    return name:find('^Register') ~= nil or name:find('^Ensure') ~= nil or name:find('^Add') ~= nil
+        or name:find('^On%u') ~= nil or name:find('^Watch') ~= nil
+        or name == 'SecureEvent' or name == 'SecureCallback'
+end
+
+--- Print a refusal (`false, why`) in this console, naming the export, and pass every answer on.
+local function sayRefusal(name, ...)
+    local ok, why = ...
+    if ok == false and type(why) == 'string' then
+        -- Whip.call's own reasons already name the export ('whip_core:X failed: ...')
+        local text = why:find('whip_core:' .. name, 1, true) == 1 and why
+            or ('whip_core:%s refused: %s'):format(name, why)
+        print(('[%s] %s'):format(SELF, text))
+    end
+    return ...
+end
+
+--- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
+--- whip_core is not running or the call threw — never an error in your code.
+---
+---     local ok, err = Whip.call('AddItem', source, 'lemonade', 1, nil, { reason = 'bought at the stand' })
+---
+--- INSIDE A Whip.register FUNCTION, A DECLARING CALL'S REFUSAL IS PRINTED in your console, naming the export:
+--- Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. Nobody else reads it there. A
+--- call straight through exports.whip_core is not.
+---
+--- AN EXPORT THAT WAITS IS ANSWERED IF whip_core STOPS. Progress and SkillCheck
+--- wait for the player; anything that reads the database waits for it. That wait lives in
+--- whip_core, and when whip_core stops it is gone with it — the call never returns, and your
+--- handler stays stuck holding whatever it held (a "busy" latch, a half-done flow) until your
+--- resource restarts. Called through here, it answers `false, 'whip_core stopped'` instead.
+--- `exports.whip_core:Progress(...)` straight gets no such answer. (With `dependency 'whip_core'`
+--- your resource stops with whip_core and starts fresh, so nothing stays stuck either way.)
+---
+--- 'whip_core stopped' MEANS "NO ANSWER", NOT "DID NOT HAPPEN": a charge whose write had already gone
+--- to the database lands anyway. Treat it like a lost connection — check, do not repeat blindly.
+---@param name string  the export's name
+---@return any ...
+function Whip.call(name, ...)
+    if _runningCo ~= nil and coroutine.running() == _runningCo and type(name) == 'string' and declares(name) then
+        return sayRefusal(name, callCore(name, ...))
+    end
+    return callCore(name, ...)
+end
+
 --- whip_core's exports, each called through Whip.call: `Whip.core:AddItem(source, 'cookie', 1)` is
 --- `Whip.call('AddItem', source, 'cookie', 1)`. Typed like exports.whip_core (types/satellite.lua), so the editor
 --- shows each export's params and answers, where Whip.call('Name') shows none and a misspelt name only answers false.
@@ -310,9 +344,6 @@ Whip.core = setmetatable({}, {
         return fn
     end,
 })
-
---- The coroutine running the registrations right now, if any (see Whip.register).
-local _runningCo = nil
 
 local function runAll(list, what)
     -- A copy of the list: a registration added while these run (from another thread, during a wait)
@@ -330,8 +361,17 @@ local function runAll(list, what)
 end
 
 --- Run `fn` whenever your registrations are needed: when whip_core becomes ready, and every time
---- it restarts. Put everything you register with whip in here (or, one call at a time, through
---- Whip.declare, below). Safe to run more than once: the same registration again changes nothing.
+--- it restarts. Put everything you register with whip in here, called through Whip.core:
+---
+---     Whip.register(function()
+---         Whip.core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+---         Whip.core:SecureEvent('lemonade:buy', { rateLimit = 1000 }, buyLemonade)
+---     end)
+---
+--- Safe to run more than once: the same registration again changes nothing. While `fn` runs, a declaring
+--- call through Whip.core or Whip.call that whip_core refuses (`false, why`) is printed in your console:
+--- Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. A call straight through
+--- exports.whip_core is not: check its answer yourself.
 ---
 --- Called late — from a thread, after the announcement already went by — `fn` runs straight
 --- away as well, instead of waiting for a whip_core restart that may never come.
@@ -348,63 +388,6 @@ function Whip.register(fn)
     _registerFns[#_registerFns + 1] = fn
     if _heard then runAll({ fn }, 'Whip.register') end
 end
-
--- ============================================
--- One declaration at a time: Whip.declare
--- ============================================
---
--- A whip_core export that declares something, called through here, is remembered and made again whenever
--- whip_core needs it, with no function around it:
---
---     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---
--- is the same as
---
---     Whip.register(function()
---         local ok, why = exports.whip_core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---         if ok == false then print(why) end
---     end)
---
--- Only declarations: whip_core's Register…, Ensure…, On… and Watch… exports, SecureEvent, SecureCallback, AddAction,
--- AddItemOption, AddPoint and AddWeapons. Anything else (AddItem, CreateShop) would happen again at every whip_core
--- start, so it is refused, with a line in this console.
---
--- THE ARGUMENTS ARE TAKEN ONCE, AS YOU CALL IT, so a function you hand it must be defined above the call. A value
--- that can change before whip_core is ready or after (a Config value on your settings page, which Whip.configPage
--- writes in when whip_core is ready) goes in Whip.register, which builds its calls each time it runs. So does a call
--- whose answer you keep (an AddAction id, a WatchVehicleStat handle): this answers only whether it took the call.
-
---- Is `name` an export Whip.declare takes? See above.
----@param name string
----@return boolean
-local function declares(name)
-    return name:find('^Register') ~= nil or name:find('^Ensure') ~= nil or name:find('^On%u') ~= nil
-        or name:find('^Watch') ~= nil or name == 'SecureEvent' or name == 'SecureCallback' or name == 'AddAction'
-        or name == 'AddItemOption' or name == 'AddPoint' or name == 'AddWeapons'
-end
-
---- whip_core's declaring exports, each remembered and made again whenever whip_core needs it (see above).
---- Written with a colon like an export; a dot works too. Answers true when it took the call.
-Whip.declare = setmetatable({}, {
-    __index = function(proxy, name)
-        local fn = function(first, ...)
-            local args = rawequal(first, proxy) and table.pack(...) or table.pack(first, ...)
-            if type(name) ~= 'string' or not declares(name) then
-                print(('[%s] Whip.declare:%s is not a declaration (Register…, Ensure…, On…, Watch…, SecureEvent, '
-                    .. 'SecureCallback, AddAction, AddItemOption, AddPoint, AddWeapons); call it in Whip.register or '
-                    .. 'where it belongs'):format(SELF, tostring(name)))
-                return false
-            end
-            Whip.register(function()
-                local ok, why = Whip.call(name, table.unpack(args, 1, args.n))
-                if ok == false then print(('[%s] Whip.declare:%s: %s'):format(SELF, name, tostring(why))) end
-            end)
-            return true
-        end
-        rawset(proxy, name, fn)
-        return fn
-    end,
-})
 
 --- Run `fn` when whip_core stops. ONLY FOR A RESOURCE WITHOUT `dependency 'whip_core'`: with it (every
 --- whip resource), FiveM stops your resource first when whip_core stops, so this never runs, and your
