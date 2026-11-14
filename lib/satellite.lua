@@ -398,15 +398,16 @@ Whip.declare = setmetatable({}, {
     __index = function(proxy, name)
         local fn = function(first, ...)
             local args = rawequal(first, proxy) and table.pack(...) or table.pack(first, ...)
+            -- A refusal is a start problem (Whip.startProblem): red, and Whip.sayStarted does not then say all is well.
             if type(name) ~= 'string' or not declares(name) then
-                print(('[%s] Whip.declare:%s is not a declaration (Register…, Ensure…, On…, Watch…, SecureEvent, '
+                Whip.startProblem('Whip.declare:%s is not a declaration (Register…, Ensure…, On…, Watch…, SecureEvent, '
                     .. 'SecureCallback, AddAction, AddItemOption, AddPoint, AddWeapons); call it in Whip.register or '
-                    .. 'where it belongs'):format(SELF, tostring(name)))
+                    .. 'where it belongs', tostring(name))
                 return false
             end
             Whip.register(function()
                 local ok, why = Whip.call(name, table.unpack(args, 1, args.n))
-                if ok == false then print(('[%s] Whip.declare:%s: %s'):format(SELF, name, tostring(why))) end
+                if ok == false then Whip.startProblem('Whip.declare:%s: %s', name, tostring(why)) end
             end)
             return true
         end
