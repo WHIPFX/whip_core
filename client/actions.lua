@@ -15,9 +15,11 @@
 -- AT
 --   { coords = vec3, heading?, follow? }        a prompt at a point. heading: stands like a sign;
 --                                               none: faces you. follow: returns x, y, z, heading
---   { entity = handle, offset? = vec3, bone? }  a prompt riding on an entity; removed a few seconds
---                                               after it is gone (`onGone` is told)
---   { netId = n, offset?, bone? }               the same by network id: off while the entity is not
+--   { entity = handle, offset? = vec3, bone?, heading? }   a prompt riding on an entity; removed a few
+--                                               seconds after it is gone (`onGone` is told). heading: a
+--                                               sign at that yaw from the entity's own facing, turning
+--                                               with it (180: on its back); none: faces you
+--   { netId = n, offset?, bone?, heading? }     the same by network id: off while the entity is not
 --                                               streamed in here, back when it is
 --   { model = 'prop_x' | { ... }, offset?, heading?, faces?, perModel? }   a prompt on every prop of
 --                                               that model near the player. perModel:
@@ -762,9 +764,20 @@ local function mountPrompt(entry)
 
     local x, y, z, follow
     local rides = at.entity ~= nil or at.netId ~= nil
+    -- A riding prompt with a heading is a sign at that yaw FROM THE ENTITY'S OWN FACING, turning with it (a speaker's
+    -- back on a car going round a corner); one without faces the player.
+    local turn = rides and tonumber(at.heading) or nil
     if rides then
         x, y, z = ridePoint(at)
-        follow = function() return ridePoint(at) end
+        if turn then
+            follow = function()
+                local px, py, pz = ridePoint(at)
+                if not px then return nil end
+                return px, py, pz, (GetEntityHeading(entityOf(at)) + turn) % 360.0
+            end
+        else
+            follow = function() return ridePoint(at) end
+        end
     else
         x, y, z = xyz(at.coords)
         follow = at.follow
@@ -788,8 +801,10 @@ local function mountPrompt(entry)
     reg.onBlur = foldOnBlur(entry, pid, entityNow, whereNow)
     reg.id = pid
     reg.x, reg.y, reg.z = x, y, z
-    -- A vector4's w is the heading, or a table's `w`, `heading` or [4].
-    reg.heading = tonumber(at.heading) or (function()
+    -- A vector4's w is the heading, or a table's `w`, `heading` or [4]. (A riding prompt's: from its entity's facing.)
+    local ent = turn and entityOf(at) or nil
+    reg.heading = (turn and ent and DoesEntityExist(ent) and (GetEntityHeading(ent) + turn) % 360.0)
+        or tonumber(at.heading) or (function()
         local c = at.coords
         if type(c) == 'vector4' then return c.w end
         if type(c) == 'table' then return tonumber(c.w or c.heading or c[4]) end
