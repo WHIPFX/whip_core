@@ -59,7 +59,8 @@ local function allResources()
     return out
 end
 
---- How many of whip's four marks the oxmysql build carries (dev/oxmysql-p001.diff: a lost connection fails at once).
+--- How many of whip's four marks the oxmysql build carries: those of WHIPFX's oxmysql, or of a build patched by hand with
+--- dev/oxmysql-p001.diff (a lost connection fails at once).
 local function oxmysqlPatched()
     local src = LoadResourceFile('oxmysql', 'dist/build.js')
     if not src then return false end
@@ -129,7 +130,7 @@ local function gather()
         -- Stock oxmysql works; the patch is what keeps a query from waiting for ever while the database is down.
         if not patched and GetResourceState('oxmysql') ~= 'missing' then
             add('note', 'oxmysql has not got whip\'s patch: while the database is down a query can wait for ever'
-                .. ' (whip gives up on it after 65 s). The steps: whip_core/dev/oxmysql-p001.diff')
+                .. ' (whip gives up on it after 65 s). WHIPFX\'s oxmysql has it: github.com/WHIPFX/oxmysql/releases')
         end
     end
 
@@ -142,12 +143,13 @@ local function gather()
         elseif s ~= 'started' and s ~= 'starting' then stopped[#stopped + 1] = res end
     end
     if #missing > 0 then
-        add('fix', 'Not in the resources folder: %s. Players miss the pictures and videos in them: put them in [whip] with'
-            .. ' the rest', table.concat(missing, ', '))
+        add('fix', 'Not in the resources folder: %s. Players miss the pictures and videos in them: put them in your resources'
+            .. ' folder (a server made by WHIP\'s recipe keeps them in [assets]/[media])', table.concat(missing, ', '))
     end
     if #stopped > 0 then
-        add('fix', 'In the resources folder but not started: %s. Ensure them ("ensure [whip]" starts every resource in'
-            .. ' the folder)', table.concat(stopped, ', '))
+        add('fix', 'In the resources folder but not started: %s. Start them with "ensure <name>" for each, or with the'
+            .. ' ensure of the folder they are in ("ensure [assets]" in a server made by WHIP\'s recipe)',
+            table.concat(stopped, ', '))
     end
     if #missing == 0 and #stopped == 0 then
         add('ok', 'Pictures and videos: %s', table.concat(packs, ', '))
