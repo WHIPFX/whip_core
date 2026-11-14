@@ -471,6 +471,10 @@ ConfigSchema = {
             { path = 'MaxWeight.player', type = 'number', min = 1, max = 1000, step = 0.5, unit = 'kg', cross = cashCross,
               label = 'Inventory Weight Limit',
               help = 'How much weight a character can carry, the accessory strip included. Lowering it below what someone carries takes nothing away, but nothing more fits until they put something down.' },
+            { path = 'WeightUnit', type = 'enum',
+              options = { { value = 'kg', label = 'Kilograms and grams' }, { value = 'lb', label = 'Pounds and ounces' } },
+              label = 'Weight unit',
+              help = 'What the inventory and shops show weights in, until a player picks their own in Server Settings. Weights typed in config.lua and on these pages are kilograms either way.' },
             -- A plain on/off; its slots are code (shared/inventory_shape.lua, AccessoryStripSlots).
             { path = 'AccessoryStrip', type = 'bool', apply = 'restart',
               why = 'Which containers a character has is fixed when whip_core starts.',

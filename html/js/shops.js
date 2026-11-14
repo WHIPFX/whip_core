@@ -20,6 +20,7 @@
 import { NuiRouter } from './router.js';
 import { nuiCallback, itemImageUrl } from './utils.js';
 import { showBasketQuantity, weightLine } from './inventory.js';
+import { weightText } from './weight.js';
 import { invItemDefs } from './core/item-defs.js';
 import { inv, shop, invRegisterShopHooks } from './core/inv-state.js';
 import { talkOpen, talkClose, talkFit } from './shop-talk.js';   // the visit's /me lines in the header
@@ -95,11 +96,6 @@ function priceText(n) {
 function itemName(key) {
     const def = invItemDefs[key];
     return (def && def.name) || key;
-}
-
-/** A weight as the inventory writes it: decimals only when there are some ("0.3 kg", "2 kg"). */
-function kgText(n) {
-    return String(Math.round((Number(n) || 0) * 100) / 100) + ' kg';
 }
 
 // ============================================
@@ -667,7 +663,7 @@ function cardEl(n, e, inBag) {
     name.textContent = itemName(e.item);
     const meta = document.createElement('div');
     meta.className = 'inv-shop-card-meta';
-    const weight = def.weight !== undefined ? kgText(def.weight) : '';
+    const weight = def.weight !== undefined ? weightText(def.weight) : '';
     meta.textContent = gone && inBag === 0 ? 'Sold out'
         : (counted ? left.toLocaleString('en-US') + ' left' + (weight ? ' · ' + weight : '') : weight);
 

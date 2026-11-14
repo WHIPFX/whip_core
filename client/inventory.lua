@@ -3,6 +3,16 @@
 -- FocusScreenUp, ExternalUIOpenForOthers), the hook registry (RegisterClientHook / RunClientHook), ThrowModeActive.
 Inventory = {}
 
+-- Each player's own unit for weights, read by the page (html/js/weight.js); Config.WeightUnit is the default.
+PlayerPrefs.define({
+    key = 'inv.weightUnit', group = 'Map & HUD', type = 'choice', label = 'Weight unit',
+    help = 'What the inventory and shops show weights in.',
+    options = { { value = 'kg', label = 'kg and g' }, { value = 'lb', label = 'lb and oz' } },
+    default = function() return Config.WeightUnit == 'lb' and 'lb' or 'kg' end,
+    page = true,
+})
+Settings.onChange('WeightUnit', function() PlayerPrefs.recheck({ 'inv.weightUnit' }) end)
+
 local invOpen = false
 
 -- Declared here: used above their definitions.

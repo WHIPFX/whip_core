@@ -16,6 +16,7 @@ import { registerRenderer, getRenderer, defaultSeated, setViewRenderHook } from 
 import { closeInventory } from './core/inv-wire.js';
 import { padGlyph } from './pad-glyphs.js';
 import { pref } from './prefs.js';
+import { weightText, weightLine } from './weight.js';
 
 // The accessory strip draws from slotConfig.accessorySlots (core/inv-state.js) — the
 // server-registered table, NOT a hardcoded list. A satellite calling
@@ -55,17 +56,7 @@ function flashPanel(el) {
     setTimeout(() => el.classList.remove('inv-panel-swapped'), 450);
 }
 
-/** A weight as a player reads it: decimals only when there are some ("80", "13.95", "6.3"). */
-function fmtKg(n) {
-    return String(Math.round((Number(n) || 0) * 100) / 100);
-}
-
-/**
- * "13.95 / 80 kg" — ONE format for every weight line.
- */
-export function weightLine(current, max) {
-    return fmtKg(current) + ' / ' + fmtKg(max) + ' kg';
-}
+export { weightLine };
 
 /**
  * A slot's stack count: thousands separated, and money as money —
@@ -2845,8 +2836,8 @@ function showTooltipForItem(item) {
     // A stack says what one weighs as well as all of them: the figure a player needs
     // to decide how many to move.
     document.getElementById('inv-tooltip-weight').textContent = amount > 1
-        ? fmtKg(totalWeight / amount) + ' kg each · ' + fmtKg(totalWeight) + ' kg'
-        : fmtKg(totalWeight) + ' kg';
+        ? weightText(totalWeight / amount) + ' each · ' + weightText(totalWeight)
+        : weightText(totalWeight);
 
     // How full the stack is, for anything that stacks (not money: "of 999,999" says nothing).
     const stackRow = document.getElementById('inv-tooltip-stack-row');

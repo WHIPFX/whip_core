@@ -50,6 +50,12 @@ Config.MaxWeight = {   -- Kilograms
     accessory = 10.0,   -- the strip on its own, inside the 80
 }
 
+-- What the inventory and shops show weights in, until a player picks their own (Server Settings → Map & HUD).
+--   'kg' = grams under a kilo, kilograms from one up
+--   'lb' = ounces under a pound, pounds from one up
+-- Weights in this file and in RegisterItem are kilograms either way.
+Config.WeightUnit = 'kg'
+
 -- The small strip beside the inventory: five slots that take anything. A car key in one goes into the ignition
 -- by itself when its holder takes the driver's seat, and whip_phone looks for a phone in the first slot first.
 --   true  = every character has it
