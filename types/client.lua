@@ -996,9 +996,9 @@ function whip_core:GetVehicleEntity(vehicleId) end
 --- `{ plate = }` reads the cache by plate, so a car that is not streamed in here is found too.
 ---
 ---     exports.whip_core:HasVehicleKey({ plate = 'ABC123' })
----@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
+---@param ref number|WhipVehicleRef Vehicle ID, or a vehicle reference
 ---@return boolean
-function whip_core:HasVehicleKey(vehicleId) end
+function whip_core:HasVehicleKey(ref) end
 
 --- Everything this CLIENT knows about a vehicle, in one call.
 ---
@@ -1011,9 +1011,9 @@ function whip_core:HasVehicleKey(vehicleId) end
 --- cars streamed in near this client are found.
 ---
 ---     local v = exports.whip_core:GetVehicle({ entity = veh })
----@param vehicleId number|WhipVehicleRef
+---@param ref number|WhipVehicleRef A vehicleId, or a vehicle reference
 ---@return table|nil
-function whip_core:GetVehicle(vehicleId) end
+function whip_core:GetVehicle(ref) end
 
 --- Resolve a vehicle entity to a vehicleId, registering it as a session vehicle if it is not one
 --- already.
@@ -1267,11 +1267,11 @@ function whip_core:RemoveZoneGroup(group) end
 --- Change one of your zones: only the keys you give. A key it doesn't know changes nothing.
 ---
 ---     exports.whip_core:UpdateZone(id, { pos = GetEntityCoords(PlayerPedId()), label = 'Here' })
----@param id string Zone id, or a saved zone's key (EnsureZone)
+---@param idOrKey string Zone id, or a saved zone's key (EnsureZone)
 ---@param patch WhipZonePatch
 ---@return boolean ok
 ---@return string|nil why
-function whip_core:UpdateZone(id, patch) end
+function whip_core:UpdateZone(idOrKey, patch) end
 
 --- Is a point inside a zone (instant, no polling)?
 ---@param id string Zone id, or a saved zone's key (EnsureZone)
@@ -1686,10 +1686,10 @@ function whip_core:ClearVehicleStatIcon(name) end
 --- Where a named point is on this vehicle now, on the side nearest the player: whip's own ('fuel', 'engine',
 --- 'storage', 'mount', 'board') or yours (SetVehiclePointRules). nil when the model has nowhere for it. `fixed`: the
 --- point is on that side wherever the player stands (a car's filler); false, it is on the side they are on.
----@param vehicle number|table A vehicle reference: a vehicleId, or the entity as { entity = veh }
+---@param ref number|table A vehicle reference: a vehicleId, or the entity as { entity = veh }
 ---@param action string
 ---@return { x: number, y: number, z: number, heading: number, side: 'left'|'right'|'front'|'rear'|nil, fixed: boolean }|nil
-function whip_core:GetVehiclePoint(vehicle, action) end
+function whip_core:GetVehiclePoint(ref, action) end
 
 --- Name a point of your own: rules = { default = { place, ... }, bike = { ... }, boat = ... }, the places to try in
 --- order per kind of vehicle. A place: a bone name, a list of bone names, 'entry', 'box', 'box:rear', 'box:front',

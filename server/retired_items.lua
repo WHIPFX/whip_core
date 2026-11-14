@@ -361,12 +361,12 @@ end
 
 --- RetireItem(name, reason): take an item out of the game for good (the top of this file). Answers true, or
 --- false and why. Asking again with the same reason changes nothing.
-exports('RetireItem', function(name, reason)
-    return RetiredItems.retire(name, reason, Registry.caller())   -- the caller first, before anything yields
+exports('RetireItem', function(key, reason)
+    return RetiredItems.retire(key, reason, Registry.caller())   -- the caller first, before anything yields
 end)
 
 --- UnretireItem(name): give up your own retirement. The name is free again (RegisterItem it to bring the item
 --- back); what was taken stays taken.
-exports('UnretireItem', function(name)
-    return _retired:remove(Registry.caller(), name)
+exports('UnretireItem', function(key)
+    return _retired:remove(Registry.caller(), key)
 end)
