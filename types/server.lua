@@ -1545,7 +1545,7 @@ function whip_core:RegisterItem(key, definition) end
 --- each loads (a character at login, a stash or a car when opened). Inside duffle bags and wallets too.
 --- Yours while your resource runs, as every registration; asking again changes nothing.
 ---
----     exports.whip_core:RetireItem('turbo', 'Turbos are sold at Whiplash now, in stages')
+---     exports.whip_core:RetireItem('mycafe_bagel', 'Bagels are off the menu')
 ---@param key string Item key
 ---@param reason? string For the log (120 characters at most)
 ---@return boolean ok

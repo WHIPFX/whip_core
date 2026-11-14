@@ -2,7 +2,7 @@
 -- RETIRED ITEMS — an item taken out of the game for good
 -- ============================================
 --
---     exports.whip_core:RetireItem('turbo', 'Turbos are sold at Whiplash now, in stages')
+--     exports.whip_core:RetireItem('mycafe_bagel', 'Bagels are off the menu')
 --
 -- The item stops being an item: its definition goes (so nothing can make a new one: AddItem, a shop, a ground
 -- drop all refuse an unknown item), RegisterItem refuses the name, and every one already out there is taken
