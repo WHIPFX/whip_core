@@ -73,7 +73,24 @@ local function placeOf(run, worldId)
     if not piece then return nil, ('%s has no model or no position'):format(tostring(worldId)) end
     if piece.attachTo then
         local t = Director.handleOf(run, piece.attachTo)
-        if type(t) == 'table' and t.netId then return { netId = t.netId } end
+        if type(t) == 'table' and t.netId then
+            -- Its spot on what it rides, worked out as nodes_props.lua attaches it (from where that was placed, by its
+            -- heading), so the song comes out of the speaker on the car, not the car's middle. Too far from it for a
+            -- world voice's place (10 m): from what it rides.
+            local pw = run.graph.world[piece.attachTo]
+            local pc = type(pw) == 'table' and type(pw.def) == 'table' and pw.def.coords or nil
+            if type(pc) == 'table' then
+                local ph = math.rad(-(tonumber(pc.heading) or 0.0))
+                local dx = piece.coords.x - (tonumber(pc.x) or 0.0)
+                local dy = piece.coords.y - (tonumber(pc.y) or 0.0)
+                local dz = piece.coords.z - (tonumber(pc.z) or 0.0)
+                local ox, oy = dx * math.cos(ph) - dy * math.sin(ph), dx * math.sin(ph) + dy * math.cos(ph)
+                if math.sqrt(ox * ox + oy * oy + dz * dz) <= 10.0 then
+                    return { netId = t.netId, offset = vector3(ox, oy, dz + 0.0), model = piece.model }
+                end
+            end
+            return { netId = t.netId }
+        end
     end
     return { coords = vector3(piece.coords.x + 0.0, piece.coords.y + 0.0, piece.coords.z + 0.0), model = piece.model }
 end
