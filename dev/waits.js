@@ -1,7 +1,10 @@
 // Which whip_core exports can wait (yield the caller)? A static scan of whip_core's Lua.
 //
 //   node dev/waits.js              the lists, server and client
-//   node dev/waits.js --check      do types/server.lua, types/client.lua (---@async) and docs.html (WAITS) say the same?
+//   node dev/waits.js --check      do types/server.lua, types/client.lua (---@async), docs.html (WAITS) and
+//                                  lib/satellite.lua (WAITS) say the same?
+//   node dev/waits.js --write      rewrite the WAITS lists in docs.html and lib/satellite.lua from the scan (the
+//                                  stubs' ---@async marks stay by hand: --check names any that differ)
 //   node dev/waits.js --why server:export:AddItem      the chain that makes one wait
 //
 // Run from whip_core. A function waits if its own body calls Wait, Citizen.Await, Await, a MySQL *.await or
@@ -14,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
 const checkMode = process.argv.includes('--check');
+const writeMode = process.argv.includes('--write');
 const whyName = process.argv.indexOf('--why') > 0 ? process.argv[process.argv.indexOf('--why') + 1] : null;
 
 function files(dir) {
@@ -219,6 +223,41 @@ for (const side of ['server', 'client', 'shared']) {
   out[side] = { total: all.length, waits: all.filter(([n, k]) => why.has(k) && !n.startsWith('__')).map(([n]) => n).sort() };
 }
 
+// The stubs' ---@async marks, by side. They are kept by hand, so they also hold a wait the scan cannot follow.
+const asyncMarks = {};
+for (const side of ['server', 'client']) {
+  const stub = fs.readFileSync(path.join(root, 'types', side + '.lua'), 'utf8');
+  asyncMarks[side] = [...stub.matchAll(/---@async\r?\nfunction whip_core:(\w+)\(/g)].map((m) => m[1]);
+}
+
+// --write: the two WAITS lists, one line of JSON each: what the scan finds, plus what a stub marks ---@async that the
+// scan cannot follow (GetScenarioStats), while it is still an export on that side. Only the list changes, so a
+// second run writes nothing.
+if (writeMode) {
+  const lists = {};
+  for (const side of ['server', 'client']) {
+    const names = new Set(out[side].waits);
+    for (const n of asyncMarks[side]) if (exportsOf[side].has(n) || exportsOf.shared.has(n)) names.add(n);
+    lists[side] = [...names].sort();
+  }
+  const json = JSON.stringify(lists);
+  const targets = [
+    { file: 'docs.html', re: /(var WAITS = )\{[\s\S]*?\}(;)/, what: '`var WAITS = {...};`' },
+    { file: 'lib/satellite.lua', re: /(local WAITS = json\.decode\(\[\[)\{[\s\S]*?\}(\]\]\))/, what: '`local WAITS = json.decode([[{...}]])`' },
+  ];
+  let failed = false;
+  for (const t of targets) {
+    const file = path.join(root, t.file);
+    const src = fs.readFileSync(file, 'utf8');
+    if (!t.re.test(src)) { failed = true; console.log(`${t.file}: no ${t.what} list to write`); continue; }
+    const next = src.replace(t.re, (_, open, close) => open + json + close);
+    if (next === src) { console.log(`${t.file}: unchanged`); continue; }
+    fs.writeFileSync(file, next);
+    console.log(`${t.file}: written (${lists.server.length} server, ${lists.client.length} client)`);
+  }
+  process.exit(failed ? 1 : 0);
+}
+
 if (!checkMode) {
   for (const side of ['server', 'client']) {
     console.log(`${side}: ${out[side].waits.length} of ${out[side].total} exports can wait`);
@@ -236,11 +275,7 @@ function compare(what, scanned, marked) {
   if (missing.length) { bad++; console.log(`${what}: not marked, but can wait: ${missing.join(' ')}`); }
   if (extra.length) { bad++; console.log(`${what}: marked, but the scan finds no wait (check by hand; keep it if it is a call the scan cannot follow): ${extra.join(' ')}`); }
 }
-for (const side of ['server', 'client']) {
-  const stub = fs.readFileSync(path.join(root, 'types', side + '.lua'), 'utf8');
-  const marked = [...stub.matchAll(/---@async\r?\nfunction whip_core:(\w+)\(/g)].map((m) => m[1]);
-  compare(`types/${side}.lua`, out[side].waits, marked);
-}
+for (const side of ['server', 'client']) compare(`types/${side}.lua`, out[side].waits, asyncMarks[side]);
 const docs = fs.readFileSync(path.join(root, 'docs.html'), 'utf8');
 const listed = docs.match(/var WAITS = (\{[\s\S]*?\});/);
 if (!listed) { bad++; console.log('docs.html: no `var WAITS = {...};` list'); }

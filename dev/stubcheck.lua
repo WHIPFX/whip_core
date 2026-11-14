@@ -4,7 +4,8 @@
 --- one is invisible to autocomplete, and a stub without an export is a call that throws. This compares them, side by
 --- side: server/ is the server, client/ and tools/ the client, shared/ both (fxmanifest.lua loads them so). An export
 --- is `exports('Name', ...)` and the zone setters made through zoneSetter('Name', ...); a stub is
---- `function whip_core:Name(...)`. Names starting __Test are whip_test's seams, not public, and are skipped.
+--- `function whip_core:Name(...)`. Names starting __ are internal (whip_test's __Test seams, and the plumbing behind
+--- lib/satellite.lua's Whip.* helpers), not public, and are skipped.
 --- Not loaded by fxmanifest.lua.
 ---
 --- Usage (from anywhere):
@@ -60,7 +61,7 @@ local problems = 0
 for _, side in ipairs({ 'server', 'client' }) do
     local noStub, noExport = {}, {}
     for name, path in pairs(exportsOf[side]) do
-        if not name:match('^__Test') and not stubsOf[side][name] then noStub[#noStub + 1] = name .. ' (' .. path .. ')' end
+        if not name:match('^__') and not stubsOf[side][name] then noStub[#noStub + 1] = name .. ' (' .. path .. ')' end
     end
     for name in pairs(stubsOf[side]) do
         if not exportsOf[side][name] then noExport[#noExport + 1] = name end
