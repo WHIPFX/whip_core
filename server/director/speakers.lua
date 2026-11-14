@@ -137,7 +137,9 @@ function DirectorSpeakers.play(run, worldIds, url, o)
     stopOn(run, things, 0)
     local range = math.max(5, math.min(300, tonumber(o.range) or 40))
     local okC, key, cwhy = pcall(function()
-        return exports[VOICE]:CreateWorldVoice({ name = 'Speakers', at = places, range = range, bucket = run.bucket or 0 })
+        -- (music: heard as from far off, late by its distance, so the Doppler effect on a moving one: whip_voice.)
+        return exports[VOICE]:CreateWorldVoice({ name = 'Speakers', at = places, range = range, bucket = run.bucket or 0,
+                                                 music = true })
     end)
     if not okC or not key then return false, tostring(okC and cwhy or key) end
     playN = playN + 1
