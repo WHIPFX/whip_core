@@ -1,3 +1,6 @@
+WHIPFX's fork of oxmysql (github.com/WHIPFX/oxmysql) has this fix in its source, and its releases need no
+patching; WHIP's txAdmin recipe installs it. This file is for putting the fix into a stock oxmysql build by hand.
+
 whip's patch to oxmysql (P-001, 2 Oct 2026). Not loaded by fxmanifest.lua.
 
 When oxmysql cannot get a connection (the database is down or restarting) the error from

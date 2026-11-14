@@ -20,8 +20,8 @@ The `near` check on the door is the point: the pay event cannot be fired from an
 
 It sits in `whip_core/docs/examples/` so it never starts by itself: FiveM does not look for resources inside another resource's folder.
 
-1. Copy the `whip_delivery_example` folder into your resources folder, beside `[whip]`.
-2. In `server.cfg`, after `ensure [whip]`: `ensure whip_delivery_example`. Restart the server.
+1. Copy the `whip_delivery_example` folder into your resources folder.
+2. In `server.cfg`, below WHIP's `ensure` lines: `ensure whip_delivery_example`. Restart the server.
 3. At the depot desk (the van on the map, *Post Op depot*, beside the Public Garage): **Sign on as a driver**, **Clock on**, **Take a van**.
 4. Open the van's boot, drag a package into your pockets, drive to the door on your map, **Deliver the package**. Back at the desk: **Return the van**.
 

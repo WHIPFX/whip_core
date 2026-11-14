@@ -1132,8 +1132,8 @@ body.searching .main > h2 { margin-top: 56px; }
   <li><strong>You know QBCore or ESX:</strong> <a href="#coming-from">Coming from QBCore, ESX or ox</a> says what to keep, what to remove, and which whip call replaces each one you know.</li>
 </ul>
 
-<h3 id="whats-in-whip">What's in [whip]</h3>
-<p>The <code>[whip]</code> folder holds whip_core and the resources built on it. Each of them needs only whip_core, so you can leave out any you don't want.</p>
+<h3 id="whats-in-whip">What's in WHIP</h3>
+<p>WHIP is whip_core and the resources built on it. Each of them needs only whip_core, so you can leave out any you don't want.</p>
 
 <table class="event-table">
 <tr><th>Resource</th><th>Kind</th><th>Purpose</th></tr>
@@ -1145,7 +1145,7 @@ body.searching .main > h2 { margin-top: 56px; }
 <tr><td><code>whip_autos</code>, <code>whip_autos_shop</code></td><td>Feature</td><td>Whiplash: a customisation shop, turbos and nitrous; the shop building in Burton</td></tr>
 <tr><td><code>whip_voice</code></td><td>Feature</td><td>Voice chat on your own voice server, placed in 3D</td></tr>
 <tr><td><code>whip_chat</code>, <code>whip_loadingscreen</code></td><td>Feature</td><td>whip's chat and loading screen</td></tr>
-<tr><td><code>whip_media_clothing_male</code>, <code>whip_media_clothing_female</code>, <code>whip_media_props</code>, <code>whip_media_previews</code>, <code>whip_media_map</code></td><td>Media</td><td>Clothing, furniture, vehicle, NPC and tattoo pictures, emote videos and the map, kept out of whip_core so its updates stay small. They are in <code>[whip]/[assets]/[media]</code>; the two map packs are in <code>[whip]/[assets]</code></td></tr>
+<tr><td><code>whip_media_clothing_male</code>, <code>whip_media_clothing_female</code>, <code>whip_media_props</code>, <code>whip_media_previews</code>, <code>whip_media_map</code></td><td>Media</td><td>Clothing, furniture, vehicle, NPC and tattoo pictures, emote videos and the map, kept out of whip_core so its updates stay small. They are in <code>[assets]/[media]</code>; the two map packs are in <code>[assets]</code></td></tr>
 <tr><td><code>whip_homes_mirrorpark</code></td><td>Map</td><td>Every Mirror Park house as a walk-in home with its own interior, and 25 walk-in garages</td></tr>
 <tr><td><code>whip_graphics</code></td><td>Map</td><td>LED streetlights and whip's look for the city's light and sky</td></tr>
 </table>
@@ -1176,7 +1176,7 @@ https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-legacy.yaml
 <span class="cm"># Enhanced</span>
 https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-enhanced.yaml</code></pre>
 <ol start="2" style="margin:8px 0 12px 20px;font-size:calc(var(--read) * 0.933);line-height:1.8">
-  <li>Give it your server key (from <a href="https://portal.cfx.re" style="color:var(--accent)">portal.cfx.re</a>) and your database login. txAdmin downloads each whip resource at its release, and oxmysql; makes an <strong>empty</strong> database (whip builds every table it needs the first time it starts, and no whip resource has an SQL file to import); turns OneSync on; writes <code>server.cfg</code>; and makes your txAdmin account an admin.</li>
+  <li>Give it your server key (from <a href="https://portal.cfx.re" style="color:var(--accent)">portal.cfx.re</a>) and your database login. txAdmin downloads each WHIP resource at its release, and <a href="#oxmysql-patch">WHIPFX's build of oxmysql</a>; makes an <strong>empty</strong> database (WHIP builds every table it needs the first time it starts, and no WHIP resource has an SQL file to import); turns OneSync on; writes <code>server.cfg</code>; and makes your txAdmin account an admin. WHIP's ten resources land at the top of <code>resources</code>, the media and map packs in <code>[assets]</code>, and oxmysql in <code>[ox]</code>.</li>
   <li>Start the server.</li>
 </ol>
 
@@ -1188,13 +1188,23 @@ https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-enhanced.yaml<
 <span class="kw">sv_enforceGameBuild</span> 3407
 
 <span class="kw">ensure</span> oxmysql
-<span class="kw">ensure</span> [whip]    <span class="cm"># whip_core, its satellites, the media packs and the map packs</span>
+<span class="kw">ensure</span> whip_core
+<span class="kw">ensure</span> whip_autos
+<span class="kw">ensure</span> whip_autos_shop
+<span class="kw">ensure</span> whip_chat
+<span class="kw">ensure</span> whip_fuel
+<span class="kw">ensure</span> whip_gunny
+<span class="kw">ensure</span> whip_loadingscreen
+<span class="kw">ensure</span> whip_phone
+<span class="kw">ensure</span> whip_rope
+<span class="kw">ensure</span> whip_voice
+<span class="kw">ensure</span> [assets]    <span class="cm"># the media packs and the map packs</span>
 
 <span class="cm"># The admin tools (/w and /whip) for everyone in group.admin, which your txAdmin account is in</span>
 <span class="kw">add_ace</span> group.admin whip.devtools allow
 <span class="kw">add_principal</span> identifier.fivem:1234567 group.admin</code></pre>
 
-<p>The order inside <code>[whip]</code> doesn't matter; only <code>oxmysql</code> has to come before it. Your own resources go after it. FiveM's own <code>chat</code>, <code>spawnmanager</code> and <code>basic-gamemode</code> are not installed: whip has its own.</p>
+<p>The order of WHIP's <code>ensure</code> lines doesn't matter; only <code>oxmysql</code> has to come before them. Your own resources go after them. FiveM's own <code>chat</code>, <code>spawnmanager</code> and <code>basic-gamemode</code> are not installed: whip has its own.</p>
 
 <p id="platform"><strong>On an Enhanced server</strong> (the <code>cfx-server</code> server) the recipe writes two other lines in place of <code>sv_enforceGameBuild</code>:</p>
 <pre><code><span class="kw">setr</span> whip_platform enhanced
@@ -1321,7 +1331,7 @@ ok, why = <span class="fn">exports.whip_core</span>:<span class="fn">CommitWithA
 <tr><td>7. Try it</td><td>Testing, and watching the calls in the Monitor</td></tr>
 </table>
 <p>You need a server running whip_core (<a href="#quickstart">Quick Start</a>), and the <code>whip.devtools</code> ACE for yourself so <code>/w</code> and <code>/whip</code> open: one <code>add_ace</code> line in <code>server.cfg</code>, shown in Quick Start step 3.</p>
-<div class="info-box tip"><strong>The finished stand is in <code>whip_core/docs/examples/whip_cafe_example</code></strong>: this page and <a href="#first-job">Your First Job</a>, line for line, with the coffee's picture. Compare yours with it when a step will not work. It never starts by itself; to run it, copy the folder beside <code>[whip]</code> and <code>ensure</code> it. It uses the same names as yours, so run one of the two.</div>
+<div class="info-box tip"><strong>The finished stand is in <code>whip_core/docs/examples/whip_cafe_example</code></strong>: this page and <a href="#first-job">Your First Job</a>, line for line, with the coffee's picture. Compare yours with it when a step will not work. It never starts by itself; to run it, copy the folder into your resources folder and <code>ensure</code> it. It uses the same names as yours, so run one of the two.</div>
 
 <h3>1. The folder</h3>
 <p>Make a folder called <code>mycafe</code> in your resources, holding four files: <code>fxmanifest.lua</code>, <code>shared.lua</code>, <code>server.lua</code> and <code>client.lua</code>. The manifest:</p>
@@ -1337,8 +1347,8 @@ shared_scripts {
 }
 server_script <span class="str">'server.lua'</span>
 client_script <span class="str">'client.lua'</span></code></pre>
-<p><code>dependency 'whip_core'</code> makes the server start whip_core first. <code>@whip_core/lib/satellite.lua</code> is whip's helper file, and step 3 is about what it gives you. Add <code>ensure mycafe</code> to <code>server.cfg</code>, below <code>ensure [whip]</code>.</p>
-<p><strong>Your editor, before you write a line.</strong> Copy <code>whip_core/types/luarc.template.json</code> into <code>mycafe</code> as <code>.luarc.json</code> and open the folder in VS Code with the <em>Lua</em> extension (by sumneko). Every <code>exports.whip_core:…</code> call and every <code>Whip.*</code> then shows its parameters and what it answers, and a misspelt name is underlined. It finds whip's types whether <code>mycafe</code> sits next to the <code>[whip]</code> folder (as here) or next to <code>whip_core</code> itself. For FiveM's own functions (<code>GetEntityCoords</code> and the rest), add a natives extension such as <em>CfxLua IntelliSense</em>. One thing the editor cannot do is tell a server file from a client one: it offers both sides' calls everywhere. Hover a call to see its side (<code>WhipCoreServerExports</code> or <code>WhipCoreClientExports</code>), or read the SERVER / CLIENT mark on its card.</p>
+<p><code>dependency 'whip_core'</code> makes the server start whip_core first. <code>@whip_core/lib/satellite.lua</code> is whip's helper file, and step 3 is about what it gives you. Add <code>ensure mycafe</code> to <code>server.cfg</code>, below WHIP's <code>ensure</code> lines.</p>
+<p><strong>Your editor, before you write a line.</strong> Copy <code>whip_core/types/luarc.template.json</code> into <code>mycafe</code> as <code>.luarc.json</code> and open the folder in VS Code with the <em>Lua</em> extension (by sumneko). Every <code>exports.whip_core:…</code> call and every <code>Whip.*</code> then shows its parameters and what it answers, and a misspelt name is underlined. It finds WHIP's types whether <code>mycafe</code> sits next to <code>whip_core</code> (as here) or next to a <code>[whip]</code> folder that holds it. For FiveM's own functions (<code>GetEntityCoords</code> and the rest), add a natives extension such as <em>CfxLua IntelliSense</em>. One thing the editor cannot do is tell a server file from a client one: it offers both sides' calls everywhere. Hover a call to see its side (<code>WhipCoreServerExports</code> or <code>WhipCoreClientExports</code>), or read the SERVER / CLIENT mark on its card.</p>
 <p>With the dependency, your resource also stops when whip_core stops, and whip_core starts it again once it is back up (the console says so). So a whip_core restart is a fresh start for your resource too. A resource you stopped by hand stays stopped.</p>
 
 <h3>2. Where the counter is</h3>
@@ -1604,7 +1614,7 @@ Whip.<span class="fn">register</span>(<span class="kw">function</span>()
 <h3>Keep, replace, remove</h3>
 <table class="event-table">
 <tr><th>Resource</th><th>With whip</th></tr>
-<tr><td><code>oxmysql</code></td><td><strong>Keep</strong>: whip uses it. Ensure it above <code>[whip]</code></td></tr>
+<tr><td><code>oxmysql</code></td><td><strong>Keep</strong>: whip uses it. Ensure it above WHIP's resources</td></tr>
 <tr><td><code>qb-core</code>, <code>es_extended</code>, <code>qbx_core</code>, <code>ox_core</code></td><td><strong>Remove</strong>: one framework at a time. The setup report says when it finds one running</td></tr>
 <tr><td><code>ox_inventory</code>, <code>qb-inventory</code></td><td><strong>Remove</strong>: whip has its own (F2), and they need their framework to run</td></tr>
 <tr><td><code>ox_target</code>, <code>qb-target</code></td><td><strong>Replace</strong> with <a href="#interactions"><code>AddAction</code></a>: prompts in the world, the F1 wheel, car parts</td></tr>
@@ -1670,7 +1680,7 @@ Whip.<span class="fn">register</span>(<span class="kw">function</span>()
 <tr><td>Van back: refund the deposit</td><td><code>RefundPlayer(receipt)</code> within 30 minutes; after that <code>PayPlayer</code></td></tr>
 </table>
 <p>The <code>near</code> check closes the classic delivery-job exploit: firing the pay event from anywhere on the map.</p>
-<p>The whole job, written out, is <code>whip_core/docs/examples/whip_delivery_example</code>: sign on, clock on, the van and its deposit, packages in the boot, a route to each door, pay at the door, the deposit back, and what happens when the driver logs out or the van is taken back. Copy the folder beside <code>[whip]</code> and <code>ensure</code> it to run it.</p>
+<p>The whole job, written out, is <code>whip_core/docs/examples/whip_delivery_example</code>: sign on, clock on, the van and its deposit, packages in the boot, a route to each door, pay at the door, the deposit back, and what happens when the driver logs out or the van is taken back. Copy the folder into your resources folder and <code>ensure</code> it to run it.</p>
 </div>
 
 <!-- Return Patterns -->
@@ -12567,7 +12577,7 @@ Whip.<span class="fn">objectViewerOption</span>(<span class="str">'mycafe.refuel
 <h2 id="guide-weapons">Weapon System</h2>
 
 <div>
-<p><code>whip_gunny</code> is whip's weapon system: guns, magazines, ammunition, melee weapons, throwables and the jerry can. It ships with whip_core in the <code>[whip]</code> folder and needs nothing set up: its items are in /whip → Economy → Items, ready to sell in shops or hand out. It is also the worked example of a resource built the way whip expects, and <a href="#gunny-patterns">Learning from gunny</a> says which parts to read. A resource that uses gunny adds <code>dependency 'whip_gunny'</code>.</p>
+<p><code>whip_gunny</code> is whip's weapon system: guns, magazines, ammunition, melee weapons, throwables and the jerry can. It ships with WHIP and needs nothing set up: its items are in /whip → Economy → Items, ready to sell in shops or hand out. It is also the worked example of a resource built the way whip expects, and <a href="#gunny-patterns">Learning from gunny</a> says which parts to read. A resource that uses gunny adds <code>dependency 'whip_gunny'</code>.</p>
 
 <h3>How it works</h3>
 <p>Weapons are inventory items with state. A gun carries a serial number and the magazine in it; a magazine carries its own serial and a round count; a revolver or a pump shotgun carries its rounds itself. None of that state lives in gunny: it is whip_core's item metadata, saved with the inventory. gunny owns the rules, whip_core owns the data.</p>
@@ -13129,7 +13139,7 @@ meta.ammo = currentAmmo - toUnload                            <span class="cm">-
 <h2 id="guide-rope">Rope System</h2>
 
 <div>
-<p><code>whip_rope</code> is a physics rope. Players carry it as an item (<code>rope</code>), tie it to cars, props and the map where they look, tow with it and hang off it. It ships with whip_core in the <code>[whip]</code> folder and needs nothing set up. Other resources make ropes of their own from a script: whip_fuel's pump hose is one (<a href="#rope-exports">Rope Exports</a>). <a href="#rope-patterns">Learning from rope</a> says which parts of its code to read.</p>
+<p><code>whip_rope</code> is a physics rope. Players carry it as an item (<code>rope</code>), tie it to cars, props and the map where they look, tow with it and hang off it. It ships with WHIP and needs nothing set up. Other resources make ropes of their own from a script: whip_fuel's pump hose is one (<a href="#rope-exports">Rope Exports</a>). <a href="#rope-patterns">Learning from rope</a> says which parts of its code to read.</p>
 
 <h3>Using a rope</h3>
 <table class="event-table">
@@ -13505,7 +13515,7 @@ meta.ammo = currentAmmo - toUnload                            <span class="cm">-
 <h2 id="autos-patterns">Learning from whip_autos</h2>
 
 <div>
-<p><code>whip_autos</code> is Whiplash: a car customisation shop players drive into (paint, parts, wheels, stance, engine swaps, paid for with in-game money), and bolt-on power (a turbo sold in stages, a nitrous bottle, every car's top speed and shift times, a gearbox computer). It ships with whip_core in the <code>[whip]</code> folder. Running it as a server owner, its settings and what to check when something goes wrong: <code>whip_autos/README.md</code>. This section is for a developer: it shows how a shop that takes money for work on a car is built on whip, file by file.</p>
+<p><code>whip_autos</code> is Whiplash: a car customisation shop players drive into (paint, parts, wheels, stance, engine swaps, paid for with in-game money), and bolt-on power (a turbo sold in stages, a nitrous bottle, every car's top speed and shift times, a gearbox computer). It ships with WHIP. Running it as a server owner, its settings and what to check when something goes wrong: <code>whip_autos/README.md</code>. This section is for a developer: it shows how a shop that takes money for work on a car is built on whip, file by file.</p>
 
 <p>Much of it teaches nothing about whip: the shop's camera (<code>client/camera.lua</code>, <code>client/boxfit.lua</code>), the 3D page (<code>html/js/view.js</code>, <code>kit.js</code>), the gearbox computer (<code>client/power/gearbox.lua</code>) and the stance maths in <code>client/tuning.lua</code>. Skip those. <code>fxmanifest.lua</code> lists every file and what it does, and states the calling rule the code keeps: the one in <a href="#patterns-calling">Calling whip_core</a>. With <code>dependency 'whip_core'</code>, a whip_core restart stops whip_autos first and starts it again after (<a href="#patterns-satellite">the satellite helper</a>), so nothing in it cleans up after whip_core.</p>
 
@@ -14372,12 +14382,12 @@ Whip.<span class="fn">directorButton</span>(<span class="str">'mycafe.customise'
 <h3>The setup</h3>
 <p>One double-click: the wizard runs start to finish by itself, with nothing to answer, in about 10 minutes.</p>
 <ol>
-<li>On the server machine, open <code>resources\whip_voice\service</code> (inside <code>[whip]</code> if whip is there) and double-click <strong>Setup voice server.bat</strong>. When Windows asks whether to let it make changes, say <strong>Yes</strong>.</li>
+<li>On the server machine, open <code>resources\whip_voice\service</code> (inside a <code>[whip]</code> folder if your resources have one) and double-click <strong>Setup voice server.bat</strong>. When Windows asks whether to let it make changes, say <strong>Yes</strong>.</li>
 <li><strong>The voice address.</strong> It works out your server's public address and makes that the voice address: <code>wss://</code> and the address. Players' games connect to it directly.</li>
 <li><strong>Your host's firewall.</strong> The wizard opens Windows' own firewall itself. Some hosts have a firewall of their own in their website's control panel (OVH, Hetzner, AWS, Azure, Google Cloud). If yours does, allow these inbound there: <strong>TCP 80 and 443</strong> (the secure address, and getting and renewing its certificate), <strong>TCP 7881</strong> and <strong>UDP 7882 to 7893</strong> (voice). The wizard does not wait for you: if a port is still shut, the check at the end says so, and the certificate comes as soon as it is open.</li>
 <li><strong>Caddy and LiveKit.</strong> It installs both as Windows services that start with Windows, or adds your voice address to the Caddy the machine already has. A LiveKit of this version already installed is not downloaded again. Caddy gets the certificate for your server's address from Let's Encrypt: it lasts about 6 days, and Caddy renews it by itself every few days, for as long as ports 80 and 443 stay open.</li>
 <li><strong>The voice bot.</strong> It plays recorded lines into phone calls as the Director's lore characters (<a href="#voice-lore-calls">Lore phone calls</a>): its own copy of Node.js in <code>C:\LiveKit\voicebot</code> and a Windows service, "whip_voice voice bot", that only this machine can reach. Then the wizard waits for the certificate and checks every piece.</li>
-<li><strong>server.cfg.</strong> The wizard writes whip_voice's lines into your server's <code>server.cfg</code> (the one in the folder above <code>resources</code>) and keeps the old file beside it as a backup. They go before the line that starts whip_voice (<code>ensure [whip]</code> or <code>ensure whip_voice</code>), older <code>whip_voice_</code> lines are replaced, and <code>setr sv_mumble true</code> is turned off: whip_voice does not use it, and on, any player's game can listen to any Mumble channel. With no <code>server.cfg</code> above <code>resources</code>, it prints the lines (and puts them on your clipboard) for you to paste after <code>ensure whip_core</code>. Always plain <code>set</code>, never <code>setr</code>: the secret and the token must stay on the server.</li>
+<li><strong>server.cfg.</strong> The wizard writes whip_voice's lines into your server's <code>server.cfg</code> (the one in the folder above <code>resources</code>) and keeps the old file beside it as a backup. They go before the line that starts whip_voice (<code>ensure whip_voice</code>, or the <code>ensure</code> of a folder it is in, such as <code>ensure [whip]</code>), older <code>whip_voice_</code> lines are replaced, and <code>setr sv_mumble true</code> is turned off: whip_voice does not use it, and on, any player's game can listen to any Mumble channel. With no <code>server.cfg</code> above <code>resources</code>, it prints the lines (and puts them on your clipboard) for you to paste after <code>ensure whip_core</code>. Always plain <code>set</code>, never <code>setr</code>: the secret and the token must stay on the server.</li>
 <li><strong>Restart the FiveM server.</strong> The first time each player joins, FiveM asks them to allow the microphone: its box takes the mouse only with the <strong>F8 console</strong> open.</li>
 </ol>
 <p>The lines it writes, with your server's address in the first:</p>
@@ -14664,8 +14674,8 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <p>When the server starts, whip_core first waits for oxmysql to reach the database. While it can't, the console says every 30 seconds what to check (the connection string, and that MySQL or MariaDB is running), and players who join are told the server is still starting. With no <code>mysql_connection_string</code> at all, whip_core stops and prints the line to add.</p>
 <p>On the first start, whip_core creates every table it uses. whip_phone, which keeps tables of its own, does the same. After an update, whip_core changes its tables to match on the next start, so there is never an SQL file to run. If a table can't be created or read, whip_core <strong>stops starting</strong> and says why in the console rather than running half built, and players are told the server did not start until it is fixed.</p>
 
-<h3 id="oxmysql-patch">whip's oxmysql patch</h3>
-<p>The normal oxmysql works, but whip ships a small patch for it in <code>whip_core/dev/oxmysql-p001.diff</code>. Without it, a query made while the database is down can wait for ever; whip gives up on one after 65 seconds. To apply it, make the four edits the file describes to <code>oxmysql/dist/build.js</code>, and make them again after each oxmysql update. The setup report says when it is missing.</p>
+<h3 id="oxmysql-patch">WHIPFX's oxmysql</h3>
+<p>WHIP's txAdmin recipe installs WHIPFX's build of oxmysql (<a href="https://github.com/WHIPFX/oxmysql" style="color:var(--accent)">github.com/WHIPFX/oxmysql</a>): oxmysql 2.14.3 with one fix. With it, a query made while no database connection is available (the database is down or restarting) answers its caller with an error at once. Stock oxmysql works with WHIP too, but without the fix such a query can wait for ever; whip_core gives up on one after 65 seconds. The setup report says which of the two your server runs. To get the fix on a server running stock oxmysql, replace its <code>oxmysql</code> folder with the latest release from <a href="https://github.com/WHIPFX/oxmysql/releases" style="color:var(--accent)">github.com/WHIPFX/oxmysql/releases</a> (or make the edits in <code>whip_core/dev/oxmysql-p001.diff</code> by hand).</p>
 
 <h3 id="first-download">A player's first download</h3>
 <p>Most of what a player downloads the first time they join is whip's pictures and videos: about 510 MB, in 5 media packs of up to 145 MB each. A pack is downloaded again only when it changes.</p>

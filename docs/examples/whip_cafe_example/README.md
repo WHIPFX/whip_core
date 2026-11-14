@@ -13,8 +13,8 @@ The coffee stand from whip's tutorial, finished: `docs.html` → **Your First Re
 
 It sits in `whip_core/docs/examples/` so it never starts by itself: FiveM does not look for resources inside another resource's folder.
 
-1. Copy the `whip_cafe_example` folder into your resources folder, beside `[whip]`.
-2. In `server.cfg`, after `ensure [whip]`: `ensure whip_cafe_example`. Restart the server.
+1. Copy the `whip_cafe_example` folder into your resources folder.
+2. In `server.cfg`, below WHIP's `ensure` lines: `ensure whip_cafe_example`. Restart the server.
 3. Hire yourself: `/whip` → **Jobs** → *Bean Machine* → **Change** → hire yourself as a Barista.
 4. The counter is a step in front of where new characters spawn. Buy a coffee; clock on; brew one (six seconds, then a coffee and $5).
 
