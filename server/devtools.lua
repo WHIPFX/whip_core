@@ -523,6 +523,43 @@ SecureEvent('whip_core:server:pmKick', {
     print(('[whip_core:admin] %s kicked %s: %s'):format(player.fullName, tostring(name), reason))
 end)
 
+local RANK = { temporary = 1, permanent = 2 }
+
+--- Everyone a ban on this account would turn away, and the highest dev-tools rank among them ('permanent',
+--- 'temporary' or nil). The ban row keeps the account's license, steam, discord and fivem, and the connect check
+--- refuses a match on any one, so another account sharing one of them (the owner's second Rockstar account, with the
+--- same Discord) is shut out with it. Each account is asked by its identifiers, which still answers while its session
+--- is leaving (a dropped session stays in Players through its final save, and FiveM's ACE check answers false for it),
+--- and by its live sessions, which also catch a server.cfg line naming an identifier the table doesn't keep
+--- (license2, xbl...).
+---@param user table  the `users` row being banned
+---@return table[] accounts, string|nil rank, string|nil own  own: the banned account's rank alone
+local function banReach(user)
+    local where, args = {}, {}
+    for _, kind in ipairs({ 'license', 'steam', 'discord', 'fivem' }) do
+        local value = user[kind]
+        if value and value ~= '' then
+            where[#where + 1] = ('`%s` = ?'):format(kind)
+            args[#args + 1] = value
+        end
+    end
+    local accounts = #where > 0
+        and MySQL.query.await('SELECT * FROM `users` WHERE ' .. table.concat(where, ' OR '), args) or nil
+    if not accounts or #accounts == 0 then accounts = { user } end
+
+    local best, own
+    local function higher(a, b) return (RANK[b] or 0) > (RANK[a] or 0) and b or a end
+    for _, account in ipairs(accounts) do
+        local rank = devtoolsStatus(account, nil)
+        for _, src in ipairs(sessionsOf(account.userId)) do
+            if GetPlayerName(src) then rank = higher(rank, devtoolsStatus(account, src)) end
+        end
+        best = higher(best, rank)
+        if account.userId == user.userId then own = rank end
+    end
+    return accounts, best, own
+end
+
 -- Ban player
 SecureEvent('whip_core:server:pmBan', {
     rateLimit = 2000,
@@ -541,13 +578,15 @@ SecureEvent('whip_core:server:pmBan', {
     local user = MySQL.single.await('SELECT * FROM `users` WHERE `userId` = ?', { userId })
     if not user then return end
 
-    -- Nobody bans someone who outranks them. An admin from server.cfg is never banned from the panel: the ban
-    -- would lock the owner out, and only the database would let them back in. Their server.cfg line comes out
-    -- first. Someone given dev tools from the panel is banned only by an admin from server.cfg, never by another
-    -- admin given them the same way.
-    local rank = devtoolsStatus(user, sessionsOf(userId)[1])
+    -- Nobody bans someone who outranks them, nor anyone the ban would also turn away (banReach). An admin from
+    -- server.cfg is never banned from the panel: the ban would lock the owner out, and only the database would let
+    -- them back in. Their server.cfg line comes out first. Someone given dev tools from the panel is banned only by an
+    -- admin from server.cfg, never by another admin given them the same way.
+    local reach, rank, own = banReach(user)
     if rank == 'permanent' then
-        return false, 'They are an admin in server.cfg: take them out of it before banning them'
+        return false, own == 'permanent'
+            and 'They are an admin in server.cfg: take them out of it before banning them'
+            or 'That ban would also turn away an admin from server.cfg, who shares an identifier with them'
     end
     if rank == 'temporary' and not isPermanentAdmin(source) then
         return false, 'Only an admin from server.cfg can ban someone who has dev tools'
@@ -572,6 +611,16 @@ SecureEvent('whip_core:server:pmBan', {
     -- is only checked at connect. Collected first; dropping mutates both tables.
     for _, src in ipairs(sessionsOf(userId)) do
         DropPlayer(src, 'Banned: ' .. reason)
+    end
+
+    -- Dev tools given from the panel go with the ban, from every account it turns away. Being dropped is not enough:
+    -- a ban that ends before the restart would let them back in with the tools.
+    for _, account in ipairs(reach) do
+        local license = type(account.license) == 'string' and account.license:match('^%x+$')
+        if license and tempDevtools[license] then
+            ExecuteCommand(('remove_principal identifier.license:%s %s'):format(license, TEMP_GROUP))
+            tempDevtools[license] = nil
+        end
     end
 
     print(('[whip_core:admin] %s banned userId %d: %s (duration: %s)'):format(
