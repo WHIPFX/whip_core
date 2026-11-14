@@ -1066,7 +1066,9 @@ function LoadCharacterForPlayer(source, charId, isNewCharacter, spawnId)
     charId = tonumber(charId)
     if not charId or PlayersByCharId[charId] or LoadingCharIds[charId] then
         releaseClaim(source, claim)
-        refuseLoad(source, 'That character is already in the game.')
+        -- 'metadata': another resource is writing this character's row while it is offline (SetPlayerMetadata).
+        refuseLoad(source, LoadingCharIds[charId] == 'metadata' and 'That character is being saved. Try again in a moment.'
+            or 'That character is already in the game.')
         return
     end
     -- Set BEFORE the first yield, so a second load of the same character is refused the moment this
@@ -1197,8 +1199,7 @@ AddEventHandler('playerDropped', function(reason)
         if Stats and Stats.endEffects then Stats.endEffects(source, 'disconnect') end
         SafeSavePlayer(player, 'disconnect', true)
         Inventory.clearCooldowns(source)
-        -- Core's own hooks first (Character.onLife), then whip_core:player:logout (why = 'disconnect';
-        -- playerLogout is the legacy name).
+        -- Core's own hooks first (Character.onLife), then whip_core:player:logout (why = 'disconnect').
         local sheet = player:serialize()
         local ended = { source = source, charId = player.charId, player = sheet, why = 'disconnect' }
         Character.runHooks('logout', ended)

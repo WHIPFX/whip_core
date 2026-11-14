@@ -122,7 +122,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field player table<number, WhipInventorySlot> Player container slots (1-30)
 ---@field accessory table<number, WhipInventorySlot> Accessory container slots (1-5)
 
---- What FindItem / FindAllItems answer: the item (a copy) and where it is.
+--- What FindItem / FindAllItems return: the item (a copy) and where it is.
 ---@class WhipFoundItem
 ---@field item string Item key
 ---@field amount number Stack count
@@ -153,7 +153,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field groundOptions table[]|nil On the ground, after Pick up, { action, label, icon? } (3 at most): `action` is one of the item's own options (contextOptions or defaultAction). Chosen, the item is picked up as Pick up does and, once it is in the pockets, that option runs on the slot it landed in. The prompt says label then the item's name ("Equip Pump Shotgun"); icon is a glyph name: server/item_options.lua
 ---@field images table[]|nil Pictures for states, { when?, image }: the first whose when passes is drawn, else its own. `image` is a path in the item's resource; {field} fills from metadata, {make} is a car's maker. An admin can change them on /whip → Items
 ---@field pictureFields table[]|nil Metadata an admin can show a picture by on /whip → Items: { key, label?, type? = 'bool' | 'number' | 'text' }
----@field settings table[]|nil Settings of this item's own, changed on /whip → Items: RegisterSettings entries { key, type = 'int'|'number'|'bool'|'string'|'enum', default, label, min?, max?, step?, unit?, maxLen?, nullable?, options?, help? }, 20 at most; read with GetItemSetting (server/item_settings.lua)
+---@field settings table[]|nil Settings of this item's own, changed on /whip → Items: settings-page entries { key, type = 'int'|'number'|'bool'|'string'|'enum', default, label, min?, max?, step?, unit?, maxLen?, nullable?, options?, help? }, 20 at most; read with GetItemSetting (server/item_settings.lua)
 
 -- ============================================
 -- Bank
@@ -224,7 +224,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field name string|nil Owner full name (nil if offline or unowned)
 ---@field online boolean Whether the owner is currently online
 
---- What the server's GetVehicle / GetVehicleBy / GetVehiclesOf / GetGarageVehicles hand back, and
+--- What the server's GetVehicle / GetVehiclesOf / GetGarageVehicles hand back, and
 --- what a `'vehicle'` SecureEvent param gives the handler: a COPY, safe to keep and change.
 ---@class WhipVehicleContext
 ---@field vehicleId number
@@ -459,7 +459,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---
 ---     { id = vehicleId }   { entity = entity }   { plate = 'ABC123' }   { netId = netId }
 ---
---- A vehicle as GetVehicle answers it is a reference too: its `vehicleId` names it.
+--- A vehicle as GetVehicle returns it is a reference too: its `vehicleId` names it.
 ---@class WhipVehicleRef
 ---@field id number|nil The vehicle's whip id
 ---@field vehicleId number|nil The same, as a GetVehicle snapshot carries it
@@ -479,10 +479,10 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field resource string|nil Server data only: the resource that made the change
 ---@field entity number|nil Client only: the entity it happened on
 
---- Options for OnVehicleStatChange / OnVehicleDataChange.
+--- Options for OnVehicleStatChanged / OnVehicleDataChanged.
 ---@class WhipVehicleListenOpts
 ---@field table boolean|nil Hand the callback one WhipVehicleChange table instead of positional arguments
----@field now boolean|'all'|nil Also call it once straight away for every car that already carries the stat or key; 'all' (OnVehicleStatChange on the server, a named stat): every car whip has, its default included
+---@field now boolean|'all'|nil Also call it once straight away for every car that already carries the stat or key; 'all' (OnVehicleStatChanged on the server, a named stat): every car whip has, its default included
 
 --- Options for SpawnTempVehicle.
 ---@class WhipTempVehicleOpts
@@ -553,8 +553,8 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field params WhipSecureParam[]|nil Parameter validation rules
 
 ---@class WhipSecureNear
----@field at (fun(source: number, player: table, ...: any): number|vector3|table|nil, number?, number?)|vector3|table|'vehicle' A function answering x, y, z (or a vector3 / {x,y,z}); a fixed vector3 or {x,y,z}; or 'vehicle' — the car named by the schema's 'vehicle' param (seated in it counts as near). NO position REFUSES the call
----@field range number|(fun(): number)|nil Metres (default 5.0), or a function answering them at each call (a range that follows a setting)
+---@field at (fun(source: number, player: table, ...: any): number|vector3|table|nil, number?, number?)|vector3|table|'vehicle' A function returning x, y, z (or a vector3 / {x,y,z}); a fixed vector3 or {x,y,z}; or 'vehicle' — the car named by the schema's 'vehicle' param (seated in it counts as near). NO position REFUSES the call
+---@field range number|(fun(): number)|nil Metres (default 5.0), or a function returning them at each call (a range that follows a setting)
 ---@field message string|false|nil What the player is told when too far (default 'Too far away'); false says nothing
 ---@field allowUnknown boolean|nil Let a call through when `at` finds no position — for a handler that reports an unknown id itself
 
@@ -659,7 +659,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 
 --- RegisterUseHandler(item, THIS) — a timed use whip runs from start to finish: canUse → the bar,
 --- timed by the server → the same item still at addr → the item is taken → onComplete. onComplete
---- answering `false, 'why'` (or erroring) gives it back and shows `why`. A bare `false` ALSO gives it
+--- returning `false, 'why'` (or erroring) gives it back and shows `why`. A bare `false` ALSO gives it
 --- back (a silent refusal, no cooldown) — unlike the function form, where bare `false` is a use that
 --- keeps the item. To keep a tool here, set `consume = false`.
 ---@class WhipTimedUse : WhipProgressOptions
@@ -698,6 +698,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field exitNotify string|nil|false Custom exit notification (false = disable)
 
 ---@class WhipZoneBoxData
+---@field type 'box'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field pos vector3 Center position
 ---@field size vector3 Width (X), length (Y), height (Z)
@@ -716,6 +717,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field onVehicleExit (fun(entity: number, plate: string, zone: WhipZoneBoxData))|nil
 
 ---@class WhipZoneSphereData
+---@field type 'sphere'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field pos vector3 Center position
 ---@field radius number Radius in meters
@@ -733,6 +735,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field rules WhipZoneRules|nil Declarative zone rules (framework-enforced)
 
 ---@class WhipZonePolyData
+---@field type 'poly'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field points vector2[] Array of polygon vertices
 ---@field minZ number|nil Minimum Z height
@@ -757,7 +760,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 --- Where a stack is, in the one shape whip uses for it everywhere — THE handle for a slot. Every slot
 --- call takes one (GetItemAt, SetItemMetadata, StoreGive, StoreTake, StoreMove, LogActivity), and
 --- whip hands you one wherever it knows where an item is (a use handler, a context action, FindItem,
---- FindItemByUid, FinishTimedAction when the start was given one, GetOpenStores).
+--- FindItemByUid, GetOpenStores).
 ---
 --- THE POINT OF THIS TYPE EXISTING is that the address was already a parameter — the note on the
 --- 'addr' param type in server/secure.lua records that it had been "declared 21 times across four
@@ -799,7 +802,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field destroyed boolean|nil true when the player is destroying the item (direction 'out', no other end)
 ---@field items table<number, WhipInventorySlot>|nil onChange: what the panel holds now (a copy)
 
---- What StoreRead answers with. A copy.
+--- What StoreRead returns. A copy.
 ---@class WhipStoreContents
 ---@field kind string
 ---@field id number|string|nil

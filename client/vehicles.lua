@@ -1161,8 +1161,8 @@ local function HasKeyForVehicle(vehicleId)
 end
 
 --- Check if player has a key for a vehicle by plate (a linear scan; prefer HasKeyForVehicle).
-local function HasKeyForPlate(plate)
-    if not plate or plate == '' then return false end
+local function hasKeyForPlate(plate)
+    if type(plate) ~= 'string' or plate == '' then return false end
     local norm = plate:upper():gsub('%s+', '')
     for _, keyPlate in pairs(vehicleKeys) do
         if type(keyPlate) == 'string' and keyPlate:upper():gsub('%s+', '') == norm then
@@ -2834,14 +2834,11 @@ exports('GetVehicleEntity', function(vehicleId)
     return entity
 end)
 
---- Check if player has a key for a vehicleId (O(1) cache lookup). A vehicle reference works too.
-exports('HasVehicleKey', function(vehicleId)
-    return HasKeyForVehicle(vehicleRefId(vehicleId))
-end)
-
---- Check if player has a key for a vehicle by plate (O(1) cache lookup).
-exports('HasKeyForPlate', function(plate)
-    return HasKeyForPlate(plate)
+--- Does the player have a key for this car? A vehicleId or a vehicle reference, from the key cache. `{ plate = }` reads
+--- the cache by plate, so a car that is not streamed in here is found too.
+exports('HasVehicleKey', function(ref)
+    if type(ref) == 'table' and ref.plate ~= nil then return hasKeyForPlate(ref.plate) end
+    return HasKeyForVehicle(vehicleRefId(ref))
 end)
 
 --- Resolve a vehicle entity to a vehicleId, registering it as a session vehicle if it is not one already.
@@ -2959,34 +2956,22 @@ local function BuildVehicleContext(vehicleId)
 end
 
 --- Everything this client knows about a vehicle: the client half of the server's GetVehicle, same shape but
---- less data (no owner name, no stored row). Takes a vehicleId or a vehicle reference.
----@param vehicleId number|table|nil
----@return table|nil
-exports('GetVehicle', function(vehicleId)
-    vehicleId = vehicleRefId(vehicleId)
-    if not vehicleId then return nil end
-    return BuildVehicleContext(vehicleId)
-end)
-
---- The same, for a caller holding an entity, a plate or a netId (as the server's GetVehicleBy). Split rather than
---- guessing, since ids and entity handles are plain integers in overlapping ranges.
+--- less data (no owner name, no stored row). By its id, or by a reference that says what you hold (ids and
+--- entity handles are plain integers in overlapping ranges, so a bare number is always a vehicleId):
 ---
----     exports.whip_core:GetVehicleBy('entity', veh)
----     exports.whip_core:GetVehicleBy('plate',  'ABC123')   -- a car streamed in near you
----     exports.whip_core:GetVehicleBy('netId',  netId)
+---     exports.whip_core:GetVehicle({ entity = veh })
+---     exports.whip_core:GetVehicle({ plate = 'ABC123' })   -- a car streamed in near you
+---     exports.whip_core:GetVehicle({ netId = netId })
 ---
---- A far car answers nil here; ask the server.
----@param kind string  'entity' | 'plate' | 'netId'
----@param value any
+--- A far car returns nil here; ask the server.
+---@param ref number|table|nil  a vehicleId, or { id = }, { entity = }, { plate = }, { netId = }
 ---@return table|nil
-function Vehicles.getBy(kind, value)
-    -- `GetVehicleBy(k, v)` is `GetVehicle({ [k] = v })`, as on the server.
-    if kind ~= 'entity' and kind ~= 'plate' and kind ~= 'netId' and kind ~= 'id' then return nil end
-    local vehicleId = vehicleRefId({ [kind] = value })
+function Vehicles.get(ref)
+    local vehicleId = vehicleRefId(ref)
     if not vehicleId then return nil end
     return BuildVehicleContext(vehicleId)
 end
-exports('GetVehicleBy', Vehicles.getBy)
+exports('GetVehicle', function(ref) return Vehicles.get(ref) end)
 
 --- Get all vehicles within a radius, sorted by distance (closest first).
 --- Returns array of { entity, plate, vehicleId, distance, model }.

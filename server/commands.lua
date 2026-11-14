@@ -189,7 +189,7 @@ devCommand('whip_giveitem', function(source, args)
     -- A give: through Inventory.giveOrDrop, so a full inventory drops at their feet rather than making
     -- the console say "Failed" while the admin wonders where the item went. This also drops
     -- fifteen lines of hand-rolled sync — a serialize, a weights table built by naming
-    -- containers, and a manual itemAdded — all of which Inventory.giveOrDrop does, and one of which
+    -- containers, and a manual item:added — all of which Inventory.giveOrDrop does, and one of which
     -- (the weights literal) was a container list in disguise waiting to go stale.
     local ok, err, placement = Inventory.giveOrDrop(playerSrc, player, item, amount, nil, {
         container = 'player',

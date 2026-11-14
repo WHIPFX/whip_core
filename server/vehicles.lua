@@ -1457,7 +1457,7 @@ end
 --- The vehicleId a vehicle reference names (the first argument of every vehicle, stat and data export). A
 --- reference says which kind of number it is:
 ---     { id = vehicleId }   { entity = entity }   { plate = 'ABC123' }   { netId = netId }
---- The same four as GetVehicleBy. A bare number on this side is a vehicleId. Anything with a `vehicleId` names
+--- The same four GetVehicle takes. A bare number on this side is a vehicleId. Anything with a `vehicleId` names
 --- that car by id, ahead of its plate.
 ---@param ref any
 ---@return number|nil vehicleId
@@ -1639,7 +1639,7 @@ function Vehicles.saveProperties(vehicleId, props, opts)
 end
 
 -- Fuel is an ordinary stat (whip_fuel's), set with SetVehicleStat(vehicleId, 'fuel', value, 'refuel:pump') and
--- heard through OnVehicleStatChange('fuel', function(vehicleId, value, previous) ... end).
+-- heard through OnVehicleStatChanged('fuel', function(vehicleId, value, previous) ... end).
 
 -- Vehicle positions, write-behind like VehicleStats: the server reads its own vehicles' positions (no client is
 -- trusted with where a car is after a restart), marks what moved, and each car's save unit writes it.
@@ -1814,9 +1814,8 @@ end
 -- Lock State (persisted to DB, applied via server-side native)
 -- ============================================
 
---- Lock or unlock a car: saved, applied to the entity, and announced, only when the state changed. Two names, one
---- payload `{ vehicleId, plate, locked, source }`: `whip_core:vehicle:lockChanged` (fires on lock and unlock) and
---- the alias `whip_core:vehicle:locked`.
+--- Lock or unlock a car: saved, applied to the entity, and announced, only when the state changed:
+--- `whip_core:vehicle:lockChanged` with `{ vehicleId, plate, locked, source }`, on lock and unlock.
 ---@param vehicleId number
 ---@param locked boolean
 ---@param source number|nil  the player who did it, when a player did
@@ -3869,8 +3868,9 @@ end
 
 -- Public exports. The key exports forward to globals in server/items/vehicle_key.lua, resolved at call time.
 
---- Everything whip knows about a vehicle, in one call.
+--- Everything whip knows about a vehicle, in one call. By its id, or by a reference that says what you hold:
 ---     local v = exports.whip_core:GetVehicle(vehicleId)
+---     local v = exports.whip_core:GetVehicle({ plate = 'ABC123' })   -- or { netId = }, { entity = }, { id = }
 ---     v.plate, v.model, v.owner.charId, v.state, v.garage, v.coords, v.locked, v.session
 ---     v.spawned, v.entity, v.netId
 ---     v.stats.fuel, v.data.myThing, v.properties, v.storage
@@ -3881,26 +3881,6 @@ end
 ---@return table|nil
 exports('GetVehicle', function(vehicleId, opts)
     vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return nil end
-    return Vehicles.context(vehicleId, opts)
-end)
-
---- The same thing, found some other way than by id:
----     exports.whip_core:GetVehicleBy('plate', 'ABC123')   -- or 'netId', or 'entity'
----@param kind string  'plate' | 'netId' | 'entity'
----@param value any
----@param opts table|nil  passed through to GetVehicle
----@return table|nil vehicle
-exports('GetVehicleBy', function(kind, value, opts)
-    -- `GetVehicleBy(k, v)` is `GetVehicle({ [k] = v })` (Vehicles.idFromRef).
-    -- A kind that is not one is said on the console, and the answer is nil ("no car", as whip_test 05 checks): a
-    -- second value would never reach the caller, as an export drops everything after a nil.
-    if kind ~= 'plate' and kind ~= 'netId' and kind ~= 'entity' and kind ~= 'id' then
-        print(("[whip_core] GetVehicleBy(%s, ...) from %s: kind must be 'plate', 'netId', 'entity' or 'id'"):format(
-            tostring(kind), tostring(GetInvokingResource() or GetCurrentResourceName())))
-        return nil
-    end
-    local vehicleId = Vehicles.idFromRef({ [kind] = value })
     if not vehicleId then return nil end
     return Vehicles.context(vehicleId, opts)
 end)
@@ -3926,17 +3906,19 @@ end)
 --- Put a vehicle into the world. Idempotent: on a vehicle already out it moves it. Returns `false` rather than nil
 --- on failure (an export's return list stops at the first nil).
 ---@param vehicleId number|WhipVehicleRef|nil
----@param x number|vector3|vector4|nil  defaults to the vehicle's saved position; or a vector3 (then y is the
----                                     heading) or a vector4 (its w is)
----@param y number|nil
----@param z number|nil
----@param heading number|nil
+---@param coords vector3|vector4|table|nil  defaults to the vehicle's saved position; a vector4's w (a table's w or
+---                                         heading) is the heading
 ---@return number|false netId, string|nil err
-exports('SpawnVehicle', function(vehicleId, x, y, z, heading)
-    if type(x) == 'vector3' or type(x) == 'vector4' or type(x) == 'table' then
-        local c = x
-        heading = tonumber(y) or tonumber(c.w) or tonumber(c.heading)
-        x, y, z = tonumber(c.x), tonumber(c.y), tonumber(c.z)
+exports('SpawnVehicle', function(vehicleId, coords)
+    local x, y, z, heading
+    if coords ~= nil then
+        local kind = type(coords)
+        if kind ~= 'vector3' and kind ~= 'vector4' and kind ~= 'table' then
+            return false, 'SpawnVehicle(vehicleId, coords): coords is a vector3, or a vector4 with the heading in w'
+        end
+        x, y, z = tonumber(coords.x), tonumber(coords.y), tonumber(coords.z)
+        -- (a vector3 has no w to read)
+        if kind ~= 'vector3' then heading = tonumber(coords.w) or tonumber(coords.heading) end
     end
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
@@ -3953,17 +3935,37 @@ exports('SpawnVehicle', function(vehicleId, x, y, z, heading)
     return netIdOrErr
 end)
 
---- Take a vehicle out of the world and put it away in its garage, its record and storage kept
---- (Vehicles.despawnToGarage). Storage is flushed first. SpawnVehicle brings it out again.
---- `(ok, err)` like every other verb.
+--- Take a vehicle out of the world, its record and storage kept (Vehicles.despawnToGarage); storage is flushed
+--- first. With no garage it goes where it belongs: someone's own car into its garage, a temporary car is forgotten,
+--- a street car handed back to GTA. `opts.garage` puts an owned car that is out away in that garage, the
+--- Vehicles.store rules: a street or temporary car is refused, as neither has a row to be garaged in.
+--- `opts.refuseOccupied` refuses a car with somebody in it: on by default with a garage (as StoreVehicle always
+--- refused), off without one. SpawnVehicle brings it out again. `(ok, err)` like every other verb.
 ---@param vehicleId number|WhipVehicleRef|nil
+---@param opts { garage?: string, refuseOccupied?: boolean }|nil
 ---@return boolean ok, string|nil err
-function Vehicles.despawnByRef(vehicleId)
+function Vehicles.despawnByRef(vehicleId, opts)
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'Vehicle not found' end
+    opts = type(opts) == 'table' and opts or {}
+    -- With a garage, refused unless the caller says otherwise: StoreVehicle, which this took in, always refused an
+    -- occupied car, and putting one away with people in it is not what "store it" means.
+    local refuseOccupied
+    if opts.refuseOccupied ~= nil then refuseOccupied = opts.refuseOccupied == true
+    else refuseOccupied = opts.garage ~= nil end
+
+    -- Into a garage named: an owned car that is out, into a garage that exists (a key that names none is refused)
+    if opts.garage ~= nil then
+        return Vehicles.store(vehicleId, opts.garage, { occupied = not refuseOccupied })
+    end
+
+    if refuseOccupied then
+        local entity = Vehicles.getEntity(vehicleId)
+        if entity and #serverOccupants(entity) > 0 then return false, 'Somebody is still in that vehicle' end
+    end
 
     -- A temporary car (SpawnTempVehicle) has nowhere to be put away, so taking it out of the world
     -- is the end of it: removed, forgotten, and its key taken back.
@@ -3978,7 +3980,7 @@ function Vehicles.despawnByRef(vehicleId)
     if err then return false, err end
     return true
 end
-exports('DespawnVehicle', Vehicles.despawnByRef)
+exports('DespawnVehicle', function(vehicleId, opts) return Vehicles.despawnByRef(vehicleId, opts) end)
 
 --- Take a car out of the world, whoever's it is: someone's own car goes into its garage, a temporary one is
 --- forgotten, and a street car whip only noticed is deleted too (letting it go would hand it back to GTA where it
@@ -3994,22 +3996,6 @@ function Vehicles.removeFromWorld(vehicleId)
     if def.session and not def.temp and entity and DoesEntityExist(entity) then DeleteEntity(entity) end   -- (its keys were stripped)
     return true
 end
-
---- Put a vehicle away in a garage: out of the world, position cleared, state 'garaged'. Unlike DespawnVehicle it
---- takes a garageKey and refuses a car that is not 'out' (DespawnVehicle files it in its own garage, works with
---- somebody inside, removes a temporary car and hands a street car back to GTA). For an impound, or a test.
----@param vehicleId number|WhipVehicleRef|nil
----@param garageKey string|nil  defaults to wherever it is already assigned, or the default garage;
----                             a key that names no garage is refused
----@return boolean ok, string|nil err
-exports('StoreVehicle', function(vehicleId, garageKey)
-    local refErr
-    vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return false, refErr end
-
-    local ok, err = Vehicles.store(vehicleId, garageKey)
-    return ok, err
-end)
 
 --- Take a vehicle out of a garage. Marks it 'out' and locked; it still has to be spawned (retrieving decides the car
 --- may come out, spawning decides where).
@@ -4029,8 +4015,8 @@ exports('RetrieveVehicle', function(vehicleId, garageKey)
     return Vehicles.retrieve(vehicleId, garageKey)
 end)
 
--- GetVehicle(id) and GetVehicleBy('entity', e) stay separate: vehicleIds and entity handles are
--- plain integers in the same range, and guessing which one was meant would return a different car.
+-- GetVehicle(id) and GetVehicle({ entity = e }) stay apart: vehicleIds and entity handles are plain
+-- integers in the same range, and guessing which one was meant would return a different car.
 
 --- Is this player in the driver's seat of this vehicle? The cheap answer (three natives, no
 --- allocation, no scan) for a question asked many times a second.
@@ -4502,19 +4488,57 @@ exports('GiveVehicleKey', function(who, vehicleId)
     return true
 end)
 
-exports('HasVehicleKey', function(source, vehicleId)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end   -- a yes/no read: false, and why
+--- The pockets a person's keys are in: an online player's live ones, or an offline character's keys read from the
+--- database (their pockets are in memory only while they play; only the key items, read and never written).
+--- A table with `inventory`, as Vehicles.playerHasKey takes it, or nil and why.
+---@param who any  a server id, or { charId = n }
+---@return table|nil holder
+---@return string|nil why
+local function keyPockets(who)
+    local charId, src = WhoIs(who)
+    if not charId then return nil, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if player then return player end
+    -- Their last session's save first (its pockets are `player:<charId>`): read before it lands, and these are the
+    -- keys they had before that session.
+    if not Stores.settle('player:' .. tostring(charId)) then
+        return nil, 'Their last save has not landed yet — try again in a moment'
+    end
+    -- A charId with no character (never made, or deleted) is said so, not answered as one with no keys.
+    local found, exists = pcall(MySQL.scalar.await,
+        'SELECT 1 FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL', { charId })
+    if not found then return nil, 'The database could not be reached — try again' end
+    if not exists then return nil, 'No such character' end
+    local ok, rows = pcall(MySQL.query.await,
+        'SELECT `container`, `slot`, `item`, `metadata` FROM `character_inventory` WHERE `charId` = ?', { charId })
+    if not ok then return nil, 'The database could not be reached — try again' end
+    local inventory = {}
+    for _, row in ipairs(rows or {}) do
+        if Inventory.isIgnitionKey(row.item) then
+            inventory[row.container] = inventory[row.container] or {}
+            inventory[row.container][row.slot] = { item = row.item, amount = 1, metadata = Inventory.readMetadata(row.metadata,
+                ('character %s %s slot %s'):format(tostring(charId), tostring(row.container), tostring(row.slot))) }
+        end
+    end
+    return { inventory = inventory }
+end
+
+--- Has this person a key for this car? A server id, or `{ charId = n }` for a character online or not.
+exports('HasVehicleKey', function(who, vehicleId)
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
-    return Vehicles.playerHasKey(player, vehicleId)
+    local holder, why = keyPockets(who)
+    if not holder then return false, why end   -- a yes/no read: false, and why
+    return Vehicles.playerHasKey(holder, vehicleId)
 end)
 
-exports('GetPlayerVehicleKeys', function(source)
-    local player = Players[source]
-    if not player then return {}, 'Player not loaded' end   -- a list read: empty, and why
-    return Vehicles.getPlayerKeys(player)
+--- The cars a person's keys fit: { [vehicleId] = plate }. A server id, or `{ charId = n }`, online or not.
+exports('GetPlayerVehicleKeys', function(who)
+    local holder, why = keyPockets(who)
+    if not holder then return {}, why end   -- a list read: empty, and why
+    return Vehicles.getPlayerKeys(holder)
 end)
 
 --- Find the vehicle wearing this plate, adopting it as a session vehicle if whip has never seen it, for a caller
@@ -4632,7 +4656,7 @@ exports('SetVehicleAppearance', function(vehicleId, props, opts)
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'vehicle not found' end
 
-    -- The data goes into memory first, checked as SetVehicleDataMany checks it; the look's write carries it.
+    -- The data goes into memory first, checked as SetVehicleData checks a table of them; the look's write carries it.
     local change
     if data or clearData then
         local stageErr

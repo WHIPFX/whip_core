@@ -26,7 +26,7 @@ end
 -- Packages still in their pockets go back when the run ends
 local function takeBackPackages(source)
     local left = exports.whip_core:GetItemCount(source, PACKAGE) or 0
-    if left > 0 then exports.whip_core:RemoveItem(source, PACKAGE, left, 'delivery run ended') end
+    if left > 0 then exports.whip_core:RemoveItem(source, PACKAGE, left, nil, { reason = 'delivery run ended' }) end
 end
 
 local function pickStops(n)
@@ -44,7 +44,7 @@ end
 Whip.register(function()
     runs = {}   -- whip_core (re)started: every van and blip went with it
 
-    exports.whip_core:RegisterItem(PACKAGE, {
+    Whip.core:RegisterItem(PACKAGE, {
         name     = 'Package',
         desc     = 'Addressed and taped. Take it to the door on your map.',
         weight   = 2.0,
@@ -52,7 +52,7 @@ Whip.register(function()
         maxStack = 5,
     })
 
-    local job, why = exports.whip_core:EnsureJob('mydelivery', {
+    local job, why = Whip.core:EnsureJob('mydelivery', {
         name  = 'Post Op',
         roles = {
             { name = 'Manager', level = 100 },
@@ -62,13 +62,13 @@ Whip.register(function()
     if not job then print('[mydelivery] no job: ' .. tostring(why)) end
 
     -- The depot on everyone's map (67 is GTA's van icon)
-    exports.whip_core:ShowBlip('everyone', 'mydelivery_depot',
+    Whip.core:ShowBlip('everyone', 'mydelivery_depot',
         { coords = Config.Depot, label = 'Post Op depot', sprite = 67, color = 5, shortRange = true })
 
     local atDepot = { at = Config.Depot, range = 3.0, message = 'Go to the depot desk' }
 
     -- Anyone may sign on as a driver
-    exports.whip_core:SecureEvent('mydelivery:signon', { rateLimit = 3000, near = atDepot }, function(source)
+    Whip.core:SecureEvent('mydelivery:signon', { rateLimit = 3000, near = atDepot }, function(source)
         if exports.whip_core:GetPlayerRole(source, 'mydelivery') then
             return false, 'You already drive for us: clock on'
         end
@@ -78,7 +78,7 @@ Whip.register(function()
     end)
 
     -- A van for a deposit, its boot loaded with packages, and a route to the first door
-    exports.whip_core:SecureEvent('mydelivery:start', { rateLimit = 3000, near = atDepot }, function(source, player)
+    Whip.core:SecureEvent('mydelivery:start', { rateLimit = 3000, near = atDepot }, function(source, player)
         if not exports.whip_core:IsPlayerClockedOn(source, 'mydelivery') then return false, 'Clock on first' end
         if runs[source] then return false, 'You already have a van out' end
 
@@ -115,7 +115,7 @@ Whip.register(function()
     end)
 
     -- At the door: the server times the bar, takes the package and pays
-    exports.whip_core:SecureEvent('mydelivery:drop', {
+    Whip.core:SecureEvent('mydelivery:drop', {
         rateLimit = 2000,
         near = {
             at = function(source)
@@ -138,7 +138,7 @@ Whip.register(function()
         if not done then return false, reason end
         if runs[source] ~= run or not exports.whip_core:IsSessionCurrent(source, player.session) then return end
 
-        local taken, terr = exports.whip_core:RemoveItem(source, PACKAGE, 1, 'delivered')
+        local taken, terr = exports.whip_core:RemoveItem(source, PACKAGE, 1, nil, { reason = 'delivered' })
         if not taken then return false, terr end
         run.done = run.done + 1
         exports.whip_core:PayPlayer(source, Config.Pay, { reason = 'Delivery: ' .. stop.label })
@@ -146,7 +146,7 @@ Whip.register(function()
     end)
 
     -- The van back at the depot: it goes, and so does the deposit, back to them
-    exports.whip_core:SecureEvent('mydelivery:finish', { rateLimit = 3000, near = atDepot }, function(source)
+    Whip.core:SecureEvent('mydelivery:finish', { rateLimit = 3000, near = atDepot }, function(source)
         local run = runs[source]
         if not run or not run.vanId then return false, 'You have no van out' end
 
@@ -156,7 +156,7 @@ Whip.register(function()
         end
 
         runs[source] = nil
-        exports.whip_core:RemoveBlip(blipId(source))
+        exports.whip_core:HideBlip(blipId(source))
         exports.whip_core:DespawnVehicle(run.vanId)
         exports.whip_core:RefundPlayer(run.receipt)
         takeBackPackages(source)
@@ -170,7 +170,7 @@ AddEventHandler('whip_core:player:logout', function(e)
     local run = runs[e.source]
     if not run then return end
     runs[e.source] = nil
-    exports.whip_core:RemoveBlip(blipId(e.source))
+    exports.whip_core:HideBlip(blipId(e.source))
     if run.vanId then exports.whip_core:DespawnVehicle(run.vanId) end
     takeBackPackages(e.source)
 end)
@@ -181,7 +181,7 @@ AddEventHandler('whip_core:vehicle:released', function(e)
     for source, run in pairs(runs) do
         if run.vanId == e.vehicleId then
             runs[source] = nil
-            exports.whip_core:RemoveBlip(blipId(source))
+            exports.whip_core:HideBlip(blipId(source))
             takeBackPackages(source)
             exports.whip_core:NotifyPlayer(source, 'The depot took the van back. Your deposit is kept', 'error')
             return

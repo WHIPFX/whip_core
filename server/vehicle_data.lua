@@ -21,9 +21,9 @@ VehicleData = {}
 --- The targeted listeners' dispatcher, defined with the subscriptions at the bottom of this file.
 local dispatchDataChange
 
---- Announce a data change: the OnVehicleDataChange listeners FIRST, from here, then the public event.
+--- Announce a data change: the OnVehicleDataChanged listeners FIRST, from here, then the public event.
 ---
---- From the write, not from the event, as OnVehicleStatChange is fed: `whip_core:vehicle:dataChanged`
+--- From the write, not from the event, as OnVehicleStatChanged is fed: `whip_core:vehicle:dataChanged`
 --- is a local event any server resource can fire. Every writer comes through here.
 ---@param data table  { vehicleId, key?, value?, old?, cleared?, resource? }
 local function announceDataChange(data)
@@ -559,7 +559,7 @@ end
 -- Subscriptions
 -- ============================================
 --
--- The server half of OnVehicleDataChange.
+-- The server half of OnVehicleDataChanged.
 --
 -- Driven by the writes, through one function (announceDataChange, top of file): every writer calls
 -- it, it calls these listeners and then fires `whip_core:vehicle:dataChanged` for everyone else, so
@@ -567,7 +567,7 @@ end
 
 -- [key] = { ['<resource>:<id>'] = { fn, owner, asTable } }. Keyed, so a satellite registering from
 -- whip_core:onReady (which fires on every resource start) replaces its listener instead of stacking
--- another; the owner rides with the callback, the same shape as OnVehicleStatChange.
+-- another; the owner rides with the callback, the same shape as OnVehicleStatChanged.
 local _dataListeners = {}
 
 --- Call one listener, in the shape it registered for.
@@ -615,7 +615,7 @@ end
 --- handler on every data change anywhere on the server. Subscribing by key is entered only when
 --- that key moved.
 ---
----     exports.whip_core:OnVehicleDataChange('kitDistances', function(vehicleId, value, cleared, old)
+---     exports.whip_core:OnVehicleDataChanged('kitDistances', function(vehicleId, value, cleared, old)
 ---         if cleared then ... end
 ---     end)
 ---
@@ -625,9 +625,9 @@ end
 ---
 --- Keyed `<your resource>:<id>`, `id` defaulting to the data key: calling it again replaces.
 ---
---- Options, the same as OnVehicleStatChange's, third or fourth:
+--- Options, the same as OnVehicleStatChanged's, third or fourth:
 ---
----     exports.whip_core:OnVehicleDataChange('kitDistances', function(change)
+---     exports.whip_core:OnVehicleDataChanged('kitDistances', function(change)
 ---         -- change.vehicleId, change.key, change.value, change.old, change.cleared, change.resource
 ---     end, { table = true, now = true })
 ---
@@ -639,10 +639,10 @@ end
 ---@param id string|nil
 ---@param opts table|nil  { table?: boolean, now?: boolean }
 ---@return boolean registered
-exports('OnVehicleDataChange', function(key, callback, id, opts)
+exports('OnVehicleDataChanged', function(key, callback, id, opts)
     -- `callback ~= nil`, not `type(callback) == 'function'`. A funcref that has crossed an export
     -- is callable but does not report as a Lua 'function', so a type test refuses every real caller.
-    -- `false, why`, as OnStatChange answers.
+    -- `false, why`, as OnStatChanged answers.
     if type(key) ~= 'string' or key == '' then return false, 'key is required (a vehicle data key)' end
     if callback == nil then return false, 'callback is required' end
     if type(id) == 'table' and opts == nil then id, opts = nil, id end
@@ -697,9 +697,11 @@ Vehicles.onLife('deleted', function(data) Stores.forget('vehdata:' .. tostring(d
 -- Exports
 -- ============================================
 
---- Attach a value to a vehicle. Anything json-encodable; nil removes it.
+--- Attach a value to a vehicle. Anything json-encodable; nil removes it. A table in place of the key sets several
+--- at once, in one replication and one database write.
 ---
 ---     exports.whip_core:SetVehicleData(vehicleId, 'kitDistances', { 250, 777, ... })
+---     exports.whip_core:SetVehicleData(vehicleId, { kit = 'street', kitAt = os.time() })
 ---
 --- For a NUMBER WITH A RANGE that the player should see, register a vehicle stat instead —
 --- that is what gauges, drains and `clearAtMin` are for. This is for everything else.
@@ -707,40 +709,28 @@ Vehicles.onLife('deleted', function(data) Stores.forget('vehdata:' .. tostring(d
 --- Every export here cleans its vehicleId first, the rule the vehicle exports follow (the string
 --- '12' finds vehicle 12).
 exports('SetVehicleData', function(vehicleId, key, value)
+    local caller = GetInvokingResource()   -- first, before anything can yield
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
-    return VehicleData.set(vehicleId, key, value, GetInvokingResource())
-end)
-
---- Attach several values in one replication and one database write.
----
---- `false, reason` when nothing was written (0 is true in Lua). A count comes back only when
---- something landed.
----@return number|false written, string|nil err
-exports('SetVehicleDataMany', function(vehicleId, values)
-    local refErr
-    vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return false, refErr end
-    local written, err = VehicleData.setMany(vehicleId, values, GetInvokingResource())
+    if type(key) ~= 'table' then return VehicleData.set(vehicleId, key, value, caller) end
+    -- Several: `false, reason` when nothing was written (0 is true in Lua); a count only when something landed.
+    local written, err = VehicleData.setMany(vehicleId, key, caller)
     if not written or written == 0 then
         return false, err or 'nothing written: no valid key (1–40 of A-Z a-z 0-9 _), or the key ceiling is full'
     end
     return written
 end)
 
---- One value, or nil when this vehicle does not carry it.
+--- One value, or nil when this vehicle does not carry it. With no key, everything it carries, as a copy.
 exports('GetVehicleData', function(vehicleId, key)
     vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
+    if key == nil then
+        if not vehicleId then return {} end
+        return VehicleData.getAll(vehicleId)
+    end
     if not vehicleId then return nil end
     return VehicleData.get(vehicleId, key)
-end)
-
---- Everything this vehicle carries, as a copy.
-exports('GetAllVehicleData', function(vehicleId)
-    vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return {} end
-    return VehicleData.getAll(vehicleId)
 end)
 
 --- Remove one value. Only a key your resource wrote.

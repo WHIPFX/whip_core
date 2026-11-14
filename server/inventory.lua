@@ -698,7 +698,7 @@ end
 -- Who a new item is for
 -- ============================================
 --
--- An item's default metadata (RegisterItemDefaultMeta) is made when the item comes into being. The
+-- An item's default metadata (RegisterItemDefaultMetadata) is made when the item comes into being. The
 -- generator gets a second argument, ctx, so it can depend on who it is for (a SIM card carrying its
 -- buyer's new number):
 --   ctx.source, ctx.charId   the player receiving it, when there is one (nil into a stash, a boot...)
@@ -708,7 +708,7 @@ end
 -- must cope without one.
 --
 -- Bought off an infinite shelf, an item is made again for the buyer only if its generator asked
--- (RegisterItemDefaultMeta(key, fn, { forBuyer = true })); every other item keeps the shelf's metadata.
+-- (RegisterItemDefaultMetadata(key, fn, { forBuyer = true })); every other item keeps the shelf's metadata.
 
 --- [itemKey] = true: its generator runs again for the buyer at purchase (see above).
 Inventory.MetaForBuyer = {}
@@ -1072,8 +1072,7 @@ end
 -- The payload is one table: { source, item, amount, count = what they carry now, reason = the
 -- caller's reason, by = the resource that asked }. reason and by are known only for changes made
 -- through the exports (AddItem, RemoveItem, the cash exports, StoreGive...), which note them just
--- before they push. The legacy names itemAdded / itemRemoved fire alongside, positional
--- (source, item, amount, { count, reason, by }).
+-- before they push.
 
 --- [source] = { [itemKey] = count } as last announced; nil until the baseline is taken.
 local _carried = {}
@@ -1134,7 +1133,7 @@ function Inventory.resetCarried(source, player)
     _pendingReason[source] = nil
 end
 
---- Fire itemAdded / itemRemoved for everything that changed since the last call for this player.
+--- Fire whip_core:item:added / :removed for everything that changed since the last call for this player.
 ---@param source number
 ---@param player table
 function Inventory.announceChanges(source, player)
@@ -1154,7 +1153,6 @@ function Inventory.announceChanges(source, player)
     local reason = note and note.reason or nil
     local by     = note and note.by or nil
 
-    -- whip_core:item:added / :removed; itemAdded / itemRemoved are the legacy names.
     for item, n in pairs(now) do
         local was = before[item] or 0
         if n > was then
@@ -2004,8 +2002,8 @@ function Inventory.useItem(source, player, container, slot)
         local owner = _uses:ownerOf(itemKey)
         local handedPlayer = (owner and owner ~= GetCurrentResourceName() and player.handlerSheet)
             and player:handlerSheet() or player
-        -- The handler gets the item's address (what GetItemAt, StoreTake, SetItemMetadata and
-        -- StartTimedAction's match take). Actions.call: what it saves lands with this use.
+        -- The handler gets the item's address (what GetItemAt, StoreTake and SetItemMetadata
+        -- take). Actions.call: what it saves lands with this use.
         --
         -- One use of an item at a time per player: the cooldown is stamped only after the handler
         -- answers, so a waiting handler could otherwise be entered twice. A second press meanwhile is
@@ -2223,9 +2221,15 @@ function Inventory.take(source, item, amount, reason, only, evenFrozen)
     end
     return ok, err
 end
-exports('RemoveItem', function(source, item, amount, reason)
+--- RemoveItem(source, item, amount?, metadata?, opts?), as AddItem: `metadata` takes only the stacks whose metadata
+--- carries every one of its values (a serial, your job's own package); `opts` is a reason or { reason }.
+exports('RemoveItem', function(source, item, amount, metadata, opts)
+    -- A reason in metadata's place is the old shape: said, not taken as a filter that matches nothing
+    if metadata ~= nil and type(metadata) ~= 'table' then
+        return false, 'metadata is a table or nil: the reason goes in opts (RemoveItem(source, item, amount, nil, { reason = ... }))'
+    end
     -- (Refused while a bank payment holds the pockets: Inventory.take asks.)
-    return Inventory.take(source, item, amount, reason)
+    return Inventory.take(source, item, amount, opts, metadata and Inventory.onlyStamped(metadata) or nil)
 end)
 
 --- Does the player have at least `amount` of this item, anywhere on them?
@@ -2551,7 +2555,7 @@ end
 --- registered without it). Registering the handler before the item is fine.
 ---
 --- The handler gets `(source, player, slotData, addr)`: `addr` is the used item's address, for
---- GetItemAt / StoreTake / SetItemMetadata / StartTimedAction. Return `false` to keep the item.
+--- GetItemAt / StoreTake / SetItemMetadata. Return `false` to keep the item.
 ---
 --- Or a table, for a use with a progress bar: see "A timed use, declared" above.
 ---@param itemKey string
@@ -2693,11 +2697,11 @@ end
 --- The generator is `function(itemKey, ctx)`: ctx says who it is for (Inventory.metaContext, above
 --- Inventory.addItem). opts.forBuyer: bought off an infinite shelf, it runs again for the buyer.
 --- Answers `true` or `false, reason`.
-exports('RegisterItemDefaultMeta', function(itemKey, generator, opts)
+exports('RegisterItemDefaultMetadata', function(itemKey, generator, opts)
     return Inventory.registerDefaultMeta(itemKey, generator, Registry.caller(), opts)   -- the caller first
 end)
 
---- RegisterItemDefaultMeta's body, with its owner. Owned, so the registry's sweep takes it away with
+--- RegisterItemDefaultMetadata's body, with its owner. Owned, so the registry's sweep takes it away with
 --- its resource (a forBuyer mark left behind with no generator does nothing: the purchase asks for both).
 ---@param owner string
 ---@param opts table|nil  { forBuyer = true }
@@ -2962,7 +2966,7 @@ exports('GetItemDef', function(key)
     return Config.Items[key]
 end)
 
-exports('GetAllItemDefs', function()
+exports('GetItemDefs', function()
     return Config.Items
 end)
 

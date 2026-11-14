@@ -4,7 +4,7 @@
 --     DirectorScenarioView answered from memory, so asking never waits on the database.
 --   * The information exports (types/server.lua has each one's shape).
 --   * What each player's own game is told about their runs (joined, objective, left, ended), for a phone's job
---     screen or a HUD: client/director_runs.lua turns it into local events and GetMyRuns. A push to that player only.
+--     screen or a HUD: client/director_runs.lua turns it into local events and GetPlayerScenarioRuns. A push to that player only.
 -- Test runs are left out of every answer unless `{ tests = true }` is asked for, and their players are told nothing.
 
 local R = DirectorRuntime
@@ -148,8 +148,8 @@ exports('GetScenarioRun', function(runId, opts)
     return Director.view(run)
 end)
 
---- ListScenarioRuns(filter?) -> { DirectorRunView, ... }   filter: { scenario?, player?, kind?, tests? }
-exports('ListScenarioRuns', function(filter)
+--- GetScenarioRuns(filter?) -> { DirectorRunView, ... }   filter: { scenario?, player?, kind?, tests? }
+exports('GetScenarioRuns', function(filter)
     filter = type(filter) == 'table' and filter or {}
     local who = filter.player ~= nil and sourceOf(filter.player) or nil
     if filter.player ~= nil and not who then return {} end
@@ -267,8 +267,8 @@ exports('GetScenario', function(key)
     return v
 end)
 
---- ListScenarios(filter?) -> { DirectorScenarioView (short), ... }   filter: { on?, kind?, startMode? }
-exports('ListScenarios', function(filter)
+--- GetScenarios(filter?) -> { DirectorScenarioView (short), ... }   filter: { on?, kind?, startMode? }
+exports('GetScenarios', function(filter)
     filter = type(filter) == 'table' and filter or {}
     local kind = type(filter.kind) == 'string' and filter.kind:lower() or nil
     local keys, seen = {}, {}
@@ -551,9 +551,9 @@ exports('CheckDirectorScenario', function(doc)
     return passes == true, plain(problems) or {}
 end)
 
---- ListDirectorCards(filter?) -> { { type, title, desc, category, owner, inputs, outputs, labels, props }, ... }
+--- GetDirectorCards(filter?) -> { { type, title, desc, category, owner, inputs, outputs, labels, props }, ... }
 --- filter: { category?, owner? }
-exports('ListDirectorCards', function(filter)
+exports('GetDirectorCards', function(filter)
     filter = type(filter) == 'table' and filter or {}
     local out = {}
     for _, c in ipairs(DirectorNodes.wire()) do

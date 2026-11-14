@@ -12,10 +12,10 @@
 -- Export writes a scenario out as a pack file (pack_exports/<key>.director.json in whip_core, the one folder it may
 -- write) with the fxmanifest lines to make a resource of it.
 -- From code:
---   * RegisterDirectorScenario(key, doc): a scenario built in code, on the same path as a file.
+--   * Whip.scenario(key, doc) (__RegisterDirectorScenario): a scenario built in code, on the same path as a file.
 --   * Trust: a Director admin may trust a resource once; its new and changed scenarios are then accepted by
 --     themselves when they pass Check and have what they need.
---   * RegisterDirectorTemplate(name, doc): a starting point in the editor's New list; a gated card is refused in the copy.
+--   * Whip.template(name, doc) (__RegisterDirectorTemplate): a starting point in the editor's New list; a gated card is refused in the copy.
 --   * A pack whose cards come from its own resource is checked again when they register.
 
 DirectorPacks = {}
@@ -36,7 +36,7 @@ local trusted = {}   -- [resource] = the director_pack_trust row: its scenarios 
 local ready = false
 local CODE = 'code:'   -- a scenario registered from code is the "file" code:<key> of its resource
 
--- Templates (RegisterDirectorTemplate): a starting point each, owned by the resource that brings it.
+-- Templates (Whip.template): a starting point each, owned by the resource that brings it.
 local templates = Registry.new('directorTemplate', { label = 'Director template', scoped = true, same = false })
 
 local function say(fmt, ...) print(('[whip_core:director] ' .. fmt):format(...)) end
@@ -605,7 +605,7 @@ end
 
 local function validKey(key) return type(key) == 'string' and #key >= 2 and #key <= 64 and key:match('^[%w_%-]+$') ~= nil end
 
---- A scenario a resource builds in code (RegisterDirectorScenario): offered as a shipped one is.
+--- A scenario a resource builds in code (Whip.scenario): offered as a shipped one is.
 --- Answers its status ('pending', 'accepted', 'refused', 'deleted'), or false and why. WAITS.
 function DirectorPacks.registerFromCode(res, key, doc)
     if not validKey(key) then return false, 'a key is 2 to 64 letters, digits, _ and -' end
@@ -647,9 +647,9 @@ function DirectorPacks.template(id)
     return plainCopy(t.doc)
 end
 
---- RegisterDirectorScenario(key, doc) -> 'pending' | 'accepted' | ... | false, why. WAITS (call it from
+--- __RegisterDirectorScenario(key, doc) -> 'pending' | 'accepted' | ... | false, why. WAITS (call it from
 --- Whip.register or a thread). Pending until a Director admin accepts it (or its resource is trusted).
-exports('RegisterDirectorScenario', function(key, doc)
+exports('__RegisterDirectorScenario', function(key, doc)
     local res = Registry.caller()
     if res == CORE then return false, 'whip_core\'s own scenarios are stored ones' end
     return DirectorPacks.registerFromCode(res, key, doc)
@@ -660,9 +660,9 @@ exports('RemoveDirectorScenario', function(key)
     return DirectorPacks.removeFromCode(Registry.caller(), key)
 end)
 
---- RegisterDirectorTemplate(name, doc) -> true | false, why: a starting point in the editor's New list
+--- __RegisterDirectorTemplate(name, doc) -> true | false, why: a starting point in the editor's New list
 --- ("Bank alarm (police)"). A builder's copy is theirs.
-exports('RegisterDirectorTemplate', function(name, doc)
+exports('__RegisterDirectorTemplate', function(name, doc)
     local res = Registry.caller()
     if type(name) ~= 'string' then return false, 'a template has a name' end
     name = DirectorKit.text(name, 60)

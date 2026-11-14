@@ -15,7 +15,7 @@
 -- edits those there.)
 --
 -- AN ITEM'S OWN SETTINGS, opted into with a `settings` list in its definition. Each entry is a
--- RegisterSettings entry: a key, a type (int, number, bool, string or enum), a default, a label, and
+-- settings-page entry (shared/settings.lua): a key, a type (int, number, bool, string or enum), a default, a label, and
 -- whatever that type takes (min, max, step, unit, maxLen, nullable, options, help):
 --
 --     exports.whip_core:RegisterItem('pistol_mag', {

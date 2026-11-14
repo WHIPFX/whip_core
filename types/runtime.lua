@@ -3,10 +3,10 @@
 -- whip_core — corrections to the FiveM runtime's own annotations
 -- ============================================
 --
--- The CfxLua natives extension types an export's function as `fun(...): any`, one answer. whip's exports answer
+-- The CfxLua natives extension types an export's function as `fun(...): any`, one value. whip's exports return
 -- `ok, why` (and some a third value), and FiveM hands every one of them across, so with that annotation every
 -- `return false, why` in an exports('Name', function ... end) was a redundant-return-value warning. This overload
--- lets the function answer as many values as it returns. It adds to the extension's `exports`; it replaces nothing.
+-- lets the function return as many values as it gives. It adds to the extension's `exports`; it replaces nothing.
 
 ---@overload fun(name: string, method: fun(...): ...)
 exports = {}
@@ -64,7 +64,7 @@ function TriggerClientEventInternal(eventName, eventTarget, eventPayload, payloa
 -- The scheduler
 -- ============================================
 
---- Run `callback` in a new thread after `msec`. Answers the timeout's id, for ClearTimeout. (The extension declares
+--- Run `callback` in a new thread after `msec`. Returns the timeout's id, for ClearTimeout. (The extension declares
 --- no answer.)
 ---@param msec number
 ---@param callback fun()
@@ -76,6 +76,6 @@ function Citizen.SetTimeout(msec, callback) end
 ---@return integer id
 function SetTimeout(msec, callback) end
 
---- Cancel a SetTimeout that has not run yet, by the id SetTimeout answered. The extension declares SetTimeout only.
+--- Cancel a SetTimeout that has not run yet, by the id SetTimeout returned. The extension declares SetTimeout only.
 ---@param id integer
 function ClearTimeout(id) end

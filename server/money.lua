@@ -26,7 +26,7 @@ Money._receipts = {}
 local _nextId = math.floor(os.time()) * 1000
 
 --- How long a payment stays refundable. Refunds undo the step right after a charge; anything later
---- is a new payment the other way, and should be one (BankSystemDeposit, AddPlayerCash).
+--- is a new payment the other way, and should be one (BankSystemDeposit, PayPlayer).
 local RECEIPT_TTL_MS = 30 * 60 * 1000
 --- A Systems Creator system's payment (owner 'system:<id>') is refunded by the system's walker when
 --- the pulse that took it is called off, and a pulse lives up to an hour (shared/systems/walk.lua's
@@ -575,12 +575,14 @@ exports('RefundPlayer', function(receipt, amount)
     return Money.refund(receipt, amount, owner)
 end)
 
---- Pay a player — a wage, a reward, a sale: `true, result`, or `false, reason`.
+--- Pay a player — a wage, a reward, a sale: `result`, or `false, reason`, as ChargePlayer returns its receipt.
 ---
 ---     exports.whip_core:PayPlayer(source, 250, { method = 'auto', reason = 'Courier job' })
 ---     exports.whip_core:PayPlayer({ charId = 12 }, 250, { method = 'bank', reason = 'Wages' })
 exports('PayPlayer', function(who, amount, opts)
     local owner = Registry.caller()   -- first, before anything can yield
     local why = Log.reasonFrom(type(opts) == 'table' and opts.reason or nil)
-    return Money.pay(who, amount, opts, owner, why)
+    local ok, result = Money.pay(who, amount, opts, owner, why)
+    if not ok then return false, result end
+    return result
 end)

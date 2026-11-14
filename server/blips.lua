@@ -8,7 +8,7 @@
 --   exports.whip_core:ShowBlip(audience, 'dropoff', {
 --       coords = vector3(x, y, z), label = 'Drop-off', sprite = 1, color = 5,
 --       route = true, radius = 25.0, tag = 'run:42' })
---   exports.whip_core:RemoveBlip('dropoff')
+--   exports.whip_core:HideBlip('dropoff')
 --   exports.whip_core:SetPlayerWaypoint(source, vector3(x, y, z))
 --
 --   * WHO SEES IT: an audience (server/audience.lua): 'everyone', { people = { serverId |
@@ -250,8 +250,8 @@ exports('ShowBlip', function(audience, id, spec)
     return Blips.show(owner, audience, id, spec)
 end)
 
---- Take yours down: RemoveBlip(id) -> true | false, why.
-exports('RemoveBlip', function(id)
+--- Take yours down, the pair of ShowBlip: HideBlip(id) -> true | false, why.
+exports('HideBlip', function(id)
     local owner = Registry.caller()
     return Blips.remove(owner, id)
 end)

@@ -1394,15 +1394,17 @@ end
 -- jobId shifts position), so the wrapper IS the public API surface; don't "simplify" it into an
 -- alias. Every name says "Bank".
 
---- Reason and actor from the last argument of a system money call: a plain string is the reason,
---- a table is { reason, actorCharId }.
----@param reasonOrOpts any
----@return string|nil reason, number|nil actorCharId
-local function reasonAndActor(reasonOrOpts)
-    local reason, actor = reasonOrOpts, nil
-    if type(reasonOrOpts) == 'table' then reason, actor = reasonOrOpts.reason, reasonOrOpts.actorCharId end
+--- Reason and actor from a system money call's `opts`, { reason, actorCharId }.
+---@param opts any
+---@return string|nil reason
+---@return number|nil actorCharId
+---@return string|nil why  for opts that are not a table
+local function reasonAndActor(opts)
+    if opts == nil then return nil, nil end
+    if type(opts) ~= 'table' then return nil, nil, 'opts is { reason?, actorCharId? }' end
+    local reason = opts.reason
     reason = type(reason) == 'string' and reason ~= '' and reason:sub(1, 120) or nil
-    return reason, tonumber(actor)
+    return reason, tonumber(opts.actorCharId)
 end
 
 --- A system money movement a SATELLITE asked for, on the activity log with the resource's name.
@@ -1443,8 +1445,14 @@ local function outRows(rows, err)
     return rows or {}, err
 end
 
-exports('GetBankAccount', function(accountId)
-    return outRow(Bank.GetAccount(accountId))
+--- One account: by its accountId, or `{ number = 'WB-123456' }` (its display number), `{ accountId = n }` or
+--- `{ id = n }` (as every GetX(ref) takes).
+exports('GetBankAccount', function(ref)
+    if type(ref) == 'table' then
+        if ref.number ~= nil then return outRow(Bank.GetAccountByNumber(ref.number)) end
+        ref = ref.accountId or ref.id
+    end
+    return outRow(Bank.GetAccount(ref))
 end)
 
 --- One account's balance, from memory after its first read (see BALANCES IN MEMORY at the top).
@@ -1486,10 +1494,6 @@ exports('GetBalance', function(who)
     return balanceOfAccount(main)
 end)
 
-exports('GetBankAccountByNumber', function(accountNumber)
-    return outRow(Bank.GetAccountByNumber(accountNumber))
-end)
-
 --- Every account a character can use, each row with their `role` on it.
 exports('GetCharacterBankAccounts', function(charId)
     return outRows(Bank.GetCharacterAccounts(charId))
@@ -1527,7 +1531,9 @@ end)
 --- it, who is moving money.
 ---@return table|false account
 ---@return string|nil err
-exports('CreateBankAccount', function(owner, label, accountType, job)
+exports('CreateBankAccount', function(owner, label, opts)
+    if opts ~= nil and type(opts) ~= 'table' then return false, "opts is { type?, job? }: CreateBankAccount(owner, label, { type = 'savings' })" end
+    local accountType, job = opts and opts.type, opts and opts.job
     local ownerCharId, why = WhoIs(owner)
     if not ownerCharId then return false, why --[[@as string]] end
     -- The job by jobId or KEY, and one that exists, as every Jobs export takes it: a linked account
@@ -1624,19 +1630,34 @@ end)
 -- ---- A PLAYER's money: their permission on the account is checked ----
 -- `actor` is the person doing it: `source` or `{ charId = n }`.
 
-exports('BankDeposit', function(accountId, amount, actor, reason)
+--- The reason in a bank call's `opts` ({ reason }), or nil and why for opts that are not a table.
+---@return string|nil reason
+---@return string|nil why
+local function optsReason(opts)
+    if opts == nil then return nil end
+    if type(opts) ~= 'table' then return nil, 'opts is { reason = ... }' end
+    return opts.reason
+end
+
+exports('BankDeposit', function(accountId, amount, actor, opts)
+    local reason, bad = optsReason(opts)
+    if bad then return false, bad end
     local charId, why = WhoIs(actor)
     if not charId then return false, why end
     return Bank.Deposit(accountId, amount, charId, reason)
 end)
 
-exports('BankWithdraw', function(accountId, amount, actor, reason)
+exports('BankWithdraw', function(accountId, amount, actor, opts)
+    local reason, bad = optsReason(opts)
+    if bad then return false, bad end
     local charId, why = WhoIs(actor)
     if not charId then return false, why end
     return Bank.Withdraw(accountId, amount, charId, reason)
 end)
 
-exports('BankTransfer', function(fromId, toId, amount, actor, reason)
+exports('BankTransfer', function(fromId, toId, amount, actor, opts)
+    local reason, bad = optsReason(opts)
+    if bad then return false, bad end
     local charId, why = WhoIs(actor)
     if not charId then return false, why end
     return Bank.Transfer(fromId, toId, amount, charId, reason)
@@ -1644,13 +1665,14 @@ end)
 
 -- ---- The SYSTEM's money: no permission check, so the caller decides who may ----
 --
--- The last argument is the reason, or { reason, actorCharId }. A satellite's system move is
+-- The last argument is `opts`: { reason, actorCharId }. A satellite's system move is
 -- written to the activity log with its name (logSystemMove).
 
 --- Pay money into an account — a sale's takings, a wage, a refund.
-exports('BankSystemDeposit', function(accountId, amount, reasonOrOpts)
+exports('BankSystemDeposit', function(accountId, amount, opts)
     local by = Log.byCaller()   -- before anything can yield
-    local reason, actor = reasonAndActor(reasonOrOpts)
+    local reason, actor, bad = reasonAndActor(opts)
+    if bad then return false, bad end
     local ok, err = Bank.SystemDeposit(accountId, amount, reason, actor)
     if ok then logSystemMove(('deposit to account #%s'):format(tostring(accountId)), amount, reason, actor, by) end
     return ok, err
@@ -1658,18 +1680,20 @@ end)
 
 --- Take money out of an account — a fine, a fee, a bill. Refused for a frozen account or
 --- one without enough in it.
-exports('BankSystemWithdraw', function(accountId, amount, reasonOrOpts)
+exports('BankSystemWithdraw', function(accountId, amount, opts)
     local by = Log.byCaller()
-    local reason, actor = reasonAndActor(reasonOrOpts)
+    local reason, actor, bad = reasonAndActor(opts)
+    if bad then return false, bad end
     local ok, err = Bank.SystemWithdraw(accountId, amount, reason, actor)
     if ok then logSystemMove(('withdrawal from account #%s'):format(tostring(accountId)), amount, reason, actor, by) end
     return ok, err
 end)
 
 --- Move money between two accounts — payroll out of a business account.
-exports('BankSystemTransfer', function(fromId, toId, amount, reasonOrOpts)
+exports('BankSystemTransfer', function(fromId, toId, amount, opts)
     local by = Log.byCaller()
-    local reason, actor = reasonAndActor(reasonOrOpts)
+    local reason, actor, bad = reasonAndActor(opts)
+    if bad then return false, bad end
     local ok, err = Bank.SystemTransfer(fromId, toId, amount, reason, actor)
     if ok then
         logSystemMove(('transfer from account #%s to #%s'):format(tostring(fromId), tostring(toId)), amount, reason, actor, by)

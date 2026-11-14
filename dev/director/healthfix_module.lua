@@ -393,13 +393,13 @@ RegisterTestModule({
             local realCall, realCaller = Actions.call, CALLER
             rawset(Actions, 'call', function(_, fn, ...) return pcall(fn, ...) end)
             CALLER = 'hf_sat'
-            local ok, why = HARNESS_EXPORTS.RegisterDirectorCard('hfsat.ping', { title = 'Ping', outputs = { 'pong' }, v = 1, __whipCard = 1 },
+            local ok, why = HARNESS_EXPORTS.__RegisterDirectorCard('hfsat.ping', { title = 'Ping', outputs = { 'pong' }, v = 1, __whipCard = 1 },
                 function(op) if op == 'run' then return { pin = 'pong', data = { n = 4 } } end return {} end)
             assertTrue(ok, 'registered (' .. tostring(why) .. ')')
             local got
             CreateThread(function() got = { HARNESS_EXPORTS.TestDirectorCard('hfsat.ping', {}, { player = 1 }) } end)
             tick(6)
-            HARNESS_EXPORTS.RemoveDirectorCard('hfsat.ping')
+            HARNESS_EXPORTS.__RemoveDirectorCard('hfsat.ping')
             Actions.call, CALLER = realCall, realCaller
             assertNotNil(got, 'answered within a few ticks')
             assertEqual(type(got[1]) == 'table' and got[1].outcome, 'pong', 'its outcome (' .. tostring(got[2]) .. ')')

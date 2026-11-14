@@ -35,8 +35,8 @@ local function reasonOf(reason, owner)
 end
 
 --- An item for a person, now if they are playing, else at their next login. `who`: a server id or { charId = n }.
---- Answers 'now' or 'login', or false and why.
-exports('GiveOnLogin', function(who, item, amount, metadata, reason)
+--- `opts` is a reason or { reason }, as AddItem's. Returns 'now' or 'login', or false and why.
+exports('GiveOnLogin', function(who, item, amount, metadata, opts)
     local owner = Registry.caller()   -- first, before anything can yield
     local charId, why = WhoIs(who)
     if not charId then return false, why end
@@ -48,6 +48,7 @@ exports('GiveOnLogin', function(who, item, amount, metadata, reason)
         local okData, what = Inventory.saveableData(metadata)
         if not okData then return false, ('metadata cannot be saved: %s'):format(what) end
     end
+    local reason = type(opts) == 'table' and opts.reason or opts
     reason = type(reason) == 'string' and reason:sub(1, 120) or nil
 
     -- Playing now: given now, as AddItem would.

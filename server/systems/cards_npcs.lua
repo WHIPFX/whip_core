@@ -94,7 +94,7 @@ define({
 })
 
 define({
-    type = 'npc.info', category = 'npcs', kind = 'value', title = 'About the NPC', api = { 'GetNpc', 'GetNpcBy' },
+    type = 'npc.info', category = 'npcs', kind = 'value', title = 'About the NPC', api = 'GetNpc',
     desc = 'An NPC as the server sees it: alive or not, its health, where it is, and who killed it.',
     values = { inputs = { { key = 'npc', type = 'npc', label = 'NPC' } },
                outputs = { { key = 'found', type = 'bool', label = 'Found' }, { key = 'alive', type = 'bool', label = 'Alive' },

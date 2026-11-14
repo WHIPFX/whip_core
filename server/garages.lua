@@ -651,8 +651,8 @@ end
 -- ============================================
 --
 -- Garages had no exports at all until these. Every one of these functions existed; none of them
--- could be reached from outside whip_core, which made StoreVehicle(vehicleId, garageKey) an export
--- whose second parameter no satellite could legally obtain — there was no way to list the garages,
+-- could be reached from outside whip_core, which made a garage key (DespawnVehicle's `garage`) a
+-- parameter no satellite could legally obtain — there was no way to list the garages,
 -- no way to validate a key, and no way to find the nearest one. The usual result was a hardcoded
 -- string copied out of config.lua and a "Wrong garage" error when it drifted.
 
@@ -781,7 +781,7 @@ end)
 
 --- Move a vehicle to a different garage without taking it out of storage.
 ---
---- NOT THE SAME AS StoreVehicle, and this is the gap it fills: Vehicles.store refuses anything that
+--- NOT THE SAME AS DespawnVehicle with a garage, and this is the gap it fills: Vehicles.store refuses anything that
 --- is not currently `out` — "Vehicle is already stored" — so until now moving a garaged car between
 --- garages was possible only from the admin tool. An impound releasing a car back to its home
 --- garage, or a dealership delivering to the buyer's garage of choice, both need exactly this.

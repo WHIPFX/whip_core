@@ -231,7 +231,7 @@ define({
 })
 
 define({
-    type = 'map.unblip', category = 'world', kind = 'action', title = 'Remove Map Marker', api = 'RemoveBlip',
+    type = 'map.unblip', category = 'world', kind = 'action', title = 'Remove Map Marker', api = 'HideBlip',
     desc = 'Takes one of this system\'s map markers away, by its name (and its player, for one player\'s).',
     props = { { key = 'name', kind = 'text', label = 'Name', default = 'marker', maxLength = 24 } },
     values = { inputs = { { key = 'player', type = 'player', label = 'For (empty: everyone\'s)', optional = true } } },

@@ -4597,7 +4597,7 @@ end)
 --   FindItemByUid(uid)                       the address of one specific item, if it is loaded
 --
 -- A stash or boot nobody has opened is loaded on demand. `{ kind = 'player', id = source, sub = 'accessory' }` is the
--- accessory strip. Changes are saved, shown to anyone looking and logged; pockets announce itemAdded / itemRemoved.
+-- accessory strip. Changes are saved, shown to anyone looking and logged; pockets announce whip_core:item:added / :removed.
 
 --- The player whose pockets a store is, if it is.
 ---@param store table
@@ -5119,11 +5119,11 @@ end)
 --- Where an item whose metadata `key` holds `value` is — `{ kind, id, sub?, slot }`, or nil: the first found, so for
 --- a value one item carries (a gun's serial). Loaded places only (findLoaded); GetItemAt(addr) reads it.
 ---
----     exports.whip_core:FindItemByMeta('serial', 'AB12CD34EF56')
+---     exports.whip_core:FindItemByMetadata('serial', 'AB12CD34EF56')
 ---@param key string
 ---@param value any  compared with ==
 ---@return table|nil addr
-exports('FindItemByMeta', function(key, value)
+exports('FindItemByMetadata', function(key, value)
     if type(key) ~= 'string' or key == '' or value == nil then return nil end
     return findLoaded(function(d) return type(d) == 'table' and type(d.metadata) == 'table' and d.metadata[key] == value end)
 end)

@@ -14,7 +14,7 @@
 -- KEPT IN THE CHARACTER'S METADATA (key FLAGS_KEY), so a flag is saved the one way whip saves a
 -- character (the player unit: with the action that set it), and reads cost no database wait. That is
 -- also why only an ONLINE character's flags can be read or set: an offline one's metadata is not in
--- memory. The player's own game is sent its metadata (GetPlayerData), so a flag is no secret from
+-- memory. The player's own game is sent its metadata (the client's GetPlayer), so a flag is no secret from
 -- the player it is about; nobody else sees it.
 --
 --   name   letters, digits and _ . - : (at most 64), starting with a letter. Names starting with _

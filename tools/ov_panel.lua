@@ -18,7 +18,7 @@
 -- And Dungeon Mode's own (server/director/live.lua), for their maker or a full admin: a Dungeon NPC's fights and
 -- switches, a Dungeon car's Key settings, a Dungeon prop's Move, Change model, Solid and Remove.
 --
--- Other resources add their own (RegisterObjectViewerOption, through Whip.objectViewerOption in
+-- Other resources add their own (Whip.objectViewerOption, in
 -- @whip_core/lib/satellite.lua): whip_autos' Open Whiplash.
 --
 -- WHERE THINGS RUN. The server answers what the thing is and does what it can (server/object_viewer.lua); the game
@@ -294,7 +294,7 @@ local OPTIONS = {
 }
 
 -- ============================================
--- Other resources' options (RegisterObjectViewerOption)
+-- Other resources' options (Whip.objectViewerOption)
 -- ============================================
 
 local Registered = {}   -- [id] = { id, owner, label, hint, group, tint, kinds, whip, entry }
@@ -347,16 +347,16 @@ local function optionOf(owner, id, spec, entry)
     return o
 end
 
---- RegisterObjectViewerOption(id, spec, entry) -> true | false, why. Through Whip.objectViewerOption only.
-exports('RegisterObjectViewerOption', function(id, spec, entry)
+--- __RegisterObjectViewerOption(id, spec, entry) -> true | false, why. Through Whip.objectViewerOption only.
+exports('__RegisterObjectViewerOption', function(id, spec, entry)
     local owner = Registry.caller()
     local o, why = optionOf(owner, id, spec, entry)
     if not o then return false, why end
     return OptionReg:add(owner, id, o)
 end)
 
---- RemoveObjectViewerOption(id) -> true | false, why. Only your own.
-exports('RemoveObjectViewerOption', function(id)
+--- __RemoveObjectViewerOption(id) -> true | false, why. Only your own.
+exports('__RemoveObjectViewerOption', function(id)
     return OptionReg:remove(Registry.caller(), id)
 end)
 

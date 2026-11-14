@@ -2,7 +2,7 @@
 Whip.register(function()
     local function offDuty() return LocalPlayer.state.whipJob ~= 'mydelivery' end
 
-    exports.whip_core:AddAction({
+    Whip.core:AddAction({
         id      = 'depot',
         at      = { coords = Config.Depot },
         options = {
@@ -29,7 +29,7 @@ Whip.register(function()
 
     -- The server decides which door is theirs; a prompt at the wrong one is told so
     for i, stop in ipairs(Config.Drops) do
-        exports.whip_core:AddAction({
+        Whip.core:AddAction({
             id       = 'drop_' .. i,
             at       = { coords = stop.coords },
             label    = 'Deliver the package',

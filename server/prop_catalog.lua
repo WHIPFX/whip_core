@@ -606,7 +606,7 @@ end)
 
 ---@param model string
 ---@return boolean
-exports('HasPropImage', function(model)
+exports('__HasPropImage', function(model)
     if type(model) ~= 'string' then return false end
     return hasImage(PropCatalog._rows[model:lower()])
 end)
@@ -622,7 +622,7 @@ exports('IsPlaceableProp', function(model)
     return row ~= nil and row.status ~= 'unavailable'
 end)
 
-exports('GetPropCatalog', function() return PropCatalog.wire() end)
+exports('__GetPropCatalog', function() return PropCatalog.wire() end)
 
 -- ============================================
 -- Add-on props from other resources (RegisterProps)

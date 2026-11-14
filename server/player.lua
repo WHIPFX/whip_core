@@ -203,7 +203,7 @@ function WhipPlayer:setMetadata(key, value)
     PlayerRows.markDirty(self.source)
     self._metadataDirty = (self.source and PlayerRows._dirty[self.source]) or true
 
-    -- And to the player's own client (GetPlayerData), which had the whole table at login anyway. Only
+    -- And to the player's own client (the client's GetPlayer), which had the whole table at login anyway. Only
     -- for a player in the world under this object (an offline character's sheet has no client).
     if Players[self.source] == self then
         TriggerClientEvent('whip_core:client:metadataChanged', self.source, key, value)
@@ -754,8 +754,8 @@ function WhipPlayer:logout(invoker)
     -- and fades for half a second, which everyone else would watch it stand frozen through.
     if EnterCharSelectBucket then EnterCharSelectBucket(source) end
 
-    -- Logout event before cleanup (whip_core:player:logout, why = 'logout'; playerLogout is the
-    -- legacy name). Core's own hooks first (Character.onLife), then the news.
+    -- Logout event before cleanup (whip_core:player:logout, why = 'logout'). Core's own hooks first
+    -- (Character.onLife), then the news.
     local sheet = self:serialize()
     local ended = { source = source, charId = self.charId, player = sheet, why = 'logout' }
     Character.runHooks('logout', ended)
@@ -890,11 +890,34 @@ exports('IsSessionCurrent', IsSessionCurrent)
 -- The identifiers (discord, fivem, license, steam) are not on the sheet: it is also sent to the
 -- client on playerLoaded. GetPlayerIdentifiers has them.
 
---- A player as plain, copyable data.
----@param source number
+--- The identifier kinds GetPlayer finds a player by: the four GetPlayerIdentifiers returns.
+local IDENTIFIER_TYPES = { license = true, steam = true, discord = true, fivem = true }
+
+--- The online player a `who` names: a server id, or `{ charId = }`, `{ userId = }` or
+--- `{ identifier = 'license:...' }`. Only identifier fields, and never nil: a nil identifier would match the
+--- first player missing it.
+---@param who any
+---@return table|nil player  the live object
+local function onlinePlayerOf(who)
+    if type(who) ~= 'table' then return Players[tonumber(who)] end
+    if who.charId ~= nil then return PlayersByCharId[Sanitize.id(who.charId)] end
+    if who.userId ~= nil then return PlayersByUserId[Sanitize.id(who.userId)] end
+    local identifier = who.identifier
+    if type(identifier) ~= 'string' then return nil end
+    local kind = identifier:match('^(%w+):.')
+    if not kind or not IDENTIFIER_TYPES[kind] then return nil end
+    for _, player in pairs(Players) do
+        if player[kind] == identifier then return player end
+    end
+    return nil
+end
+
+--- A player as plain, copyable data: by server id, or by `{ charId = }`, `{ userId = }` or
+--- `{ identifier = 'license:...' }`. nil when nobody online matches.
+---@param who number|table
 ---@return table|nil
-exports('GetPlayer', function(source)
-    local player = Players[source]
+exports('GetPlayer', function(who)
+    local player = onlinePlayerOf(who)
     return player and player:serialize() or nil
 end)
 
@@ -935,32 +958,6 @@ exports('GetPlayers', function(opts)
     return out
 end)
 
-exports('GetPlayerFromUserId', function(userId)
-    local player = PlayersByUserId[userId]
-    return player and player:serialize() or nil
-end)
-
-exports('GetPlayerFromCharId', function(charId)
-    local player = PlayersByCharId[charId]
-    return player and player:serialize() or nil
-end)
-
---- The identifier kinds GetPlayerFromIdentifier looks up — the same four GetPlayerIdentifiers returns.
-local IDENTIFIER_TYPES = { license = true, steam = true, discord = true, fivem = true }
-
---- Find the online player holding an identifier, e.g. ('license', 'license:abc...').
----
---- Only identifier fields, and never nil: a nil identifier would match the first player missing it.
-exports('GetPlayerFromIdentifier', function(idType, identifier)
-    if not IDENTIFIER_TYPES[idType] or type(identifier) ~= 'string' or identifier == '' then
-        return nil
-    end
-    for _, player in pairs(Players) do
-        if player[idType] == identifier then return player:serialize() end
-    end
-    return nil
-end)
-
 --- The identifiers serialize() deliberately leaves out (the sheet also goes to the client), behind
 --- their own call so adding a field to the sheet can never publish one.
 ---@param source number
@@ -991,37 +988,6 @@ exports('GetPlayerCash', function(source)
     -- A count answers 0 and why when there is no player, as GetItemCount does.
     if not player then return 0, 'Player not loaded' end
     return player:getCash()
-end)
-
---- `reason` is optional and goes in the activity log beside your resource's name — 'rental
---- refund · by my_rentals' — so an admin can tell a wage from a refund. Without one the row says
---- only which resource it was.
----
---- Cash never drops: pockets too full for the notes means `false, reason`, and nothing was paid.
----@param reason string|nil
----@return boolean added
----@return string|nil err
-exports('AddPlayerCash', function(source, amount, reason)
-    local why = Log.reasonFrom(reason)   -- first, before anything can yield (house rule 10)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
-    local ok, err = player:addCash(amount, why)
-    if not ok then return false, err or 'Could not add the cash' end
-    return true
-end)
-
----@param reason string|nil  see AddPlayerCash
----@return boolean removed  false when they did not have it
----@return string|nil err
-exports('RemovePlayerCash', function(source, amount, reason)
-    local why = Log.reasonFrom(reason)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
-    -- Not the notes of an ATM withdrawal still waiting on its debit (Inventory.pocketsFrozen).
-    if Inventory.pocketsFrozen(source) then return false, 'Paying — wait a moment' end
-    local ok, err = player:removeCash(amount, why)
-    if not ok then return false, err or 'Could not take the cash' end
-    return true
 end)
 
 local NOTIFY_KINDS = { 'info', 'success', 'warning', 'error' }
@@ -1079,10 +1045,36 @@ function ShowSuccess(source, text, duration)
     return NotifyPlayer(source, text, 'success', duration)
 end
 
-exports('GetPlayerMetadata', function(source, key)
-    local player = Players[source]
-    if not player then return nil end
-    return player:getMetadata(key)
+--- An offline character's metadata, read from their row (it is in memory only while they play), or nil and why.
+---@param charId number
+---@return table|nil metadata
+---@return string|nil why
+local function offlineMetadata(charId)
+    -- Their last session's save first (a failed teardown write still owed, `player:<charId>` holds the metadata):
+    -- read before it lands, and the row is the one from before that session. The login settles it the same way.
+    if not Stores.settle('player:' .. tostring(charId)) then
+        return nil, 'Their last save has not landed yet — try again in a moment'
+    end
+    -- The row, not the column alone: a character whose metadata is NULL is still a character.
+    local ok, row = pcall(MySQL.single.await,
+        'SELECT `metadata` FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL', { charId })
+    if not ok then return nil, 'The database could not be reached — try again' end
+    if type(row) ~= 'table' then return nil, 'No such character' end
+    return Character.readJson(row.metadata, ('charId %s metadata'):format(tostring(charId)))
+end
+
+--- A person's metadata, one key or all of it: a server id, or `{ charId = n }` for a character online or not (an
+--- offline one's is read from the database, so this waits). nil for nobody.
+exports('GetPlayerMetadata', function(who, key)
+    local charId, src = WhoIs(who)
+    if not charId then return nil end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if player then return player:getMetadata(key) end
+    local metadata = offlineMetadata(charId)
+    if not metadata then return nil end
+    if key then return metadata[key] end
+    return metadata
 end)
 
 -- whip_core's own keys in a character's metadata, written only by the calls that own them (the creator and
@@ -1094,15 +1086,52 @@ local CORE_METADATA_KEYS = {
     whipFlags = true, moneyHeldOwed = true, pourRefundOwed = true, lastSeat = true,
 }
 
-exports('SetPlayerMetadata', function(source, key, value)
+--- Set one key on a character who is not playing: their row, read and written back. The whole read-and-write holds
+--- the character in LoadingCharIds as 'metadata' (as a delete holds it as 'deleting'): a login refuses a character
+--- held there, so it can neither read the row before this write lands and save over it, nor start between the two,
+--- and a second write waits its turn the same way. Refused while they are logging in.
+---@return boolean ok
+---@return string|nil why
+local function setOfflineMetadata(charId, key, value)
+    if value ~= nil and not pcall(json.encode, { v = value }) then
+        return false, ('metadata "%s" cannot be saved (not JSON-encodable — store plain numbers, strings and tables)')
+            :format(key)
+    end
+    if PlayersByCharId[charId] or LoadingCharIds[charId] then
+        return false, 'That character is busy right now — try again in a moment'
+    end
+    LoadingCharIds[charId] = 'metadata'
+    local ok, done, why = pcall(function()
+        local metadata, readWhy = offlineMetadata(charId)
+        if not metadata then return false, readWhy end
+        metadata[key] = value
+        -- (No count check: a write that changes nothing may count 0 rows.)
+        local wrote = pcall(MySQL.update.await,
+            'UPDATE `characters` SET `metadata` = ? WHERE `charId` = ? AND `deleted` IS NULL',
+            { json.encode(metadata), charId })
+        if not wrote then return false, 'Could not save that (database error)' end
+        return true
+    end)
+    if LoadingCharIds[charId] == 'metadata' then LoadingCharIds[charId] = nil end
+    if not ok then return false, tostring(done) end
+    if not done then return false, why end
+    return true
+end
+
+--- Set one key of a person's metadata: a server id, or `{ charId = n }` for a character online or not (an
+--- offline one's row is written, so this waits). Not whip_core's own keys.
+exports('SetPlayerMetadata', function(who, key, value)
     if type(key) ~= 'string' or key == '' then return false, 'a metadata key is a string, such as "myresource_licences"' end
     if CORE_METADATA_KEYS[key] then
         local res = GetInvokingResource() or 'myresource'
         return false, ("metadata '%s' is whip_core's own (it has its own calls): give yours another name, such as '%s_%s'")
             :format(key, res, key)
     end
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
+    local charId, src = WhoIs(who)
+    if not charId then return false, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if not player then return setOfflineMetadata(charId, key, value) end
     local ok, err = player:setMetadata(key, value)
     if not ok then return false, err end
     return true

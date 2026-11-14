@@ -365,7 +365,7 @@ end
 --- While LB is held: is this button LB + something that works in menus (talk)? Then the panel driver leaves its press to the combo.
 ---@param control number  a frontend control
 ---@return boolean
-function PadComboTakes(control)
+function PadComboInMenus(control)
     if not held then return false end
     local id = LB_SLOT_OF[control]
     local a = id and layout[id]
@@ -379,16 +379,16 @@ end
 --- Does LB + this button belong to whip's combo rather than to the screen? false when LB is not held.
 ---@param control number|nil  a frontend control (201 A, 202 B, 203 X, 204 Y, 206 RB, the D-pad 187-190)
 ---@return boolean
-exports('PadComboTakes', function(control)
+exports('__PadComboTakes', function(control)
     control = tonumber(control)
     if not held or not control then return false end
     if control == 201 or control == 203 then return true end
-    return PadComboTakes(control)
+    return PadComboInMenus(control)
 end)
 
 --- Was a combo used during the current LB hold (or the last)? True means the screen's own LB press is not sent.
 ---@return boolean
-exports('PadComboUsed', function()
+exports('__PadComboUsed', function()
     return WhipPadComboUsed == true
 end)
 

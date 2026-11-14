@@ -611,7 +611,7 @@ async function askScenario(copyOf) {
         const h = st.hub || {};
         start = WP.select([{ value: '', label: 'Nothing' }]
             .concat(arr(h.examples).map((x) => ({ value: 'example:' + x, label: 'Example: ' + String(x).replace(/_/g, ' ') })))
-            // Other resources' starting points (RegisterDirectorTemplate): the copy is yours.
+            // Other resources' starting points (Whip.template): the copy is yours.
             .concat(arr(h.templates).map((t) => ({ value: 'template:' + t.id, label: `${t.name} (${t.resource})` }))));
         box.appendChild(WP.field('Start from', start, true));
     }
@@ -705,7 +705,7 @@ async function renderShipped() {
                     cell.appendChild(b);
                 }
             }
-            // One built in its code (RegisterDirectorScenario) has no file: said so.
+            // One built in its code (Whip.scenario) has no file: said so.
             return [`${p.resource} · ${p.fromCode ? 'from its code' : p.file}${p.trusted ? ' · trusted' : ''}`, `${p.name || '?'} (${p.key || '?'})`,
                 pill(label + (p.changed ? ' · changed' : ''), cls), WP.el('span', 'wd-wrap', requiresText(p)), cell];
         })));

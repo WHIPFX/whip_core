@@ -287,7 +287,7 @@ local function makeEntityHandler(key)
         -- with whip's own writer, a whip bug, not the driver's doing. Corrected and reported for the
         -- developer; nobody is struck.
         if _serverWriting > 0 then
-            -- The writer is whip or, through SentinelSetEntityKey, the satellite that owns the key.
+            -- The writer is whip or, through SetSentinelEntityKey, the satellite that owns the key.
             print(('[whip_core:sentinel] %s wrote %s = %s but its truth says %s — corrected, nobody struck%s')
                 :format(reg.owner == 'whip_core' and 'WHIP BUG: whip' or tostring(reg.owner), key,
                     shortVal(value), shortVal(truth),
@@ -526,7 +526,7 @@ end)
 ---@param value any
 ---@return boolean ok
 ---@return string|nil err
-exports('SentinelSetPlayerKey', function(src, key, value)
+exports('SetSentinelPlayerKey', function(src, key, value)
     local caller = Registry.caller()   -- first, before anything can yield
     if type(key) ~= 'string' or key == '' then return false, 'key (string) is required' end
     if type(src) ~= 'number' or not GetPlayerName(src) then return false, 'no such player' end
@@ -554,7 +554,7 @@ end)
 ---@param value any
 ---@return boolean ok
 ---@return string|nil err
-exports('SentinelSetEntityKey', function(entity, key, value)
+exports('SetSentinelEntityKey', function(entity, key, value)
     local caller = Registry.caller()   -- first, before anything can yield
     if type(key) ~= 'string' or key == '' then return false, 'key (string) is required' end
     entity = tonumber(entity)
@@ -574,7 +574,7 @@ exports('SentinelSetEntityKey', function(entity, key, value)
 end)
 
 --- The server-truth read, for satellites (and for whip's own gates — see events_misc).
-exports('SentinelGetTruth', function(src, key)
+exports('GetSentinelTruth', function(src, key)
     return Sentinel.getTruth(src, key)
 end)
 

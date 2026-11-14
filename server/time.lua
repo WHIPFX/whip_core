@@ -492,7 +492,7 @@ local function whenReady(fn)
 end
 exports('SetTime', whenReady(function(h, m) return TimeWeather.setTime(h, m) end))
 exports('SetWeather', whenReady(function(w) return TimeWeather.setWeather(w) end))
-exports('SetFrozen', whenReady(function(f) return TimeWeather.setFrozen(f) end))
+exports('SetTimeFrozen', whenReady(function(f) return TimeWeather.setFrozen(f) end))
 exports('SetBlackout', whenReady(function(b) return TimeWeather.setBlackout(b) end))
 exports('SetTimeScale', whenReady(function(s) return TimeWeather.setTimeScale(s) end))
 

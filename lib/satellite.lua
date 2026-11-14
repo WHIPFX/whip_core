@@ -3,20 +3,16 @@
 --     dependency 'whip_core'
 --     shared_script '@whip_core/lib/satellite.lua'
 --
--- Then, on either side (server or client), declare what your resource adds:
---
---     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---     Whip.declare:RegisterUseHandler('lemonade', drinkLemonade)
---
--- or, for more than one call (a loop over your Config, an answer you keep), a function:
+-- Then, on either side (server or client), declare what your resource adds in a function:
 --
 --     Whip.register(function()
---         for key, def in pairs(Config.Drinks) do exports.whip_core:RegisterItem(key, def) end
+--         Whip.core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+--         Whip.core:RegisterUseHandler('lemonade', drinkLemonade)
 --     end)
 --
--- Each runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what you
--- registered). It is a file you include, not an export, because the registration list has to live in your
--- resource's Lua state.
+-- It runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what you
+-- registered). A declaring call that whip_core refuses is printed in your console. It is a file you include, not an
+-- export, because the registration list has to live in your resource's Lua state.
 
 Whip = Whip or {}
 
@@ -223,31 +219,28 @@ end
 --- Calls still waiting on whip_core, answered if it stops first. [promise] = the export's name.
 local _waiting = {}
 
---- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
---- whip_core is not running or the call threw — never an error in your code.
----
----     local ok, err = Whip.call('AddItem', source, 'lemonade', 1, nil, 'bought at the stand')   -- nil: no metadata
----
---- AN EXPORT THAT WAITS IS ANSWERED IF whip_core STOPS. Progress and SkillCheck
---- wait for the player; anything that reads the database waits for it. That wait lives in
---- whip_core, and when whip_core stops it is gone with it — the call never returns, and your
---- handler stays stuck holding whatever it held (a "busy" latch, a half-done flow) until your
---- resource restarts. Called through here, it answers `false, 'whip_core stopped'` instead.
---- `exports.whip_core:Progress(...)` straight gets no such answer. (With `dependency 'whip_core'`
---- your resource stops with whip_core and starts fresh, so nothing stays stuck either way.)
----
---- 'whip_core stopped' MEANS "NO ANSWER", NOT "DID NOT HAPPEN": a charge whose write had already gone
---- to the database lands anyway. Treat it like a lost connection — check, do not repeat blindly.
--- The exports that can wait, on each side: dev/waits.js finds them, and its --check keeps this list, the stubs'
--- ---@async marks and the docs' WAITS list the same. Only these get Whip.call's thread and promise; every other
--- call goes straight through (cheap enough for a loop).
-local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankAccountByNumber","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetShopSlotPrice","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","RemovePropertyKey","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","ClockOff","ClockOn","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlaceObject","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]}]])
+-- The exports that can wait, on each side: dev/waits.js finds them, its --write writes this list and the docs' WAITS
+-- list, and its --check keeps both the same as the stubs' ---@async marks. Only these get Whip.call's thread and
+-- promise; every other call goes straight through (cheap enough for a loop).
+local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetPlayerMetadata","GetPlayerVehicleKeys","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HasVehicleKey","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPlayerMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop","__AdoptOrCreateDoor","__RegisterDirectorScenario","__ReleaseManagedDoor"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlaceObject","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]}]])
 local WAITS_HERE = {}
 for _, n in ipairs(WAITS[IsDuplicityVersion() and 'server' or 'client'] or {}) do WAITS_HERE[n] = true end
 
+--- The coroutines running registrations right now (see Whip.register): [co] = how many passes it is inside. A set,
+--- not one saved-and-restored value: two passes can overlap (one waits on a slow export while another starts), and
+--- the first to end must not hide the other's refusals.
+local _passes = {}
+
+--- Is this coroutine inside a registration pass?
+local function inPass()
+    local co = coroutine.running()
+    return co ~= nil and _passes[co] ~= nil
+end
+
+--- One call into whip_core: Whip.call without its refusal line.
 ---@param name string  the export's name
 ---@return any ...
-function Whip.call(name, ...)
+local function callCore(name, ...)
     if GetResourceState(CORE) ~= 'started' then
         return false, 'whip_core is not running'
     end
@@ -269,11 +262,10 @@ function Whip.call(name, ...)
         return table.unpack(packed, 2, packed.n)
     end
 
-    -- An export that cannot wait (most of them): straight through, no thread and no promise. The export is looked up
-    -- INSIDE the pcall: one whip_core does not have (an older whip_core still running, a name mistyped) answers
-    -- false, why, as every other failure here does, not a script error in the caller (14 Nov 2026: PlaceObject
-    -- asked of a whip_core not restarted since it was added).
+    -- An export that cannot wait (most of them): straight through, no thread and no promise.
     if not WAITS_HERE[name] then
+        -- The lookup inside the pcall too: FiveM raises "No such export" for a name whip_core does not have (one
+        -- renamed, or a typo), and that must answer false like any failure rather than throw out of a Whip.register.
         local packed = table.pack(pcall(function(...) return exports[CORE][name](exports[CORE], ...) end, ...))
         if not packed[1] then
             return false, ('whip_core:%s failed: %s'):format(tostring(name), tostring(packed[2]))
@@ -304,10 +296,63 @@ function Whip.call(name, ...)
     return table.unpack(packed, 2, packed.n)
 end
 
+--- Does `name` declare something (what a Whip.register function is for)? Its refusal there is printed.
+---@param name string
+---@return boolean
+local function declares(name)
+    return name:find('^Register') ~= nil or name:find('^Ensure') ~= nil or name:find('^Add') ~= nil
+        or name:find('^On%u') ~= nil or name:find('^Watch') ~= nil
+        or name == 'SecureEvent' or name == 'SecureCallback'
+end
+
+--- Print a refusal (`false, why`) in this console, naming the export, and pass every answer on. A start problem
+--- (Whip.startProblem): red, and Whip.sayStarted does not then say all is well.
+local function sayRefusal(name, ...)
+    local ok, why = ...
+    if ok == false and type(why) == 'string' then
+        -- Whip.call's own reasons already name the export ('whip_core:X failed: ...')
+        local text = why:find('whip_core:' .. name, 1, true) == 1 and why
+            or ('whip_core:%s refused: %s'):format(name, why)
+        Whip.startProblem('%s', text)
+    end
+    return ...
+end
+
+--- Call a whip_core export safely, by a name built at run time (for a name you know, Whip.core:Name(...), below, is
+--- the same call with the export's types). Returns what the export returns, or (false, reason) when whip_core is not
+--- running or the call threw — never an error in your code.
+---
+---     local ok, err = Whip.call(exportName, source, 'lemonade', 1, nil, { reason = 'bought at the stand' })
+---
+--- INSIDE A Whip.register FUNCTION, A DECLARING CALL'S REFUSAL IS PRINTED in your console, naming the export:
+--- Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. Nobody else reads it there. A
+--- call straight through exports.whip_core is not.
+---
+--- AN EXPORT THAT WAITS IS ANSWERED IF whip_core STOPS. Progress and SkillCheck
+--- wait for the player; anything that reads the database waits for it. That wait lives in
+--- whip_core, and when whip_core stops it is gone with it — the call never returns, and your
+--- handler stays stuck holding whatever it held (a "busy" latch, a half-done flow) until your
+--- resource restarts. Called through here, it returns `false, 'whip_core stopped'` instead.
+--- `exports.whip_core:Progress(...)` straight gets no such answer. (With `dependency 'whip_core'`
+--- your resource stops with whip_core and starts fresh, so nothing stays stuck either way.)
+---
+--- 'whip_core stopped' MEANS "NO ANSWER", NOT "DID NOT HAPPEN": a charge whose write had already gone
+--- to the database lands anyway. Treat it like a lost connection — check, do not repeat blindly.
+---@param name string  the export's name
+---@return any ...
+function Whip.call(name, ...)
+    if type(name) == 'string' and inPass() and declares(name) then
+        return sayRefusal(name, callCore(name, ...))
+    end
+    return callCore(name, ...)
+end
+
 --- whip_core's exports, each called through Whip.call: `Whip.core:AddItem(source, 'cookie', 1)` is
 --- `Whip.call('AddItem', source, 'cookie', 1)`. Typed like exports.whip_core (types/satellite.lua), so the editor
---- shows each export's params and answers, where Whip.call('Name') shows none and a misspelt name only answers false.
---- Written with a colon like an export; a dot works too.
+--- shows each export's params and returns, where Whip.call('Name') shows none and a misspelt name only returns false.
+--- Written with a colon like an export; a dot works too. Typed here too, so an editor that has this file open (a
+--- workspace holding whip_core) still underlines a misspelt name.
+---@type WhipCoreServerExports|WhipCoreClientExports
 Whip.core = setmetatable({}, {
     __index = function(proxy, name)
         local fn = function(first, ...)
@@ -319,15 +364,12 @@ Whip.core = setmetatable({}, {
     end,
 })
 
---- The coroutine running the registrations right now, if any (see Whip.register).
-local _runningCo = nil
-
 local function runAll(list, what)
     -- A copy of the list: a registration added while these run (from another thread, during a wait)
     -- has already run when it was added, and must not run again here.
     local snapshot = table.move(list, 1, #list, 1, {})
-    local outer = _runningCo
-    _runningCo = coroutine.running()
+    local co = coroutine.running()
+    _passes[co] = (_passes[co] or 0) + 1
     for _, fn in ipairs(snapshot) do
         local ok, err = pcall(fn)
         if not ok then
@@ -335,12 +377,21 @@ local function runAll(list, what)
             print(('^1[%s] %s failed: %s^0'):format(SELF, what, tostring(err)))
         end
     end
-    _runningCo = outer
+    _passes[co] = _passes[co] > 1 and _passes[co] - 1 or nil
 end
 
 --- Run `fn` whenever your registrations are needed: when whip_core becomes ready, and every time
---- it restarts. Put everything you register with whip in here (or, one call at a time, through
---- Whip.declare, below). Safe to run more than once: the same registration again changes nothing.
+--- it restarts. Put everything you register with whip in here, called through Whip.core:
+---
+---     Whip.register(function()
+---         Whip.core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+---         Whip.core:SecureEvent('lemonade:buy', { rateLimit = 1000 }, buyLemonade)
+---     end)
+---
+--- Safe to run more than once: the same registration again changes nothing. While `fn` runs, a declaring
+--- call through Whip.core or Whip.call that whip_core refuses (`false, why`) is printed in your console:
+--- Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. A call straight through
+--- exports.whip_core is not: check its answer yourself.
 ---
 --- Called late — from a thread, after the announcement already went by — `fn` runs straight
 --- away as well, instead of waiting for a whip_core restart that may never come.
@@ -350,71 +401,13 @@ end
 --- time it runs.
 ---@param fn function
 function Whip.register(fn)
-    if _runningCo ~= nil and coroutine.running() == _runningCo then
+    if inPass() then
         runAll({ fn }, 'Whip.register')
         return
     end
     _registerFns[#_registerFns + 1] = fn
     if _heard then runAll({ fn }, 'Whip.register') end
 end
-
--- ============================================
--- One declaration at a time: Whip.declare
--- ============================================
---
--- A whip_core export that declares something, called through here, is remembered and made again whenever
--- whip_core needs it, with no function around it:
---
---     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---
--- is the same as
---
---     Whip.register(function()
---         local ok, why = exports.whip_core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---         if ok == false then print(why) end
---     end)
---
--- Only declarations: whip_core's Register…, Ensure…, On… and Watch… exports, SecureEvent, SecureCallback, AddAction,
--- AddItemOption, AddPoint and AddWeapons. Anything else (AddItem, CreateShop) would happen again at every whip_core
--- start, so it is refused, with a line in this console.
---
--- THE ARGUMENTS ARE TAKEN ONCE, AS YOU CALL IT, so a function you hand it must be defined above the call. A value
--- that can change before whip_core is ready or after (a Config value on your settings page, which Whip.configPage
--- writes in when whip_core is ready) goes in Whip.register, which builds its calls each time it runs. So does a call
--- whose answer you keep (an AddAction id, a WatchVehicleStat handle): this answers only whether it took the call.
-
---- Is `name` an export Whip.declare takes? See above.
----@param name string
----@return boolean
-local function declares(name)
-    return name:find('^Register') ~= nil or name:find('^Ensure') ~= nil or name:find('^On%u') ~= nil
-        or name:find('^Watch') ~= nil or name == 'SecureEvent' or name == 'SecureCallback' or name == 'AddAction'
-        or name == 'AddItemOption' or name == 'AddPoint' or name == 'AddWeapons'
-end
-
---- whip_core's declaring exports, each remembered and made again whenever whip_core needs it (see above).
---- Written with a colon like an export; a dot works too. Answers true when it took the call.
-Whip.declare = setmetatable({}, {
-    __index = function(proxy, name)
-        local fn = function(first, ...)
-            local args = rawequal(first, proxy) and table.pack(...) or table.pack(first, ...)
-            -- A refusal is a start problem (Whip.startProblem): red, and Whip.sayStarted does not then say all is well.
-            if type(name) ~= 'string' or not declares(name) then
-                Whip.startProblem('Whip.declare:%s is not a declaration (Register…, Ensure…, On…, Watch…, SecureEvent, '
-                    .. 'SecureCallback, AddAction, AddItemOption, AddPoint, AddWeapons); call it in Whip.register or '
-                    .. 'where it belongs', tostring(name))
-                return false
-            end
-            Whip.register(function()
-                local ok, why = Whip.call(name, table.unpack(args, 1, args.n))
-                if ok == false then Whip.startProblem('Whip.declare:%s: %s', name, tostring(why)) end
-            end)
-            return true
-        end
-        rawset(proxy, name, fn)
-        return fn
-    end,
-})
 
 --- Run `fn` when whip_core stops. ONLY FOR A RESOURCE WITHOUT `dependency 'whip_core'`: with it (every
 --- whip resource), FiveM stops your resource first when whip_core stops, so this never runs, and your
@@ -424,7 +417,7 @@ Whip.declare = setmetatable({}, {
 ---
 --- A handler waiting in `exports.whip_core:Progress` (or SkillCheck, or any export that waits)
 --- when whip_core stops is never answered, so anything it holds stays held; clear that here. Or
---- make the call through Whip.call, which answers it with `false, 'whip_core stopped'`.
+--- make the call through Whip.core, which returns `false, 'whip_core stopped'` for it.
 ---
 --- EVERY PLAYER HAS BEEN LOGGED OUT when this runs, and no whip_core:player:logout
 --- fires for them — whip_core is going away, and it cannot announce on the way down. So drop any
@@ -509,7 +502,7 @@ end
 -- The version a resource needs goes in its fxmanifest.lua, where the setup report reads it and prints a FIX line
 -- when this server's whip_core is older:
 --
---     whip_requires '1.2'
+--     whip_requires '1.0'
 --
 -- Whip.requires says the same from your code (once, in this console); Whip.has asks about one call, for a feature
 -- newer than the oldest whip you support.
@@ -521,7 +514,7 @@ local function versionNumbers(v)
     return out
 end
 
---- Is version `have` at least `want`? ('1.2' is 1.2.0.)
+--- Is version `have` at least `want`? ('1.0' is 1.0.0.)
 ---@param have string
 ---@param want string
 ---@return boolean
@@ -536,7 +529,7 @@ end
 
 local _saidRequires = false
 --- Is this server's whip_core at least `min`? Says so once in this console when it is not, naming your resource.
----@param min string  '1.2' or '1.2.0'
+---@param min string  '1.0' or '1.0.0'
 ---@return boolean
 function Whip.requires(min)
     local have = GetResourceMetadata('whip_core', 'version', 0) or '0'
@@ -593,7 +586,7 @@ end
 --   rateLimit = false   no limit; default 3 at once, then one a second
 --   console = false     not from the server console (allowed by default)
 -- A refusal is said to the player as a toast (or printed for the console). fn runs in its own thread, so it may
--- wait (Whip.call with an export that waits).
+-- wait (Whip.core with an export that waits).
 if IsDuplicityVersion() then
     local _commandUse = {}   -- [name] = { [source] = { tokens, at } }
 
@@ -742,7 +735,7 @@ end
 -- Each key is a path in your Config, and its default is what config.lua says. What an admin saved
 -- is written into Config on this side when the page is declared and whenever a change arrives
 -- (a table in place, so a file holding Config.Shop sees the new values), so your code keeps reading
--- Config.X. The entries are RegisterSettings' (whip_core's docs: Settings pages) with no `default`.
+-- Config.X. The entries are whip_core's settings entries (docs.html#registersettings) with no `default`.
 -- A 'record' entry is one card for several values of one table: key = 'Turbo', fields = { { key =
 -- 'TorqueGain', ... }, ... }, each field kept as its own setting ('Turbo.TorqueGain').
 -- The page is declared again whenever whip_core starts; a refusal is printed here, with why.
@@ -879,7 +872,7 @@ function Whip.configPage(def)
         page.groups[gi] = { id = type(g) == 'table' and g.id or nil, label = type(g) == 'table' and g.label or nil, settings = list }
     end
     Whip.register(function()
-        local ok, why = exports[CORE]:RegisterSettings(page)
+        local ok, why = exports[CORE]:__RegisterSettings(page)
         if ok ~= true then
             print(('[%s] settings page refused: %s'):format(SELF, tostring(why)))
             return
@@ -888,10 +881,10 @@ function Whip.configPage(def)
         -- whip_core left off the page (its default failed its check: printed there) reads nil, and
         -- keeps config.lua's value.
         for _, key in ipairs(keys) do
-            exports[CORE]:OnSettingChanged(key, function(value, _, changed)
+            exports[CORE]:__OnSettingChanged(key, function(value, _, changed)
                 configApply(root, changed or key, value)
             end)
-            local value = exports[CORE]:GetSetting(key)
+            local value = exports[CORE]:__GetSetting(key)
             if value ~= nil then configApply(root, key, value) end
         end
     end)
@@ -946,7 +939,7 @@ function Whip.playerSetting(def)
         return false
     end
     Whip.register(function()
-        local ok, why = exports[CORE]:RegisterPlayerSetting(def)
+        local ok, why = exports[CORE]:__RegisterPlayerSetting(def)
         if ok ~= true then
             print(('[%s] player setting %s refused: %s'):format(SELF, def.key, tostring(why)))
         end
@@ -1111,10 +1104,10 @@ if not IsDuplicityVersion() then
                                 lbHere = true
                             elseif not down and was.lb and lbHere then
                                 lbHere = false
-                                if Whip.call('PadComboUsed') ~= true then call('onButton', onButton, 'lb', true) end
+                                if Whip.call('__PadComboUsed') ~= true then call('onButton', onButton, 'lb', true) end
                             end
                         elseif down and not was[cmd] then
-                            if not (lbDown and Whip.call('PadComboTakes', id) == true) then
+                            if not (lbDown and Whip.call('__PadComboTakes', id) == true) then
                                 held[cmd], nextAt[cmd], reps[cmd] = true, now + FIRST, 0
                                 call('onButton', onButton, cmd, true)
                             end
@@ -1215,7 +1208,7 @@ end
 --         props = { { key = 'message', kind = 'text', label = 'Message', default = '10-90 alarm', maxLength = 120 } },
 --         testSays = 'Would send "{message}" to the police on duty',
 --         run = function(card)
---             ...                              -- it may wait: Whip.call, the database
+--             ...                              -- it may wait: Whip.core, the database
 --             return 'sent'                    -- an outcome; or nothing, and Whip.answerCard(card.callId, 'sent') later
 --         end,
 --     })
@@ -1286,7 +1279,7 @@ if IsDuplicityVersion() then
                 local ok, s = pcall(string.format, tostring(args[1]), table.unpack(args, 2, args.n))
                 args = table.pack(ok and s or tostring(args[1]))
             end
-            local r = table.pack(Whip.call('DirectorCardDo', rawget(self, 'callId'), m, table.unpack(args, 1, args.n)))
+            local r = table.pack(Whip.call('__DirectorCardDo', rawget(self, 'callId'), m, table.unpack(args, 1, args.n)))
             if GETTERS[m] then
                 if r[1] == true then return r[2] end
                 return nil, r[2]
@@ -1407,7 +1400,7 @@ if IsDuplicityVersion() then
             _cardSenders[t] = function()
                 local now = _cards[t]
                 if not now then return end   -- (removed since)
-                local ok, why = Whip.call('RegisterDirectorCard', t, specOf(now), entry)
+                local ok, why = Whip.call('__RegisterDirectorCard', t, specOf(now), entry)
                 if ok ~= true then print(('[%s] Director card %s refused: %s'):format(SELF, t, tostring(why))) end
             end
             Whip.register(_cardSenders[t])
@@ -1418,7 +1411,7 @@ if IsDuplicityVersion() then
     --- Take one of this resource's cards away (it goes by itself when this resource stops).
     function Whip.removeCard(t)
         _cards[t] = nil
-        return Whip.call('RemoveDirectorCard', t)
+        return Whip.call('__RemoveDirectorCard', t)
     end
 
     --- A Director scenario built in code: offered to the server's Director
@@ -1428,7 +1421,7 @@ if IsDuplicityVersion() then
     ---@param doc table    a scenario document, as the editor saves it (format 1)
     function Whip.scenario(key, doc)
         Whip.register(function()
-            local status, why = Whip.call('RegisterDirectorScenario', key, doc)
+            local status, why = Whip.call('__RegisterDirectorScenario', key, doc)
             if status == false then print(('[%s] Director scenario %s refused: %s'):format(SELF, tostring(key), tostring(why))) end
         end)
     end
@@ -1438,17 +1431,17 @@ if IsDuplicityVersion() then
     ---@param doc table
     function Whip.template(name, doc)
         Whip.register(function()
-            local ok, why = Whip.call('RegisterDirectorTemplate', name, doc)
+            local ok, why = Whip.call('__RegisterDirectorTemplate', name, doc)
             if ok ~= true then print(('[%s] Director template %s refused: %s'):format(SELF, tostring(name), tostring(why))) end
         end)
     end
 
-    --- A thread card's answer, later (from anywhere): AnswerDirectorCard.
+    --- A thread card's answer, later (from anywhere): __AnswerDirectorCard.
     ---@param callId string  card.callId (never send it to a player's game)
     ---@param outcome string
     ---@param data table|nil  data.source: which of the run's players what follows acts for
     function Whip.answerCard(callId, outcome, data)
-        return Whip.call('AnswerDirectorCard', callId, outcome, data)
+        return Whip.call('__AnswerDirectorCard', callId, outcome, data)
     end
 end
 
@@ -1472,7 +1465,7 @@ end
 --             return true
 --         end,
 --         -- client, optional: the same rule, for a client script's SkillCheck({ difficulty, game }) (no source; it
---         -- must not wait: read what this game already knows, e.g. Whip.call('GetItemCount', 'phone') > 0)
+--         -- must not wait: read what this game already knows, e.g. Whip.core:GetItemCount('phone') > 0)
 --         run = function(difficulty, token)            -- client: play it (in a thread: it may wait)
 --             return passed, why                       -- why: 'failed' | 'cancelled' | 'timeout' | 'busy'
 --         end,
@@ -1524,7 +1517,7 @@ do
                         print(('[%s] skill check game %s failed: %s'):format(SELF, id, tostring(passed)))
                         passed, why = false, 'failed'
                     end
-                    Whip.call('SkillCheckGameDone', token, passed == true, type(why) == 'string' and why or nil)
+                    Whip.call('__SkillCheckGameDone', token, passed == true, type(why) == 'string' and why or nil)
                 end)
                 return { ok = true }
             elseif not IS_SERVER and op == 'cancel' then
@@ -1569,12 +1562,12 @@ do
             if not now then return end   -- (removed since)
             local ok, why
             if IS_SERVER then
-                ok, why = Whip.call('RegisterSkillCheckGame', id, {
+                ok, why = Whip.call('__RegisterSkillCheckGame', id, {
                     label = now.label, desc = now.desc, levels = levelsOf(now.levels),
                     canStart = type(now.canStart) == 'function' or nil,
                 }, entry)
             else
-                ok, why = Whip.call('RegisterSkillCheckGame', id, entry)
+                ok, why = Whip.call('__RegisterSkillCheckGame', id, entry)
             end
             if ok ~= true then print(('[%s] skill check game %s refused: %s'):format(SELF, id, tostring(why))) end
         end
@@ -1585,7 +1578,7 @@ do
     --- Take one of this resource's games away (they go by themselves when this resource stops).
     function Whip.removeSkillCheckGame(id)
         _gameDefs[id] = nil
-        return Whip.call('RemoveSkillCheckGame', id)
+        return Whip.call('__RemoveSkillCheckGame', id)
     end
 end
 
@@ -1730,14 +1723,14 @@ do
             send = function()
                 local now = _tasks[t]
                 if not now then return end   -- (removed since)
-                local ok, why = Whip.call('RegisterDirectorTask', t, taskSpec(now))
+                local ok, why = Whip.call('__RegisterDirectorTask', t, taskSpec(now))
                 if ok ~= true then print(('[%s] Director task %s refused: %s'):format(SELF, t, tostring(why))) end
             end
         else
             local entry = stepEntry(t)
             send = function()
                 if not _tasks[t] then return end
-                local ok, why = Whip.call('RegisterDirectorTaskStep', t, entry)
+                local ok, why = Whip.call('__RegisterDirectorTaskStep', t, entry)
                 if ok ~= true then print(('[%s] Director task %s (its step) refused: %s'):format(SELF, t, tostring(why))) end
             end
         end
@@ -1749,7 +1742,7 @@ do
     --- Take one of this resource's tasks away, on this side (it goes by itself when this resource stops).
     function Whip.removeTask(t)
         _tasks[t] = nil
-        return Whip.call(IsDuplicityVersion() and 'RemoveDirectorTask' or 'RemoveDirectorTaskStep', t)
+        return Whip.call(IsDuplicityVersion() and '__RemoveDirectorTask' or '__RemoveDirectorTaskStep', t)
     end
 end
 
@@ -1789,7 +1782,7 @@ do
         end
         _weaponSender = function()
             if not _weapons then return end
-            local ok, why = Whip.call('AddWeapons', _weapons.list, _weapons.opts)
+            local ok, why = Whip.call('__AddWeapons', _weapons.list, _weapons.opts)
             if ok ~= true then print(('[%s] Whip.weapons refused: %s'):format(SELF, tostring(why))) end
         end
         Whip.register(_weaponSender)
@@ -1799,7 +1792,7 @@ do
     --- Take all of this resource's weapons away, on this side (they go by themselves when it stops).
     function Whip.removeWeapons()
         _weapons = nil
-        return Whip.call('RemoveWeapons')
+        return Whip.call('__RemoveWeapons')
     end
 end
 
@@ -1835,8 +1828,8 @@ if not IsDuplicityVersion() then
     local _buttons, _buttonSenders = {}, {}
 
     local thingMethods = {}
-    function thingMethods.save(self, data) return Whip.call('DirectorButtonDo', rawget(self, 'token'), 'save', data) end
-    function thingMethods.back(self, data) return Whip.call('DirectorButtonDo', rawget(self, 'token'), 'back', data) end
+    function thingMethods.save(self, data) return Whip.call('__DirectorButtonDo', rawget(self, 'token'), 'save', data) end
+    function thingMethods.back(self, data) return Whip.call('__DirectorButtonDo', rawget(self, 'token'), 'back', data) end
     local thingMeta = { __index = thingMethods }
 
     --- The one function whip_core holds: it runs your press here, in a thread, and answers at once.
@@ -1886,7 +1879,7 @@ if not IsDuplicityVersion() then
             for i, k in ipairs(type(now.kinds) == 'table' and now.kinds or {}) do kinds[i] = k end
             local spec = { __whipButton = 1, label = now.label, icon = now.icon, hint = now.hint, kinds = kinds,
                            where = now.where, takesOver = now.takesOver == true }
-            local ok, why = Whip.call('RegisterDirectorButton', id, spec, entry)
+            local ok, why = Whip.call('__RegisterDirectorButton', id, spec, entry)
             if ok ~= true then print(('[%s] Director button %s refused: %s'):format(SELF, id, tostring(why))) end
         end
         Whip.register(_buttonSenders[id])
@@ -1896,7 +1889,7 @@ if not IsDuplicityVersion() then
     --- Take one of this resource's buttons away (it goes by itself when this resource stops).
     function Whip.removeDirectorButton(id)
         _buttons[id] = nil
-        return Whip.call('RemoveDirectorButton', id)
+        return Whip.call('__RemoveDirectorButton', id)
     end
 end
 
@@ -1966,7 +1959,7 @@ if not IsDuplicityVersion() then
             for i, k in ipairs(type(now.kinds) == 'table' and now.kinds or {}) do kinds[i] = k end
             local spec = { __whipOvOption = 1, label = now.label, hint = now.hint, group = now.group, tint = now.tint,
                            kinds = kinds, whip = now.whip }
-            local ok, why = Whip.call('RegisterObjectViewerOption', id, spec, entry)
+            local ok, why = Whip.call('__RegisterObjectViewerOption', id, spec, entry)
             if ok ~= true then print(('[%s] object viewer option %s refused: %s'):format(SELF, id, tostring(why))) end
         end
         Whip.register(_optionSenders[id])
@@ -1976,7 +1969,7 @@ if not IsDuplicityVersion() then
     --- Take one of this resource's options away (it goes by itself when this resource stops).
     function Whip.removeObjectViewerOption(id)
         _options[id] = nil
-        return Whip.call('RemoveObjectViewerOption', id)
+        return Whip.call('__RemoveObjectViewerOption', id)
     end
 end
 

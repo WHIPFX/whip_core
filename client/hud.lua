@@ -430,7 +430,7 @@ local hudLastHidden = false
 local hudUp = false
 
 --- Re-decide whether the status HUD is on screen and tell the page if it changed. Idempotent, safe to call
---- from anywhere. A global, not an export: satellites declare themselves through SetUIOpen.
+--- from anywhere. A global, not an export: satellites declare themselves through SetScreenOpen.
 function WhipRefreshHudVisibility()
     -- Nothing to hide before load; the playerLoaded handler at the bottom does the first paint.
     if not PlayerLoaded or not hudUp then return end
@@ -449,14 +449,14 @@ AddEventHandler('whip_core:ui:stateChanged', function()
     WhipRefreshHudVisibility()
 end)
 
--- SetUIArea: a satellite whose UI sits in the HUD's corner says where, and the vehicle dial (and the pad's
+-- SetScreenArea: a satellite whose UI sits in the HUD's corner says where, and the vehicle dial (and the pad's
 -- buttons on it) slides up or left, or fades if neither fits (html/js/vehicle-dial.js).
 --
---     exports.whip_core:SetUIArea({ left = 0.78, top = 0.46, right = 0.98, bottom = 1.0 }, 'phone')   -- fractions of the screen
---     exports.whip_core:SetUIArea(nil, 'phone')                                                        -- gone
+--     exports.whip_core:SetScreenArea({ left = 0.78, top = 0.46, right = 0.98, bottom = 1.0 }, 'phone')   -- fractions of the screen
+--     exports.whip_core:SetScreenArea(nil, 'phone')                                                        -- gone
 --
 -- Send where it will be once still, when that changes. Held under '<resource>:<key>' and released when that
--- resource stops. An area hides nothing and takes no keys (SetUIOpen does that).
+-- resource stops. An area hides nothing and takes no keys (SetScreenOpen does that).
 
 --- ['<resource>:<key>'] = { left, top, right, bottom }
 local areaStore = {}
@@ -488,7 +488,7 @@ local uiAreas = Registry.new('uiArea', {
     onRemove = sendUIAreas,
 })
 
-exports('SetUIArea', function(area, key)
+exports('SetScreenArea', function(area, key)
     if not GetInvokingResource() then return false end
     local owner, id = Registry.caller(), tostring(key or 'default')
     if area == nil or area == false then

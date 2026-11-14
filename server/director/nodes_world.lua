@@ -1334,7 +1334,7 @@ define({
 --
 -- Nothing drops unless a card says so: an NPC never leaves its gun (client/npcs.lua), and what a run
 -- puts down is a whip ITEM like any other — a gunny pistol, whip_autos' nitro, whip_voice's radio —
--- with the item's own default data (its serial...: RegisterItemDefaultMeta), as AddItem gives it.
+-- with the item's own default data (its serial...: RegisterItemDefaultMetadata), as AddItem gives it.
 -- In a live run it is real: a pile outlives the run, still on the ground when it ends, an ordinary
 -- item anyone can pick up (ground items never expire, so one nobody takes lies there). A test's is
 -- stamped with the run and goes with it, on the ground or in a pocket: a test keeps nothing.

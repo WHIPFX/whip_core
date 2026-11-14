@@ -56,7 +56,7 @@ local function versionOf(res)
     return type(v) == 'string' and v ~= '' and v or nil
 end
 
---- The numbers in a version or tag: 'v1.2.0' and '1.2' both read as 1.2.0.
+--- The numbers in a version or tag: 'v1.0.0' and '1.0' both read as 1.0.0.
 local function numbers(v)
     local out = {}
     for n in (tostring(v or ''):gsub('^[vV]', '')):gmatch('%d+') do out[#out + 1] = tonumber(n) end

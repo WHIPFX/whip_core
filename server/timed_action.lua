@@ -3,36 +3,9 @@
 -- ============================================
 --
 -- A progress bar runs on the player's machine, so "the bar finished" is a client CLAIM (the same
--- problem skillcheck.lua describes for "I passed"). This remembers when the use started and refuses
--- a finish that comes back sooner than the bar could have filled.
---
--- How to use it: two calls, both on the server:
---
---   1. When the action STARTS. Usually the item's use handler, which already runs on the server and
---      is handed the item's address:
---
---        exports.whip_core:StartTimedAction(source, 'drink', 5000, addr)
---
---   2. When the client says it FINISHED, before handing anything over:
---
---        local addr = exports.whip_core:FinishTimedAction(source, 'drink')
---        if not addr then return end
---        -- addr is what step 1 was given: the drink the use STARTED from
---
--- The duration is the SAME number the client's progress bar uses. The last argument of the start is
--- optional, and whatever is in it comes back from the finish — so the client never has to say which
--- slot it used, and cannot say a different one. Passing a table to the finish as well still works,
--- and then it must match exactly. Names only need to be unique within your own resource.
---
--- If the action starts on the CLIENT instead (an aim-target, an interaction prompt), give it a small
--- "starting" SecureCallback that checks what it can, calls StartTimedAction, and answers before the
--- bar is shown. Or use Progress (below), where the server shows the bar itself.
---
--- What it defends, the same three things Skill.run does:
---
---   1. A finish nobody started is refused, and every start can be finished once.
---   2. A finish that arrives sooner than the bar could have filled is refused.
---   3. A start that is never finished expires, rather than waiting forever to be collected.
+-- problem skillcheck.lua describes for "I passed"). The server's Progress (below) shows the bar itself
+-- and refuses a finish that comes back sooner than the bar could have filled. For an item, a declared
+-- timed use (RegisterUseHandler with a table) does the same.
 --
 -- What it does NOT defend: a cheater who waits the full time and only skips the animation. That
 -- costs them exactly what it costs an honest player, which is the point.
@@ -41,13 +14,9 @@ local TimedAction = {}
 
 local RESOURCE = GetCurrentResourceName()
 
---- How much earlier than the full duration a finish may arrive and still count.
----
---- The server's clock starts when IT decides the action started, and an honest finish only
---- arrives after the bar has run AND the message has crossed the network — so it is normally LATER
---- than the duration, not earlier. The slack covers the one exception: an action the client
---- starts, where the start and the finish each make one trip and the first can be delayed more
---- than the second. 10% (4.5s for a 5s bar).
+--- How much earlier than the full duration a finish may arrive and still count. An honest finish
+--- arrives after the bar has run AND the message has crossed the network, so it is normally LATER than
+--- the duration; the slack covers a start delayed more than its finish. 10% (4.5s for a 5s bar).
 local SLACK = 0.9
 
 --- How long after the duration a finish is still accepted.
@@ -56,146 +25,12 @@ local SLACK = 0.9
 --- to four seconds for both) plus a slow connection. Past this, the start is stale.
 local GRACE_MS = 15000
 
---- [source] = { ['<resource>:<name>'] = { at, minMs, expiresAt, match, owner } }
-local _active = {}
-
-local function keyFor(owner, name)
-    return owner .. ':' .. name
-end
-
---- Keep only plain values — numbers, strings, booleans — and tables of them, COPIED. A table can
---- cross an export boundary and come back as a different table, so what is kept is compared by
---- value (sameMatch).
----
---- Nested tables come back too (a 'slot' param's `{ addr = { kind, id, sub, slot } }`), three levels
---- deep at most. Vectors too, kept as plain { x, y, z, w } tables (a vector3 is not a 'table' to
---- type()).
-local VECTOR_TYPES = { vector2 = true, vector3 = true, vector4 = true }
-
-local function copyMatch(match, depth)
-    depth = depth or 0
-    if type(match) ~= 'table' or depth > 3 then return {} end
-    local out = {}
-    for k, v in pairs(match) do
-        local t = type(v)
-        if t == 'number' or t == 'string' or t == 'boolean' then
-            out[k] = v
-        elseif VECTOR_TYPES[t] then
-            out[k] = { x = v.x, y = v.y, z = t ~= 'vector2' and v.z or nil, w = t == 'vector4' and v.w or nil }
-        elseif t == 'table' and rawget(v, '__cfx_functionReference') == nil then
-            out[k] = copyMatch(v, depth + 1)
-        end
-    end
-    return out
-end
-
-local function sameMatch(a, b)
-    for k, v in pairs(a) do
-        if type(v) == 'table' then
-            if type(b[k]) ~= 'table' or not sameMatch(v, b[k]) then return false end
-        elseif b[k] ~= v then
-            return false
-        end
-    end
-    for k, v in pairs(b) do
-        if a[k] == nil and v ~= nil then return false end
-    end
-    return true
-end
-
---- Start timing an action for a player. Starting the same action again restarts its clock.
----@param source number|string|nil
----@param name string        unique within the calling resource
----@param durationMs number|string|nil  the progress bar's length, the same number the client uses
----@param match table|nil    plain values the finish must repeat exactly
----@param owner string|nil   the resource the action belongs to (the exports fill this in)
----@return boolean started
----@return string|nil reason  why not
-function TimedAction.start(source, name, durationMs, match, owner)
-    source = tonumber(source)
-    if not source or not Players[source] then return false, 'no loaded player on that source' end
-    if type(name) ~= 'string' or name == '' then return false, 'a timed action needs a name' end
-
-    durationMs = tonumber(durationMs)
-    -- Written as `not (x > 0)` so NaN is refused too: every comparison with NaN is false.
-    if not durationMs or not (durationMs > 0) or durationMs == math.huge then
-        return false, 'durationMs must be a number of milliseconds above 0'
-    end
-
-    owner = owner or RESOURCE
-    local now  = GetGameTimer()
-    local mine = _active[source]
-    if not mine then
-        mine = {}
-        _active[source] = mine
-    end
-
-    mine[keyFor(owner, name)] = {
-        at        = now,
-        minMs     = math.floor(durationMs * SLACK),
-        expiresAt = now + durationMs + GRACE_MS,
-        match     = copyMatch(match),
-        owner     = owner,
-    }
-    return true
-end
-
---- The client says the action finished. Only if it was started, long enough ago and recently
---- enough — and, when `match` is passed, with the same match values. Refusals are recorded in the
---- Event Monitor.
----
---- The answer is what the start was given: the match table, always a table, so it is truthy. That is
---- how a finish learns WHICH item the use started from without the client naming it: pass no match,
---- get the start's back.
----@param source number|string|nil
----@param name string
----@param match table|nil  omit to take the start's values as they are
----@param owner string|nil
----@return table|false started  the start's match values
----@return string|nil reason  why it was refused
-function TimedAction.finish(source, name, match, owner)
-    source = tonumber(source)
-    if not source then return false, 'no player' end
-
-    local key   = keyFor(owner or RESOURCE, tostring(name))
-    local mine  = _active[source]
-    local entry = mine and mine[key]
-
-    -- One-shot, whatever happens next: a refused finish must not leave its start behind for a second
-    -- attempt.
-    if mine then mine[key] = nil end
-
-    local reason
-    if not entry then
-        reason = 'finished without being started'
-    else
-        local now = GetGameTimer()
-        local elapsed = now - entry.at
-        if elapsed < entry.minMs then
-            reason = ('finished in %dms, minimum is %dms'):format(elapsed, entry.minMs)
-        elseif now > entry.expiresAt then
-            reason = ('finished %dms after it started, which is too late'):format(elapsed)
-        elseif match ~= nil and not sameMatch(entry.match, copyMatch(match)) then
-            reason = 'finished a different action from the one that was started'
-        end
-    end
-
-    if reason then
-        RecordEventRejection(key, source, reason)
-        return false, reason
-    end
-    -- A copy of what the start was given (see above); plain values only, so a table as an answer.
-    local started = {}
-    for k, v in pairs(entry.match) do started[k] = v end
-    return started
-end
-
 -- ============================================
 -- A bar the server shows and waits for
 -- ============================================
 --
--- The same promise as Start/Finish in ONE call: the server shows the bar and waits for the answer,
--- the way Skill.run waits for a skill check (a one-shot token, a minimum time, a timeout):
+-- The server shows the bar and waits for the answer, the way Skill.run waits for a skill check (a
+-- one-shot token, a minimum time, a timeout):
 --
 --     if exports.whip_core:Progress(source, { label = 'Drinking...', duration = 5000,
 --             anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' } }) then
@@ -455,8 +290,7 @@ end)
 
 -- ---- cleanup ----
 --
--- Starts belong to a player's session and to the resource that made them. None of them should
--- outlive either.
+-- A bar belongs to a player's session. It should not outlive it.
 
 --- A bar waiting on a player who left answers now, rather than at its timeout.
 local function endBarsOf(src)
@@ -471,7 +305,6 @@ local function endBarsOf(src)
 end
 
 AddEventHandler('playerDropped', function()
-    _active[source] = nil
     endBarsOf(source)
 end)
 
@@ -482,7 +315,6 @@ end)
 --- handler waiting on a bar is one of them. (Not an event handler: any resource could fire that.)
 ---@param src number
 function EndTimedActionsFor(src)
-    _active[src] = nil
     endBarsOf(src)
 end
 
@@ -509,46 +341,7 @@ end, function(owner, tag)
     return out
 end)
 
-AddEventHandler('onResourceStop', function(res)
-    for _, mine in pairs(_active) do
-        for key, entry in pairs(mine) do
-            if entry.owner == res then mine[key] = nil end
-        end
-    end
-end)
-
 -- ---- exports ----
-
---- Start timing an action. Call it where the action begins — usually the item's use handler.
----
---- ```lua
---- exports.whip_core:StartTimedAction(source, 'drink', 5000, addr)   -- addr: the item's address
---- ```
----@param source number
----@param name string
----@param durationMs number
----@param match table|nil  plain values (an address is fine); FinishTimedAction hands them back
----@return boolean started
----@return string|nil reason
-exports('StartTimedAction', function(source, name, durationMs, match)
-    return TimedAction.start(source, name, durationMs, match, GetInvokingResource())
-end)
-
---- Check the client's "finished" against the server's own clock. Hand nothing over unless it
---- answers — and what it answers is what StartTimedAction was given.
----
---- ```lua
---- local addr = exports.whip_core:FinishTimedAction(source, 'drink')
---- if not addr then return end
---- ```
----@param source number
----@param name string
----@param match table|nil  optional; when given it must equal the start's
----@return table|false started  the start's values
----@return string|nil reason
-exports('FinishTimedAction', function(source, name, match)
-    return TimedAction.finish(source, name, match, GetInvokingResource())
-end)
 
 --- Show a progress bar on a player's screen and WAIT for it — true only if the bar really ran its
 --- length. Blocks the calling handler for the bar. The same options as the client's Progress:

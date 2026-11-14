@@ -196,6 +196,6 @@ exports('GetItemDef', function(key)
     return Config.Items[key]
 end)
 
-exports('GetAllItemDefs', function()
+exports('GetItemDefs', function()
     return Config.Items
 end)

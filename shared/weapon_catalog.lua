@@ -119,7 +119,7 @@ function WeaponCatalog.onChange(fn)
 end
 
 -- ============================================
--- Adding: AddWeapons
+-- Adding: Whip.weapons (__AddWeapons)
 -- ============================================
 
 local function readWeapon(e, i, tag)
@@ -146,12 +146,12 @@ local function readWeapon(e, i, tag)
     return { name = name, label = label, group = e.group, model = model, from = tag }
 end
 
---- AddWeapons(list, opts) -> true | false, why. Through Whip.weapons. `list`: { { name, label, group, model? } };
+--- __AddWeapons(list, opts) -> true | false, why. Through Whip.weapons. `list`: { { name, label, group, model? } };
 --- opts.tag: shown beside each label (16 characters; the resource's name unless given). The caller's whole list: one
 --- it gave before that is not in this one goes. Nothing is added when any of it is refused.
-exports('AddWeapons', function(list, opts)
+exports('__AddWeapons', function(list, opts)
     local owner = Registry.caller()
-    if type(list) ~= 'table' then return false, 'AddWeapons(list): a list of { name, label, group, model }' end
+    if type(list) ~= 'table' then return false, 'Whip.weapons(list): a list of { name, label, group, model }' end
     if #list > MAX_WEAPONS then return false, ('%d weapons at most'):format(MAX_WEAPONS) end
     local tag = type(opts) == 'table' and opts.tag or nil
     if tag ~= nil then
@@ -189,8 +189,8 @@ exports('AddWeapons', function(list, opts)
     return true
 end)
 
---- RemoveWeapons() -> true. All of the caller's (they go by themselves when it stops).
-exports('RemoveWeapons', function()
+--- __RemoveWeapons() -> true. All of the caller's (they go by themselves when it stops).
+exports('__RemoveWeapons', function()
     local owner = Registry.caller()
     for _, name in ipairs(reg:keysOf(owner)) do reg:remove(owner, name) end
     return true

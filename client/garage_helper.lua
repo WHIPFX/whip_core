@@ -141,11 +141,11 @@ local function vehicleQualifies(veh)
     end
 
     local ok, ctx = pcall(function()
-        return Vehicles.getBy('entity', veh)
+        return Vehicles.get({ entity = veh })
     end)
     ownedCacheEntity = veh
     ownedCacheAt = now
-    -- `mine`, not `owned`: GetVehicleBy's context names this field `mine` (client/vehicles.lua,
+    -- `mine`, not `owned`: GetVehicle's context names this field `mine` (client/vehicles.lua,
     -- BuildVehicleContext).
     ownedCacheValue = (ok and ctx and ctx.mine) and true or false
     return ownedCacheValue

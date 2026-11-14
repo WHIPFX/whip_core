@@ -102,7 +102,7 @@
 --
 -- Whose a card is: every type is an entry in ONE registry
 -- (shared/registry.lua), owned by whoever registered it: whip_core's own, defined below at load, and
--- other resources' cards (server/director/cards_api.lua: RegisterDirectorCard, through Whip.card).
+-- other resources' cards (server/director/cards_api.lua: __RegisterDirectorCard, through Whip.card).
 -- A type is '<namespace>.<name>'; a namespace belongs to the first running resource to use it, for
 -- its cards and its events alike (SendDirectorEvent), and whip_core's (every group its own cards use,
 -- and a few more) are nobody else's. A stopped resource's cards go with it: a scenario that uses one
@@ -418,7 +418,7 @@ end
 
 --- Add, or change, another resource's card type (server/director/cards_api.lua builds `def`). Refused when
 --- the type is someone else's: whip_core's own, or a running resource's.
----@param owner string  Registry.caller() of RegisterDirectorCard
+---@param owner string  Registry.caller() of __RegisterDirectorCard
 ---@param def table
 ---@return boolean ok
 ---@return string|nil why

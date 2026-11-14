@@ -1,5 +1,5 @@
 -- Vehicle stats, client side: satellites react to server-registered vehicle stats here, e.g.
---     exports.whip_core:OnVehicleStatChange('nos', function(vehicleId, value, old, entity) ... end)
+--     exports.whip_core:OnVehicleStatChanged('nos', function(vehicleId, value, old, entity) ... end)
 -- Pushed by statebag handlers for every vehicle streamed to this client.
 
 -- [statName] = { ['<resource>:<id>'] = callback }. Keyed so registering twice from one resource replaces
@@ -177,7 +177,7 @@ local function updateHolders(entity, block)
             holders[entity] = nil
             announcePresence(name, entity, nil, false)
         elseif held ~= nil then
-            -- Still held, new number: no transition, nothing announced (OnVehicleStatChange covers every change).
+            -- Still held, new number: no transition, nothing announced (OnVehicleStatChanged covers every change).
             holders[entity] = held
         end
     end
@@ -844,19 +844,20 @@ end)
 --- Every stat on a vehicle, as a plain copy.
 ---@param vehicle number|WhipVehicleRef  a vehicleId, or a reference: `{ entity = veh }` for a handle
 ---@return table
-exports('GetAllVehicleStats', function(vehicle)
+exports('GetVehicleStats', function(vehicle)
     local entity = resolveEntity(vehicle)
     if not entity then return {} end
 
-    -- Every registered stat, defaults filled in (the server's GetAllVehicleStats). What a car has is GetStoredVehicleStats.
+    -- Every registered stat, defaults filled in (the server's GetVehicleStats). What a car has is the server's
+    -- GetVehicleStats(id, { stored = true }).
     local stats, live = GetVehicleStatBlocks(entity)
     return ResolveAllVehicleStats(stats, live)
 end)
 
---- Be told when a vehicle stat changes, on any vehicle streamed to this client. Mirrors OnStatChange (client/stats.lua),
+--- Be told when a vehicle stat changes, on any vehicle streamed to this client. Mirrors OnStatChanged (client/stats.lua),
 --- with the vehicle passed too. Options, third or fourth, as on the server:
 ---
----     exports.whip_core:OnVehicleStatChange('nitro', function(change)
+---     exports.whip_core:OnVehicleStatChanged('nitro', function(change)
 ---         -- change.vehicleId, change.key, change.value, change.old, change.cleared, change.entity
 ---     end, { table = true, now = true })
 ---
@@ -867,8 +868,8 @@ end)
 ---@param id any|nil
 ---@param opts table|nil  { table?: boolean, now?: boolean }
 ---@return boolean registered
-exports('OnVehicleStatChange', function(name, callback, id, opts)
-    -- `callback ~= nil`, not a type check: an export callback is a callable of another type. Answers `false, why` as OnStatChange does.
+exports('OnVehicleStatChanged', function(name, callback, id, opts)
+    -- `callback ~= nil`, not a type check: an export callback is a callable of another type. Answers `false, why` as OnStatChanged does.
     if type(name) ~= 'string' or name == '' then return false, 'name is required (a vehicle stat name)' end
     if callback == nil then return false, 'callback is required' end
     if type(id) == 'table' and opts == nil then id, opts = nil, id end

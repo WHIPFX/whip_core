@@ -1,2 +1,0 @@
-# whip_core files still allowed to call whip_core's own exports, and how many times (dev/selfexports.lua).
-# Only ever shrinks: a file moved to the functions comes off.

@@ -144,7 +144,7 @@
 ---@field slot number 1-5
 
 --- S  whip_core:inventory:changed — { source }: something in a player's pockets changed, any way —
---- a move between their own slots too, which the two below never hear. Once per change. (No old name.)
+--- a move between their own slots too, which the two below never hear. Once per change.
 ---
 --- S  whip_core:item:added / whip_core:item:removed — a player carries more / less of an item,
 --- by any route.
@@ -224,7 +224,7 @@
 ---@class WhipEvtShopPrice
 ---@field containerId number
 ---@field item string The item priced (one price per item)
----@field slot number|nil The shelf slot it was priced from, when it was (SetShopSlotPrice, the stock view)
+---@field slot number|nil The shelf slot it was priced from, when it was (the stock view)
 ---@field price number
 ---@field forSale boolean
 
@@ -253,7 +253,6 @@
 --- C  whip_core:zone:entered / whip_core:zone:exited: the local player
 ---@class WhipEvtZone
 ---@field zoneId string
----@field id string          the same as zoneId (the old name)
 ---@field key string|nil     the zone's own key, for matching on
 ---@field label string|nil
 ---@field group string|nil
@@ -346,7 +345,7 @@
 ---@field interiorId number|nil the interior copy it was made on
 ---@field count number|nil furnished only
 
---- C  whip_core:property:furnishStateChanged — its GetInteriorFurnishState answer changed. New.
+--- C  whip_core:property:furnishStateChanged — what its GetInteriorFurnishState returns changed. New.
 ---@class WhipEvtPropertyFurnishState
 ---@field propertyId number
 ---@field interiorId number|nil the copy whip last found ready; nil before that
@@ -381,7 +380,7 @@
 
 --- C  whip_core:job:listChanged — the local player's job list changed (hired, fired, promoted, renamed).
 ---@class WhipEvtJobList
----@field jobs table<number, WhipPlayerJobInfo> What GetPlayerJobs answers
+---@field jobs table<number, WhipPlayerJobInfo> What GetPlayerJobs returns
 
 -- ============================================
 -- NPCs (server/npcs.lua)
@@ -470,7 +469,7 @@
 --    whip_core:scenario:switchedOn { scenario, name, rev, replaced, by } -- replaced = another revision
 --    of it was on; by = { source, name } (a player) | { resource } (SwitchScenario) | nil (the server)
 --    whip_core:scenario:switchedOff { scenario, name, rev, why, by }
--- C (this player's own runs, from client/director_runs.lua; GetMyRuns): whip_core:run:joined /
+-- C (this player's own runs, from client/director_runs.lua; GetPlayerScenarioRuns): whip_core:run:joined /
 --    :updated { runId, scenario, name, objective, countdown }, :left { runId, scenario, name, why },
 --    :ended { runId, scenario, name, outcome, payout }
 -- C (local, the world builder, client/furnish_builder.lua): whip_core:director:builderCopy { id, kind, model, entity,
@@ -492,7 +491,7 @@
 --- A phone resource gives each one a number on it. New.
 ---@class WhipEvtLoreChanged
 ---@field key string
----@field character table|nil  GetLoreCharacter's answer: { key, name, model, bankName, payName, notes, retired, accountId }
+---@field character table|nil  what GetLoreCharacter returns: { key, name, model, bankName, payName, notes, retired, accountId }
 ---@field retired boolean      retired (out of the pickers, records kept), or gone
 
 -- ============================================

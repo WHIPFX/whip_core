@@ -11,7 +11,7 @@
 --   classes.lua          — Shared type definitions (WhipPlayer, WhipItemDef, etc.)
 --   server.lua           — Server-side export signatures
 --   client.lua           — Client-side export signatures
---   events.lua           — Every event whip fires, with its payload type (and old name)
+--   events.lua           — Every event whip fires, with its payload type
 --   director.lua         — The Director API's shapes (DirectorRunView, DirectorScenarioView, its events)
 --   satellite.lua        — The Whip.* helper from '@whip_core/lib/satellite.lua'
 --   oxmysql.lua          — oxmysql's MySQL global, as whip calls it
@@ -35,7 +35,7 @@
 -- USAGE:
 --   local player = exports.whip_core:GetPlayer(source)
 --   player.charId       -- autocomplete shows all WhipPlayer fields
---   -- (a player sheet has fields only, no methods: act through exports such as AddPlayerCash)
+--   -- (a player sheet has fields only, no methods: act through exports such as PayPlayer)
 --
 --   local where, err = exports.whip_core:AddItem(source, 'drink', 2)
 --   -- editor shows: (source: number, item: string, amount?: number, metadata?: table, opts?: string|WhipAddItemOpts)

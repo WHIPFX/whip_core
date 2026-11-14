@@ -23,29 +23,24 @@ local function blockOf(entity)
     return type(block) == 'table' and block or nil
 end
 
---- Read one value off a vehicle. No default, unlike a stat: nil means the car does not carry it.
+--- Read one value off a vehicle. No default, unlike a stat: nil means the car does not carry it. With no key,
+--- everything it carries, as a copy (changing it replicates nothing).
 ---@param vehicle number|WhipVehicleRef  a vehicleId, or a reference: `{ entity = veh }` for a handle
----@param key string
+---@param key string|nil
 ---@return any
 exports('GetVehicleData', function(vehicle, key)
+    if key == nil then
+        local all = blockOf(resolveEntity(vehicle))
+        local copy = {}
+        for k, v in pairs(all or {}) do copy[k] = v end
+        return copy
+    end
     if type(key) ~= 'string' then return nil end
     local block = blockOf(resolveEntity(vehicle))
     if not block then return nil end
 
     -- As stored, false included.
     return block[key]
-end)
-
---- Everything a vehicle carries, as a copy (changing it replicates nothing).
----@param vehicle number|WhipVehicleRef  a vehicleId, or a reference: `{ entity = veh }` for a handle
----@return table
-exports('GetAllVehicleData', function(vehicle)
-    local block = blockOf(resolveEntity(vehicle))
-    if not block then return {} end
-
-    local copy = {}
-    for k, v in pairs(block) do copy[k] = v end
-    return copy
 end)
 
 -- Change notification
@@ -241,7 +236,7 @@ end)
 
 --- Be told when a piece of vehicle data changes, on any vehicle streamed to this client.
 ---
----     exports.whip_core:OnVehicleDataChange('kitDistances', function(vehicleId, value)
+---     exports.whip_core:OnVehicleDataChanged('kitDistances', function(vehicleId, value)
 ---         ...
 ---     end)
 ---
@@ -254,7 +249,7 @@ end)
 ---@param id string|nil
 ---@param opts table|nil  { table?: boolean, now?: boolean }
 ---@return boolean registered
-exports('OnVehicleDataChange', function(key, callback, id, opts)
+exports('OnVehicleDataChanged', function(key, callback, id, opts)
     -- `callback ~= nil`, not a type check: an exported callback arrives as a callable, not a Lua 'function'.
     -- Listeners are pcall'd when they fire. Refusals answer `false, why`.
     if type(key) ~= 'string' or key == '' then return false, 'key is required (a vehicle data key)' end

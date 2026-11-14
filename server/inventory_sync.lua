@@ -46,7 +46,7 @@ end
 ---@return boolean
 local function syncAndPersist(source, player, force, quiet, reply)
     -- Whatever changed is announced first — before the save, so a failed write (which is owed, not
-    -- undone) cannot hold back itemAdded / itemRemoved, and before a quiet return.
+    -- undone) cannot hold back whip_core:item:added / :removed, and before a quiet return.
     Inventory.announceChanges(source, player)
 
     -- Routed through the store so the kind's declared durability decides whether this commits now or

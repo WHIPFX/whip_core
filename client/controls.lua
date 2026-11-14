@@ -133,7 +133,7 @@ local function normalise(spec, allowEmpty)
         names[#names + 1] = speed == 1.0 and 'walk' or 'jog'
     end
     -- A mode of your own (placing, aiming a tool, a minigame): whip's world keys (E prompts, hotbar, wheels) stand
-    -- down (IsGameInputFree answers false). The HUD stays (SetUIOpen hides it).
+    -- down (IsGameInputFree answers false). The HUD stays (SetScreenOpen hides it).
     local mode = spec.mode == true
     if mode then names[#names + 1] = 'mode' end
     -- ...but the hotbar's number keys still use their slots (the camera item).

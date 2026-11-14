@@ -1,7 +1,7 @@
 -- Director: other resources' task steps on this game (Whip.task). A resource's task type
 -- (server/director/satellite_api.lua) is played by its own code on the game that owns the thing (whip_core's own steps:
 -- client/npcs.lua, client/actors.lua; the builder's preview: client/director_preview.lua). Whip.task hands in one
--- entry function (RegisterDirectorTaskStep) that runs on that resource's side inside a pcall and answers data.
+-- entry function (__RegisterDirectorTaskStep) that runs on that resource's side inside a pcall and answers data.
 -- whip_core asks it:
 --   run   { call, entity, args, info }  start the step (in a thread of its own: it may wait)
 --   done  { call, entity, args }        a waiting step: { how = 'done' | 'failed' | nil }, each quarter second
@@ -87,8 +87,8 @@ end
 
 -- Exports
 
---- RegisterDirectorTaskStep(taskType, entry) -> true | false, why. Through Whip.task only (its client half).
-exports('RegisterDirectorTaskStep', function(taskType, entry)
+--- __RegisterDirectorTaskStep(taskType, entry) -> true | false, why. Through Whip.task only (its client half).
+exports('__RegisterDirectorTaskStep', function(taskType, entry)
     local owner = Registry.caller()
     if type(taskType) ~= 'string' or #taskType > 64 or not taskType:match('^[%a][%w_]*%.[%a][%w_]*$') then
         return false, 'a task type is "<your namespace>.<name>", like autos.paint'
@@ -97,7 +97,7 @@ exports('RegisterDirectorTaskStep', function(taskType, entry)
     return StepReg:add(owner, taskType, entry)
 end)
 
---- RemoveDirectorTaskStep(taskType) -> true | false, why. Only your own.
-exports('RemoveDirectorTaskStep', function(taskType)
+--- __RemoveDirectorTaskStep(taskType) -> true | false, why. Only your own.
+exports('__RemoveDirectorTaskStep', function(taskType)
     return StepReg:remove(Registry.caller(), taskType)
 end)
