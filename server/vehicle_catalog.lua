@@ -147,12 +147,8 @@ function VehicleCatalog.loadAll()
         VehicleCatalog.rows[model] = { model = model, displayName = row.displayName, class = tonumber(row.class) }
     end
 
-    local added = addFromList()
-    local pictured = findPictures()
-    local n = 0
-    for _ in pairs(VehicleCatalog.rows) do n = n + 1 end
-    print(('[whip_core:vehicles] vehicle catalog: %d models, %d with pictures%s'):format(n, pictured,
-        added > 0 and (', %d added from the list'):format(added) or ''))
+    addFromList()
+    findPictures()
     return true
 end
 
