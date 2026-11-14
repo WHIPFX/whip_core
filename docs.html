@@ -15367,7 +15367,7 @@ add_ace identifier.license:xxxx whip.devtools allow</code></pre>
 
 <h3>Bans</h3>
 <p>Bans are enforced on connect: banned players cannot join the server. The ban check uses <strong>all identifiers</strong> (license, steam, discord, fivem). If ANY identifier matches an active ban, the player is blocked.</p>
-<p>Nobody bans someone who outranks them. An admin from server.cfg cannot be banned from the panel: take them out of server.cfg first. Someone given dev tools from the panel can be banned only by an admin from server.cfg.</p>
+<p>Nobody bans someone who outranks them. An admin from server.cfg cannot be banned from the panel: take them out of server.cfg first. Nor can an account that shares a license, Steam, Discord or FiveM identifier with one, since the ban would turn the admin away too. Someone given dev tools from the panel can be banned only by an admin from server.cfg, and the ban takes those tools away.</p>
 <p>A temporary ban ends by itself. When a banned player tries to connect, they see:</p>
 <pre><code>You are banned from this server.
 
@@ -16342,7 +16342,7 @@ CreateThread(<span class="kw">function</span>()
 <h2 id="credits">Credits</h2>
 <p><strong>DurtyFree</strong>: the <a href="https://github.com/DurtyFree/gta-v-data-dumps">GTA V data dumps</a> that whip's lists of the game's tattoos, weapons, NPCs, ammo limits, voice lines and props are made from.</p>
 <p><strong>WildBrick142</strong>: <a href="https://www.gta5-mods.com/misc/chameleon-paint-add-on">Chameleon Paint [Add-On] 2.0</a>, the colour ramps the Chameleon paints in whip_autos need, installed beside WHIP as its own resource, <code>chameleon_paint</code>. With thanks to Disquse, who found how to make the game load them.</p>
-<p><strong>RPEmotes</strong> (<a href="https://github.com/TayMcKenzieNZ/rpemotes">TayMcKenzieNZ, Mathu_lmn, MadsL and its community</a>, which grew from DullPear's dpemotes): many of the emote menu's emotes, their commands and their prop placements. The emote list, <code>shared/emote_list.lua</code>, is under the GPL 3.0 for it.</p>
+<p><strong>RPEmotes</strong> (TayMcKenzieNZ, Mathu_lmn, MadsL and its community, which grew from DullPear's dpemotes; its first repository is gone, and it carries on as <a href="https://github.com/alberttheprince/rpemotes-reborn">rpemotes-reborn</a>): many of the emote menu's emotes, their commands and their prop placements. The emote list, <code>shared/emote_list.lua</code>, is under the GPL 3.0 for it.</p>
 <p><strong>txAdmin</strong> (<a href="https://github.com/tabarra/txAdmin">André Tabarra</a>): many of the weapon names that death reasons show, under the MIT licence.</p>
 <p><strong>Regynate</strong>: <a href="https://gist.github.com/Regynate/01a82731994e592cbe5d7e1c1b055d33">GTA V's map traced as shapes</a>, which the pause map and the 3D map are drawn from.</p>
 

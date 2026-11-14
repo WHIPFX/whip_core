@@ -49,7 +49,7 @@ Each keeps its own licence.
 
 | What | Where | Licence |
 |---|---|---|
-| RPEmotes, by TayMcKenzieNZ, Mathu_lmn, MadsL and the RPEmotes community, which grew from DullPear's dpemotes (github.com/TayMcKenzieNZ/rpemotes): many of the emotes, their commands and their prop placements | whip_core/shared/emote_list.lua | GPL 3.0 (whip_core's `COPYING`). Any copy keeps these credits and stays open source |
+| RPEmotes, by TayMcKenzieNZ, Mathu_lmn, MadsL and the RPEmotes community, which grew from DullPear's dpemotes (its first repository, github.com/TayMcKenzieNZ/rpemotes, is gone; it carries on as rpemotes-reborn, github.com/alberttheprince/rpemotes-reborn): many of the emotes, their commands and their prop placements | whip_core/shared/emote_list.lua | GPL 3.0 (whip_core's `COPYING`). Any copy keeps these credits and stays open source |
 | txAdmin's death reasons, by André Tabarra (github.com/tabarra/txAdmin): many of the weapon names | whip_core/client/stats.lua, with its licence above the list | MIT, Copyright (c) 2019-2025 Take-Two Interactive Software, Inc. |
 | three.js, with its loaders and controls | whip_core (vehicle HUD), whip_autos, whip_loadingscreen, whip_phone, whip_voice | MIT |
 | LiveKit JavaScript client | whip_voice/html/js/vendor | Apache 2.0 |
