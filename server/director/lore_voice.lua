@@ -93,6 +93,9 @@ function LoreVoice.audioProblem(url)
     return ('only links starting with %s are accepted'):format(table.concat(starts, ' or '))
 end
 
+--- The same check for any recording the voice bot plays for the Director (a speaker's song: speakers.lua).
+function DirectorLore.audioProblem(url) return LoreVoice.audioProblem(url) end
+
 --- A character's voice lines as whip keeps them: { [line] = { { url, text? }, ... } } (lines with none left out).
 --- From the Lore form (JSON text) or a table. nil and why for something it will not keep.
 function DirectorLore.cleanVoice(v)

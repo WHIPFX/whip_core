@@ -187,6 +187,7 @@ server_scripts {
     'server/director/nodes_weapons.lua',
     'server/director/lore.lua',
     'server/director/lore_voice.lua',
+    'server/director/speakers.lua',
     'server/director/store.lua',
     'server/director/takes.lua',
     'server/director/packs.lua',

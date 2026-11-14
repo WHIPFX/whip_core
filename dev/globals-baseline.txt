@@ -364,6 +364,7 @@ GLOBAL  server DirectorPacks  server/director/packs.lua
 GLOBAL  server DirectorRefs  server/director/refs.lua
 GLOBAL  server DirectorRoutes  server/director/routes.lua
 GLOBAL  server DirectorRuntime  server/director/runtime.lua
+GLOBAL  server DirectorSpeakers  server/director/speakers.lua
 GLOBAL  server DirectorSpots  server/director/spots.lua
 GLOBAL  server DirectorSteps  shared/director/steps.lua
 GLOBAL  server DirectorStore  server/director/store.lua

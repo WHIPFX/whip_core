@@ -1440,6 +1440,7 @@ function Director.runEnded(run, outcome, reason)
         if not ok then say('^1run %d: its cooldown could not be kept: %s^0', run.id, tostring(err)) end
     end
     DirectorTalk.runEnded(run)
+    DirectorSpeakers.runEnded(run)   -- the songs it plays on speakers stop with it
     if run.scenario then refreshStart(run.scenario) end
     -- A test's own end goes to its strip (server/director/hub.lua), not to a notification.
     if run.test then
