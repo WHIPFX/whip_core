@@ -890,11 +890,34 @@ exports('IsSessionCurrent', IsSessionCurrent)
 -- The identifiers (discord, fivem, license, steam) are not on the sheet: it is also sent to the
 -- client on playerLoaded. GetPlayerIdentifiers has them.
 
---- A player as plain, copyable data.
----@param source number
+--- The identifier kinds GetPlayer finds a player by: the four GetPlayerIdentifiers returns.
+local IDENTIFIER_TYPES = { license = true, steam = true, discord = true, fivem = true }
+
+--- The online player a `who` names: a server id, or `{ charId = }`, `{ userId = }` or
+--- `{ identifier = 'license:...' }`. Only identifier fields, and never nil: a nil identifier would match the
+--- first player missing it.
+---@param who any
+---@return table|nil player  the live object
+local function onlinePlayerOf(who)
+    if type(who) ~= 'table' then return Players[tonumber(who)] end
+    if who.charId ~= nil then return PlayersByCharId[Sanitize.id(who.charId)] end
+    if who.userId ~= nil then return PlayersByUserId[Sanitize.id(who.userId)] end
+    local identifier = who.identifier
+    if type(identifier) ~= 'string' then return nil end
+    local kind = identifier:match('^(%w+):.')
+    if not kind or not IDENTIFIER_TYPES[kind] then return nil end
+    for _, player in pairs(Players) do
+        if player[kind] == identifier then return player end
+    end
+    return nil
+end
+
+--- A player as plain, copyable data: by server id, or by `{ charId = }`, `{ userId = }` or
+--- `{ identifier = 'license:...' }`. nil when nobody online matches.
+---@param who number|table
 ---@return table|nil
-exports('GetPlayer', function(source)
-    local player = Players[source]
+exports('GetPlayer', function(who)
+    local player = onlinePlayerOf(who)
     return player and player:serialize() or nil
 end)
 
@@ -933,32 +956,6 @@ exports('GetPlayers', function(opts)
         out[src] = light and player:lightSheet() or player:serialize()
     end
     return out
-end)
-
-exports('GetPlayerFromUserId', function(userId)
-    local player = PlayersByUserId[userId]
-    return player and player:serialize() or nil
-end)
-
-exports('GetPlayerFromCharId', function(charId)
-    local player = PlayersByCharId[charId]
-    return player and player:serialize() or nil
-end)
-
---- The identifier kinds GetPlayerFromIdentifier looks up — the same four GetPlayerIdentifiers returns.
-local IDENTIFIER_TYPES = { license = true, steam = true, discord = true, fivem = true }
-
---- Find the online player holding an identifier, e.g. ('license', 'license:abc...').
----
---- Only identifier fields, and never nil: a nil identifier would match the first player missing it.
-exports('GetPlayerFromIdentifier', function(idType, identifier)
-    if not IDENTIFIER_TYPES[idType] or type(identifier) ~= 'string' or identifier == '' then
-        return nil
-    end
-    for _, player in pairs(Players) do
-        if player[idType] == identifier then return player:serialize() end
-    end
-    return nil
 end)
 
 --- The identifiers serialize() deliberately leaves out (the sheet also goes to the client), behind

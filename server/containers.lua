@@ -1614,20 +1614,15 @@ exports('DeleteContainer', function(containerId)
     return true
 end)
 
---- What a container IS — its name, size, position, owner. What it HOLDS is StoreRead:
+--- What a container IS — its name, size, position, owner — by its id or a reference: `{ id = }`, or
+--- `{ key = }` (EnsureContainer's). nil when there is none. What it HOLDS is StoreRead:
 --- `StoreRead({ kind = 'container', id = containerId })`.
-exports('GetContainerDef', function(containerId)
-    return Containers.getDef(containerId)
-end)
-
---- One container, found by what you have — the pair shops and vehicles have (GetShopBy,
---- GetVehicleBy). nil when there is none.
----@param kind 'id'|'key'
----@param value any
+---@param ref number|table|nil
 ---@return table|nil
-exports('GetContainerBy', function(kind, value)
-    if kind == 'id' then return Containers.getDef(Sanitize.id(value)) end
-    if kind == 'key' then return type(value) == 'string' and Containers.getByKey(value) or nil end
+exports('GetContainer', function(ref)
+    if type(ref) ~= 'table' then return Containers.getDef(Sanitize.id(ref)) end
+    if ref.id ~= nil then return Containers.getDef(Sanitize.id(ref.id)) end
+    if ref.key ~= nil then return type(ref.key) == 'string' and Containers.getByKey(ref.key) or nil end
     return nil
 end)
 

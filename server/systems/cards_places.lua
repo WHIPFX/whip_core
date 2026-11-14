@@ -139,7 +139,7 @@ end
 local function shopProp() return { key = 'shop', kind = 'text', label = 'Shop (its key)', required = true, maxLength = 64 } end
 
 define({
-    type = 'shop.info', category = 'world', kind = 'value', title = 'Shop Details', api = { 'GetShop', 'GetShopBy' },
+    type = 'shop.info', category = 'world', kind = 'value', title = 'Shop Details', api = 'GetShop',
     desc = 'A shop by its key: its name and where it is.',
     props = { shopProp() },
     values = { outputs = { { key = 'found', type = 'bool', label = 'Found' }, { key = 'name', type = 'text', label = 'Name' },

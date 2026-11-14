@@ -114,7 +114,7 @@ define({
 })
 
 define({
-    type = 'car.byPlate', category = 'cars', kind = 'value', title = 'Car With Plate', api = 'GetVehicleBy',
+    type = 'car.byPlate', category = 'cars', kind = 'value', title = 'Car With Plate', api = 'GetVehicle',
     desc = 'The car with this plate, if whip knows one.',
     values = { inputs = { { key = 'plate', type = 'text', label = 'Plate' } },
                outputs = { { key = 'car', type = 'vehicle', label = 'Car' }, { key = 'found', type = 'bool', label = 'Found' } } },

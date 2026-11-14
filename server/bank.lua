@@ -1443,8 +1443,13 @@ local function outRows(rows, err)
     return rows or {}, err
 end
 
-exports('GetBankAccount', function(accountId)
-    return outRow(Bank.GetAccount(accountId))
+--- One account: by its accountId, or `{ number = 'WB-123456' }` (its display number) or `{ accountId = n }`.
+exports('GetBankAccount', function(ref)
+    if type(ref) == 'table' then
+        if ref.number ~= nil then return outRow(Bank.GetAccountByNumber(ref.number)) end
+        ref = ref.accountId
+    end
+    return outRow(Bank.GetAccount(ref))
 end)
 
 --- One account's balance, from memory after its first read (see BALANCES IN MEMORY at the top).
@@ -1484,10 +1489,6 @@ exports('GetBalance', function(who)
     end
     if not main then return false, 'They have no bank account' end
     return balanceOfAccount(main)
-end)
-
-exports('GetBankAccountByNumber', function(accountNumber)
-    return outRow(Bank.GetAccountByNumber(accountNumber))
 end)
 
 --- Every account a character can use, each row with their `role` on it.

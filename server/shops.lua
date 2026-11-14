@@ -1600,6 +1600,40 @@ function Shops.getByKey(key)
     return nil
 end
 
+--- One shop, by its id or by a reference that says what you hold (the GetShop export):
+---     4   { id = 4 }   { key = 'burgershot' }   { containerId = 12 } (the shop whose stock it is)
+---@param ref number|string|table|nil
+---@return table|nil
+function Shops.find(ref)
+    if type(ref) ~= 'table' then return Shops.getDef(tonumber(ref)) end
+    if ref.id ~= nil then return Shops.getDef(tonumber(ref.id)) end
+    if ref.key ~= nil then return Shops.getByKey(ref.key) end
+    if ref.containerId ~= nil then
+        local containerId = tonumber(ref.containerId)
+        for _, def in pairs(Shops.cache) do
+            if def.containerId == containerId then return def end
+        end
+    end
+    return nil
+end
+
+--- Every shop, or those a filter keeps (the GetShops export), sorted by shopId. `{ job = }` takes the job by
+--- jobId or key, like every Jobs export; `{}` and why when there is no such job.
+---@param filter table|nil  { job = jobId|key }
+---@return table[] shops
+---@return string|nil why
+function Shops.list(filter)
+    if type(filter) ~= 'table' or filter.job == nil then return Shops.getAll() end
+    local job = Jobs.resolve(filter.job)
+    if not job then return {}, 'No such job' end
+    local result = {}
+    for _, def in pairs(Shops.cache) do
+        if def.jobId == job.jobId then result[#result + 1] = def end
+    end
+    table.sort(result, function(a, b) return a.shopId < b.shopId end)
+    return result
+end
+
 --- Update a shop's catalog (infinite/npc modes)
 ---@param shopId number
 ---@param catalog table  { [itemKey] = price }
@@ -2479,10 +2513,10 @@ end
 -- Shops — Server Exports
 -- ============================================
 
---- One shop by its id. Found by anything else — its key, its stock container, its job — is GetShopBy,
---- the same pair vehicles have (GetVehicle / GetVehicleBy).
-exports('GetShop', function(shopId) return Shops.getDef(tonumber(shopId)) end)
-exports('GetAllShops', function() return Shops.getAll() end)
+--- One shop, by its id or a reference: GetShop(4), GetShop({ key = 'burgershot' }), GetShop({ containerId = 12 }).
+--- A job's shops (a job can own several) are GetShops({ job = }).
+exports('GetShop', function(ref) return Shops.find(ref) end)
+exports('GetShops', function(filter) return Shops.list(filter) end)
 
 --- `(def)` or `(false, reason)`. Follows a changed declaration like EnsureZone; see Shops.ensureShop.
 exports('EnsureShop', function(key, data)
@@ -2573,35 +2607,6 @@ exports('SetShopItemPrice', function(target, itemKey, price, forSale)
     return Shops.setItemPrice(containerId, itemKey, price, forSale)
 end)
 
---- One shop, found by something other than its id — the GetVehicleBy shape:
----     GetShopBy('key', 'burgershot')   GetShopBy('containerId', 12)   GetShopBy('id', 4)
---- `'job'` answers with a LIST of that job's shops, since a job can own several.
----@param kind string  'id' | 'key' | 'containerId' | 'job'
----@param value any
----@return table|table[]|nil
-exports('GetShopBy', function(kind, value)
-    if kind == 'id' then return Shops.getDef(tonumber(value)) end
-    if kind == 'key' then return Shops.getByKey(value) end
-    if kind == 'containerId' then
-        value = tonumber(value)
-        for _, def in pairs(Shops.cache) do
-            if def.containerId == value then return def end
-        end
-        return nil
-    end
-    if kind == 'job' then
-        -- A job by jobId OR KEY, like every Jobs export.
-        local job = Jobs.resolve(value)
-        if not job then return {}, 'No such job' end
-        local result = {}
-        for _, def in pairs(Shops.cache) do
-            if def.jobId == job.jobId then result[#result + 1] = def end
-        end
-        table.sort(result, function(a, b) return a.shopId < b.shopId end)
-        return result
-    end
-    return nil
-end)
 exports('GetShopViewers', function(shopId)
     local viewers = {}
     for src, openId in pairs(Shops._openShops) do

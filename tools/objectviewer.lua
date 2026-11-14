@@ -352,7 +352,7 @@ end
 --- What whip itself knows about this entity, if anything (a car is said in Source).
 ---@return string|nil
 local function WhipInfo(entity)
-    local ok, door = pcall(GetDoorByEntity, entity)
+    local ok, door = pcall(GetClientDoor, { entity = entity })
     if ok and type(door) == 'table' and door.doorId then
         return ('Door #%s (%s)'):format(door.doorId, door.locked and 'locked' or 'unlocked')
     end

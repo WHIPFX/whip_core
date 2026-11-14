@@ -1457,7 +1457,7 @@ end
 --- The vehicleId a vehicle reference names (the first argument of every vehicle, stat and data export). A
 --- reference says which kind of number it is:
 ---     { id = vehicleId }   { entity = entity }   { plate = 'ABC123' }   { netId = netId }
---- The same four as GetVehicleBy. A bare number on this side is a vehicleId. Anything with a `vehicleId` names
+--- The same four GetVehicle takes. A bare number on this side is a vehicleId. Anything with a `vehicleId` names
 --- that car by id, ahead of its plate.
 ---@param ref any
 ---@return number|nil vehicleId
@@ -3868,8 +3868,9 @@ end
 
 -- Public exports. The key exports forward to globals in server/items/vehicle_key.lua, resolved at call time.
 
---- Everything whip knows about a vehicle, in one call.
+--- Everything whip knows about a vehicle, in one call. By its id, or by a reference that says what you hold:
 ---     local v = exports.whip_core:GetVehicle(vehicleId)
+---     local v = exports.whip_core:GetVehicle({ plate = 'ABC123' })   -- or { netId = }, { entity = }, { id = }
 ---     v.plate, v.model, v.owner.charId, v.state, v.garage, v.coords, v.locked, v.session
 ---     v.spawned, v.entity, v.netId
 ---     v.stats.fuel, v.data.myThing, v.properties, v.storage
@@ -3880,26 +3881,6 @@ end
 ---@return table|nil
 exports('GetVehicle', function(vehicleId, opts)
     vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return nil end
-    return Vehicles.context(vehicleId, opts)
-end)
-
---- The same thing, found some other way than by id:
----     exports.whip_core:GetVehicleBy('plate', 'ABC123')   -- or 'netId', or 'entity'
----@param kind string  'plate' | 'netId' | 'entity'
----@param value any
----@param opts table|nil  passed through to GetVehicle
----@return table|nil vehicle
-exports('GetVehicleBy', function(kind, value, opts)
-    -- `GetVehicleBy(k, v)` is `GetVehicle({ [k] = v })` (Vehicles.idFromRef).
-    -- A kind that is not one is said on the console, and the answer is nil ("no car", as whip_test 05 checks): a
-    -- second value would never reach the caller, as an export drops everything after a nil.
-    if kind ~= 'plate' and kind ~= 'netId' and kind ~= 'entity' and kind ~= 'id' then
-        print(("[whip_core] GetVehicleBy(%s, ...) from %s: kind must be 'plate', 'netId', 'entity' or 'id'"):format(
-            tostring(kind), tostring(GetInvokingResource() or GetCurrentResourceName())))
-        return nil
-    end
-    local vehicleId = Vehicles.idFromRef({ [kind] = value })
     if not vehicleId then return nil end
     return Vehicles.context(vehicleId, opts)
 end)
@@ -4028,8 +4009,8 @@ exports('RetrieveVehicle', function(vehicleId, garageKey)
     return Vehicles.retrieve(vehicleId, garageKey)
 end)
 
--- GetVehicle(id) and GetVehicleBy('entity', e) stay separate: vehicleIds and entity handles are
--- plain integers in the same range, and guessing which one was meant would return a different car.
+-- GetVehicle(id) and GetVehicle({ entity = e }) stay apart: vehicleIds and entity handles are plain
+-- integers in the same range, and guessing which one was meant would return a different car.
 
 --- Is this player in the driver's seat of this vehicle? The cheap answer (three natives, no
 --- allocation, no scan) for a question asked many times a second.

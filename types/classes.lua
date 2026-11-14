@@ -224,7 +224,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field name string|nil Owner full name (nil if offline or unowned)
 ---@field online boolean Whether the owner is currently online
 
---- What the server's GetVehicle / GetVehicleBy / GetVehiclesOf / GetGarageVehicles hand back, and
+--- What the server's GetVehicle / GetVehiclesOf / GetGarageVehicles hand back, and
 --- what a `'vehicle'` SecureEvent param gives the handler: a COPY, safe to keep and change.
 ---@class WhipVehicleContext
 ---@field vehicleId number

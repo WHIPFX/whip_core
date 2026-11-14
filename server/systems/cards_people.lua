@@ -165,7 +165,7 @@ define({
 })
 
 define({
-    type = 'player.ofCharacter', category = 'players', kind = 'value', title = 'Their Player', api = 'GetPlayerFromCharId',
+    type = 'player.ofCharacter', category = 'players', kind = 'value', title = 'Their Player', api = 'GetPlayer',
     desc = 'The player who is on as a character now (a car\'s owner, a job\'s boss), if they are. Found is no while they are not.',
     values = { inputs = { { key = 'character', type = 'character', label = 'Character' } },
                outputs = { { key = 'player', type = 'player', label = 'Player' }, { key = 'found', type = 'bool', label = 'Found' } } },

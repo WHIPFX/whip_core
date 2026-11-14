@@ -28,7 +28,6 @@ const LEFT_OUT_SECTIONS = {
 // stats, shops, jobs and zones.)
 const LEFT_OUT = {
     GetPlayerIdentifiers: 'licence and account ids are not a builder\'s to read',
-    GetPlayerFromUserId: 'an account id is not a builder\'s',
     IsSessionCurrent: 'every card already checks the session (ctx:source)',
     SetPlayerMetadata: 'plan §3: a system keeps its state in its own variables, never character metadata',
     GetPlayerMetadata: 'plan §3, as SetPlayerMetadata',
@@ -56,7 +55,6 @@ const LEFT_OUT = {
     SpawnVehicle: 'an owned car out of its garage skips Retrieve; Spawn Temporary Car is a system\'s',
     // Players: an admin's, whip's own, or every player at once
     GetPlayers: 'every player at once: Players Near and Players in Area find them by place',
-    GetPlayerFromIdentifier: 'licence ids are not a builder\'s',
     IsCharacterDeleted: 'a deleted character is never in a pulse',
     ShowPropSet: 'a held prop is the player\'s game\'s (S4)',
     HidePropSet: 'as ShowPropSet',
@@ -76,7 +74,7 @@ const LEFT_OUT = {
     GetScenarioStats: 'the Director API\'s own', ListDirectorCards: 'the Director\'s own',
     // The bank: someone's accounts are theirs
     GetBankAccount: 'another\'s accounts are private: Has Money? reads this pulse\'s player\'s own',
-    GetBankAccountByNumber: 'as GetBankAccount', GetCharacterBankAccounts: 'as GetBankAccount',
+    GetCharacterBankAccounts: 'as GetBankAccount',
     GetJobBankAccounts: 'as GetBankAccount', GetBankTransactions: 'as GetBankAccount', GetBankAccessList: 'as GetBankAccount',
     CanUseBankAccount: 'as GetBankAccount',
     CreateBankAccount: 'the bank\'s own screens', CloseBankAccount: 'the bank\'s own screens',
@@ -115,7 +113,7 @@ const LEFT_OUT = {
     GetItemAt: 'as StoreMove', SetItemMetadata: 'an item\'s own data is its resource\'s', FindItemByUid: 'as StoreMove',
     GetOpenStores: 'as StoreMove', OpenStore: 'a screen (S4)', CloseStore: 'a screen (S4)',
     // Shops: a system's shops are S3d's
-    GetAllShops: 'every shop at once', EnsureShop: 'S3d Registers', CreateShop: 'S3d Registers', DeleteShop: 'S3d Registers',
+    GetShops: 'every shop at once', EnsureShop: 'S3d Registers', CreateShop: 'S3d Registers', DeleteShop: 'S3d Registers',
     UpdateShop: 'S3d Registers', AddCatalogItem: 'S3d Registers', RemoveCatalogItem: 'S3d Registers', GetShopViewers: 'a screen\'s',
     // Time
     SetTimeScale: 'how fast the clock runs is the server\'s own setting',
@@ -140,7 +138,7 @@ const LEFT_OUT = {
     ListPoints: 'a system\'s points are its Point Used cards\'',
     UpdatePoint: 'a system\'s points are its Point Used cards\'', RemovePoint: 'as UpdatePoint',
     SetVehicleAppearance: 'a car\'s look is a customs screen\'s (S4)', RestoreVehicleAppearance: 'as SetVehicleAppearance',
-    GetContainerBy: 'a container\'s contents are its own: S3d Registers makes a system\'s', GetContainerDef: 'as GetContainerBy',
+    GetContainer: 'a container\'s contents are its own: S3d Registers makes a system\'s',
     BankTransfer: 'account ids are private: Pay and Charge move a system\'s money',
     DeleteGroundItem: 'it destroys whatever someone dropped',
     ListNpcs: 'every NPC at once: About the NPC reads one',

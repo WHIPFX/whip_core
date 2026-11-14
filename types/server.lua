@@ -30,11 +30,16 @@ local whip_core = {}
 -- IDENTIFIERS ARE NOT ON THE SHEET. serialize() omits license, steam, discord and fivem because
 -- it is also the payload sent to the CLIENT on playerLoaded. Use GetPlayerIdentifiers.
 
---- A player as plain, copyable data, by server id. A copy of the whole sheet (appearance and inventory too): for
---- one number use GetCharId, for "are they in" IsPlayerLoaded.
----@param source number Player server ID
+--- A player as plain, copyable data. A copy of the whole sheet (appearance and inventory too): for one number
+--- use GetCharId, for "are they in" IsPlayerLoaded. Online players only; nil when nobody online matches.
+---
+---     exports.whip_core:GetPlayer(source)
+---     exports.whip_core:GetPlayer({ charId = 42 })
+---     exports.whip_core:GetPlayer({ userId = 7 })
+---     exports.whip_core:GetPlayer({ identifier = 'license:abc...' })   -- license, steam, discord or fivem
+---@param who number|{ charId: number }|{ userId: number }|{ identifier: string } A server id, or a reference
 ---@return WhipPlayerData|nil
-function whip_core:GetPlayer(source) end
+function whip_core:GetPlayer(who) end
 
 --- Their charId, or nil while no character is loaded. Copies nothing.
 ---@param source number
@@ -74,16 +79,6 @@ function whip_core:GetPlayers(opts) end
 ---@return boolean
 function whip_core:IsSessionCurrent(source, session) end
 
---- Find a player by their user account ID.
----@param userId number
----@return WhipPlayerData|nil
-function whip_core:GetPlayerFromUserId(userId) end
-
---- Find a player by their character ID.
----@param charId number
----@return WhipPlayerData|nil
-function whip_core:GetPlayerFromCharId(charId) end
-
 --- The players within network range of a point (Config.NetworkRange, 424 m), for a message about a
 --- place that only the players there should get. `coords` is a vector3 or `{ x, y }`; `range` in
 --- metres overrides the default. Server ids; empty for bad input.
@@ -101,12 +96,6 @@ function whip_core:GetPlayersInRange(coords, range) end
 ---@return string|nil why
 ---@async
 function whip_core:IsCharacterDeleted(charId) end
-
---- Find a player by a specific identifier type.
----@param idType string Identifier type ('license', 'steam', 'discord', 'fivem')
----@param identifier string The identifier value
----@return WhipPlayerData|nil
-function whip_core:GetPlayerFromIdentifier(idType, identifier) end
 
 --- The four identifiers GetPlayer deliberately leaves off the player sheet.
 ---
@@ -925,17 +914,11 @@ function whip_core:SentinelGetTruth(src, key) end
 
 ---@alias WhipBankRole 'view'|'deposit'|'withdraw'|'manager'|'owner'  -- each includes those before it
 
---- Get a bank account by its ID.
----@param accountId number
+--- One bank account: by its ID, or by its display number, `{ number = 'WB-123456' }`.
+---@param ref number|{ number: string }|{ accountId: number } An accountId, or a reference
 ---@return WhipBankAccount|nil
 ---@async
-function whip_core:GetBankAccount(accountId) end
-
---- Find a bank account by its display number (e.g. 'WB-123456').
----@param accountNumber string
----@return WhipBankAccount|nil
----@async
-function whip_core:GetBankAccountByNumber(accountNumber) end
+function whip_core:GetBankAccount(ref) end
 
 --- Every account a character can use — owned, shared or job — each row with their `role` on it.
 ---@param charId number
@@ -1701,32 +1684,23 @@ function whip_core:GetAllItemDefs() end
 
 --- Everything whip knows about a vehicle, in one call. THE read.
 ---
---- Always a copy — editing what comes back changes nothing. Replaces GetVehicleDef,
---- GetVehicleContext, GetVehicleContextForEntity, GetVehicleByPlate, GetVehicleByNetId,
---- GetVehiclesByOwner, GetVehicleOwner, GetVehicleNetId, IsVehicleLocked and IsSessionVehicle,
---- which were ten exports answering pieces of the same question.
+--- Always a copy — editing what comes back changes nothing.
 ---
 ---     local v = exports.whip_core:GetVehicle(id)
+---     local v = exports.whip_core:GetVehicle({ plate = 'ABC123' })   -- or { netId = }, { entity = }
 ---     v.plate  v.model  v.owner.charId  v.state  v.garage  v.coords  v.locked  v.session
 ---     v.spawned  v.entity  v.netId  v.stats.fuel  v.data.mine  v.properties  v.storage
 ---
 --- Occupants cost a scan of every player on the server, so they are opt-in.
 ---
 --- Every vehicle, stat and data export takes a vehicleId OR a vehicle reference (WhipVehicleRef):
---- `{ id = }`, `{ entity = }`, `{ plate = }`, `{ netId = }`. GetVehicle answers nil for a car whip
---- does not know; the exports that answer `false, why` say 'Vehicle not found', or 'Invalid vehicle
+--- `{ id = }`, `{ entity = }`, `{ plate = }`, `{ netId = }`. GetVehicle returns nil for a car whip
+--- does not know; the exports that return `false, why` say 'Vehicle not found', or 'Invalid vehicle
 --- reference' for a table that names nothing.
 ---@param vehicleId number|WhipVehicleRef
 ---@param opts table|nil `{ occupants = true }`
 ---@return WhipVehicleContext|nil
 function whip_core:GetVehicle(vehicleId, opts) end
-
---- The same vehicle, found some other way than by id.
----@param kind string `'plate'` | `'netId'` | `'entity'`
----@param value any
----@param opts table|nil passed through to GetVehicle
----@return WhipVehicleContext|nil
-function whip_core:GetVehicleBy(kind, value, opts) end
 
 --- Every vehicle a person owns, as full snapshots. A person: a server id, or `{ charId = n }`.
 ---@param who number|{ charId: number } A server id, or a character
@@ -1858,7 +1832,7 @@ function whip_core:GetHeldPropsTag(source) end
 ---@async
 function whip_core:RemoveVehicleKey(who, vehicleId) end
 
--- By network id: exports.whip_core:GetVehicleBy('netId', netId)
+-- By network id: exports.whip_core:GetVehicle({ netId = netId })
 
 --- Create a vehicle owned by a player's character.
 ---
@@ -2231,7 +2205,7 @@ function whip_core:SetVehicleGarage(vehicleId, garageKey) end
 --
 --   exports.whip_core:GetVehicle(id).netId
 --   exports.whip_core:GetVehicle(id)
---   exports.whip_core:GetVehicleBy('entity', entity)
+--   exports.whip_core:GetVehicle({ entity = entity })
 --
 -- Two things worth knowing about what comes back. `occupants` is opt-in, and PLAYERS ONLY when you
 -- ask for it: ambient peds are created by clients and never reach the server, so an empty list does
@@ -2551,12 +2525,6 @@ function whip_core:GetGroundItem(id) end
 ---@async
 function whip_core:EnsureContainer(key, data) end
 
---- One container, by its key (EnsureContainer's) or its id. nil when there is none.
----@param kind 'key'|'id'
----@param value string|number
----@return WhipContainerDef|nil
-function whip_core:GetContainerBy(kind, value) end
-
 --- Create a persistent world container — a NEW one on every call. For a stash your resource always
 --- has, EnsureContainer.
 ---
@@ -2579,11 +2547,12 @@ function whip_core:CreateContainer(data) end
 ---@async
 function whip_core:DeleteContainer(containerId) end
 
---- What a container IS — name, size, position, owner. What it HOLDS is
+--- What a container IS — name, size, position, owner — by its id, or by its key (EnsureContainer's):
+--- `GetContainer({ key = 'pd:weapon_locker' })`. nil when there is none. What it HOLDS is
 --- StoreRead({ kind = 'container', id = containerId }).
----@param containerId number Container ID
+---@param ref number|{ id: number }|{ key: string } A container id, or a reference
 ---@return WhipContainerDef|nil
-function whip_core:GetContainerDef(containerId) end
+function whip_core:GetContainer(ref) end
 
 --- Change a container's definition after it has been created. Fields absent
 --- from `data` are left alone — including `accessCharId`, which is what makes
@@ -2797,21 +2766,22 @@ function whip_core:CloseStore(source, addr) end
 -- Shops
 -- ============================================
 
---- Get a shop definition by ID. By anything else: GetShopBy.
----@param shopId number
+--- One shop, by its id or by a reference that says what you hold, as GetVehicle takes one:
+---
+---     exports.whip_core:GetShop(4)
+---     exports.whip_core:GetShop({ key = 'burgershot' })
+---     exports.whip_core:GetShop({ containerId = 12 })   -- the shop whose stock that container is
+---
+--- A job's shops (a job can own several) are GetShops({ job = }).
+---@param ref number|{ id: number }|{ key: string }|{ containerId: number } A shop id, or a reference
 ---@return WhipShopDef|nil
-function whip_core:GetShop(shopId) end
+function whip_core:GetShop(ref) end
 
---- One shop, found by what you have — the same pair vehicles have (GetVehicle / GetVehicleBy).
---- 'job' answers with a LIST, and takes the job by jobId or key.
----@param kind 'id'|'key'|'containerId'|'job'
----@param value any
----@return WhipShopDef|WhipShopDef[]|nil
-function whip_core:GetShopBy(kind, value) end
-
---- Get all registered shops.
----@return WhipShopDef[]
-function whip_core:GetAllShops() end
+--- Every shop, sorted by shopId, or those of one job: `{ job = }` takes the job by jobId or key.
+---@param filter? { job: number|string }
+---@return WhipShopDef[] shops
+---@return string|nil why 'No such job' (with an empty list)
+function whip_core:GetShops(filter) end
 
 --- A shop declared in code, by key — the EnsureZone rule. New key: made. The same declaration as
 --- last time: nothing changes (an admin's panel edits stand). A changed declaration: every declared
@@ -4085,21 +4055,19 @@ function whip_core:DespawnNpc(npcId) end
 ---@return string|nil reason
 function whip_core:SetNpcState(npcId, patch) end
 
---- An NPC, as a copy (any resource's).
----@param npcId number
+--- An NPC, as a copy (any resource's). By its npcId, or by what you hold: `{ entity = }` or `{ netId = }`,
+--- found only while that is still the NPC's ped.
+---
+---     local npc = exports.whip_core:GetNpc({ netId = netId })
+---@param ref number|{ id: number }|{ entity: number }|{ netId: number } An npcId, or a reference
 ---@return WhipNpcInfo|nil
-function whip_core:GetNpc(npcId) end
+function whip_core:GetNpc(ref) end
 
 --- Your NPCs, or those under one of your tags.
 ---@param filter? { tag?: string }
 ---@return WhipNpcInfo[]
 function whip_core:ListNpcs(filter) end
 
---- Which NPC an entity or a netId is, or nil (a lookup).
----@param kind 'netId'|'entity'
----@param value number
----@return number|nil npcId
-function whip_core:GetNpcBy(kind, value) end
 
 -- ============================================
 -- Settings (your page in /whip → Config)

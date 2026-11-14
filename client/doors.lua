@@ -525,7 +525,7 @@ RegisterNetEvent('whip_core:client:doorCreated', function(door)
     TotalDoorCount = TotalDoorCount + 1
 
     -- Into the world NOW when it is beside us, not at the next 1s tick: the in-world editor's
-    -- save-then-link flow aims at the door it just placed, and GetDoorByEntity reads the
+    -- save-then-link flow aims at the door it just placed, and GetClientDoor({ entity = }) reads the
     -- nearby subset.
     local pos = GetEntityCoords(PlayerPedId())
     local dx, dy = door.x - pos.x, door.y - pos.y
@@ -619,11 +619,15 @@ exports('GetDoorsNearby', function(a, b, c, d)
     return result
 end)
 
---- Global as well: the door and object tools read it without the export.
-function GetDoorByEntity(entity)
-    return getDoorByEntity(entity)
+--- A door from the client's cache: by its doorId, or `{ entity = }` for the saved door a world entity is (by
+--- model and position, among the doors nearby). Global as well: the door and object tools read it without the
+--- export.
+---@param ref number|{ entity: number }|nil
+---@return table|nil
+function GetClientDoor(ref)
+    if type(ref) == 'table' then return getDoorByEntity(ref.entity) end
+    return clientDoors[ref]
 end
-exports('GetDoorByEntity', GetDoorByEntity)
 
 exports('GetLoadedDoors', function()
     local result = {}
@@ -633,9 +637,7 @@ exports('GetLoadedDoors', function()
     return result
 end)
 
-exports('GetDoor', function(doorId)
-    return clientDoors[doorId]
-end)
+exports('GetDoor', function(ref) return GetClientDoor(ref) end)
 
 --- The last list the server gave — what a refused read answers instead (see below).
 local lastToolDoors = nil

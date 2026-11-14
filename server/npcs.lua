@@ -1499,8 +1499,18 @@ exports('SetNpcState', function(npcId, patch)
     return Npcs.setState(owner, npcId, patch)
 end)
 
---- An NPC, as a copy: GetNpc(npcId) -> table | nil.
-exports('GetNpc', function(npcId) return Npcs.get(npcId) end)
+--- An NPC, as a copy: GetNpc(ref) -> table | nil. `ref` is an npcId, `{ id = }`, or what you hold: `{ entity = }`
+--- or `{ netId = }`, found only while that is still the NPC's ped.
+exports('GetNpc', function(ref)
+    if type(ref) == 'table' then
+        if ref.id ~= nil then return Npcs.get(ref.id) end
+        local kind = (ref.entity ~= nil and 'entity') or (ref.netId ~= nil and 'netId') or nil
+        local npcId = kind and Npcs.by(kind, ref[kind])
+        if not npcId then return nil end
+        return Npcs.get(npcId)
+    end
+    return Npcs.get(ref)
+end)
 
 --- Your NPCs (or those under one of your tags): ListNpcs({ tag }) -> table[].
 exports('ListNpcs', function(filter)
@@ -1510,5 +1520,3 @@ exports('ListNpcs', function(filter)
     return Npcs.list(f)
 end)
 
---- Which NPC an entity or netId is: GetNpcBy('netId' | 'entity', value) -> npcId | nil (a lookup: nil, like GetNpc).
-exports('GetNpcBy', function(kind, value) return Npcs.by(kind, value) or nil end)

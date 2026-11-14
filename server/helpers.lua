@@ -86,8 +86,8 @@ NOT_READY = 'whip_core has not finished starting (see its console)'
 
 --- A person, the way every export takes one: a bare number is a SERVER ID (the `source` a handler
 --- already holds), and a character, online or not, is `{ charId = n }`. One rule, so the same number
---- never names two people. An export whose own NAME says Character or CharId (GetCharacterProperties,
---- GetPlayerFromCharId) takes the charId it names.
+--- never names two people. An export whose own NAME says Character or CharId (GetCharacterProperties)
+--- takes the charId it names.
 ---
 --- Answers `charId, source` (source only while they are online), or `nil, why`.
 ---@param ref number|table

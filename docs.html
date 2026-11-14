@@ -1857,10 +1857,17 @@ if not ok then return false, why end</code></pre>
 </table>
 
 <h3 id="person-refs">Naming a person</h3>
-<p>Wherever an export takes a person, a <strong>bare number is a server id</strong> (the <code>source</code> you already hold) and <strong><code>{ charId = n }</code></strong> is a character, online or not. A bare number is never a charId, except in exports whose name says so (<code>GetCharacterProperties(charId)</code>, <code>GetPlayerFromCharId(charId)</code>).</p>
+<p>Wherever an export takes a person, a <strong>bare number is a server id</strong> (the <code>source</code> you already hold) and <strong><code>{ charId = n }</code></strong> is a character, online or not. A bare number is never a charId, except in exports whose name says so (<code>GetCharacterProperties(charId)</code>).</p>
 <pre><code class="lang-lua">exports.whip_core:GivePropertyKey(propertyId, source)              -- the player in front of you
 exports.whip_core:GivePropertyKey(propertyId, { charId = 42 })   -- a character, online or not</code></pre>
 <div class="info-box warn"><strong>A server id must be online.</strong> To reach someone who may be offline, pass <code>{ charId = n }</code>. Some calls need the person online either way (a car key, <code>TransferVehicle</code>); their cards say so. A parameter named <code>source</code> is always a server id.</div>
+
+<h3 id="patterns-lookups">Finding one thing</h3>
+<p>A lookup is one call, <code>GetX(ref)</code>: an id, or a table with one key that says what you hold. A list is <code>GetXs(filter?)</code>.</p>
+<pre><code class="lang-lua">exports.whip_core:GetVehicle({ plate = 'ABC123' })
+exports.whip_core:GetShop({ key = 'burgershot' })
+exports.whip_core:GetPlayer({ charId = 42 })          -- online players only
+exports.whip_core:GetShops({ job = 'burgershot' })</code></pre>
 
 <h3 id="patterns-boundary">Two export gotchas</h3>
 <p>Both come from FiveM, and neither errors where the mistake is.</p>
@@ -2670,13 +2677,14 @@ if not player then return end
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
-<div class="export-card" id="getplayer" data-search="getplayer player source sheet">
-<div class="export-header"><span class="export-name">GetPlayer(source)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="getplayer" data-search="getplayer player source sheet charid userid account identifier license steam discord fivem">
+<div class="export-header"><span class="export-name">GetPlayer(who)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>A copy of the whole <a href="#whipplayer">sheet</a>, appearance included, or <code>nil</code> until the character has loaded. For one number, <code>GetCharId</code> is cheaper.</p>
+  <p>A copy of the whole <a href="#whipplayer">sheet</a>, appearance included, or <code>nil</code> until the character has loaded. Online players only. For one number, <code>GetCharId</code> is cheaper.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>source</td><td>number</td><td>Server id</td></tr></table>
+  <tr><td>who</td><td>number|table</td><td>A server id, <code>{ charId = }</code>, <code>{ userId = }</code> (the account), or <code>{ identifier = 'license:…' }</code> (license, steam, discord or fivem)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
+<pre><code class="lang-lua">local owner = exports.whip_core:GetPlayer({ charId = v.owner.charId })   -- nil when they are offline</code></pre>
 </div></div>
 
 <div class="export-card" id="getcharid" data-search="getcharid charid character id isplayerloaded isplayerdead loaded ready cheap">
@@ -2703,34 +2711,6 @@ end</code></pre>
 <div class="export-body">
   <p>Every loaded player's sheet, keyed by server id. <code>{ light = true }</code> returns light sheets (<code>source, session, userId, charId</code>, names, date of birth, gender, <code>isDead</code>): much cheaper.</p>
   <div class="return-info"><strong>Returns: </strong><code>table&lt;number, table&gt;</code></div>
-</div></div>
-
-<div class="export-card" data-search="getplayerfromuserid userid account">
-<div class="export-header"><span class="export-name">GetPlayerFromUserId(userId)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>The sheet of the character this account has in.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>userId</td><td>number</td><td>Database user id</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-</div></div>
-
-<div class="export-card" data-search="getplayerfromcharid charid character">
-<div class="export-header"><span class="export-name">GetPlayerFromCharId(charId)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>The sheet of this character, if it's online.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>charId</td><td>number</td><td>Character id</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-</div></div>
-
-<div class="export-card" data-search="getplayerfromidentifier license steam discord fivem identifier">
-<div class="export-header"><span class="export-name">GetPlayerFromIdentifier(idType, identifier)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>The sheet of the player with this platform identifier.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>idType</td><td>string</td><td><code>'license'</code>, <code>'steam'</code>, <code>'discord'</code> or <code>'fivem'</code></td></tr>
-  <tr><td>identifier</td><td>string</td><td>The identifier value</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
 <div class="export-card" data-search="getplayeridentifiers license steam discord fivem identifier">
@@ -3604,22 +3584,13 @@ if not holdId then return false, why end
 <div class="return-info"><strong>Returns: </strong><code>integer</code>, or <code>false, why</code>: no such person or account, no bank account, or it's closed</div>
 </div></div>
 
-<div class="export-card" id="getbankaccount" data-search="getbankaccount getaccount bank account">
-<div class="export-header"><span class="export-name">GetBankAccount(accountId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="getbankaccount" data-search="getbankaccount getaccount bank account number">
+<div class="export-header"><span class="export-name">GetBankAccount(ref)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>An account by its ID.</p>
+<p>An account, by its ID or its number.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>accountId</td><td>number</td><td>Bank account ID</td></tr></table>
+<tr><td>ref</td><td>number|table</td><td>A bank account ID, or <code>{ number = 'WB-XXXXXX' }</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code>: <code>{ accountId, accountNumber, label, type, ownerCharId, jobId, balance, isDefault, frozen, createdAt }</code>, as every account read; times are epoch seconds</div>
-</div></div>
-
-<div class="export-card" id="getbankaccountbynumber" data-search="getbankaccountbynumber getaccountbynumber account number">
-<div class="export-header"><span class="export-name">GetBankAccountByNumber(accountNumber)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>An account by its number.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>accountNumber</td><td>string</td><td><code>"WB-XXXXXX"</code></td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
 <div class="export-card" id="getdefaultbankaccount" data-search="getdefaultbankaccount getdefaultaccount default account">
@@ -4842,20 +4813,14 @@ local safe = exports.whip_core:CreateContainer({
 
 <h3>Finding</h3>
 
-<div class="export-card" data-search="getcontainerby container key find lookup">
-<div class="export-header"><span class="export-name">GetContainerBy(kind, value)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>One container, by <code>'key'</code> (the key it was declared by) or <code>'id'</code>, like <code>GetShopBy</code> and <code>GetVehicleBy</code>.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-</div></div>
-
-<div class="export-card" data-search="getcontainerdef container get info">
-<div class="export-header"><span class="export-name">GetContainerDef(containerId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getcontainer container get info key find lookup">
+<div class="export-header"><span class="export-name">GetContainer(ref)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>What a container <em>is</em> (name, size, position, owner), from cache. What it <em>holds</em> is <code>StoreRead</code>.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>containerId</td><td>number</td><td>Container ID</td></tr></table>
+  <tr><td>ref</td><td>number|table</td><td>A container id, or <code>{ key = }</code> (the key it was declared by)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
+<pre><code class="lang-lua">local locker = exports.whip_core:GetContainer({ key = 'pd:weapon_locker' })</code></pre>
 </div></div>
 
 <h3>Changing and deleting</h3>
@@ -5246,7 +5211,7 @@ exports.whip_core:SecureEvent('tow:hookVehicle', {
 }, function(source, player, v)
     print(('Towing %s (%s)'):format(v.model, v.plate))
 end)</code></pre>
-<div class="info-box warn"><strong><code>ResolveVehicle</code> waits for the server.</strong> Call it in <code>onSelect</code>, a command or another one-off, never in <code>canInteract</code>, a label, a loop or per-frame code. Use <code>GetVehicleId</code> or <code>GetVehicleBy('entity', entity)</code> there.</div>
+<div class="info-box warn"><strong><code>ResolveVehicle</code> waits for the server.</strong> Call it in <code>onSelect</code>, a command or another one-off, never in <code>canInteract</code>, a label, a loop or per-frame code. Use <code>GetVehicleId</code> or <code>GetVehicle({ entity = entity })</code> there.</div>
 <p>The other client reads are in the <a href="#client-vehicles">Client vehicles API</a>. On the server, <a href="#getvehicle"><code>GetVehicle</code></a> returns one snapshot with the owner, lock, state, netId, stats and storage. Sell a car with <code>TransferVehicle</code> and remove one with <code>DeleteVehicle</code>.</p>
 
 <h3 id="guide-vehicle-damage">Damage a car keeps</h3>
@@ -5317,33 +5282,22 @@ end)</code></pre>
 <div class="export-body">
   <p>A copy of everything the server knows about a vehicle, or <code>nil</code> if WHIP doesn't know it. Editing the copy changes nothing.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>vehicleId</td><td>number|table</td><td>A vehicleId or a <a href="#vehicle-references">vehicle reference</a></td></tr>
+  <tr><td>vehicleId</td><td>number|table</td><td>A vehicleId or a <a href="#vehicle-references">vehicle reference</a>: <code>{ plate = }</code>, <code>{ netId = }</code>, <code>{ entity = }</code></td></tr>
   <tr><td>opts</td><td>table?</td><td><code>{ occupants = true }</code> adds who is sitting in it (slower: it checks every player)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-<pre><code class="lang-lua">local v = exports.whip_core:GetVehicle(vehicleId)
+<pre><code class="lang-lua">local v = exports.whip_core:GetVehicle(vehicleId)   -- or GetVehicle({ plate = 'ABC123' })
 if not v then return false, 'No such vehicle' end
 print(v.plate, v.model, v.owner.charId, v.state, v.locked)</code></pre>
   <p>Also on it: <code>displayName</code> and <code>class</code> (<code>nil</code> for a model the catalog lacks), <code>vehType</code>, <code>owner.name</code>, <code>owner.online</code>, <code>garage</code>, <code>coords</code>, <code>heading</code>, <code>temp</code>, <code>session</code>, <code>secure</code>, <code>spawned</code>, <code>entity</code>, <code>netId</code>, <code>stats</code>, <code>data</code>, <code>properties</code>, <code>occupants</code> when asked, and <code>storage</code> once the car's storage is loaded (<code>storage.trunk = { slots, maxWeight, used }</code>).</p>
   <div class="info-box warn"><strong>Rental or street car?</strong> <code>session = true</code> means nobody owns it, rentals included. <code>temp = true</code> means a <code>SpawnTempVehicle</code> car only.</div>
 </div></div>
 
-<div class="export-card" data-search="getvehicle getvehicleby client vehicle context everything info occupants stats colours damage">
+<div class="export-card" data-search="getvehicle client vehicle context everything info occupants stats colours damage plate netid entity">
 <div class="export-header"><span class="export-name">GetVehicle(vehicleId)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Everything this client knows about a vehicle, or <code>nil</code> when it isn't streamed in here: live damage, colours, lock and engine state and every occupant, but not ownership or the garage.</p>
+  <p>Everything this client knows about a vehicle, or <code>nil</code> when it isn't streamed in here: live damage, colours, lock and engine state and every occupant, but not ownership or the garage. Takes a vehicleId or a <a href="#vehicle-references">vehicle reference</a>.</p>
   <div class="return-info"><strong>Returns: </strong><code>table|nil</code>: <code>vehicleId</code>, <code>plate</code>, <code>mine</code>, <code>hasKey</code>, <code>entity</code>, <code>netId</code>, <code>model</code>, <code>modelHash</code>, <code>class</code> (GTA's number), <code>vehType</code>, <code>session</code>, <code>keyInIgnition</code> (your car only), <code>coords</code>, <code>heading</code>, <code>locked</code>, <code>engineOn</code>, <code>engineHealth</code>, <code>bodyHealth</code>, <code>colorPrimary</code>, <code>colorSecondary</code>, <code>occupants</code> (<code>{ seat, ped, isPlayer, serverId }</code>), <code>stats</code> (a copy, defaults filled in), <code>data</code></div>
 <pre><code class="lang-lua">local v = exports.whip_core:GetVehicle({ entity = GetVehiclePedIsIn(PlayerPedId(), false) })</code></pre>
-</div></div>
-
-<div class="export-card" data-search="getvehicleby plate netid entity find vehicle lookup">
-<div class="export-header"><span class="export-name">GetVehicleBy(kind, value, opts)</span><span class="export-side side-server">SERVER</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>The same snapshot, found by plate, netId or entity: <code>GetVehicleBy('plate', 'ABC123')</code> equals <code>GetVehicle({ plate = 'ABC123' })</code>. On the client it only finds cars streamed in nearby.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>kind</td><td>string</td><td><code>'plate'</code>, <code>'netId'</code> or <code>'entity'</code></td></tr>
-  <tr><td>value</td><td>any</td><td>The plate text, net id or entity handle</td></tr>
-  <tr><td>opts</td><td>table?</td><td>Passed to <code>GetVehicle</code> (server)</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
 <div class="export-card" data-search="getvehiclesof vehicles owner character list garage">
@@ -5578,7 +5532,7 @@ if not vehicleId then exports.whip_core:RefundPlayer(receipt) return false, why 
   <tr><td>ref</td><td>string|table</td><td><code>{ entity = vehicle }</code>, <code>{ netId = networkId }</code>, or a plate (the first car wearing it). Prefer the car</td></tr>
   <tr><td>ref.player</td><td>number?</td><td>When a player's action brings it in: counts against their street-car limit (20)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>number|false vehicleId, string|nil err</code></div>
-  <div class="info-box warn"><strong>Not a lookup.</strong> It searches every car and <em>pins</em> the one it finds (GTA can't clear it), without the player limits (20 m, 20 cars). To read by plate, use <code>GetVehicleBy</code>.</div>
+  <div class="info-box warn"><strong>Not a lookup.</strong> It searches every car and <em>pins</em> the one it finds (GTA can't clear it), without the player limits (20 m, 20 cars). To read by plate, use <code>GetVehicle({ plate = })</code>.</div>
 </div></div>
 
 <h3>In and out of the world</h3>
@@ -5769,22 +5723,14 @@ if not vehicleId then return ctx.refuse(why) end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>table[]</code>: <code>{ entity, plate, vehicleId, distance, model }</code></div>
 </div></div>
 
-<div class="export-card" data-search="hasvehiclekey haskeyforvehicle has key vehicle check client">
+<div class="export-card" data-search="hasvehiclekey haskeyforvehicle has key vehicle plate check client">
 <div class="export-header"><span class="export-name">HasVehicleKey(vehicleId)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Whether the local player has a key for a vehicle, from the cache.</p>
+  <p>Whether the local player has a key for a vehicle, from the cache. <code>{ plate = }</code> finds a car that isn't streamed in here too.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
-</div></div>
-
-<div class="export-card" data-search="haskeyforplate has key plate check client">
-<div class="export-header"><span class="export-name">HasKeyForPlate(plate)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>Whether the local player has a key for a plate, from the cache.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>plate</td><td>string</td><td>Licence plate text</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
+<pre><code class="lang-lua">if exports.whip_core:HasVehicleKey({ plate = plate }) then ... end</code></pre>
 </div></div>
 
 <h3>Look and network control</h3>
@@ -6891,27 +6837,23 @@ end)</code></pre>
 
 <h3>Finding shops</h3>
 
-<div class="export-card" data-search="getshop shop get lookup">
-<div class="export-header"><span class="export-name">GetShop(shopId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getshop shop get lookup find key stable container stock id">
+<div class="export-header"><span class="export-name">GetShop(ref)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>A shop by id.</p>
+  <p>One shop, by id or by what you hold, as <code>GetVehicle</code> takes a reference.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>shopId</td><td>number</td><td>Shop ID</td></tr></table>
+  <tr><td>ref</td><td>number|table</td><td>A shop id, <code>{ key = }</code>, or <code>{ containerId = }</code> (the shop whose stock that container is)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>table|nil</code>: <code>{ shopId, key, name, mode, jobId, containerId, npcModel, prop, x, y, z, heading, blipSprite, blipColor, catalog, settings }</code></div>
+<pre><code class="lang-lua">local shop = exports.whip_core:GetShop({ key = 'burgershot' })</code></pre>
 </div></div>
 
-<div class="export-card" data-search="getshopby shop find lookup key stable container stock job business owned id">
-<div class="export-header"><span class="export-name">GetShopBy(kind, value)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getshops shop all list job business owned">
+<div class="export-header"><span class="export-name">GetShops(filter?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>One shop, like <code>GetVehicleBy</code>. <code>kind</code> is <code>'id'</code>, <code>'key'</code>, <code>'containerId'</code> (the shop whose stock that container is) or <code>'job'</code> (by key or jobId), which returns a list, as a job can own several.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code>, or a list for <code>'job'</code> (<code>{}, 'No such job'</code> for an unknown job)</div>
-</div></div>
-
-<div class="export-card" data-search="getallshops shop all list">
-<div class="export-header"><span class="export-name">GetAllShops()</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>Every shop, sorted by shopId.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
+  <p>Every shop, sorted by shopId, or one job's: a job can own several.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>filter</td><td>table?</td><td><code>{ job = }</code>, by key or jobId</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>table[]</code>; <code>{}, 'No such job'</code> for an unknown job</div>
 </div></div>
 
 <div class="export-card" data-search="getshopviewers shop open players browsing">
@@ -7559,15 +7501,6 @@ exports.whip_core:SetHeldDoorAccess(vault, { charIds = crewCharIds })</code></pr
 <div class="return-info"><strong>Returns: </strong><code>boolean</code>, or <code>nil</code> for a door the client doesn't know</div>
 </div></div>
 
-<div class="export-card" data-search="getdoorbyentity door entity find">
-<div class="export-header"><span class="export-name">GetDoorByEntity(entity)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>The saved door for a world entity, by model and position.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>entity</td><td>number</td><td>Entity handle</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-</div></div>
-
 <div class="export-card" data-search="getdoorsnearby doors near">
 <div class="export-header"><span class="export-name">GetDoorsNearby(range) · GetDoorsNearby(coords, range) · GetDoorsNearby(x, y, z, range)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
@@ -7585,13 +7518,14 @@ exports.whip_core:SetHeldDoorAccess(vault, { charIds = crewCharIds })</code></pr
 <div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
 </div></div>
 
-<div class="export-card" data-search="getdoor door definition data">
-<div class="export-header"><span class="export-name">GetDoor(doorId)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getdoor door definition data entity find">
+<div class="export-header"><span class="export-name">GetDoor(ref)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>A door's full data, from the client cache.</p>
+<p>A door's full data, from the client cache: by id, or the saved door a world entity is (by model and position).</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>doorId</td><td>number</td><td>Door id</td></tr></table>
+<tr><td>ref</td><td>number|table</td><td>A door id, or <code>{ entity = }</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
+<pre><code class="lang-lua">local door = exports.whip_core:GetDoor({ entity = entity })</code></pre>
 </div></div>
 <h2 id="guide-zones">Zones</h2>
 <p class="lede">A zone is an area of the world (a box, sphere or polygon) that knows when players enter and leave, and can enforce rules inside with no code of your own.</p>
@@ -8208,10 +8142,10 @@ exports.whip_core:SetNpcState(hostageId, { follow = source, pace = 'run' })    -
 <h3>Reading and events</h3>
 <p>Events: <code>whip_core:npc:spawned</code>, <code>:despawned { reason }</code>, <code>:damaged { amount, attacker }</code>, <code>:killed { killer, weapon, coords }</code>.</p>
 
-<div class="export-card" data-search="getnpc listnpcs getnpcby npc read">
-<div class="export-header"><span class="export-name">GetNpc(npcId) · ListNpcs({ tag }) · GetNpcBy(kind, value)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getnpc listnpcs npc read entity netid">
+<div class="export-header"><span class="export-name">GetNpc(ref) · ListNpcs({ tag })</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p><code>GetNpc</code> returns a copy or <code>nil</code>: <code>{ npcId, owner, tag, model, netId, alive, health, armour, behaviour, conditions, targets, focus, range, group, killer, killedAt, weapon, coords, post, pace, follow, flee, interior }</code>. <code>killer</code> is the server's reading (a car's driver for a run-over). <code>ListNpcs</code> returns yours, or one tag's; <code>GetNpcBy('netId' | 'entity', value)</code> returns an npcId or <code>nil</code>.</p>
+<p><code>GetNpc</code> returns a copy or <code>nil</code>: <code>{ npcId, owner, tag, model, netId, alive, health, armour, behaviour, conditions, targets, focus, range, group, killer, killedAt, weapon, coords, post, pace, follow, flee, interior }</code>. <code>killer</code> is the server's reading (a car's driver for a run-over). <code>ref</code> is an npcId, or <code>{ entity = }</code> or <code>{ netId = }</code> while that is still the NPC's ped. <code>ListNpcs</code> returns yours, or one tag's.</p>
 <pre><code class="lang-lua">local paid = {}
 AddEventHandler('whip_core:npc:killed', function(e)
     local npc = exports.whip_core:GetNpc(e.npcId)   -- the server's reading, not the event's
@@ -12178,7 +12112,7 @@ end)</code></pre>
 }</code></pre>
 
 <h3>Vehicle</h3>
-<p>Every server vehicle read (<a href="#vehicles"><code>GetVehicle</code></a>, <code>GetVehicleBy</code> and the rest) returns this snapshot, as a copy.</p>
+<p>Every server vehicle read (<a href="#vehicles"><code>GetVehicle</code></a>, <code>GetVehiclesOf</code> and the rest) returns this snapshot, as a copy.</p>
 <pre><code class="lang-lua">-- GetVehicle(vehicleId)
 {
     vehicleId   = 42,
@@ -12313,7 +12247,7 @@ end)</code></pre>
     if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
         return false, 'Only on-duty police can impound'
     end
-    local owner = v.owner.charId and exports.whip_core:GetPlayerFromCharId(v.owner.charId)
+    local owner = v.owner.charId and exports.whip_core:GetPlayer({ charId = v.owner.charId })
     if owner then exports.whip_core:RemoveVehicleKey(owner.source, v.vehicleId) end
     exports.whip_core:SetVehicleLocked(v.vehicleId, true)
 end)
@@ -12340,7 +12274,7 @@ Whip.declare:SecureEvent('police:runPlate', {
     if not exports.whip_core:IsPlayerClockedOn(source, 'police') then
         return false, 'On-duty police only'
     end
-    local v = exports.whip_core:GetVehicleBy('plate', plate)
+    local v = exports.whip_core:GetVehicle({ plate = plate })
     if not v or v.session then return false, plate .. ': no record' end   -- street car or rental
     exports.whip_core:NotifyPlayer(source, ('%s (%s) is registered to character #%d'):format(plate, v.model, v.owner.charId))
 end)</code></pre>
@@ -12351,7 +12285,7 @@ end)</code></pre>
 local sold = {}
 
 AddEventHandler('whip_core:shop:purchased', function(e)
-    local shop = exports.whip_core:GetShopBy('key', 'dynamic_store')
+    local shop = exports.whip_core:GetShop({ key = 'dynamic_store' })
     if not shop or e.shopId ~= shop.shopId then return end
 
     for _, line in ipairs(e.items) do
@@ -12610,7 +12544,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankAccountByNumber","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

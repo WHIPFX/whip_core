@@ -1035,15 +1035,13 @@ function whip_core:GetVehicleId(entity) end
 ---@return number|nil entity
 function whip_core:GetVehicleEntity(vehicleId) end
 
---- Check if the local player has a key for a vehicle ID (O(1) cache lookup). The server's HasVehicleKey, for this player.
+--- Does the local player have a key for this car? From the key cache: the server's HasVehicleKey, for this player.
+--- `{ plate = }` reads the cache by plate, so a car that is not streamed in here is found too.
+---
+---     exports.whip_core:HasVehicleKey({ plate = 'ABC123' })
 ---@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
 ---@return boolean
 function whip_core:HasVehicleKey(vehicleId) end
-
---- Check if the local player has a key for a vehicle plate (O(1) cache lookup).
----@param plate string License plate
----@return boolean
-function whip_core:HasKeyForPlate(plate) end
 
 --- Everything this CLIENT knows about a vehicle, in one call.
 ---
@@ -1052,17 +1050,13 @@ function whip_core:HasKeyForPlate(plate) end
 --- vehicle is not streamed in here, which is a real answer rather than an error.
 ---
 --- Named to match the server's GetVehicle, so one word means one thing on both sides. Takes a
---- vehicleId or a vehicle reference (`{ entity = }`, `{ plate = }`, `{ netId = }`, `{ id = }`).
+--- vehicleId or a vehicle reference (`{ entity = }`, `{ plate = }`, `{ netId = }`, `{ id = }`). Only
+--- cars streamed in near this client are found.
+---
+---     local v = exports.whip_core:GetVehicle({ entity = veh })
 ---@param vehicleId number|WhipVehicleRef
 ---@return table|nil
 function whip_core:GetVehicle(vehicleId) end
-
---- The same, for a caller holding an entity, a plate or a netId — the three the server takes too.
---- Only cars streamed in near this client are found.
----@param kind string `'entity'` | `'plate'` | `'netId'`
----@param value any
----@return table|nil
-function whip_core:GetVehicleBy(kind, value) end
 
 --- Resolve a vehicle entity to a vehicleId, registering it as a session vehicle if it is not one
 --- already.
@@ -1408,19 +1402,17 @@ function whip_core:IsDoorLocked(doorId) end
 ---@return string? why
 function whip_core:GetDoorsNearby(a, b, c, d) end
 
---- Get a door by its entity handle.
----@param entity number Entity handle
----@return table|nil doorData
-function whip_core:GetDoorByEntity(entity) end
-
 --- Get all doors currently synced to the client.
 ---@return table[] Array of door data
 function whip_core:GetLoadedDoors() end
 
---- Get a specific door's definition by ID.
----@param doorId number Door ID
+--- A door from this client's cache: by its ID, or `{ entity = }` for the saved door a world entity is (by
+--- model and position, among the doors nearby).
+---
+---     local door = exports.whip_core:GetDoor({ entity = entity })
+---@param ref number|{ entity: number } A doorId, or a reference
 ---@return table|nil doorData
-function whip_core:GetDoor(doorId) end
+function whip_core:GetDoor(ref) end
 
 -- ============================================
 -- Properties

@@ -2009,7 +2009,7 @@ local function deLoop()
                 and GetEntityType(hitEntity) == 3) and hitEntity or nil
             local aimDoor = nil   -- the saved door aimed at: its whole record (or the client's, until the list has it)
             if aimEnt then
-                local live = GetDoorByEntity(aimEnt)
+                local live = GetClientDoor({ entity = aimEnt })
                 if live then aimDoor = deById[live.doorId] or live end
             else
                 aimDoor = deNearestToSight(camCoords, fwdX, fwdY, fwdZ)
