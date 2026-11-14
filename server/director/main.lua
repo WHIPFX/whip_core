@@ -1796,7 +1796,6 @@ CoreStart.add('the Director', function()
 
     -- Back on once a character has loaded: their standing things are NPCs, and an NPC made with nobody
     -- in the game loses its network id on Enhanced (Character.afterFirstLoad).
-    if not Character.anyLoaded() then say('active scenarios come back on when the first character loads') end
     Character.afterFirstLoad(function()
         -- Each on its own: one that throws is said, and the rest still come back on.
         for _, s in ipairs(DirectorStore.list()) do
