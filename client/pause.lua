@@ -299,15 +299,28 @@ RegisterNUICallback('pauseResume', function(_, cb)
     closeMenu()
 end)
 
---- Settings' Key Bindings tab: GTA's own key bindings screen, in place of the pause menu. GTA's settings menu, up under
---- the Settings page, shuts with the pause menu (client/game_settings.lua); the screen opens once it has gone.
-RegisterNUICallback('pauseKeyBindings', function(_, cb)
-    cb('ok')
+--- One of GTA's own screens in place of the pause menu. GTA's settings menu, up under the Settings page, shuts with the
+--- pause menu (client/game_settings.lua); the screen opens once it has gone.
+local function openGtaMenu(menu)
     closeMenu()
     local deadline = GetGameTimer() + 1000
     while IsPauseMenuActive() and GetGameTimer() < deadline do Wait(0) end
     Wait(100)
-    ActivateFrontendMenu(GetHashKey('FE_MENU_VERSION_LANDING_KEYMAPPING_MENU'), false, -1)
+    ActivateFrontendMenu(GetHashKey(menu), false, -1)
+end
+
+--- Settings' Key Bindings tab: GTA's own key bindings screen.
+RegisterNUICallback('pauseKeyBindings', function(_, cb)
+    cb('ok')
+    openGtaMenu('FE_MENU_VERSION_LANDING_KEYMAPPING_MENU')
+end)
+
+--- GTA's own settings menu, as Settings opened before the Settings page: the way in when the page cannot read GTA's
+--- (after a game update WHIP's copy of GTA's settings page is not built for), so Graphics, Display and Audio stay
+--- reachable.
+RegisterNUICallback('pauseSettings', function(_, cb)
+    cb('ok')
+    openGtaMenu('FE_MENU_VERSION_LANDING_MENU')
 end)
 
 RegisterNUICallback('pauseLeave', function(_, cb)

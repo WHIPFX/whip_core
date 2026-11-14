@@ -65,9 +65,13 @@ local busy = false            -- a job is running
 local drawn = false           -- GTA's menu drawn this frame (a press is on its way)
 local pressing = nil          -- the control held down this frame, or nil
 local asked = nil             -- the hash of the question GTA is asking now, or nil
+local answering = false       -- an answer to GTA's question is being pressed: another waits for the next question
 local tabs = nil              -- GTA's tabs as read: { index, id, label }
 local labels = {}             -- [tab id] = { [row id] = name }: they do not change while the menu is up
-local options = {}            -- [tab id] = { [row id] = { count, texts } }: a list's options, kept while their count holds
+--- [tab id] = { [row id] = { count, texts, list } }: a row's options (a slider's: its top). A list's are read again after
+--- any change on its tab, as one row can change another's (a resolution, the refresh rates).
+local options = {}
+local rowIndex = {}           -- [tab id] = { [row id] = index }: where a row was last read, so it can be read alone
 --- [graphics tab id] = { [row id] = { from = { value, text }, steps } }: graphics changes made here and waiting for
 --- Apply, each with what it was and how many steps it has moved (right +, left -), which is how Undo takes it back. Kept
 --- here, not read from GTA: the "changed" mark GTA shows on such a row is on the row drawn, not on the data the page reads.
@@ -141,25 +145,43 @@ local function plain(text)
     return (text:gsub('<[^>]*>', ''):gsub('~[^~]*~', ''):gsub('&amp;', '&'):gsub('&lt;', '<'):gsub('&gt;', '>'))
 end
 
---- Texts from rows' data, each { col, index, field }: read in pieces of CHUNK until a piece comes back short.
+--- The longest start of `s` that is whole UTF-8: GTA can cut a long answer through a character.
+local function wholeUtf8(s)
+    for cut = 0, 3 do
+        local t = s:sub(1, #s - cut)
+        if utf8.len(t) then return t end
+    end
+    return ''
+end
+
+--- One piece of an answer's text, and whether it was the last. The page counts characters, an answer may hold fewer
+--- bytes than CHUNK characters of a language past ASCII: a piece is the last only when it is short in both, and the next
+--- piece starts after the characters that came.
+local function textPiece(answer)
+    local piece = answer:sub(1, 3) == 'W1|' and wholeUtf8(answer:sub(4)) or ''
+    local chars = utf8.len(piece) or 0
+    return piece, chars, chars == 0 or (chars < CHUNK and #piece < CHUNK - 3)
+end
+
+--- Texts from rows' data, each { col, index, field }: read in pieces until one comes back short.
 local function readTexts(list, g)
-    local texts, open, from = {}, {}, 0
-    for i in ipairs(list) do texts[i] = '' open[i] = true end
-    while next(open) do
+    local texts, from, open = {}, {}, {}
+    for i in ipairs(list) do texts[i] = '' from[i] = 0 open[i] = true end
+    for _ = 1, 40 do
+        if not next(open) then break end
         local order, cmds = {}, {}
         for i in pairs(open) do
             local t = list[i]
             order[#order + 1] = i
-            cmds[#cmds + 1] = ('whip|text|%d|%d|%d|%d|%d'):format(t[1], t[2], t[3], from, CHUNK)
+            cmds[#cmds + 1] = ('whip|text|%d|%d|%d|%d|%d'):format(t[1], t[2], t[3], from[i], CHUNK)
         end
         local answers = askAll(cmds, g)
         for k, i in ipairs(order) do
-            local piece = answers[k]:sub(1, 3) == 'W1|' and answers[k]:sub(4) or ''
+            local piece, chars, last = textPiece(answers[k])
             texts[i] = texts[i] .. piece
-            if #piece < CHUNK then open[i] = nil end
+            from[i] = from[i] + chars
+            if last then open[i] = nil end
         end
-        from = from + CHUNK
-        if from > 1000 then break end
     end
     for i, t in ipairs(texts) do texts[i] = plain(t) end
     return texts
@@ -167,18 +189,24 @@ end
 
 --- Rows' data in column `col` (1 the tabs, 2 the settings): { index, id, type, value, state, count }.
 --- state is GTA's: 0 cannot be changed, 1 can, 2 changed and not applied.
+local function rowOf(answer, index)
+    local f = fields(answer)
+    if f[1] ~= 'W1' then return nil end
+    return { index = index, id = tonumber(f[3]), type = tonumber(f[4]), value = tonumber(f[5]) or 0,
+        state = tonumber(f[6]) or 0, count = tonumber(f[7]) or 0, menu = tonumber(f[2]) }
+end
+
 local function readRows(col, count, g)
     local cmds = {}
     for i = 0, count - 1 do cmds[#cmds + 1] = ('whip|row|%d|%d'):format(col, i) end
     local rows = {}
-    for i, a in ipairs(askAll(cmds, g)) do
-        local f = fields(a)
-        if f[1] == 'W1' then
-            rows[#rows + 1] = { index = i - 1, id = tonumber(f[3]), type = tonumber(f[4]), value = tonumber(f[5]) or 0,
-                state = tonumber(f[6]) or 0, count = tonumber(f[7]) or 0, menu = tonumber(f[2]) }
-        end
-    end
+    for i, a in ipairs(askAll(cmds, g)) do rows[#rows + 1] = rowOf(a, i - 1) end
     return rows
+end
+
+--- One row's data, alone.
+local function readRow(col, index, g)
+    return rowOf(ask(('whip|row|%d|%d'):format(col, index), g), index)
 end
 
 --- What GTA shows: { tabs, rows, tab (the tab row chosen), menuState }.
@@ -194,6 +222,20 @@ end
 -- ============================================
 
 local close
+
+--- GTA's question `hash` to the page (nil: GTA is done asking, and the tab may have changed).
+local function sendQuestion(hash)
+    local q = hash and (QUESTIONS[hash] or UNKNOWN_QUESTION)
+    local msg = { action = 'gameSettingsQuestion', refresh = not hash }
+    if q then
+        local words = {}
+        for i, b in ipairs(q.buttons) do words[i] = b[1] end
+        -- `id`: an answer names the question it answers, so one meant for this question never lands on the next.
+        msg.question = { id = hash, title = q.title, body = q.body or (q.label and plain(GetLabelText(q.label))) or '',
+            buttons = words }
+    end
+    SendNUIMessage(msg)
+end
 
 --- One frame while the menu is up: not drawn (bar a press), its cursor hidden, the pad kept off it, the press held, and
 --- GTA's questions watched for. whip's pause menu shutting (Resume, Esc, logging out) shuts it.
@@ -213,15 +255,7 @@ local function frame()
     local hash = IsWarningMessageActive() and (warningHash() & 0xffffffff) or nil
     if hash ~= asked then
         asked = hash
-        local q = hash and (QUESTIONS[hash] or UNKNOWN_QUESTION)
-        local msg = { action = 'gameSettingsQuestion', refresh = not hash }
-        if q then
-            local words = {}
-            for i, b in ipairs(q.buttons) do words[i] = b[1] end
-            msg.question = { title = q.title, body = q.body or (q.label and plain(GetLabelText(q.label))) or '',
-                buttons = words }
-        end
-        SendNUIMessage(msg)
+        sendQuestion(hash)
     end
 end
 
@@ -229,8 +263,8 @@ function close()
     if not active then return end
     active = false
     gen = gen + 1
-    drawn, pressing, asked, tabs = false, nil, nil, nil
-    labels, options, pending = {}, {}, {}
+    drawn, pressing, asked, tabs, answering = false, nil, nil, nil, false
+    labels, options, pending, rowIndex = {}, {}, {}, {}
     ControlBlocks.release('gameSettings')
     if IsPauseMenuActive() then SetFrontendActive(false) end
     SendNUIMessage({ action = 'gameSettingsQuestion' })
@@ -248,18 +282,30 @@ local function press(control, g, holdMs)
     if stillOpen(g) then drawn = false end
 end
 
---- GTA's settings menu up and answering, its tabs read. Opened again when something shut it.
+--- The page shut while GTA's menu was opening for it: the menu shut as soon as it is up (close() found nothing to shut
+--- yet), so the player is not left in GTA's own settings with whip's pause keys off.
+local function abandonOpening()
+    local deadline = GetGameTimer() + 2000
+    while not IsPauseMenuActive() and GetGameTimer() < deadline do Wait(0) end
+    if IsPauseMenuActive() then SetFrontendActive(false) end
+    error('closed', 0)
+end
+
+--- GTA's settings menu up and answering, its tabs read. Opened again when something shut it: what was read, and the
+--- changes waiting for Apply (GTA drops them with its menu), go with the old one.
 local function ensureOpen(g)
     if tabs and IsPauseMenuActive() then return end
     tabs = nil
+    labels, options, pending, rowIndex = {}, {}, {}, {}
     if IsPauseMenuActive() then
         SetFrontendActive(false)
         Wait(100)
     end
+    if not stillOpen(g) then error('closed', 0) end
     ActivateFrontendMenu(GetHashKey(MENU), false, -1)
     local deadline = GetGameTimer() + 5000
     while not IsPauseMenuActive() or IsPauseMenuRestarting() or not IsFrontendReadyForControl() do
-        assert(stillOpen(g), 'closed')
+        if not stillOpen(g) then abandonOpening() end
         assert(GetGameTimer() < deadline, 'GTA\'s settings did not open')
         Wait(0)
     end
@@ -321,12 +367,12 @@ local function readMemory(g)
     local f = fields(ask('whip|vidmem', g))
     if f[1] ~= 'W1' then return nil end
     local label, from = '', 0
-    repeat
-        local a = ask(('whip|vidtext|%d|%d'):format(from, CHUNK), g)
-        local piece = a:sub(1, 3) == 'W1|' and a:sub(4) or ''
+    for _ = 1, 10 do
+        local piece, chars, last = textPiece(ask(('whip|vidtext|%d|%d'):format(from, CHUNK), g))
         label = label .. piece
-        from = from + CHUNK
-    until #piece < CHUNK or from > 600
+        from = from + chars
+        if last then break end
+    end
     return { label = plain(label), percent = tonumber(f[2]) or 0, percent2 = tonumber(f[3]) or -1 }
 end
 
@@ -338,11 +384,14 @@ local function readTab(id, g)
     labels[id] = names
     local known = options[id] or {}
     options[id] = known
+    local where = {}
+    rowIndex[id] = where
 
-    -- Names once per tab; a list's options while their count holds, or always for a list of one (GTA fills it as it
-    -- goes, so its one option is what it is set to).
+    -- Names once per tab; a list's options until a change on its tab (or their count changes), and always for a list
+    -- of one (GTA fills it as it goes, so its one option is what it is set to).
     local want, why = {}, {}
     for _, r in ipairs(data) do
+        where[r.id] = r.index
         if names[r.id] == nil then
             want[#want + 1] = { 2, r.index, 6 }
             why[#why + 1] = { r, 'name' }
@@ -350,7 +399,7 @@ local function readTab(id, g)
         if r.type == 1 and r.count > 0 then
             local k = known[r.id]
             if not k or k.count ~= r.count or r.count == 1 then
-                known[r.id] = { count = r.count, texts = {} }
+                known[r.id] = { count = r.count, texts = {}, list = true }
                 for o = 0, r.count - 1 do
                     want[#want + 1] = { 2, r.index, 7 + o }
                     why[#why + 1] = { r, o + 1 }
@@ -411,17 +460,27 @@ local function answer(id, g, extra)
     return st
 end
 
---- The tab's row `rowId` as GTA has it now: its data and, for a list, the option it shows.
+--- The tab's row `rowId` as GTA has it now: its data and, for a list, the option it shows. Read alone where it was last
+--- seen; the whole tab only when it is not there any more.
 local function rowNow(id, rowId, g)
     local h = showTab(id, g)
-    for _, r in ipairs(readRows(2, h.rows, g)) do
-        if r.id == rowId then
-            if r.type == 1 then
-                r.text = readTexts({ { 2, r.index, 7 + (r.count > 1 and r.value or 0) } }, g)[1]
-            end
-            return r
+    local found
+    local at = rowIndex[id] and rowIndex[id][rowId]
+    if at and at < h.rows then
+        local r = readRow(2, at, g)
+        if r and r.id == rowId then found = r end
+    end
+    if not found then
+        rowIndex[id] = rowIndex[id] or {}
+        for _, r in ipairs(readRows(2, h.rows, g)) do
+            rowIndex[id][r.id] = r.index
+            if r.id == rowId then found = r end
         end
     end
+    if found and found.type == 1 then
+        found.text = readTexts({ { 2, found.index, 7 + (found.count > 1 and found.value or 0) } }, g)[1]
+    end
+    return found
 end
 
 --- The row clicked in GTA's menu, so a press lands on it. Twice: the first click into the list moves GTA there, the
@@ -441,8 +500,12 @@ local function stepRow(id, rowId, dir, g)
     local max = tonumber((options[id] and options[id][rowId] and options[id][rowId].texts[1]) or '') or 10
     if row.type == 2 and ((dir > 0 and row.value >= max) or (dir < 0 and row.value <= 0)) then return false end
     focusRow(row, g)
-    -- A graphics row waits for Apply, keeping what it was; stepped back to it, it waits no more.
+    -- A graphics row waits for Apply, keeping what it was; stepped back to it, it waits no more. The tab's lists are read
+    -- again: one row can change another's choices.
     local function moved()
+        for rid, k in pairs(options[id] or {}) do
+            if k.list then options[id][rid] = nil end
+        end
         if GRAPHICS_TABS[id] then
             pending[id] = pending[id] or {}
             local p = pending[id][rowId]
@@ -599,8 +662,16 @@ RegisterNUICallback('gameSettingsUndo', function(data, cb)
     end))
 end)
 
---- The graphics changes applied, as GTA's Apply (Space) does, on a row that changed. GTA may ask first: its answer
---- (gameSettingsAnswer) decides; with no question they are applied.
+--- How many rows on the tab shown GTA marks as changed and not applied (its own mark), or nil when its page cannot say.
+local function changedCount(g)
+    local f = fields(ask('whip|changed', g))
+    return f[1] == 'W1' and tonumber(f[2]) or nil
+end
+
+--- The graphics changes applied, as GTA's Apply (Space) does, on a row that changed. GTA asks first (its answer,
+--- gameSettingsAnswer, decides), or applies them: its own count of rows changed falls to none. With neither after a
+--- press, GTA dropped it: Space once more, and then the changes keep waiting and the page says Apply did not go through.
+--- Where GTA's count cannot tell (it marks none), no question after a press means applied.
 RegisterNUICallback('gameSettingsApply', function(data, cb)
     cb(job(function(g)
         ensureOpen(g)
@@ -619,24 +690,47 @@ RegisterNUICallback('gameSettingsApply', function(data, cb)
         end
         assert(row, 'there is nothing to apply')
         focusRow(row, g)
-        press(KEY.x, g, 150)
-        local deadline = GetGameTimer() + 1500
-        while not asked and GetGameTimer() < deadline do Wait(50) end
-        if not asked then pending = {} end
-        return answer(id, g)
+        local before = changedCount(g)
+        local canTell = before ~= nil and before > 0
+        for _ = 1, canTell and 2 or 1 do
+            press(KEY.x, g, 150)
+            local now
+            local deadline = GetGameTimer() + 3000
+            repeat
+                Wait(150)
+                if not asked and canTell then now = changedCount(g) end
+            until asked or not stillOpen(g) or now == 0 or GetGameTimer() > deadline
+            if asked then return answer(id, g) end
+            if not canTell or now == 0 then
+                pending = {}
+                for tab in pairs(GRAPHICS_TABS) do options[tab] = nil end
+                return answer(id, g)
+            end
+        end
+        return answer(id, g, { notice = 'GTA did not take Apply: your changes are still waiting. Try Apply again.' })
     end))
 end)
 
---- GTA's question answered: button `index` (1 the first) pressed. Not a job: a job waits for the answer. Going ahead
---- (Apply, Keep, OK) or Discard ends the graphics changes waiting; Cancel keeps them waiting.
+--- GTA's question answered: button `index` (1 the first) of question `id` pressed. Not a job: a job waits for the
+--- answer. Only for the question still up, and one answer at a time: a second press of the same button (a double tap)
+--- would otherwise land on GTA's next question. Going ahead (Apply, Keep, OK) or Discard ends the graphics changes
+--- waiting; Cancel keeps them waiting.
 RegisterNUICallback('gameSettingsAnswer', function(data, cb)
     cb({})
-    if not active or not asked then return end
+    if not active or not asked or answering or type(data) ~= 'table' then return end
+    if math.tointeger(tonumber(data.id)) ~= asked then return end
     local q = QUESTIONS[asked] or UNKNOWN_QUESTION
-    local b = q.buttons[math.tointeger(tonumber(type(data) == 'table' and data.index or nil)) or 0]
+    local b = q.buttons[math.tointeger(tonumber(data.index)) or 0]
     if not b then return end
-    if b[2] ~= KEY.cancel then pending = {} end
+    local was = asked
+    answering = true
     press(b[2], gen, 150)
+    Wait(300)
+    answering = false
+    if not active then return end
+    -- GTA dropped the press: the same question is still up, and the page (which put it away) is shown it again.
+    if asked == was then sendQuestion(was) return end
+    if b[2] ~= KEY.cancel then pending = {} end
 end)
 
 --- Back to whip's menu, or the pause menu shut: GTA's menu shut with it. A change waiting for Apply is dropped.

@@ -485,6 +485,8 @@ html[data-input="pad"] .st-grp-pad { display: inline-flex; }
 .st-empty { padding: 40px 16px; max-width: 560px; }
 .st-empty h2 { margin: 0 0 10px; font-family: var(--ui-font-display); font-size: 26px; font-weight: 800; color: #ffffff; }
 .st-empty p { margin: 0 0 18px; font-size: 16px; font-weight: 500; line-height: 1.5; color: rgba(255, 255, 255, 0.74); }
+.st-empty-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.st-railnote .st-link { margin-left: 6px; }
 
 /* ---- the inspector ---- */
 

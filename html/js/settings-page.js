@@ -206,6 +206,7 @@ export class SettingsPage {
             const b = e.target.closest('[data-tab]');
             if (b && !this.question) this.setTab(b.dataset.tab);
             else if (e.target.closest('[data-act="retry"]')) this.openGame();
+            else if (e.target.closest('[data-act="gta"]')) this.openGtaSettings();
         });
         // MOUSEMOVE, NOT MOUSEOVER: every draw rebuilds the rows, and a fresh mouseover on the row under a still mouse
         // would take the choice back from the keys and pad.
@@ -218,6 +219,7 @@ export class SettingsPage {
         this.rowsEl.addEventListener('click', (e) => {
             if (this.question) return;
             if (e.target.closest('[data-act="retry"]')) { this.openGame(); return; }
+            if (e.target.closest('[data-act="gta"]')) { this.openGtaSettings(); return; }
             const r = e.target.closest('.st-row');
             if (!r) return;
             this.sel = Number(r.dataset.i);
@@ -344,6 +346,7 @@ export class SettingsPage {
     setGame(st) {
         if (!st) return;
         if (st.error) this.note = 'Not changed: ' + st.error;
+        if (st.notice) this.note = st.notice;
         if (typeof st.unapplied === 'boolean') this.game.unapplied = st.unapplied;
         if (Array.isArray(st.pending)) this.game.pending = st.pending;
         const t = st.tab;
@@ -488,7 +491,8 @@ export class SettingsPage {
         let game = tabs.filter((t) => t.section === 'game').map(item).join('');
         if (this.game.state === 'loading') game = '<div class="st-railnote st-breathe">Opening GTA\'s settings</div>';
         else if (this.game.state === 'failed') {
-            game = '<div class="st-railnote">Didn\'t open <button type="button" class="st-link" data-act="retry">Try again</button></div>';
+            game = '<div class="st-railnote">Didn\'t open <button type="button" class="st-link" data-act="retry">Try again</button>'
+                + ' <button type="button" class="st-link" data-act="gta">GTA\'s own</button></div>';
         }
         const server = tabs.filter((t) => t.section === 'server').map(item).join('')
             || '<div class="st-railnote st-breathe">Loading</div>';
@@ -503,8 +507,9 @@ export class SettingsPage {
         if (!cur || (cur.section === 'game' && !cur.keys && (this.game.loading || this.game.state !== 'ready'))) {
             if (this.game.state === 'failed') {
                 this.rowsEl.innerHTML = '<div class="st-empty"><h2>GTA\'s settings didn\'t open</h2>'
-                    + `<p>${escapeHtml(this.game.failed)}. If it keeps happening after a game update, whip's copy of GTA's settings page needs building again.</p>`
-                    + '<button type="button" class="st-btn st-pill" data-act="retry">Try again</button></div>';
+                    + `<p>${escapeHtml(this.game.failed)}. If it keeps happening after a game update, WHIP's copy of GTA's settings page needs building again. GTA's own settings menu still works meanwhile.</p>`
+                    + '<div class="st-empty-btns"><button type="button" class="st-btn st-pill" data-act="retry">Try again</button>'
+                    + '<button type="button" class="st-btn" data-act="gta">Open GTA\'s own settings</button></div></div>';
             } else {
                 this.rowsEl.innerHTML = Array.from({ length: 9 }, (_, i) =>
                     `<div class="st-row st-skel"><span class="st-skelbar" style="width:${[46, 32, 54, 38, 50, 28, 44, 36, 48][i]}%"></span></div>`).join('');
@@ -544,7 +549,7 @@ export class SettingsPage {
         if (!cur || (cur.section === 'game' && !cur.keys && this.game.state !== 'ready')) {
             this.inspEl.innerHTML = this.game.state === 'failed'
                 ? '<div class="st-ihold"><h2 class="st-ititle st-small">Server tabs still work</h2>'
-                    + '<p class="st-help">Controller, Vehicles, Map &amp; HUD, Minimap and Chat &amp; voice are whip\'s own and don\'t need GTA\'s menu.</p></div>'
+                    + '<p class="st-help">Controller, Vehicles, Map &amp; HUD, Minimap and Chat &amp; voice are WHIP\'s own and don\'t need GTA\'s menu.</p></div>'
                 : '<div class="st-ihold"><h2 class="st-ititle st-small">Reading GTA\'s settings</h2>'
                     + '<p class="st-help">They take a few seconds to open the first time, then each tab comes in about a second. The Server tabs work straight away.</p></div>';
             return;
@@ -833,11 +838,24 @@ export class SettingsPage {
         this.gameChange(null, 'gameSettingsUndo', which ? { tab: which.tab, id: which.id } : { all: true }, 'undo');
     }
 
-    /** GTA's key bindings: this page and the pause menu shut, and pause.lua opens GTA's screen once GTA's settings
-     *  menu under this page has gone. */
+    /** GTA's key bindings, after the question Back asks when graphics changes wait for Apply (leaving drops them). */
     openKeys() {
+        if (this.game.unapplied && !this.question) { this.ask({ ...LEAVE_QUESTION, then: 'keys' }); return; }
+        this.openKeysNow();
+    }
+
+    /** This page and the pause menu shut, and pause.lua opens GTA's key bindings once GTA's settings menu under this
+     *  page has gone. */
+    openKeysNow() {
         this.close();
         nuiCallback('pauseKeyBindings', {});
+    }
+
+    /** GTA's own settings menu in the pause menu's place: the way in when this page cannot read GTA's (a game update
+     *  WHIP's copy of GTA's settings page is not built for yet). */
+    openGtaSettings() {
+        this.close();
+        nuiCallback('pauseSettings', {});
     }
 
     setTab(key) {
@@ -906,11 +924,17 @@ export class SettingsPage {
         if (q.own) {
             this.question = null;
             if (i === 0) this.apply();
-            else if (i === 1) { this.game.unapplied = false; this.onBack(); }
-            else this.draw();
+            else if (i === 1) {
+                this.game.unapplied = false;
+                if (q.then === 'keys') this.openKeysNow(); else this.onBack();
+            } else this.draw();
             return;
         }
-        nuiCallback('gameSettingsAnswer', { index: i + 1 });
+        // GTA's: put away until GTA asks again or is done, so a second tap lands on nothing, never on GTA's next
+        // question. It names the question it answers; Lua shows it again if GTA did not take the press.
+        this.question = null;
+        this.draw();
+        nuiCallback('gameSettingsAnswer', { index: i + 1, id: q.id });
     }
 
     // ---- keys and the pad (pause.js hands them over in this mode) ----
@@ -954,6 +978,7 @@ export class SettingsPage {
         else if (n === 'select') this.press();
         else if (n === 'tabPrev') this.stepTab(-1);
         else if (n === 'tabNext') this.stepTab(1);
+        else if (n === 'buttonX' && this.game.state === 'failed') this.openGtaSettings();
         else if (n === 'buttonY') {
             if (this.current()?.section === 'server') this.askReset(); else this.apply();
         } else if (n === 'back') {
@@ -968,7 +993,7 @@ export class SettingsPage {
         if (this.question || this.confirmReset) return [['dpad', 'Choose'], ['a', 'Select'], ['b', 'Back']];
         const row = this.row();
         const h = [['dpad', changeable(row) ? 'Choose / change' : 'Choose']];
-        if (this.game.state === 'failed' && this.current()?.section !== 'server') h.push(['a', 'Try again']);
+        if (this.game.state === 'failed' && this.current()?.section !== 'server') h.push(['a', 'Try again'], ['x', 'GTA\'s own settings']);
         else if (row && (row.kind === 'action' || row.kind === 'keys')) h.push(['a', 'Select']);
         else if (row && (row.kind === 'choice' || row.kind === 'stepper') && !row.locked) h.push(['a', 'Next']);
         h.push(['lb', ''], ['rb', 'Tab']);
