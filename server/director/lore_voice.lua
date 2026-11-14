@@ -480,16 +480,14 @@ function LoreVoice.playFrom(npcId, v, opts)
     end
     -- (`voice`: each game shows it as the line is heard there, not as it is asked for: client/bubbles.lua.)
     if v.text and Bubbles then Bubbles.show({ netId = n.netId }, v.text, { far = bonus, voice = true }) end
-    -- Its hands while it talks: the game that owns it plays GTA's gestures for the line's length, or holds the
-    -- megaphone up or the radio to its mouth (shown whatever Config.LoreVoice.Gestures says: it is what it talks into).
+    -- Its hands while it talks (client/lore_reactions.lua): the game that owns it plays GTA's gestures for the line's
+    -- length (Config.LoreVoice.Gestures), or holds the megaphone up or the radio to its mouth (shown whatever that says:
+    -- it is what it talks into), and EVERY game near holds its own copy of that prop in its hand, so none is left there
+    -- when the NPC goes over to another player's game (WLVF's review). Sent to every game for every line, so a line
+    -- that cuts one short ends that one's hold and gestures, gestures on or off.
     local hold = dev.megaphone and 'megaphone' or (dev.radio and 'radio') or nil
-    if cfg().gestures or hold then
-        local ent = NetworkGetEntityFromNetworkId(n.netId)
-        local owner = ent and ent ~= 0 and NetworkGetEntityOwner(ent) or nil
-        if owner and owner > 0 then
-            TriggerClientEvent('whip_core:client:loreTalk', owner, n.netId, type(opts.line) == 'string' and opts.line or nil, d, hold)
-        end
-    end
+    TriggerClientEvent('whip_core:client:loreTalk', -1, n.netId, type(opts.line) == 'string' and opts.line or nil, d, hold,
+        cfg().gestures == true)
     if p then
         -- Kept, so whip_voice stopping answers it (its line's end never would: onResourceStop below)
         if p.state == 0 then playing[npcId] = p end

@@ -184,10 +184,11 @@ end)
 -- ============================================
 --
 -- GTA's peds wave their hands about as they talk because its speech plays a gesture with each line. Ours are
--- recordings, so the server tells the game that OWNS the NPC when a line starts and how long it is
--- (whip_core:client:loreTalk), and that game plays GTA's own standing gestures on it, upper body only, over
--- whatever it is doing: one that suits the line first (a wave for Hello), then ordinary talking ones until the
--- line ends. Played by the owner, so every game sees them. Not in a car, on the floor or in a scenario.
+-- recordings, so the server tells every game when a line starts and how long it is (whip_core:client:loreTalk), and
+-- the game that OWNS the NPC plays GTA's own standing gestures on it (when Config.LoreVoice.Gestures is on), upper body
+-- only, over whatever it is doing: one that suits the line first (a wave for Hello), then ordinary talking ones until
+-- the line ends. Played by the owner, so every game sees them. Not in a car, on the floor or in a scenario. Every line
+-- is sent, gestures or not, so a newer one always ends what an older one was doing.
 
 local GESTURES = { m = 'gestures@m@standing@casual', f = 'gestures@f@standing@casual' }
 local TALKING = { 'gesture_you_soft', 'gesture_what_soft', 'gesture_hand_right', 'gesture_hand_left', 'gesture_easy_now',
@@ -207,55 +208,61 @@ local function gesturable(netId)
 end
 
 -- WHAT IT TALKS INTO (a line said through a megaphone, or on the radio): it holds that up for the line instead, as a
--- player does, with the player's own emote (shared/emote_list.lua: 'megaphone', 'walkie'): its clip, upper body, and
--- its prop in the hand. The prop is one networked object this game makes, so every game sees it, gone with the line.
+-- player does, with the player's own emote (shared/emote_list.lua: 'megaphone', 'walkie'): its clip on the upper body,
+-- played by the game that owns it, and its prop in the hand. THE PROP IS EVERY GAME'S OWN COPY, made where this game
+-- sees the NPC and let go of by it: one networked prop, made and deleted by the owner, stayed in its hand when the NPC
+-- went over to another player's game, whose delete it could not do (WLVF's review).
 local HOLD_EMOTE = { megaphone = 'megaphone', radio = 'walkie' }
 
-local function emoteByCmd(cmd)
-    for _, e in ipairs(EmoteList and EmoteList.emotes or {}) do
-        if e.cmd == cmd then return e end
-    end
-    return nil
-end
-
---- Hold it up for `ms` (or until a newer line): its clip looped on the upper body and its prop in the hand.
-local function holdUp(netId, ped, gen, hold, ms)
-    local e = emoteByCmd(HOLD_EMOTE[hold] or '')
-    if not e or not LoadAnimDict(e.dict) then return end
+--- Hold it up for `ms` (or until a newer line): its prop in the hand on this game, and on the game that owns the NPC its
+--- clip looped on the upper body.
+local function holdUp(netId, gen, hold, ms)
+    local e = Emotes.get(HOLD_EMOTE[hold] or '')
+    if not e then return end
+    local ped = DirectorKit.entityOfNet(netId, 1)
+    if not ped then return end   -- (not near this game)
     local p = type(e.props) == 'table' and e.props[1] or nil
     local obj
     if p and LoadModel(p.model) then
+        if talkGen[netId] ~= gen or not DoesEntityExist(ped) then return end   -- (a newer line while it loaded)
         local c = GetEntityCoords(ped)
-        obj = CreateObject(GetHashKey(p.model), c.x, c.y, c.z + 0.2, true, true, false)
+        obj = CreateObject(GetHashKey(p.model), c.x, c.y, c.z + 0.2, false, false, false)   -- (this game's alone)
         local o, r = p.offset or { 0.0, 0.0, 0.0 }, p.rot or { 0.0, 0.0, 0.0 }
         AttachEntityToEntity(obj, ped, GetPedBoneIndex(ped, p.bone), o[1] + 0.0, o[2] + 0.0, o[3] + 0.0,
             r[1] + 0.0, r[2] + 0.0, r[3] + 0.0, true, true, false, true, 1, true)
         SetModelAsNoLongerNeeded(GetHashKey(p.model))
     end
-    TaskPlayAnim(ped, e.dict, e.anim, 3.0, 3.0, -1, 1 + UPPER_ONLY, 0.0, false, false, false)
+    local anim = gesturable(netId) == ped and LoadAnimDict(e.dict)
+    if anim then TaskPlayAnim(ped, e.dict, e.anim, 3.0, 3.0, -1, 1 + UPPER_ONLY, 0.0, false, false, false) end
     local ends = GetGameTimer() + math.min(ms, 60000)
     while talkGen[netId] == gen and GetGameTimer() < ends and DoesEntityExist(ped) and not IsPedDeadOrDying(ped, true) do
         Wait(200)
     end
-    if DoesEntityExist(ped) then StopAnimTask(ped, e.dict, e.anim, 2.0) end
+    if anim then
+        if DoesEntityExist(ped) and DirectorKit.mine(ped) then StopAnimTask(ped, e.dict, e.anim, 2.0) end
+        RemoveAnimDict(e.dict)
+    end
     if obj and DoesEntityExist(obj) then DetachEntity(obj, true, false); DeleteObject(obj) end
-    RemoveAnimDict(e.dict)
 end
 
-RegisterNetEvent('whip_core:client:loreTalk', function(netId, line, ms, hold)
+-- `gestures`: Config.LoreVoice.Gestures (the owner gestures through the line). A line with no time (0) only ends the
+-- one before it.
+RegisterNetEvent('whip_core:client:loreTalk', function(netId, line, ms, hold, gestures)
     netId, ms = tonumber(netId), tonumber(ms)
-    if not netId or not ms or ms <= 0 then return end
+    if not netId then return end
     local gen = (talkGen[netId] or 0) + 1
-    talkGen[netId] = gen
-    local ped = gesturable(netId)
-    if not ped then return end
+    talkGen[netId] = gen   -- (whatever an older line was doing ends with this one: its hold, its gestures)
+    if not ms or ms <= 0 then return end
     if hold == 'megaphone' or hold == 'radio' then
         CreateThread(function()
-            holdUp(netId, ped, gen, hold, ms)
+            holdUp(netId, gen, hold, ms)
             if talkGen[netId] == gen then talkGen[netId] = nil end
         end)
         return
     end
+    if gestures == false then return end
+    local ped = gesturable(netId)
+    if not ped then return end
     CreateThread(function()
         local ends = GetGameTimer() + math.min(ms, 60000)
         local dict = IsPedMale(ped) and GESTURES.m or GESTURES.f
