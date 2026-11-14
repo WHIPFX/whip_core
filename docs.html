@@ -13814,6 +13814,7 @@ meta.ammo = currentAmmo - toUnload                            <span class="cm">-
 <tr><td>Show Objective · Clear Objective</td><td>What to do next, on the job's card at the top right of the screen until it is cleared, for everyone in the run or this player, with an icon of your choice. Its <em>Subtext</em> is the line under it: <em>The scenario's name</em> (the default), <em>None</em>, or <em>My own words</em> (typed in <em>Subtext words</em>; left empty, there is none). A Countdown's clock sits beside it either way</td></tr>
 <tr><td>Show Prop · Hide Prop</td><td>The scenario's props from the World tab (<strong>+ Prop</strong>: a list of props checked against the game, or any model), or groups of them, put where they were placed, or taken away, with "their groups too", every run prop of the same groups at once. A <em>standing</em> prop needs no card: it is there whenever the scenario is on. Every prop has <strong>Physics</strong> on unless you switch it to static (its page): it falls, rolls and gets knocked about, as one networked object that the nearest player's game moves while everyone else's follows. It is held still until something that moves is within 100 m of it (a player, a scripted car, an NPC, traffic: with nothing there, the ground under it may not be loaded yet), and again once nothing is. A standing one stays where it was knocked to until the scenario is switched off and on again (or the server restarts). A static prop is made by each player's own game (<code>ShowPropSet</code>), never networked, and so is one inside an interior, not solid, a Fixed Weapon, or with tasks (its page says which)</td></tr>
 <tr><td>Fire Weapon</td><td>A <em>Fixed Weapon</em> fires: a prop that is a firearm (the world builder's More, Weapons: GTA's, and whip_gunny's own guns marked "(gunny)" while it runs), placed and turned where you want it (selected, a red line shows where it fires), on its own or attached to a car, an NPC or a prop (its page: Attached to). Its shots, the gap between them, at where it points or at a placed thing (it turns to face it first). One player's game fires it, so there is one rocket, not one per player; the shots are real, and hurt whoever is in the way, in a Test too</td></tr>
+<tr><td>Play on Speakers · Stop Speakers</td><td>Props from the World tab (or a group of them) play a song from a Fivemanage link, from every one of them at once and in step, heard through walls and doorways like a voice: how loud, how far, how much of a speaker it sounds like, its tone. Stopped by Stop Speakers, faded out or at once, and always at the run's end (<a href="#voice-speakers">Speakers</a>)</td></tr>
 <tr><td>Interaction Menu</td><td>A prompt with a menu for the run's players, <em>On</em> a placed thing: riding the run's NPC or car, just above its ground pile or container, else at the spot (before the run has made the NPC, car, pile or container, at the spot it was placed, and the run log says so). Up to eight choices, each <em>At the top</em> or <em>Under</em> another: a choice with choices under it opens them on the same prompt with a Back (three deep, six to a level); every other choice is an outcome, its pin named by its text. Wire a choice back into the card to keep the menu up after it</td></tr>
 </table>
 <p>Sell to NPC and Haggle speak as a Dialog Line does: an answer wired straight to one for the same NPC carries the conversation into it, and one of their outcomes wired to another speaking card carries it on; any other outcome closes it, and the NPC says a parting line over its head. <strong>A test changes nothing that lasts</strong>: costs and sales are only said, and flags it sets live on the test run alone.</p>
@@ -14581,6 +14582,7 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <p>Add a <strong>Lore Says</strong> card (the green <em>Lore</em> group): <em>Who</em> (empty is the scenario's own), <em>Line</em>, and <em>Wait until it has been said</em>. It goes on by <em>done</em> or <em>failed</em> (its NPC is not in the world, it has no such line, or no voice bot; the run's log says why).</p>
 <p>For a line only one scenario needs, add a <strong>Play Custom Voice Line</strong> card instead: <em>Who</em>, the <em>Recording link</em> (pasted in as a voice line's variant is, the same links accepted; <em>Play it at you</em> hears it as it sounds from their NPC), an optional <em>Subtitle</em>, <em>If it is already talking</em> (say it after, the default; cut in; or skip it), and <em>Wait until it has been said</em>. It is said the same way, heard by the players near the NPC, and goes on by <em>Said</em>, <em>Could not</em> or <em>Took too long</em>.</p>
 <p>Both cards have a <strong>Bonus range</strong> slider (0 to 250 m), for a line said where players may not be close: from a car ahead of them, across a yard. For that line the character is heard at full volume that many metres further out than usual, fading away over the usual distance past it, and its subtitle is seen as far, growing with the distance so it stays readable. A line whose range just grew waits a second, so the players now in reach hear it from the start. The next line is back to the usual unless it has a bonus of its own.</p>
+<p>Both cards can also say the line <strong>Through a megaphone</strong>: its NPC holds one up as a player does, and the line carries further with the bullhorn sound. <strong>On the radio</strong> says it on a frequency as well as out loud: <em>On the player's frequency</em> is the one the radio of the player the card acts for is on (with their radio off, it is said out loud only, and the run's log says so), and <em>On a frequency</em> asks for the number (100 to 999). Everyone on that frequency hears it as a player's radio, breaking up with distance, while its NPC holds a radio to its mouth. Both last for that line only. The radio needs the voice bot from whip_voice's current setup (1.4.0 or newer).</p>
 
 <h3>3. The settings</h3>
 <p>In <em>/whip → Settings → Config → Emotes, /me and talk</em>: <em>Lore characters speak</em> (on/off) and <em>Voice line links accepted</em> (Fivemanage by default). The voice range (15 m) and the Hello, Goodbye and reaction timings above are <code>Config.LoreVoice</code> in config.lua.</p>
@@ -14589,7 +14591,7 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <div class="export-card" data-search="loresay lore character say voice line speak npc">
 <div class="export-header"><span class="export-name">LoreSay(key, line, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>A lore character says one of its voice lines from its NPC in the world, as the Lore Says card does. <code>opts = { near = source, npcId, wait, busy }</code>: <code>near</code> picks its NPC nearest that player (else <code>npcId</code>, else the first); <code>wait = true</code> answers once it has been said; <code>busy</code> (<code>'skip'</code>, <code>'queue'</code>, <code>'cut'</code>) overrides the line's own <em>If talking</em>. It WAITS while the recording is fetched: call it from a thread or a handler.</p>
+  <p>A lore character says one of its voice lines from its NPC in the world, as the Lore Says card does. <code>opts = { near = source, npcId, wait, busy, bonus, megaphone, radio }</code>: <code>near</code> picks its NPC nearest that player (else <code>npcId</code>, else the first); <code>wait = true</code> answers once it has been said; <code>busy</code> (<code>'skip'</code>, <code>'queue'</code>, <code>'cut'</code>) overrides the line's own <em>If talking</em>; <code>bonus</code> is its Bonus range in metres; <code>megaphone = true</code> says it through a megaphone; <code>radio</code> is a frequency to say it on too (whip_voice's <code>GetPlayerRadio(source)</code> gives a player's). It WAITS while the recording is fetched: call it from a thread or a handler.</p>
   <pre><code><span class="kw">local</span> ok, why = <span class="fn">exports.whip_core</span>:<span class="fn">LoreSay</span>(<span class="str">'irwin'</span>, <span class="str">'positive'</span>, { near = source })</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>true</code> (or <code>true, 'queued'</code>), or <code>false, why</code>: no such character, no NPC of it in the world, no such line, no voice bot. With <code>wait</code>, also when whip_voice stopped or the NPC went before it was said</div>
 </div></div>
@@ -14600,6 +14602,37 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
   <p>A profile picture as whip takes one, for a resource that keeps its own (whip_phone: a player's contact card): the link must be on the accepted sites (<em>Picture links accepted</em>), and its framing (<code>{ x, y, z }</code>: where its middle is, 0 to 100 across and down, and the zoom, 1 to 3, as Edit picture makes) is cleaned; the plain framing (the middle, no zoom) is none. An empty link is no picture.</p>
   <div class="return-info"><strong>Returns: </strong><code>true, frame</code> (<code>frame</code> nil for none, and for an empty link), or <code>false, why</code></div>
 </div></div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- VOICE: speakers -->
+<!-- ═══════════════════════════════════ -->
+<h2 id="voice-speakers">Speakers</h2>
+
+<div class="info-box owner"><strong>For scenario builders.</strong> Speakers play a song in the world, from props you place: a gang's hideout with speakers on every wall playing rock as the players storm it, or a stage with a stack each side. Everyone near hears the song from each speaker, louder close to one, through walls and doorways the way a voice carries, and every speaker plays it in step.</div>
+
+<h3>1. Place the speakers</h3>
+<p>A speaker is any prop placed on the World tab (<strong>+ Prop</strong>): a speaker model such as <code>prop_speaker_06</code>, a boombox, a radio on a shelf. Give the ones that play together the same <strong>Group</strong> on their pages, and one card can name the whole group. A speaker attached to a car or an NPC plays from what it is attached to as that moves.</p>
+
+<h3>2. Play a song</h3>
+<p>Upload the song to Fivemanage, as for a lore character's voice lines, and add a <strong>Play on Speakers</strong> card (the <em>World</em> group):</p>
+<table class="param-table">
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td>Speakers</td><td>The props that play it, or a group of them (up to 32).</td></tr>
+<tr><td>Song link</td><td>The song's Fivemanage link (an mp3, ogg or wav, up to 10 minutes). The play button beside it plays it to you.</td></tr>
+<tr><td>Loop</td><td>On: it plays over and over until Stop Speakers or the run's end. Off: once.</td></tr>
+<tr><td>Volume</td><td>0 to 200 %.</td></tr>
+<tr><td>Heard up to</td><td>How far from each speaker it carries (5 to 300 m).</td></tr>
+<tr><td>Full volume within</td><td>Up to this close to a speaker, it is at full volume.</td></tr>
+<tr><td>Speaker sound</td><td>0 % is perfectly clear. Higher, it sounds more like a speaker, and a cheaper one: less bass and treble, a honk in the middle, a little grit when it is pushed. 100 % is a cheap, tinny one.</td></tr>
+<tr><td>Tone</td><td>On: its Bass, Mids and Treble, each -12 to +12 dB.</td></tr>
+<tr><td>Fade in</td><td>Seconds from silence to full at its start.</td></tr>
+<tr><td>Wait until it has played</td><td>With Loop off: the card goes on once the song has ended, instead of as it starts.</td></tr>
+</table>
+<p>It goes on by <em>Done</em>, <em>Could not</em> (no speakers, a link that is not accepted, or no voice bot; the run's log says why) or <em>Took too long</em>. A speaker plays one song at a time: a new one on any of its speakers stops the one playing there.</p>
+
+<h3>3. Stop it</h3>
+<p>A <strong>Stop Speakers</strong> card stops whatever its speakers play, over its <em>Fade out</em> (0 to 30 s; 0 stops at once). Every song a run plays stops when the run ends.</p>
+<p>Speakers need whip_voice and the voice bot from its current setup (1.5.0 or newer), the same as lore characters' lines. The voice bot plays the song; players never download it.</p>
 
 <!-- ═══════════════════════════════════ -->
 <!-- VOICE: for other resources -->
