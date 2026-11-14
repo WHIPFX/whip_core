@@ -132,8 +132,9 @@ Resources built on WHIP (satellites) declare `dependency 'whip_core'`, load
 whip_core checks GitHub every 12 hours for newer releases of WHIP's resources: the server console and the setup report
 say when one is out, and `whipupdates` lists them all (`set whip_update_check false` turns it off).
 
-Read `CHANGELOG.md`, copy out `pack_exports/` (the Director and property packs you exported), then replace the
-`whip_core` folder with the latest release. whip_core updates its tables on the next start.
+Read the release notes on [whip_core's releases page](https://github.com/WHIPFX/whip_core/releases), copy out
+`pack_exports/` (the Director and property packs you exported), then replace the `whip_core` folder with the latest
+release. whip_core updates its tables on the next start.
 
 ## License
 
