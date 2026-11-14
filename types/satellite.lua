@@ -28,6 +28,17 @@ function WhipSatellite.register(fn) end
 ---@param fn fun()
 function WhipSatellite.onCoreLost(fn) end
 
+--- SERVER. Once your Whip.register functions have run, the console says "<your resource> started successfully!",
+--- unless something went wrong since your resource started (one of them threw, an error was caught in your code, or
+--- something was printed in red): then those lines are all it says. Each time whip_core is ready.
+function WhipSatellite.sayStarted() end
+
+--- Something wrong found while starting: printed in red with your resource's name, and Whip.sayStarted stays quiet.
+---     Whip.startProblem('engines.json is unreadable: %s', why)
+---@param fmt string as string.format's, with the values after it
+---@param ... any
+function WhipSatellite.startProblem(fmt, ...) end
+
 --- A registry of your own, with whip's rule: an entry is its first registrant's; the same again changes nothing;
 --- a changed one replaces it; another resource's is refused (said once in your console); a resource's entries
 --- go when it stops. For a resource others extend (apps, plugins, parts).

@@ -19,6 +19,9 @@ Whip = Whip or {}
 local CORE = 'whip_core'
 local SELF = GetCurrentResourceName()
 
+--- Errors and red prints since this resource started, or since Whip.sayStarted last spoke.
+local _startProblems = 0
+
 -- ============================================
 -- Your errors, kept by whip_core for tools
 -- ============================================
@@ -78,6 +81,7 @@ if GetResourceMetadata(SELF, 'whip_error_tap', 0) ~= 'no' then
     local function runCaught(fn, ...)
         local r = table.pack(xpcall(fn, traceback, ...))
         if r[1] then return table.unpack(r, 2, r.n) end
+        _startProblems = _startProblems + 1
         report('error', r[2])
         nativePrint(('^1SCRIPT ERROR: %s^7'):format(tostring(r[2])))
     end
@@ -146,6 +150,7 @@ if GetResourceMetadata(SELF, 'whip_error_tap', 0) ~= 'no' then
         nativePrint(...)
         local first = ...
         if type(first) == 'string' and first:sub(1, 2) == '^1' then
+            _startProblems = _startProblems + 1
             local parts = table.pack(...)
             for i = 1, parts.n do parts[i] = tostring(parts[i]) end
             report('warning', (table.concat(parts, ' ', 1, parts.n):gsub('%^%d', '')))
@@ -319,7 +324,8 @@ local function runAll(list, what)
     for _, fn in ipairs(snapshot) do
         local ok, err = pcall(fn)
         if not ok then
-            print(('[%s] %s failed: %s'):format(SELF, what, tostring(err)))
+            _startProblems = _startProblems + 1
+            print(('^1[%s] %s failed: %s^0'):format(SELF, what, tostring(err)))
         end
     end
     _runningCo = outer
@@ -362,6 +368,32 @@ end
 ---@param fn function
 function Whip.onCoreLost(fn)
     _lostFns[#_lostFns + 1] = fn
+end
+
+-- ============================================
+-- One line when you have started: Whip.sayStarted, Whip.startProblem
+-- ============================================
+--
+--     Whip.sayStarted()                                          -- once, in a server file
+--     Whip.startProblem('engines.json is unreadable: %s', why)   -- what went wrong, in red
+--
+-- Once your Whip.register functions have run, the server console says "<your resource> started successfully!",
+-- unless something went wrong since your resource started: one of them threw, an error was caught in your code, or
+-- something was printed in red (Whip.startProblem does both). Then those lines are all it says.
+
+local _sayStarted = false
+
+--- SERVER. Say "<your resource> started successfully!" once your registrations have run, each time whip_core is ready.
+function Whip.sayStarted()
+    _sayStarted = IsDuplicityVersion()
+end
+
+--- Something wrong found while starting: printed in red with your resource's name, and Whip.sayStarted stays quiet.
+---@param fmt string  as string.format's, with the values after it
+function Whip.startProblem(fmt, ...)
+    _startProblems = _startProblems + 1
+    local text = select('#', ...) > 0 and fmt:format(...) or tostring(fmt)
+    print(('^1[%s] %s^0'):format(SELF, text))
 end
 
 -- ============================================
@@ -2044,8 +2076,11 @@ end
 AddEventHandler('whip_core:onReady', function(info)
     if not concernsUs(info) then return end
     _heard = true
-    if #_registerFns == 0 then return end
-    runAll(_registerFns, 'Whip.register')
+    if #_registerFns > 0 then runAll(_registerFns, 'Whip.register') end
+    if _sayStarted then
+        if _startProblems == 0 then print(('%s started successfully!'):format(SELF)) end
+        _startProblems = 0
+    end
 end)
 
 AddEventHandler('onResourceStop', function(res)
