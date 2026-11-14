@@ -22,9 +22,11 @@ local MAX_SPEAKERS = 32
 
 local function say(fmt, ...) print(('[whip_core:director] speakers: ' .. fmt):format(...)) end
 
--- Songs playing: [runId] = { [n] = { key = world voice, things = { [worldId] = true } } }
+-- Songs playing: [runId] = { [n] = { key = world voice (nil while it is being made), things = { [worldId] = true } } }
 local plays = {}
 local playN = 0
+-- Runs over: no song starts for one (a card still waiting as it ended), and one being made as it ended is let go.
+local over = {}
 
 -- ============================================
 -- How it sounds
@@ -106,7 +108,8 @@ local function release(runId, n)
     if not p then return end
     list[n] = nil
     if next(list) == nil then plays[runId] = nil end
-    if GetResourceState(VOICE) == 'started' then
+    -- (One still being made has no voice yet: play() sees its entry gone and lets its voice go itself.)
+    if p.key and GetResourceState(VOICE) == 'started' then
         local key = p.key
         CreateThread(function() pcall(function() exports[VOICE]:RemoveWorldVoice(key) end) end)
     end
@@ -122,7 +125,7 @@ local function stopOn(run, things, fadeMs)
         if hit then
             stopped = stopped + 1
             local ok, done = false, false
-            if fadeMs > 0 and GetResourceState(VOICE) == 'started' then
+            if p.key and fadeMs > 0 and GetResourceState(VOICE) == 'started' then
                 ok, done = pcall(function() return exports[VOICE]:StopWorldVoice(p.key, fadeMs) end)
             end
             if ok and done then
@@ -141,6 +144,7 @@ end
 --- song's length (ms), or false and why. `opts.wait`: answers once a song that does not loop has played to its end.
 function DirectorSpeakers.play(run, worldIds, url, o)
     if GetResourceState(VOICE) ~= 'started' then return false, 'whip_voice is not running' end
+    if over[run.id] then return false, 'the scenario has ended' end
     local places, things = {}, {}
     for _, id in ipairs(worldIds) do
         local p, why = placeOf(run, id)
@@ -153,16 +157,28 @@ function DirectorSpeakers.play(run, worldIds, url, o)
     -- One song at a time on a speaker: one already playing on any of these stops at once.
     stopOn(run, things, 0)
     local range = math.max(5, math.min(300, tonumber(o.range) or 40))
+    -- ITS ENTRY FIRST, THEN ITS VOICE: making the voice waits (up to 5 s with its retries), and a run that ended in
+    -- that time found nothing of it to stop, then got a song that looped on after it (WLVF's review). Ended meanwhile, or
+    -- stopped by a song after it on the same speakers, the entry is gone, and the voice just made is let go.
+    playN = playN + 1
+    local n = playN
+    plays[run.id] = plays[run.id] or {}
+    local entry = { key = nil, things = things }
+    plays[run.id][n] = entry
     local okC, key, cwhy = pcall(function()
         -- (music: heard as from far off, late by its distance, so the Doppler effect on a moving one: whip_voice.)
         return exports[VOICE]:CreateWorldVoice({ name = 'Speakers', at = places, range = range, bucket = run.bucket or 0,
                                                  music = true })
     end)
-    if not okC or not key then return false, tostring(okC and cwhy or key) end
-    playN = playN + 1
-    local n = playN
-    plays[run.id] = plays[run.id] or {}
-    plays[run.id][n] = { key = key, things = things }
+    if not okC or not key then
+        release(run.id, n)
+        return false, tostring(okC and cwhy or key)
+    end
+    if over[run.id] or not (plays[run.id] and plays[run.id][n] == entry) then
+        CreateThread(function() pcall(function() exports[VOICE]:RemoveWorldVoice(key) end) end)
+        return false, over[run.id] and 'the scenario has ended' or 'another song took these speakers'
+    end
+    entry.key = key
     local full = math.max(0, math.min(range, tonumber(o.full) or 0))
     pcall(function() exports[VOICE]:SetWorldVoiceRange(key, range, full > 0 and full or nil) end)
     local recipe = DirectorSpeakers.recipe(o)
@@ -189,6 +205,7 @@ end
 
 --- Every song a run plays stops with it (main.lua's runEnded).
 function DirectorSpeakers.runEnded(run)
+    over[run.id] = true
     for n in pairs(plays[run.id] or {}) do release(run.id, n) end
     plays[run.id] = nil
 end
