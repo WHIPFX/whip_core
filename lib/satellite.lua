@@ -265,9 +265,12 @@ function Whip.call(name, ...)
         return table.unpack(packed, 2, packed.n)
     end
 
-    -- An export that cannot wait (most of them): straight through, no thread and no promise.
+    -- An export that cannot wait (most of them): straight through, no thread and no promise. The export is looked up
+    -- INSIDE the pcall: one whip_core does not have (an older whip_core still running, a name mistyped) answers
+    -- false, why, as every other failure here does, not a script error in the caller (14 Nov 2026: PlaceObject
+    -- asked of a whip_core not restarted since it was added).
     if not WAITS_HERE[name] then
-        local packed = table.pack(pcall(exports[CORE][name], exports[CORE], ...))
+        local packed = table.pack(pcall(function(...) return exports[CORE][name](exports[CORE], ...) end, ...))
         if not packed[1] then
             return false, ('whip_core:%s failed: %s'):format(tostring(name), tostring(packed[2]))
         end
