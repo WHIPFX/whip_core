@@ -1164,6 +1164,7 @@ body.searching .main > h2 { margin-top: 56px; }
   <li><strong>FiveM's server with txAdmin</strong>: <strong>Legacy</strong> (the <code>FXServer</code> server, artifact 38435 or newer) or <strong>Enhanced</strong> (the <code>cfx-server</code> server). WHIP runs on both.</li>
   <li><strong>MariaDB 10.2.3 or newer, or MySQL 8.0.16 or newer</strong>, and a login that may create a database.</li>
   <li><strong>About 1 GB of disk, and at least 10 Mbit/s to GitHub.</strong> txAdmin gives each download 150 seconds, and the largest of whip's is about 145 MB.</li>
+  <li><strong>The voice ports open inbound</strong>, as for 30120: UDP 7882-7893 and TCP 7881. whip_voice runs its own voice server on this machine (<a href="#voice-setup">Setting up whip_voice</a>).</li>
 </ul>
 
 <h3>2. Install whip</h3>
@@ -1200,6 +1201,8 @@ https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-enhanced.yaml<
 <span class="kw">ensure</span> whip_loadingscreen
 <span class="kw">ensure</span> whip_phone
 <span class="kw">ensure</span> whip_rope
+<span class="cm"># whip_voice runs its own voice server on this machine: FXServer lets a resource start a program only with this line</span>
+<span class="kw">add_unsafe_child_process_permission</span> whip_voice
 <span class="kw">ensure</span> whip_voice
 <span class="kw">ensure</span> [assets]    <span class="cm"># the media packs and the map packs</span>
 
@@ -14311,7 +14314,7 @@ Whip.<span class="fn">directorButton</span>(<span class="str">'mycafe.customise'
 <!-- ═══════════════════════════════════ -->
 <h2 id="voice">Voice: keys, items, settings</h2>
 
-<p>whip_voice is whip's voice system. The people near you hear you in 3D, muffled through walls and doors, heard from the doorway or window between you, and different in cars and underwater. A phone call carries the phone's full sound, and on speaker it works both ways: the other side hears the people near the phone too. The radio is clear up close, then breaks up with static in the gaps and fades out by its range. Voice is private, because the server decides who hears whom and a modified game cannot change that. whip_phone's calls, the <code>radio</code> and <code>megaphone</code> items, the HUD's voice light and your own resources (<a href="#voice-api">For other resources</a>) all go through it. Setting it up is one double-click on its wizard, about 10 minutes, and needs a Windows server you control (<a href="#voice-setup">Setting up whip_voice</a>).</p>
+<p>whip_voice is whip's voice system. The people near you hear you in 3D, muffled through walls and doors, heard from the doorway or window between you, and different in cars and underwater. A phone call carries the phone's full sound, and on speaker it works both ways: the other side hears the people near the phone too. The radio is clear up close, then breaks up with static in the gaps and fades out by its range. Voice is private, because the server decides who hears whom and a modified game cannot change that. whip_phone's calls, the <code>radio</code> and <code>megaphone</code> items, the HUD's voice light and your own resources (<a href="#voice-api">For other resources</a>) all go through it. It runs its own voice server on the same machine as your FiveM server: nothing to install, only one line in <code>server.cfg</code> (WHIP's recipe writes it) and the voice ports open (<a href="#voice-setup">Setting up whip_voice</a>).</p>
 
 <h3>Keys</h3>
 <p>Players can change these in GTA's <em>Settings &gt; Key Bindings &gt; FiveM</em>. The ones below are the defaults.</p>
@@ -14335,7 +14338,7 @@ Whip.<span class="fn">directorButton</span>(<span class="str">'mycafe.customise'
 <h3>Commands</h3>
 <table class="param-table">
 <tr><th>Command</th><th>Who</th><th>What</th></tr>
-<tr><td><code>/voicecheck</code></td><td>developer mode, console</td><td>Checks voice from the game's side, and says what to fix: the voice system, the keys, the voice address, and every player's game (connected, over UDP or TCP, and whether it can read the secret). See <a href="#voice-setup">Setting up whip_voice</a>.</td></tr>
+<tr><td><code>/voicecheck</code></td><td>developer mode, console</td><td>Checks voice from the game's side, and says what to fix: the voice system, the voice server (and Windows Firewall, for the built-in one), and every player's game (connected, over UDP or TCP, and whether it can read the secret). See <a href="#voice-setup">Setting up whip_voice</a>.</td></tr>
 <tr><td><code>/voicestatus</code></td><td>developer mode, console</td><td>whip_voice's state: the voice address, the room, and each player connected, with how many voices they hear.</td></tr>
 <tr><td><code>/voicevolume 0-200</code></td><td>everyone</td><td>How loud the people around you are (100 is normal, 0 mutes them). Calls and the radio have their own volumes. Kept on your PC.</td></tr>
 <tr><td><code>/voicedebug</code></td><td>developer mode</td><td>Shows what each voice goes through (muffled by what, heard from which doorway) and every door and window of the building you're in.</td></tr>
@@ -14358,6 +14361,7 @@ Whip.<span class="fn">directorButton</span>(<span class="str">'mycafe.customise'
 <tr><td><code>Config.Environment.headphone3D</code></td><td>true</td><td>Full 3D made for headphones. <code>false</code> for plain left/right panning, if voices sound hollow or boxy.</td></tr>
 <tr><td><code>Config.MaxVoices</code></td><td>100</td><td>The most voices one player is connected to at once (the nearest). Only matters in a crowd bigger than this.</td></tr>
 <tr><td><code>Config.Megaphone.rangeMultiplier</code></td><td>6</td><td>How many times further a megaphone voice carries (normal 8 m becomes 48 m).</td></tr>
+<tr><td><code>Config.Megaphone.carMuffle</code></td><td>4</td><td>How many dB a closed car takes off a megaphone voice (a normal voice: <code>Config.Muffle.car</code>, 9). A bullhorn is loud, so it gets through, dulled.</td></tr>
 <tr><td><code>Config.Radio</code></td><td>Caps Lock, 500 / 1500 m, 100-999</td><td>The radio's key, how far it is clear, how far it reaches, its frequencies.</td></tr>
 <tr><td><code>Config.Radio.staticVolume</code></td><td>0.06</td><td>How loud the static is when a weak radio voice cuts out (0 none, 1 very loud). It only plays in the gaps, never over the voice.</td></tr>
 <tr><td><code>Config.Radio.distortion</code></td><td>1.0</td><td>How garbled a weak radio voice sounds as it breaks up: thinner, clipped and gritty (0 clean, 1 normal, 1.5 the most).</td></tr>
@@ -14374,18 +14378,79 @@ Whip.<span class="fn">directorButton</span>(<span class="str">'mycafe.customise'
 <!-- ═══════════════════════════════════ -->
 <h2 id="voice-setup">Setting up whip_voice</h2>
 
-<div class="info-box owner"><strong>For server owners.</strong> No code: a wizard does the work, and two checks tell you what is wrong if anything is.</div>
+<div class="info-box owner"><strong>For server owners.</strong> Nothing to install: whip_voice brings its own voice server (LiveKit) and runs it on the same machine as your FiveM server. One line in <code>server.cfg</code> and the voice ports open, and it works.</div>
 
 <h3>What you need</h3>
 <ul>
-<li><strong>A Windows server you can log into as an administrator</strong>: a VPS or a dedicated server running Windows. Rented FiveM hosting that only gives you a control panel cannot run it, because the voice server is a program of its own, installed on the machine.</li>
+<li><strong>FXServer on Windows or Linux</strong> (64-bit), on a machine whose ports you can open: a VPS, a dedicated server, or your own PC. Rented FiveM hosting with only a control panel works if the host lets you open the voice ports; if it cannot, use <a href="#voice-setup-own">a voice server of your own</a> somewhere else.</li>
+<li><strong>This line in <code>server.cfg</code></strong>, above <code>ensure whip_voice</code>. WHIP's txAdmin recipe writes it for you. FXServer lets a resource start a program only with it, and the voice server is a program. ("Unsafe" is FXServer's word for any resource allowed to: whip_voice starts the voice server and the voice bot, and Windows' own <code>tar</code> and PowerShell to unpack them and read the firewall, nothing else.) Without it, the console says so, with the line to add.</li>
+<li><strong>The voice ports open, inbound</strong> (below): players' games send their voices to them, as they join through 30120.</li>
 </ul>
-<p>That is all. Players' games connect to your server's own address, with a free certificate for that address that the wizard sets up, so you need no domain name. The wizard downloads and sets up the rest, and checks each download is the genuine file: LiveKit, the voice server, and Caddy, the HTTPS front door that gets and renews the certificate by itself.</p>
+<pre><code><span class="kw">add_unsafe_child_process_permission</span> whip_voice</code></pre>
+<p>That is all: no domain name, no certificate, no service to install, no keys to copy. The signalling (who joins, who hears whom) goes through your FiveM server's own connection with each player; only the voices themselves go to the voice ports.</p>
 
-<h3>The setup</h3>
-<p>One double-click: the wizard runs start to finish by itself, with nothing to answer, in about 10 minutes.</p>
+<h3>Opening the voice ports</h3>
+<pre><code>UDP 7882 to 7893   <span class="cm">voices</span>
+TCP 7881           <span class="cm">voices, when a player's network blocks UDP</span></code></pre>
+<ul>
+<li><strong>Windows Firewall.</strong> The first time the voice server starts, Windows may ask whether to let <code>livekit-server.exe</code> through: click <strong>Allow</strong> (on a server, tick Public networks too). Or double-click <strong><code>resources\whip_voice\service\Open voice ports.bat</code></strong>: it asks for administrator rights and opens the ports. On a server nobody is logged into, that is the way, as no box comes up there. If someone clicked <strong>Cancel</strong>, Windows blocks the voice server whatever the ports say: the same file takes the block away. When the FiveM server itself runs as administrator, whip_voice opens the ports at start by itself. Nothing to restart either way.</li>
+<li><strong>Your host's firewall.</strong> Some hosts have one of their own in their website's control panel (OVH, Hetzner, AWS, Azure, Google Cloud). Allow the ports there, as you did 30120.</li>
+<li><strong>At home, behind a router:</strong> forward them to this machine, as you did 30120. <strong>Linux</strong> with ufw: <code>ufw allow 7882:7893/udp</code> and <code>ufw allow 7881/tcp</code>.</li>
+</ul>
+
+<h3>The first start</h3>
+<p>whip_voice downloads the voice server (about 20 MB) into <code>whip_voice\bin</code>, checks it is the genuine file, starts it with new random keys (they are never written to disk) and opens the voice room. The voice bot, which plays recorded lines into phone calls as the Director's lore characters (<a href="#voice-lore-calls">Lore phone calls</a>), comes in the background: its own copy of Node.js and its packages, about 100 MB, then it starts. Voice works meanwhile. Both start and stop with the FiveM server, and one that stops by itself is started again. The console says each step:</p>
+<pre><code>[whip_voice] built-in voice server: downloading LiveKit 1.13.7, the voice server (once, about 20 MB)...
+[whip_voice] built-in voice server: LiveKit 1.13.7 is running. Players' games send voices to UDP 7882-7893 ...
+[whip_voice] voice room whipvoice-6fd35ef1 open
+[whip_voice] voice bot: running (lore characters can phone players)</code></pre>
+<p>Later starts download nothing. Updating whip_voice by replacing its folder takes <code>bin</code> with it, so the next start downloads them again. <code>whip_voice\bin\logs</code> keeps the voice server's and the bot's logs. The first time each player joins, FiveM asks them to allow the microphone: its box takes the mouse only with the <strong>F8 console</strong> open.</p>
+
+<h3>Checking it</h3>
+<p><strong><code>/voicecheck</code></strong>, in game with developer mode on (or <code>voicecheck</code> in txAdmin's Live Console), checks the voice server, Windows Firewall, every player's game (connected, over UDP or TCP, with a microphone) and the voice bot. It says OK, or what is wrong and how to fix it, top to bottom: an early problem often causes the later ones. <code>voicestatus</code> in the console shows who is connected and what each player picks up.</p>
+
+<h3>Settings</h3>
+<p>All optional, in <code>server.cfg</code> with plain <code>set</code>, before <code>ensure whip_voice</code>:</p>
+<table class="param-table">
+<tr><th>Setting</th><th>What it is</th><th>Default</th></tr>
+<tr><td><code>whip_voice_udp</code></td><td>The UDP ports for voices: one (<code>7882</code>) or a range.</td><td><code>7882-7893</code></td></tr>
+<tr><td><code>whip_voice_tcp</code></td><td>The TCP port for players whose network blocks UDP.</td><td><code>7881</code></td></tr>
+<tr><td><code>whip_voice_ip</code></td><td>The public IPv4 players' games send voices to.</td><td>found by asking the internet</td></tr>
+<tr><td><code>whip_voice_api</code></td><td>Where the voice server listens for this FiveM server, on this machine only.</td><td><code>http://127.0.0.1:7880</code></td></tr>
+<tr><td><code>whip_voice_bot</code></td><td><code>false</code>: no voice bot (lore characters cannot phone players).</td><td>on</td></tr>
+<tr><td><code>whip_voicebot_url</code></td><td>Where the voice bot listens, on this machine only.</td><td><code>http://127.0.0.1:7899</code></td></tr>
+</table>
+<p>The voice bot's own settings (calls at once, the sites recordings may come from, how long and big they may be) are <code>Config.VoiceBot</code> in whip_voice's <code>config.lua</code>. Two FiveM servers on one machine (Legacy and Enhanced) each run a voice server of their own, so the second needs other ports, open as well: <code>whip_voice_udp "7982-7993"</code>, <code>whip_voice_tcp "7981"</code>, <code>whip_voice_api "http://127.0.0.1:7980"</code> and <code>whip_voicebot_url "http://127.0.0.1:7999"</code>. For Windows Firewall, run <code>"Open voice ports.bat" -Udp 7982-7993 -Tcp 7981</code> from a command prompt in <code>whip_voice\service</code>.</p>
+
+<h3>What the problems mean</h3>
+<table class="param-table">
+<tr><th>It says</th><th>What it means</th><th>What to do</th></tr>
+<tr><td>FXServer lets a resource start programs only when server.cfg allows it</td><td>server.cfg has no <code>add_unsafe_child_process_permission whip_voice</code>.</td><td>Add the line above <code>ensure whip_voice</code>, and restart the server.</td></tr>
+<tr><td>Windows Firewall BLOCKS the voice server</td><td>Someone clicked Cancel when Windows asked about <code>livekit-server.exe</code>.</td><td>Double-click <code>whip_voice\service\Open voice ports.bat</code>.</td></tr>
+<tr><td>Windows Firewall: the voice ports are not open yet, or does not let voices in</td><td>No rule lets them in yet.</td><td>Click Allow when Windows asks, or double-click <code>Open voice ports.bat</code>.</td></tr>
+<tr><td>all players connect over TCP</td><td>UDP 7882-7893 is not getting through.</td><td>Allow UDP 7882-7893 inbound in the host's firewall (and Windows Firewall).</td></tr>
+<tr><td>(everyone) is not connected to voice</td><td>The voice ports are shut.</td><td>Open UDP 7882-7893 and TCP 7881, in Windows Firewall and the host's.</td></tr>
+<tr><td>some players connect over TCP</td><td>Their own network blocks UDP.</td><td>Nothing on your side. Voice works for them, but can stutter.</td></tr>
+<tr><td>something already answers on 127.0.0.1:7880</td><td>Another voice server is there: the setup wizard's "LiveKit" service, say.</td><td>Use it (keep the wizard's lines in server.cfg), uninstall it (<code>"Setup voice server.bat" -Uninstall</code>), or give the built-in one other ports (Settings).</td></tr>
+<tr><td>… does not match its published checksum, answered 403, or could not unpack</td><td>The download was cut off or changed on the way, or the machine cannot reach github.com.</td><td>Restart whip_voice to try again. The machine needs HTTPS to github.com (and nodejs.org and registry.npmjs.org, for the bot).</td></tr>
+<tr><td>the voice server stopped five times in a row</td><td>It cannot run, often because another program holds one of its ports.</td><td><code>whip_voice\bin\logs\livekit.log</code> says why. Free the port, or change it (Settings).</td></tr>
+<tr><td>the voice bot: its packages could not be installed</td><td>The machine cannot reach registry.npmjs.org.</td><td><code>whip_voice\bin\logs\voicebot-install.log</code> says why. Restart whip_voice to try again.</td></tr>
+<tr><td><em>name</em> is the voice system, so whip_voice is off</td><td>Another voice resource started first, and only one can run.</td><td>Take its <code>ensure</code> out of server.cfg and restart the server.</td></tr>
+<tr><td>can hear but not talk</td><td>That player's game has no microphone: FiveM's box unanswered, or refused.</td><td>They open F8 and click Allow in the box. Refused earlier: they allow it in FiveM's settings and reconnect.</td></tr>
+</table>
+
+<h3 id="voice-setup-own">Your own voice server</h3>
+<p>Instead of the built-in one: a voice server on another machine, players connecting to a domain name, LiveKit Cloud, or rented hosting that cannot open the voice ports. With <code>whip_voice_url</code> in <code>server.cfg</code>, whip_voice connects players there and the built-in voice server stays off (no <code>add_unsafe_child_process_permission</code> line needed). Players' games then connect to it directly, so it needs a secure address: <code>wss://</code> with a valid certificate.</p>
+<p><strong>Any LiveKit server</strong> (LiveKit Cloud, or one you run yourself): these lines, with plain <code>set</code>, never <code>setr</code> (it would send the secret to every player). The voice bot is then yours to run too (<code>whip_voice\service\voicebot</code>, with <code>whip_voicebot_url</code> and <code>whip_voicebot_token</code>).</p>
+<pre><code><span class="kw">set</span> whip_voice_url    <span class="str">"wss://your-project.livekit.cloud"</span>
+<span class="kw">set</span> whip_voice_key    <span class="str">"API..."</span>
+<span class="kw">set</span> whip_voice_secret <span class="str">"..."</span>
+<span class="kw">set</span> whip_voice_api    <span class="str">"https://your-project.livekit.cloud"</span>   <span class="cm"># where this FiveM server reaches its API</span></code></pre>
+<p><strong>On a Windows server of your own, the setup wizard</strong> does it all: LiveKit, an HTTPS front door (Caddy) with a free certificate for your server's address, and the voice bot, as Windows services, and the lines in <code>server.cfg</code>. It needs a Windows server you can log into as an administrator, and no domain name. One double-click, with nothing to answer, in about 10 minutes:</p>
+
+<h4>The setup wizard</h4>
 <ol>
-<li>On the server machine, open <code>resources\whip_voice\service</code> (inside a <code>[whip]</code> folder if your resources have one) and double-click <strong>Setup voice server.bat</strong>. When Windows asks whether to let it make changes, say <strong>Yes</strong>.</li>
+<li>On the server machine, open <code>resources\whip_voice\service</code> and double-click <strong>Setup voice server.bat</strong>. When Windows asks whether to let it make changes, say <strong>Yes</strong>.</li>
 <li><strong>The voice address.</strong> It works out your server's public address and makes that the voice address: <code>wss://</code> and the address. Players' games connect to it directly.</li>
 <li><strong>Your host's firewall.</strong> The wizard opens Windows' own firewall itself. Some hosts have a firewall of their own in their website's control panel (OVH, Hetzner, AWS, Azure, Google Cloud). If yours does, allow these inbound there: <strong>TCP 80 and 443</strong> (the secure address, and getting and renewing its certificate), <strong>TCP 7881</strong> and <strong>UDP 7882 to 7893</strong> (voice). The wizard does not wait for you: if a port is still shut, the check at the end says so, and the certificate comes as soon as it is open.</li>
 <li><strong>Caddy and LiveKit.</strong> It installs both as Windows services that start with Windows, or adds your voice address to the Caddy the machine already has. A LiveKit of this version already installed is not downloaded again. Caddy gets the certificate for your server's address from Let's Encrypt: it lasts about 6 days, and Caddy renews it by itself every few days, for as long as ports 80 and 443 stay open.</li>
@@ -14400,7 +14465,7 @@ set whip_voice_secret   <span class="str">"..."</span>
 set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <p>Run the setup again whenever you like: it keeps every key and token, leaves alone what is already installed and the same, and only restarts a service when something about it changed (a restart drops voice for a few seconds). Two FiveM servers on one machine (Legacy and Enhanced) share one voice server: run the setup from each one's <code>whip_voice\service</code>, and the second run keeps the same keys and writes the same lines into its own <code>server.cfg</code>.</p>
 
-<h3>A domain name instead</h3>
+<h4>A domain name instead</h4>
 <p>Players can connect to a name such as <code>voice.myserver.com</code> instead of your server's address. You need a domain you own (about $10 a year). Its certificate lasts about 3 months rather than 6 days, and the voice address stays the same if the server ever moves to a new address.</p>
 <ol>
 <li>In <code>whip_voice\service</code>, click the folder's address bar, type <code>cmd</code> and press Enter, then run <code>"Setup voice server.bat" -Domain voice.myserver.com</code> with your own domain.</li>
@@ -14414,14 +14479,14 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 </ol>
 <p>Once a domain is set up, running the setup again keeps it. To go back to your server's address, run <code>"Setup voice server.bat" -UseIp</code> the same way.</p>
 
-<h3>Checking it</h3>
+<h4>Checking the wizard's voice server</h4>
 <ul>
 <li><strong>Check voice server.bat</strong>, next to the setup, changes nothing. It checks the machine: the LiveKit, Caddy and voice bot services, their ports and Windows firewall rules, the voice address (a domain's DNS record too), the certificate and when it runs out, and whether server.cfg's lines match the voice server's keys and the bot's token.</li>
 <li><strong><code>/voicecheck</code></strong>, in game with developer mode on (or <code>voicecheck</code> in txAdmin's Live Console), checks from the game's side: the voice system, the keys, the voice address, every player's game (connected, over UDP or TCP, with a microphone, and whether it can read the secret), and the voice bot.</li>
 </ul>
 <p>Both say OK, or what is wrong and how to fix it, top to bottom: an early problem often causes the later ones.</p>
 
-<h3>What the problems mean</h3>
+<h4>What its problems mean</h4>
 <table class="param-table">
 <tr><th>It says</th><th>What it means</th><th>What to do</th></tr>
 <tr><td>the voice address is …, but the internet sees this server as …</td><td>The server's address changed: a new server, or the host gave it a new address.</td><td>Run the setup again: it moves the voice address and updates server.cfg. Then restart the FiveM server.</td></tr>
@@ -14442,7 +14507,7 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <tr><td>the LiveKit, caddy or voice bot service is stopped</td><td>A service did not start.</td><td><em>Services</em> (Win+R, <code>services.msc</code>) &gt; "LiveKit voice server (whip_voice)", "Caddy web server (HTTPS for whip_voice)" or "whip_voice voice bot" &gt; Start. If it will not start, run the setup again.</td></tr>
 </table>
 
-<h3>Later</h3>
+<h4>Later</h4>
 <ul>
 <li><strong>Run the setup again</strong> whenever you like: it keeps your keys and skips what is already done. Run it when the server's address changes: the voice address moves with it, and server.cfg is updated.</li>
 <li><strong>New keys</strong>, if the secret was ever seen, pasted or shared: run <code>"Setup voice server.bat" -NewKeys</code> (as for a domain, above), then restart the FiveM server. It writes the new lines into server.cfg and makes the voice bot a new token too. A second server on the machine: run the setup from its <code>whip_voice\service</code> too, without <code>-NewKeys</code>.</li>
@@ -14490,7 +14555,7 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <h3>When it doesn't play</h3>
 <table class="param-table">
 <tr><th>It says</th><th>What to do</th></tr>
-<tr><td>only links starting with https://r2.fivemanage.com/ are accepted</td><td>Use a Fivemanage file link, or put the file in a resource and use its <code>@</code> name. Another site: <a href="#voice-setup">Setting up whip_voice</a>, Later.</td></tr>
+<tr><td>only links starting with https://r2.fivemanage.com/ are accepted</td><td>Use a Fivemanage file link, or put the file in a resource and use its <code>@</code> name. Another site: add its start to <code>Config.VoiceBot.audioLinks</code> in whip_voice's <code>config.lua</code> (with <a href="#voice-setup-own">your own voice server</a>, its <code>config.json</code>).</td></tr>
 <tr><td>the recording is over 120 seconds · over 15 MB</td><td>Shorten it, or save it as mp3.</td></tr>
 <tr><td>there is no irwin_intro.ogg · the resource my_story is not started</td><td>Check the path inside the resource, and that the resource is ensured.</td></tr>
 <tr><td>You need a phone with a SIM on you</td><td>The call rings the phone you carry.</td></tr>

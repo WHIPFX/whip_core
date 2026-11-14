@@ -227,8 +227,8 @@ local function gather()
     elseif #others > 0 then
         add('note', 'Voice: %s. whip\'s phone calls and radio need whip_voice', table.concat(others, ', '))
     else
-        add('note', 'No voice: players cannot talk. whip_voice is whip\'s voice (it needs a voice server of its own:'
-            .. ' whip_voice/docs/SETUP.md)')
+        add('note', 'No voice: players cannot talk. whip_voice is WHIP\'s voice: add "ensure whip_voice", and it runs its'
+            .. ' own voice server (whip_voice/docs/SETUP.md)')
     end
 
     -- What fights whip.
