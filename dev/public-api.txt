@@ -519,6 +519,8 @@ server:GetStat
 server:GetStoredVehicleStats
 server:GetTime
 server:GetTimeScale
+server:GetUpdate
+server:GetUpdates
 server:GetVehicle
 server:GetVehicleBy
 server:GetVehicleCatalog

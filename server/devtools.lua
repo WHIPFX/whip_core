@@ -489,6 +489,41 @@ SecureEvent('whip_core:server:requestThemeSwap', {
     TriggerClientEvent('whip_core:client:applyTheme', source, resource)
 end)
 
+-- ---- Who may act on whom ----
+--
+-- Nobody kicks or bans someone of their own rank or above, nor lifts a ban that someone above them placed. The ranks:
+-- an admin from server.cfg ('permanent'), someone given dev tools from the panel until the restart ('temporary'),
+-- everyone else (nil). An owner kicked or banned from the panel could be locked out of their own server.
+
+local RANK = { temporary = 1, permanent = 2 }
+
+---@return string|nil
+local function higherRank(a, b) return (RANK[b] or 0) > (RANK[a] or 0) and b or a end
+
+--- Does the rank `actor` stand above the rank `target`?
+local function outranks(actor, target) return (RANK[actor] or 0) > (RANK[target] or 0) end
+
+--- A connected player's rank, from their own session.
+---@param src number
+---@return string|nil
+local function rankOfSource(src)
+    if not IsPlayerAceAllowed(src, 'whip.devtools') then return nil end
+    return DevTools.isTemporary(src) and 'temporary' or 'permanent'
+end
+
+--- An account's rank: by its identifiers, which still answer while its session is leaving (a dropped session stays in
+--- Players through its final save, and FiveM's ACE check answers false for it), and by its live sessions, which also
+--- catch a server.cfg line naming an identifier the table doesn't keep (license2, xbl...).
+---@param account table  a `users` row
+---@return string|nil
+local function accountRank(account)
+    local rank = devtoolsStatus(account, nil)
+    for _, src in ipairs(sessionsOf(account.userId)) do
+        if GetPlayerName(src) then rank = higherRank(rank, devtoolsStatus(account, src)) end
+    end
+    return rank
+end
+
 -- Kick player
 --
 -- 'id', not 'int': the int type CLAMPS, and an id is an address (a clamped id kicks whoever holds
@@ -502,6 +537,13 @@ SecureEvent('whip_core:server:pmKick', {
     if not GetPlayerName(targetSource) then
         NotifyPlayer(source, 'They are not on the server', 'error')
         return
+    end
+    -- Only someone below the kicking admin (Who may act on whom, above).
+    local theirs = rankOfSource(targetSource)
+    if not outranks(rankOfSource(source), theirs) then
+        return false, theirs == 'permanent' and 'They are an admin in server.cfg: they cannot be kicked from the panel'
+            or theirs == 'temporary' and 'Only an admin from server.cfg can kick someone who has dev tools'
+            or 'You cannot kick yourself'
     end
     local loaded = Players[targetSource]
     local userId = (loaded or PendingPlayers[targetSource] or {}).userId
@@ -523,6 +565,34 @@ SecureEvent('whip_core:server:pmKick', {
     print(('[whip_core:admin] %s kicked %s: %s'):format(player.fullName, tostring(name), reason))
 end)
 
+--- Everyone a ban on this account would turn away, and the highest dev-tools rank among them ('permanent',
+--- 'temporary' or nil). The ban row keeps the account's license, steam, discord and fivem, and the connect check
+--- refuses a match on any one, so another account sharing one of them (the owner's second Rockstar account, with the
+--- same Discord) is shut out with it. Each account is ranked by accountRank.
+---@param user table  the `users` row being banned
+---@return table[] accounts, string|nil rank, string|nil own  own: the banned account's rank alone
+local function banReach(user)
+    local where, args = {}, {}
+    for _, kind in ipairs({ 'license', 'steam', 'discord', 'fivem' }) do
+        local value = user[kind]
+        if value and value ~= '' then
+            where[#where + 1] = ('`%s` = ?'):format(kind)
+            args[#args + 1] = value
+        end
+    end
+    local accounts = #where > 0
+        and MySQL.query.await('SELECT * FROM `users` WHERE ' .. table.concat(where, ' OR '), args) or nil
+    if not accounts or #accounts == 0 then accounts = { user } end
+
+    local best, own
+    for _, account in ipairs(accounts) do
+        local rank = accountRank(account)
+        best = higherRank(best, rank)
+        if account.userId == user.userId then own = rank end
+    end
+    return accounts, best, own
+end
+
 -- Ban player
 SecureEvent('whip_core:server:pmBan', {
     rateLimit = 2000,
@@ -540,6 +610,20 @@ SecureEvent('whip_core:server:pmBan', {
     -- Get user identifiers
     local user = MySQL.single.await('SELECT * FROM `users` WHERE `userId` = ?', { userId })
     if not user then return end
+
+    -- Nobody bans someone who outranks them, nor anyone the ban would also turn away (banReach). An admin from
+    -- server.cfg is never banned from the panel: the ban would lock the owner out, and only the database would let
+    -- them back in. Their server.cfg line comes out first. Someone given dev tools from the panel is banned only by an
+    -- admin from server.cfg, never by another admin given them the same way.
+    local reach, rank, own = banReach(user)
+    if rank == 'permanent' then
+        return false, own == 'permanent'
+            and 'They are an admin in server.cfg: take them out of it before banning them'
+            or 'That ban would also turn away an admin from server.cfg, who shares an identifier with them'
+    end
+    if rank == 'temporary' and not isPermanentAdmin(source) then
+        return false, 'Only an admin from server.cfg can ban someone who has dev tools'
+    end
 
     local expiresAt = nil
     if durationSeconds > 0 then
@@ -562,6 +646,16 @@ SecureEvent('whip_core:server:pmBan', {
         DropPlayer(src, 'Banned: ' .. reason)
     end
 
+    -- Dev tools given from the panel go with the ban, from every account it turns away. Being dropped is not enough:
+    -- a ban that ends before the restart would let them back in with the tools.
+    for _, account in ipairs(reach) do
+        local license = type(account.license) == 'string' and account.license:match('^%x+$')
+        if license and tempDevtools[license] then
+            ExecuteCommand(('remove_principal identifier.license:%s %s'):format(license, TEMP_GROUP))
+            tempDevtools[license] = nil
+        end
+    end
+
     print(('[whip_core:admin] %s banned userId %d: %s (duration: %s)'):format(
         player.fullName, userId, reason, durationSeconds > 0 and (durationSeconds .. 's') or 'permanent'))
 
@@ -579,6 +673,33 @@ SecureEvent('whip_core:server:pmUnban', {
     ace = 'whip.devtools',
     params = { {'banId', 'id', 0}, {'userId', 'id', 0} },   -- 0 = not given
 }, function(source, player, banId, userId)
+    -- Not a ban that someone above this admin placed (Who may act on whom). The placer is the account behind the
+    -- character that placed it, ranked now. A ban with no placer on record (none written, the character gone) counts
+    -- as an admin from server.cfg's.
+    local placed
+    if banId > 0 then
+        placed = MySQL.query.await('SELECT `bannedBy` FROM `bans` WHERE `banId` = ? AND `active` = 1', { banId })
+    elseif userId > 0 then
+        placed = MySQL.query.await('SELECT `bannedBy` FROM `bans` WHERE `userId` = ? AND `active` = 1', { userId })
+    end
+    -- (if/else, not `a and b or c`: a placer with no rank at all is a nil the shortcut would turn into 'permanent')
+    local mine, asked = rankOfSource(source), {}   -- asked: [charId] = rank, or false for none
+    for _, row in ipairs(placed or {}) do
+        local by = tonumber(row.bannedBy)
+        local placer = 'permanent'
+        if by then
+            if asked[by] == nil then
+                local account = MySQL.single.await([[SELECT u.* FROM `characters` c JOIN `users` u ON u.`userId` = c.`userId`
+                    WHERE c.`charId` = ?]], { by })
+                if account then asked[by] = accountRank(account) or false else asked[by] = 'permanent' end
+            end
+            placer = asked[by]
+        end
+        if outranks(placer, mine) then
+            return false, 'An admin above you placed that ban: only someone of their rank can lift it'
+        end
+    end
+
     if banId > 0 then
         local ok, err = pcall(MySQL.update.await,
             'UPDATE `bans` SET `active` = 0, `unbannedAt` = NOW(), `unbannedBy` = ?, `unbannedByName` = ? WHERE `banId` = ?',
@@ -1682,14 +1803,15 @@ local function pmGetAllData()
     return entries
 end
 
---- Whether whip_phone's phone_numbers has this column (it adds its own when it starts: `locked`, `prefs`, and
---- `retiredAt` / `renamedTo` for retired numbers).
-local function phoneColumn(name)
+--- Whether whip_phone's phone_numbers (or `tableName`) has this column. whip_phone adds its own when it starts:
+--- `locked`, `prefs`, and `retiredAt` / `renamedTo` for retired numbers; `blocked` on phone_messages and phone_calls
+--- since its block list.
+local function phoneColumn(name, tableName)
     return (tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM information_schema.columns
-        WHERE table_schema = DATABASE() AND table_name = 'phone_numbers' AND column_name = ?]], { name })) or 0) > 0
+        WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?]], { tableName or 'phone_numbers', name })) or 0) > 0
 end
 
---- Whether a table is there (phone_calls is whip_phone's, made when it first starts).
+--- Whether a table is there (phone_calls and phone_blocks are whip_phone's, made when it first starts).
 local function phoneTable(name)
     return (tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM information_schema.tables
         WHERE table_schema = DATABASE() AND table_name = ?]], { name })) or 0) > 0
@@ -1738,7 +1860,7 @@ end)
 
 --- Edit phone number (which number: a character may own several).
 ---
---- The new row first, the old one last, in one transaction: contacts, messages and calls point at their
+--- The new row first, the old one last, in one transaction: contacts, messages, calls and blocks point at their
 --- number with a foreign key, so the number can't be renamed in place. The new number is written beside
 --- the old one, everything moves across, and the old one goes, all of it or none.
 ---
@@ -1792,6 +1914,12 @@ SecureEvent('whip_core:server:pmEditNumber', {
         steps[#steps + 1] = { query = 'UPDATE phone_calls SET callerNumber = ? WHERE callerNumber = ?', values = { newNumber, oldNumber } }
         steps[#steps + 1] = { query = 'UPDATE phone_calls SET calleeNumber = ? WHERE calleeNumber = ?', values = { newNumber, oldNumber } }
     end
+    -- So is phone_blocks (its block list): the number's own list, and its place on everyone else's. The new number
+    -- had no row before this, so no block names it yet and neither side can collide.
+    if phoneTable('phone_blocks') then
+        steps[#steps + 1] = { query = 'UPDATE phone_blocks SET phoneNumber = ? WHERE phoneNumber = ?', values = { newNumber, oldNumber } }
+        steps[#steps + 1] = { query = 'UPDATE phone_blocks SET blockedNumber = ? WHERE blockedNumber = ?', values = { newNumber, oldNumber } }
+    end
     -- Retired where whip_phone has brought the table up to date; deleted on a server it never ran on.
     steps[#steps + 1] = retire
         and { query = 'UPDATE phone_numbers SET retiredAt = CURRENT_TIMESTAMP, renamedTo = ?, prefs = NULL, locked = 0 WHERE phoneNumber = ?',
@@ -1813,9 +1941,10 @@ SecureEvent('whip_core:server:pmEditNumber', {
     pmBroadcast()
 end)
 
---- Delete phone number (which number: a character may own several). Its contacts, messages and calls go
---- with it. The number itself is RETIRED, not removed (see pmEditNumber), so the SIM cards still carrying
---- it stop working.
+--- Delete phone number (which number: a character may own several). Its contacts, messages, calls and blocks
+--- (its own list and its place on others') go with it. The number itself is RETIRED, not removed (see
+--- pmEditNumber), so the SIM cards still carrying it stop working, and the foreign keys' cascade never fires:
+--- each table is emptied of it here.
 SecureEvent('whip_core:server:pmDeleteNumber', {
     ace = 'whip.devtools',
     params = { {'phoneNumber', 'string', 10} },
@@ -1834,6 +1963,9 @@ SecureEvent('whip_core:server:pmDeleteNumber', {
         }
         if phoneTable('phone_calls') then
             steps[#steps + 1] = { query = 'DELETE FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ?', values = { number, number } }
+        end
+        if phoneTable('phone_blocks') then
+            steps[#steps + 1] = { query = 'DELETE FROM phone_blocks WHERE phoneNumber = ? OR blockedNumber = ?', values = { number, number } }
         end
         steps[#steps + 1] = { query = 'UPDATE phone_numbers SET retiredAt = CURRENT_TIMESTAMP, renamedTo = NULL, prefs = NULL, locked = 0 WHERE phoneNumber = ?',
             values = { number } }
@@ -1940,8 +2072,9 @@ SecureEvent('whip_core:server:pmSpawnSim', {
 end)
 
 --- What one number holds, for its page (html/js/wp/phones.js): its
---- contacts, the messages it sent or received and its calls — what Delete takes with it. Answers { ok, contacts,
---- messages, calls }; a count whose table is not there (whip_phone has never run) is left out.
+--- contacts, the messages it sent or received, its calls and its blocks (the numbers it blocked and those that
+--- blocked it) — what Delete takes with it. Answers { ok, contacts, messages, calls, blocks }; a count whose table is
+--- not there (whip_phone has never run, or predates its block list) is left out.
 SecureCallback('whip_core:pmNumberDetail', {
     ace       = 'whip.devtools',
     rateLimit = 250,
@@ -1961,6 +2094,9 @@ SecureCallback('whip_core:pmNumberDetail', {
     if phoneTable('phone_calls') then
         out.calls = count('SELECT COUNT(*) FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ?', { number, number })
     end
+    if phoneTable('phone_blocks') then
+        out.blocks = count('SELECT COUNT(*) FROM phone_blocks WHERE phoneNumber = ? OR blockedNumber = ?', { number, number })
+    end
     return out
 end)
 
@@ -1968,7 +2104,9 @@ end)
 -- Phone records: the Phones page's dashboard (html/js/wp/phoneRecords.js)
 -- ============================================
 --
--- Everything one number did: its contacts, its conversations, its calls, who it talks to and when. Read
+-- Everything one number did: its contacts, its conversations, its calls, its blocks both ways, who it talks to and
+-- when. A text or call that came while its receiver had blocked the sender (whip_phone's `blocked` mark) is kept in,
+-- marked HELD: the receiver never saw it, and it is the evidence when someone reports being harassed. Read
 -- only. Every moment goes out as unix SECONDS (UNIX_TIMESTAMP, fields named …At), not oxmysql's milliseconds.
 -- Hours and days are the ADMIN's own (their PC's offset from UTC, `tzOffset` in minutes as JS's
 -- getTimezoneOffset gives it), so "busy at 2am" means 2am where they are reading it.
@@ -2017,6 +2155,10 @@ end
 
 local function prNum(v) return tonumber(v) or 0 end
 
+--- A flag as oxmysql gives it: a TINYINT(1) column (whip_phone's `blocked`) comes as a boolean, a 0 in its place as a
+--- number.
+local function prYes(v) return v == true or prNum(v) == 1 end
+
 --- One number's records. Answers { ok = true, … } or { ok = false, why }.
 SecureCallback('whip_core:pmPhoneDossier', {
     ace       = 'whip.devtools',
@@ -2029,6 +2171,11 @@ SecureCallback('whip_core:pmPhoneDossier', {
     if not phoneRow(number, true) then return { ok = false, why = 'That number is not on this server' } end
     local tz = (tonumber(tzOffset) or 0) * 60   -- local = UTC - offset
     local hasCalls = phoneTable('phone_calls')
+    -- whip_phone's block list: its table, and the `blocked` mark on texts and calls. A whip_phone that predates it has
+    -- neither, and nothing there was held back (0).
+    local hasBlocks = phoneTable('phone_blocks')
+    local msgHeld = phoneColumn('blocked', 'phone_messages') and 'blocked' or '0'
+    local callHeld = hasCalls and phoneColumn('blocked', 'phone_calls') and 'blocked' or '0'
 
     local ok, res = pcall(function()
         local q = MySQL.query.await
@@ -2040,18 +2187,19 @@ SecureCallback('whip_core:pmPhoneDossier', {
             contacts[#contacts + 1] = { id = c.contactId, name = c.contactName, number = c.contactNumber, savedAt = prNum(c.t) }
         end
 
-        -- A conversation a counterpart: how many each way, how many this phone has not read, and its last text.
+        -- A conversation a counterpart: how many each way, how many this phone has not read, how many were held back,
+        -- and its last text. A held text this phone received was never shown on it, so it is not unread there.
         local threads, lastIds = {}, {}
-        for _, t in ipairs(q([[SELECT other, COUNT(*) AS n, SUM(mine) AS sent,
-                SUM(CASE WHEN mine = 0 AND readAt IS NULL THEN 1 ELSE 0 END) AS unread,
+        for _, t in ipairs(q(([[SELECT other, COUNT(*) AS n, SUM(mine) AS sent,
+                SUM(CASE WHEN mine = 0 AND readAt IS NULL AND held = 0 THEN 1 ELSE 0 END) AS unread, SUM(held) AS held,
                 MIN(t) AS firstAt, MAX(t) AS lastAt, MAX(messageId) AS lastId
             FROM (SELECT IF(senderNumber = ?, receiverNumber, senderNumber) AS other, (senderNumber = ?) AS mine,
-                    readAt, UNIX_TIMESTAMP(createdAt) AS t, messageId
+                    readAt, UNIX_TIMESTAMP(createdAt) AS t, messageId, %s AS held
                 FROM phone_messages WHERE senderNumber = ? OR receiverNumber = ?) x
-            GROUP BY other ORDER BY lastId DESC]], { number, number, number, number }) or {}) do
+            GROUP BY other ORDER BY lastId DESC]]):format(msgHeld), { number, number, number, number }) or {}) do
             local n, sent = prNum(t.n), prNum(t.sent)
             threads[#threads + 1] = { number = t.other, n = n, sent = sent, recv = n - sent, unread = prNum(t.unread),
-                firstAt = prNum(t.firstAt), lastAt = prNum(t.lastAt), lastId = prNum(t.lastId) }
+                held = prNum(t.held), firstAt = prNum(t.firstAt), lastAt = prNum(t.lastAt), lastId = prNum(t.lastId) }
             lastIds[#lastIds + 1] = prNum(t.lastId)
         end
         if #lastIds > 0 then
@@ -2089,13 +2237,14 @@ SecureCallback('whip_core:pmPhoneDossier', {
 
         local calls, callsBy, callTotals = {}, {}, nil
         if hasCalls then
-            for _, c in ipairs(q([[SELECT callId, callerNumber, calleeNumber, status, UNIX_TIMESTAMP(startedAt) AS s,
-                    UNIX_TIMESTAMP(answeredAt) AS a, UNIX_TIMESTAMP(endedAt) AS e
-                FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ? ORDER BY callId DESC LIMIT ?]],
+            for _, c in ipairs(q(([[SELECT callId, callerNumber, calleeNumber, status, UNIX_TIMESTAMP(startedAt) AS s,
+                    UNIX_TIMESTAMP(answeredAt) AS a, UNIX_TIMESTAMP(endedAt) AS e, %s AS b
+                FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ? ORDER BY callId DESC LIMIT ?]]):format(callHeld),
                 { number, number, PR_CALLS }) or {}) do
                 local out = c.callerNumber == number
                 calls[#calls + 1] = { id = c.callId, out = out, other = out and c.calleeNumber or c.callerNumber,
-                    status = c.status, startedAt = tonumber(c.s), answeredAt = tonumber(c.a), endedAt = tonumber(c.e) }
+                    status = c.status, startedAt = tonumber(c.s), answeredAt = tonumber(c.a), endedAt = tonumber(c.e),
+                    held = prYes(c.b) or nil }
             end
             local talk = 'CASE WHEN status = \'answered\' AND answeredAt IS NOT NULL AND endedAt IS NOT NULL '
                 .. 'THEN TIMESTAMPDIFF(SECOND, answeredAt, endedAt) ELSE 0 END'
@@ -2107,10 +2256,11 @@ SecureCallback('whip_core:pmPhoneDossier', {
                 callsBy[#callsBy + 1] = { number = c.other, n = prNum(c.n), outN = prNum(c.outN),
                     answered = prNum(c.answered), talk = prNum(c.talk), lastAt = prNum(c.lastAt) }
             end
+            -- A held call this phone received never rang on it: not one it missed.
             callTotals = MySQL.single.await(([[SELECT COUNT(*) AS n, SUM(callerNumber = ?) AS outN,
-                    SUM(status = 'answered') AS answered, SUM(status <> 'answered' AND callerNumber <> ?) AS missedIn,
-                    SUM(%s) AS talk, MIN(UNIX_TIMESTAMP(startedAt)) AS firstAt, MAX(UNIX_TIMESTAMP(startedAt)) AS lastAt
-                FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ?]]):format(talk),
+                    SUM(status = 'answered') AS answered, SUM(status <> 'answered' AND callerNumber <> ? AND %s = 0) AS missedIn,
+                    SUM(%s) AS held, SUM(%s) AS talk, MIN(UNIX_TIMESTAMP(startedAt)) AS firstAt, MAX(UNIX_TIMESTAMP(startedAt)) AS lastAt
+                FROM phone_calls WHERE callerNumber = ? OR calleeNumber = ?]]):format(callHeld, callHeld, talk),
                 { number, number, number, number })
             bucket([[SELECT MOD(FLOOR((UNIX_TIMESTAMP(startedAt) - ?) / 3600), 24) AS h, COUNT(*) AS n FROM phone_calls
                 WHERE callerNumber = ? OR calleeNumber = ? GROUP BY h]], 'calls')
@@ -2118,9 +2268,23 @@ SecureCallback('whip_core:pmPhoneDossier', {
                 WHERE (callerNumber = ? OR calleeNumber = ?) AND startedAt >= NOW() - INTERVAL 15 DAY GROUP BY d]], 'calls')
         end
 
-        local sent, recv, unread, firstAt, lastAt = 0, 0, 0, nil, nil
+        -- Its blocks both ways (whip_phone's phone_blocks), the latest first: the numbers it blocked, and the numbers
+        -- that blocked it.
+        local blocks, blockedBy = {}, {}
+        if hasBlocks then
+            for _, b in ipairs(q([[SELECT phoneNumber, blockedNumber, UNIX_TIMESTAMP(createdAt) AS t FROM phone_blocks
+                WHERE phoneNumber = ? OR blockedNumber = ? ORDER BY createdAt DESC, blockedNumber, phoneNumber]], { number, number }) or {}) do
+                if b.phoneNumber == number then
+                    blocks[#blocks + 1] = { number = b.blockedNumber, at = prNum(b.t) }
+                else
+                    blockedBy[#blockedBy + 1] = { number = b.phoneNumber, at = prNum(b.t) }
+                end
+            end
+        end
+
+        local sent, recv, unread, held, firstAt, lastAt = 0, 0, 0, 0, nil, nil
         for _, t in ipairs(threads) do
-            sent, recv, unread = sent + t.sent, recv + t.recv, unread + t.unread
+            sent, recv, unread, held = sent + t.sent, recv + t.recv, unread + t.unread, held + t.held
             if t.firstAt > 0 and (not firstAt or t.firstAt < firstAt) then firstAt = t.firstAt end
             if not lastAt or t.lastAt > lastAt then lastAt = t.lastAt end
         end
@@ -2139,6 +2303,8 @@ SecureCallback('whip_core:pmPhoneDossier', {
         for _, c in ipairs(contacts) do numbers[#numbers + 1] = c.number end
         for _, t in ipairs(threads) do numbers[#numbers + 1] = t.number end
         for _, c in ipairs(callsBy) do numbers[#numbers + 1] = c.number end
+        for _, b in ipairs(blocks) do numbers[#numbers + 1] = b.number end
+        for _, b in ipairs(blockedBy) do numbers[#numbers + 1] = b.number end
         local owners = prOwners(numbers)
 
         -- The owner's other numbers, for the dashboard's switch.
@@ -2160,14 +2326,17 @@ SecureCallback('whip_core:pmPhoneDossier', {
             callsMore = cn > #calls,
             callsBy   = callsBy,
             hasCalls  = hasCalls,
+            blocks    = blocks,
+            blockedBy = blockedBy,
+            hasBlocks = hasBlocks,
             owners    = owners,
             hours     = hours,
             days      = dayList,
             totals    = {
-                contacts = #contacts, messages = sent + recv, sent = sent, recv = recv, unread = unread,
+                contacts = #contacts, messages = sent + recv, sent = sent, recv = recv, unread = unread, held = held,
                 calls = cn, callsOut = prNum(ct.outN), callsIn = cn - prNum(ct.outN), answered = prNum(ct.answered),
-                missedIn = prNum(ct.missedIn), talk = prNum(ct.talk), firstAt = firstAt, lastAt = lastAt,
-                people = 0,
+                missedIn = prNum(ct.missedIn), callsHeld = prNum(ct.held), talk = prNum(ct.talk), firstAt = firstAt,
+                lastAt = lastAt, people = 0,
             },
         }
     end)
@@ -2185,7 +2354,8 @@ SecureCallback('whip_core:pmPhoneDossier', {
 end)
 
 --- One conversation, newest first, PR_PAGE at a time (`beforeId`: the oldest text already shown).
---- Answers { ok, messages = { { id, me, text, at, readAt } } oldest first, more }.
+--- Answers { ok, messages = { { id, me, text, at, readAt, held } } oldest first, more }. `held`: sent while the
+--- receiver had blocked the sender, so the receiver never saw it.
 SecureCallback('whip_core:pmPhoneThread', {
     ace       = 'whip.devtools',
     rateLimit = 150,
@@ -2198,9 +2368,11 @@ SecureCallback('whip_core:pmPhoneThread', {
     local before = math.floor(tonumber(beforeId) or 0)
     ---@type (string|integer)[]
     local args = { number, number, other, other, number }
-    local sql = [[SELECT messageId, (senderNumber = ?) AS mine, content, UNIX_TIMESTAMP(createdAt) AS t,
-            UNIX_TIMESTAMP(readAt) AS r
-        FROM phone_messages WHERE ((senderNumber = ? AND receiverNumber = ?) OR (senderNumber = ? AND receiverNumber = ?))]]
+    -- (a whip_phone that predates its block list has no `blocked`: nothing held back)
+    local sql = ([[SELECT messageId, (senderNumber = ?) AS mine, content, UNIX_TIMESTAMP(createdAt) AS t,
+            UNIX_TIMESTAMP(readAt) AS r, %s AS b
+        FROM phone_messages WHERE ((senderNumber = ? AND receiverNumber = ?) OR (senderNumber = ? AND receiverNumber = ?))]])
+        :format(phoneColumn('blocked', 'phone_messages') and 'blocked' or '0')
     if before > 0 then
         sql = sql .. ' AND messageId < ?'
         args[#args + 1] = before
@@ -2217,7 +2389,7 @@ SecureCallback('whip_core:pmPhoneThread', {
     for i = #rows, 1, -1 do
         local m = rows[i]
         messages[#messages + 1] = { id = m.messageId, me = prNum(m.mine) == 1, text = m.content,
-            at = prNum(m.t), readAt = tonumber(m.r) }
+            at = prNum(m.t), readAt = tonumber(m.r), held = prYes(m.b) or nil }
     end
     return { ok = true, messages = messages, more = #rows >= PR_PAGE }
 end)

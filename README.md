@@ -130,14 +130,19 @@ Resources built on WHIP (satellites) declare `dependency 'whip_core'`, load
 
 ## Updating
 
-Read `CHANGELOG.md`, copy out `pack_exports/` (the Director and property packs you exported), then replace the
-`whip_core` folder with the latest release. whip_core updates its tables on the next start.
+whip_core checks GitHub every 12 hours for newer releases of WHIP's resources: the server console and the setup report
+say when one is out, and `whipupdates` lists them all (`set whip_update_check false` turns it off).
+
+Read the release notes on [whip_core's releases page](https://github.com/WHIPFX/whip_core/releases), copy out
+`pack_exports/` (the Director and property packs you exported), then replace the `whip_core` folder with the latest
+release. whip_core updates its tables on the next start.
 
 ## License
 
-whip_core is licensed under the GNU LGPL 3.0: see `LICENSE` and `COPYING`. The example resources in `docs/examples/`
-are MIT. Resources that use WHIP through its exports are your own, under any licence: see **Selling on WHIP** in
-`docs.html`.
+whip_core is licensed under the GNU LGPL 3.0: see `COPYING.LESSER`, and `COPYING` for the GPL 3.0 it builds on. One
+file is GPL 3.0 instead: the emote list, `shared/emote_list.lua`, made from RPEmotes. The example resources in
+`docs/examples/` are MIT. Resources that use WHIP through its exports are your own, under any licence: see
+**Selling on WHIP** in `docs.html`.
 
 `NOTICE.md` lists what the licence doesn't cover: the WHIP name and logo, Rockstar Games material, and third-party
 code, fonts and data under their own licences.

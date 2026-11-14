@@ -8,7 +8,7 @@
 //                search that matches the number, the name or the character id.
 //   its page     the owner's face, large, beside the number as the title, with Online / Offline and Locked;
 //                then what it is, row by row — Number (Change: a field under it, Save or Cancel), Owner, SIM,
-//                Since, and what it holds (contacts, messages, calls: pmDetail) — and the owner's other
+//                Since, and what it holds (contacts, messages, calls, blocks: pmDetail) — and the owner's other
 //                numbers. Destructive far-left, the rest far-right: Delete number, then Give me its SIM card.
 //   no number    a word on what the page is for, and Give a character a number (the server's pmAssignNumber,
 //                which the old page never offered): find them by name, and they have one.
@@ -34,7 +34,7 @@ let changing = false;       // the Number row's field is open
 let assigning = false;      // Give a character a number is open (nothing selected)
 let pendingCharId = null;   // a character just given a number: their new one opens once the list has it
 let pendingNumber = null;   // a number just changed to: its page opens once the list has it (a refusal leaves it)
-let holds = {};             // number -> { contacts, messages, calls } | 'loading'
+let holds = {};             // number -> { contacts, messages, calls, blocks } | 'loading'
 let recordsOpen = false;    // a number's records (the dashboard) cover the section
 let els = {};
 
@@ -129,6 +129,8 @@ function holdsText(h) {
     if (h.contacts !== undefined && h.contacts !== null) parts.push(plural(h.contacts, 'contact'));
     if (h.messages !== undefined && h.messages !== null) parts.push(plural(h.messages, 'message'));
     if (h.calls !== undefined && h.calls !== null) parts.push(plural(h.calls, 'call'));
+    // Both ways: the numbers it blocked and those that blocked it (whip_phone's block list, when it has one).
+    if (h.blocks !== undefined && h.blocks !== null) parts.push(plural(h.blocks, 'block'));
     return parts.length ? parts.join('  ·  ') : 'nothing to read';
 }
 
@@ -208,7 +210,7 @@ function renderDetail() {
         form.appendChild(WP.btn('Save', 'pmEditNumber', 'primary'));
         body.appendChild(form);
         body.appendChild(WP.el('div', 'wp-hint',
-            'Its contacts, messages and calls move to the new number, and its SIM cards take it the next time '
+            'Its contacts, messages, calls and blocks move to the new number, and its SIM cards take it the next time '
             + 'their phone is used. The old number is retired: it is never given out again.'));
         setTimeout(() => { if (els.editNumber) { els.editNumber.focus(); els.editNumber.select(); } }, 0);
     }
@@ -405,7 +407,7 @@ WhipPanel.registerSection({
             if (selected === null) return;
             const e = findEntry(selected);
             const h = holds[selected];
-            const what = h && h !== 'loading' ? ' Its ' + holdsText(h).replace(/ {2}· {2}/g, ', ') + ' go with it.' : ' Its contacts, messages and calls go with it.';
+            const what = h && h !== 'loading' ? ' Its ' + holdsText(h).replace(/ {2}· {2}/g, ', ') + ' go with it.' : ' Its contacts, messages, calls and blocks go with it.';
             const ok = await WP.confirm({
                 title: 'Delete this number?',
                 body: phoneNumber(selected) + (e ? ' (' + fullName(e) + '\'s)' : '') + ' will be removed.' + what

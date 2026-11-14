@@ -374,6 +374,10 @@
 .pr-bub.me { background: var(--ui-pill); color: var(--ui-pill-ink); border-bottom-right-radius: 5px; }
 .pr-bub.them { background: var(--ui-slot-bg-filled); border-bottom-left-radius: 5px; }
 .pr-bub-meta { margin: 2px 4px 5px; font-size: var(--ui-fs-xs); color: var(--ui-text-label); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Held back: the receiver had blocked the sender and never saw it. Faded, with a dashed edge, so it reads as kept
+   but never delivered. */
+.pr-bub.held { opacity: 0.6; outline: 1px dashed var(--ui-error); outline-offset: -1px; }
+.pr-bub-meta.held { color: var(--ui-error); }
 .pr-more {
     align-self: center;
     margin: 0 0 var(--ui-sp-3);
@@ -526,6 +530,20 @@ button.pr-tr.open { background: var(--ui-slot-bg-chosen); box-shadow: 0 0 0 1px 
 /* ---- 04 people ---- */
 
 .pr-s-people .pr-screen-body { padding: var(--ui-sp-4); }
+/* A group of people (the blocks either way, then everyone), labelled as the charts are. */
+.pr-group {
+    display: flex;
+    align-items: baseline;
+    gap: var(--ui-sp-3);
+    padding: var(--ui-sp-5) var(--ui-sp-4) var(--ui-sp-2);
+    font-size: var(--ui-fs-xs);
+    font-weight: var(--ui-fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ui-text-label);
+}
+.pr-group:first-child { padding-top: 0; }
+.pr-group-n { font-variant-numeric: tabular-nums; color: var(--ui-text-mid); }
 .pr-person {
     display: flex;
     align-items: center;

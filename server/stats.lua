@@ -265,8 +265,8 @@ local ICONS = {
           .. ' M7 4a2 2 0 1 0 4 0a2 2 0 1 0-4 0z',
 }
 
---- Hunger or thirst. On: drains every 10 seconds at whatever empties a full one in `minutes` (42 minutes
---- is 0.4 a step), is saved, has a gauge, and costs Config.NeedDamage health a step once under 10 (0: none).
+--- Hunger or thirst. On: drains every 10 seconds at whatever empties a full one in `minutes` (120 minutes
+--- is about 0.14 a step), is saved, has a gauge, and costs Config.NeedDamage health a step once under 10 (0: none).
 ---
 --- Off is no hunger at all, but the stat is still registered: food is still eaten, and a script or
 --- Systems card reading it gets 100. No gauge, no drain, no cost, and nothing saved (so turning it back
@@ -278,7 +278,7 @@ local ICONS = {
 ---@return table
 local function need(on, minutes, icon, color)
     if not on then return { type = 'need', default = 100, min = 0, max = 100, persist = false } end
-    local steps = math.max(1.0, (tonumber(minutes) or 42) * 6)   -- six 10-second steps a minute
+    local steps = math.max(1.0, (tonumber(minutes) or 120) * 6)   -- six 10-second steps a minute
     local damage = math.max(0, tonumber(Config.NeedDamage) or 1)
     return {
         type = 'need', default = 100, min = 0, max = 100, persist = true,
@@ -592,6 +592,18 @@ end
 --- True only inside Stats.showDeveloper: the one writer the `developer` stat takes.
 local developerWrite = false
 
+--- What a death from a health loss WHIP made reads as. The player's game reports what killed them, and GTA calls any
+--- health a script takes a fall (WEAPON_FALL), so the cause goes with the loss: an empty need by its name, anything
+--- else (an effect, a script) by its reason in the Stats change log.
+local LOSS_NAMES = { ['threshold:hunger'] = 'Starvation', ['threshold:thirst'] = 'Dehydration' }
+
+---@param changeSource string|nil
+---@return string|nil
+local function lossCause(changeSource)
+    if type(changeSource) ~= 'string' or changeSource == '' then return nil end
+    return LOSS_NAMES[changeSource] or changeSource
+end
+
 --- Set a stat value. Validates, clamps, caches, timestamps, syncs to client.
 ---
 --- Answers, and refuses what it cannot use: a value that is not a number, and an unregistered name
@@ -656,8 +668,11 @@ function Stats.set(source, name, value, changeSource, pedDelta)
         end
     end
 
-    -- Sync to client. A vital changed BY an amount goes as that amount (see Stats.add).
-    Stats._syncStat(source, name, value, config.type == 'vital' and pedDelta or nil)
+    -- Sync to client. A vital changed BY an amount goes as that amount (see Stats.add). A health loss goes with its
+    -- cause, which the player's game reports if it kills them (lossCause).
+    local loss = name == 'health' and (pedDelta or delta) < 0
+    Stats._syncStat(source, name, value, config.type == 'vital' and pedDelta or nil,
+        loss and lossCause(changeSource) or nil)
 
     -- And to anyone on the server listening (OnStatChange). A vital re-set to the same value is
     -- a correction, not a change, so it is not announced.
@@ -1242,8 +1257,9 @@ end
 ---@param name string
 ---@param value number
 ---@param delta number|nil  a vital changed by an amount: the client adds it to the live ped
-function Stats._syncStat(source, name, value, delta)
-    TriggerClientEvent('whip_core:client:statUpdate', source, name, value, delta)
+---@param cause string|nil  a health loss: what the player's game reports if it kills them (lossCause)
+function Stats._syncStat(source, name, value, delta, cause)
+    TriggerClientEvent('whip_core:client:statUpdate', source, name, value, delta, cause)
 end
 
 --- Send all stats to client (used on login and periodic).

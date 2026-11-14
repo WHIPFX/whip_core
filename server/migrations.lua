@@ -93,7 +93,7 @@ local WHIP_TABLES = {
     'character_inventory', 'character_portraits', 'characters', 'container_inventory', 'containers', 'director_lore',
     'director_lore_portraits', 'director_pack_trust', 'director_packs', 'director_revisions', 'director_run_events',
     'director_run_players', 'director_runs', 'director_scenarios', 'director_takes', 'doors', 'garage_spots', 'garages',
-    'ground_items', 'job_employees', 'job_roles', 'jobs', 'pending_gives', 'phone_calls', 'phone_contacts',
+    'ground_items', 'job_employees', 'job_roles', 'jobs', 'pending_gives', 'phone_blocks', 'phone_calls', 'phone_contacts',
     'phone_messages', 'phone_numbers', 'prop_catalog', 'properties', 'property_keys', 'property_objects',
     'property_packs', 'property_template_units', 'property_templates', 'schema_migrations', 'shop_item_prices', 'shops',
     'system_revisions', 'system_state', 'systems', 'users', 'vehicle_catalog', 'vehicle_class_meta', 'vehicle_inventory',

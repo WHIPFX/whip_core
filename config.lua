@@ -457,7 +457,8 @@ Config.Keyboard = {
 Config.Hunger = true
 Config.Thirst = true
 
--- How long each takes to drain from full to empty, in minutes, while it is on.
+-- How long each takes to drain from full to empty, in minutes, while it is on. Health starts going at 10%: about
+-- an hour and 50 minutes after a full meal, an hour and 20 after a full drink.
 Config.HungerMinutes = 120
 Config.ThirstMinutes = 90
 
@@ -704,8 +705,9 @@ Config.AtmBadgeOffset = {
 Config.AtmMaxDigits = 9
 
 -- Logs every vehicle storage open (trunk, glovebox, ignition) on both sides, one line per keypress, to find out
--- whether the server refused or the client never sent the request. false silences it.
-Config.LogVehicleStorage = true
+-- whether the server refused or the client never sent the request. Off by default: turn it on while finding out why
+-- a boot, glovebox or ignition will not open.
+Config.LogVehicleStorage = false
 
 Config.VehicleLockRange  = 8.0   -- How far away you can still lock/unlock with L
 
