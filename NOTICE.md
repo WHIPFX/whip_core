@@ -53,7 +53,6 @@ Each keeps its own licence.
 | Material Design Icons: the turbocharger glyph | whip_core/html/js/glyphs.js | Apache 2.0 |
 | Fonts: Archivo Narrow, Arimo, Barlow, Barlow Condensed, Big Shoulders, Bricolage Grotesque, DM Mono, IBM Plex Mono, Inter, Michroma, Orbitron, Plus Jakarta Sans, Rajdhani, Roboto, Russo One, Saira, Saira Condensed, Saira Semi Condensed | each resource's fonts folder, and whip_phone/html/core/fonts.js | SIL Open Font License 1.1 |
 | The English keyboard words, from hermitdave's FrequencyWords (OpenSubtitles 2018) | whip_core/html/keyboard/en.txt | CC BY-SA 4.0 |
-| WildBrick142's Chameleon Paint [Add-On] 2.0 paint ramps | whip_autos/stream/vehicle_paint_ramps.ytd | Its author's terms: ask them before using it in another mod, and never sell or monetise it, so a paid bundle must leave this file out |
 | GTA V's map traced as shapes, by Regynate (gist.github.com/Regynate/01a82731994e592cbe5d7e1c1b055d33) | whip_media_map/map | No licence stated; the map is Rockstar's |
 | DurtyFree's GTA V data dumps, which WHIP's game lists are made from (github.com/DurtyFree/gta-v-data-dumps) | whip_core lists (weapons, peds, tattoos, voice lines, props) | No licence stated; the data is the game's |
 
