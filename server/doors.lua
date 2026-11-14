@@ -586,7 +586,7 @@ function Doors.update(doorId, updates, manager)
     if updates.metadata ~= nil then
         local wanted = type(updates.metadata) == 'table' and updates.metadata.managedBy or nil
         if not Registry.deepEquals(wanted, managerOf(door)) then
-            return false, 'A door\'s manager changes only through AdoptOrCreateDoor and ReleaseDoor'
+            return false, 'A door\'s manager is set by EnsureDoors or EnsureDoor, not by UpdateDoor'
         end
     end
 
@@ -2228,7 +2228,7 @@ exports('GetDoorByPosition', function(x, y, z, range)
     end
     return Doors.getByPosition(x, y, z, range)
 end)
-exports('GetAllDoors', function() return Doors.getAll() end)
+exports('GetDoors', function() return Doors.getAll() end)
 -- `false`, not nil, on failure — an export truncates its return list at the first nil, so
 -- Doors.create's (nil, err) arrived as a bare nil. Same rule as CreateGarage.
 exports('CreateDoor', function(data)
@@ -2269,31 +2269,33 @@ exports('DeleteDoor', function(doorId, manager)
     return Doors.delete(id, mgr)
 end)
 
---- Take charge of the door at a spot, making it if there is none. See Doors.adoptOrCreate.
+--- Take charge of the door at a spot, making it if there is none. See Doors.adoptOrCreate. Internal: a resource's
+--- managed doors come from EnsureDoors and EnsureDoor.
 --- `false`, not nil, on failure (an export stops at the first nil), then why, then the door in
 --- the way's id when another manager holds it.
-exports('AdoptOrCreateDoor', function(data, manager)
+exports('__AdoptOrCreateDoor', function(data, manager)
     local mgr = callerManager(manager)   -- first: it reads the caller, before anything can yield
-    if not mgr or mgr.id == nil then return false, 'AdoptOrCreateDoor needs a manager with an id' end
+    if not mgr or mgr.id == nil then return false, '__AdoptOrCreateDoor needs a manager with an id' end
     -- Not before the doors are loaded (see CreateDoor).
     if not WaitForCoreReady() then return false, NOT_READY end
-    local taken, takeWhy = Doors.takeRequire(data, 'AdoptOrCreateDoor')
+    local taken, takeWhy = Doors.takeRequire(data, '__AdoptOrCreateDoor')
     if not taken then return false, takeWhy end
     local door, how, conflict = Doors.adoptOrCreate(taken, mgr)
     if not door then return false, how, conflict and conflict.doorId or nil end
     return door, how
 end)
 
---- Give a door back: deleted if it was made for you, restored if it was adopted.
-exports('ReleaseDoor', function(doorId, manager)
+--- Give a managed door back: deleted if it was made for you, restored if it was adopted. Internal, beside
+--- __AdoptOrCreateDoor.
+exports('__ReleaseManagedDoor', function(doorId, manager)
     local caller = Registry.caller()
     local mgr = callerManager(manager)
     if not mgr then
         if type(doorId) == 'table' then
             -- One EnsureDoor made sits in its own set, 'door:<key>'.
-            return false, "A declared door is released by taking it off your EnsureDoors list; one from EnsureDoor with ReleaseDoor(door, { id = 'door:<key>' })"
+            return false, "A declared door is released by taking it off your EnsureDoors list; one from EnsureDoor with __ReleaseManagedDoor(door, { id = 'door:<key>' })"
         end
-        return false, 'ReleaseDoor needs the manager that holds the door'
+        return false, '__ReleaseManagedDoor needs the manager that holds the door'
     end
     local id, why = doorIdOf(doorId, caller)
     if not id then return false, why or 'Door not found' end
@@ -2325,8 +2327,8 @@ exports('SetHeldDoorAccess', function(doorId, requirements)
     return Doors.setHoldAccess(caller, Sanitize.id(doorId), requirements)
 end)
 
---- Give a held door back now: its old lock, or gone if it was a temporary one.
-exports('ReleaseHeldDoor', function(doorId)
+--- Give a held door back now, the pair of HoldDoor: its old lock, or gone if it was a temporary one.
+exports('ReleaseDoor', function(doorId)
     local caller = Registry.caller()
     return Doors.releaseHold(caller, Sanitize.id(doorId))
 end)
@@ -2424,7 +2426,7 @@ exports('IsDoorLocked', function(doorId)
     return d.locked == true
 end)
 --- May this player open this door? `true`, or `false` and why (the reason the player is shown).
-exports('IsAuthorizedForDoor', function(source, doorId)
+exports('CanUseDoor', function(source, doorId)
     local id, refWhy = doorIdOf(doorId, Registry.caller())
     local door = id and doorCache[id]
     if not door then return false, refWhy or 'Door not found' end

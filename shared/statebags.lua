@@ -80,7 +80,7 @@ VEHICLE_ENGINE_HOLD_KEY = 'whipEngineHold'
 -- ============================================
 --
 -- Watched by the Sentinel (server/sentinel.lua). The server writes them only through
--- Sentinel.setPlayerKey; satellites can't write them (SentinelSetPlayerKey takes only the caller's
+-- Sentinel.setPlayerKey; satellites can't write them (SetSentinelPlayerKey takes only the caller's
 -- own keys). A direct `Player(src).state.x =` write is treated as tampering: reverted and logged.
 --
 -- At their default the modifiers and mood are absent, never 1.0 or an empty name. Dead, escorted and

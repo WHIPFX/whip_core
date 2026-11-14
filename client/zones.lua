@@ -495,7 +495,7 @@ local function registerZone(zType, data)
     end
 
     -- A zone registered again replaces the old one cleanly: its grid cells unhooked, and its rules
-    -- off a player standing in it (as ZoneSetRules does). The enforcement loop applies the new ones,
+    -- off a player standing in it (as a new rules table from UpdateZone does). The enforcement loop applies the new ones,
     -- and the poll decides whether they are still inside (no fake exit and re-enter).
     if held then
         unregisterZoneCells(id)
@@ -514,7 +514,7 @@ local function registerZone(zType, data)
 
     -- Sync to server for server-side validation, but NOT for a zone the server just pushed to us
     -- via zonesSync (an echo). The server keeps the shape most reporters hold (server/zones.lua); a
-    -- zone the server has to trust belongs in the server's ZoneRegister / EnsureZone. An id the server's
+    -- zone the server has to trust belongs in the server's RegisterZone / EnsureZone. An id the server's
     -- key rule refuses never reaches it: said here, once, because the server's refusal is silent to
     -- the resource that made the zone.
     if not zone._dbZone and (type(id) ~= 'string' or #id > 60 or id:find('[^%w_%-]')) then
@@ -1839,28 +1839,22 @@ end)
 -- Exports
 -- ============================================
 
--- A zone is one table; anything else is refused with its shape, rather than an error deep in whip_core.
-exports('ZoneBox', function(data)
-    if type(data) ~= 'table' then return false, 'ZoneBox needs a table: { id, pos, size, heading?, ... }' end
-    data._owner = GetInvokingResource()
-    return registerZone('box', data)
-end)
+local ZONE_TYPES = { box = true, sphere = true, poly = true }
 
-exports('ZoneSphere', function(data)
-    if type(data) ~= 'table' then return false, 'ZoneSphere needs a table: { id, pos, radius, ... }' end
-    data._owner = GetInvokingResource()
-    return registerZone('sphere', data)
-end)
-
-exports('ZonePoly', function(data)
-    if type(data) ~= 'table' then return false, 'ZonePoly needs a table: { id, points, minZ?, maxZ?, ... }' end
-    data._owner = GetInvokingResource()
-    return registerZone('poly', data)
+-- A zone is one table with its `type`; anything else is refused with its shape, rather than an error deep in
+-- whip_core. Returns the zone's id.
+exports('RegisterZone', function(data)
+    local owner = GetInvokingResource()   -- first, before anything can yield
+    if type(data) ~= 'table' or not ZONE_TYPES[data.type] then
+        return false, "RegisterZone needs { type = 'box', pos, size }, { type = 'sphere', pos, radius } or { type = 'poly', points }"
+    end
+    data._owner = owner
+    return registerZone(data.type, data)
 end)
 
 -- The caller is passed so a resource can only remove its own. Zones.remove (below) is whip_core's.
-exports('ZoneRemove', function(id) return removeOwnZone(id, Registry.caller()) end)
-exports('ZoneRemoveGroup', function(group) return removeGroup(group, Registry.caller()) end)
+exports('RemoveZone', function(id) return removeOwnZone(id, Registry.caller()) end)
+exports('RemoveZoneGroup', function(group) return removeGroup(group, Registry.caller()) end)
 
 --- The zone a setter may change: found by its id or, for a saved zone, its key, and only the
 --- caller's own. whip_core itself may change any zone (its editor).
@@ -1882,34 +1876,70 @@ local function ownZone(idOrKey, caller)
 end
 
 --- whip_core's own zone calls: the editor (tools/zones.lua) changes zones as whip_core
---- through these — `Zones.setDebug(id, on)`, `Zones.remove(id)` — never through its own exports.
+--- through these — `Zones.update(id, { debug = on })`, `Zones.remove(id)` — never through its own exports.
 Zones = {}
 
---- A setter: the zone resolved and checked for `caller`, then `fn(zone, id, ...)`. Answers `true`, or
---- `false, why`. The export reads its caller first (before anything can yield); Zones.<name> is
---- whip_core's. ZoneSetDebug -> Zones.setDebug.
-local function zoneSetter(name, fn)
-    local function set(caller, idOrKey, ...)
-        local zone, id, why = ownZone(idOrKey, caller)
-        if not zone then return false, why end
-        -- Guarded, and its refusal passed on: an update must not throw into the calling resource.
-        local okCall, ok, err = pcall(fn, zone, id, ...)
-        if not okCall then return false, tostring(ok) end
-        if ok == false then return false, err end
-        return true
+--- What each UpdateZone key does to the zone, `fn(zone, id, value)`: nothing returned, or `false, why`.
+local PATCH = {
+    pos = function(_, id, pos) updatePosition(id, pos) end,
+    size = function(_, id, size) return updateSize(id, size) end,
+    -- false takes the condition off (a nil in a table is no key at all)
+    condition = function(zone, _, fn) zone.condition = fn or nil end,
+    debug = function(zone, _, enabled)
+        zone.debug = enabled == true
+        if enabled then startDebugDraw() end
+    end,
+    trackVehicles = function(zone, _, enabled) zone.trackVehicles = enabled == true end,
+    label = function(zone, _, label) zone.label = label end,
+    priority = function(zone, _, priority) zone.priority = priority end,
+    notify = function(zone, _, enabled) zone.notify = enabled == true end,
+    rules = function(zone, id, rules)
+        -- The old rules' effects come off first; the enforcement loop applies the new ones. false: no rules.
+        if insideZones[id] then revertZoneRules(zone, insideZones) end
+        zone.rules = rules or nil
+    end,
+}
+--- In this order: where the zone is first, then its size.
+local PATCH_ORDER = { 'pos', 'size', 'condition', 'debug', 'trackVehicles', 'label', 'priority', 'notify', 'rules' }
+
+--- Change a zone of `caller`'s: each key of `patch` (PATCH above), checked before any is applied, so a bad key
+--- changes nothing. Returns `true`, or `false, why`.
+---@param caller string
+---@param idOrKey string
+---@param patch table
+---@return boolean ok
+---@return string|nil why
+local function updateZone(caller, idOrKey, patch)
+    if type(patch) ~= 'table' then
+        return false, 'UpdateZone(id, patch): patch is a table of pos, size, condition, debug, trackVehicles, label, priority, notify, rules'
     end
-    exports(name, function(idOrKey, ...) return set(Registry.caller(), idOrKey, ...) end)
-    Zones[(name:gsub('^Zone(%u)', string.lower))] = function(idOrKey, ...) return set(CORE, idOrKey, ...) end
+    for k in pairs(patch) do
+        if not PATCH[k] then return false, ('UpdateZone: no key "%s" (pos, size, condition, debug, trackVehicles, label, priority, notify, rules)'):format(tostring(k)) end
+    end
+    local zone, id, why = ownZone(idOrKey, caller)
+    if not zone then return false, why end
+    for _, k in ipairs(PATCH_ORDER) do
+        local v = patch[k]
+        if v ~= nil then
+            -- Guarded, and its refusal passed on: an update must not throw into the calling resource.
+            local okCall, ok, err = pcall(PATCH[k], zone, id, v)
+            if not okCall then return false, tostring(ok) end
+            if ok == false then return false, err end
+        end
+    end
+    return true
 end
+
+-- The export reads its caller first (before anything can yield); Zones.update is whip_core's.
+exports('UpdateZone', function(idOrKey, patch) return updateZone(Registry.caller(), idOrKey, patch) end)
+function Zones.update(idOrKey, patch) return updateZone(CORE, idOrKey, patch) end
 
 ---@diagnostic disable-next-line: duplicate-set-field -- the server's Zones is a different table
 function Zones.remove(id) return removeOwnZone(id, CORE) end
 
-zoneSetter('ZoneUpdatePosition', function(_, id, pos) updatePosition(id, pos) end)
-zoneSetter('ZoneUpdateSize', function(_, id, size) return updateSize(id, size) end)
-exports('ZoneContains', function(id, point) return checkContains(id, point) end)
+exports('IsPointInZone', function(id, point) return checkContains(id, point) end)
 
-exports('ZoneIsInside', function(id)
+exports('IsInZone', function(id)
     return insideZones[zoneIdOf(id)] == true
 end)
 
@@ -1921,37 +1951,14 @@ function IsInsideZone(id)
     return insideZones[zoneIdOf(id)] == true
 end
 
-exports('ZoneGetInside', function()
+exports('GetZonesInside', function()
     local result = {}
     for id in pairs(insideZones) do result[#result + 1] = id end
     return result
 end)
 
-zoneSetter('ZoneSetCondition', function(zone, _, fn) zone.condition = fn end)
-zoneSetter('ZoneSetDebug', function(zone, _, enabled)
-    zone.debug = enabled
-    if enabled then startDebugDraw() end
-end)
-zoneSetter('ZoneSetTrackVehicles', function(zone, _, enabled) zone.trackVehicles = enabled end)
-zoneSetter('ZoneSetLabel', function(zone, _, label) zone.label = label end)
-zoneSetter('ZoneSetPriority', function(zone, _, priority) zone.priority = priority end)
-zoneSetter('ZoneSetNotify', function(zone, _, enabled) zone.notify = enabled end)
-
-zoneSetter('ZoneSetRules', function(zone, id, rules)
-    -- The old rules' effects come off first; the enforcement loop applies the new ones.
-    if insideZones[id] then revertZoneRules(zone, insideZones) end
-    zone.rules = rules
-end)
-
-zoneSetter('ZoneToggleRule', function(zone, id, ruleKey)
-    if not zone.rules then zone.rules = {} end
-    -- As ZoneSetRules: the current effects come off, and the loop re-applies what is still on.
-    if insideZones[id] then revertZoneRules(zone, insideZones) end
-    zone.rules[ruleKey] = not zone.rules[ruleKey]
-end)
-
 --- Get a specific zone's data by ID (client-side).
-exports('GetZoneDef', function(id)
+exports('GetZone', function(id)
     local zone = zones[zoneIdOf(id)]
     if not zone then return nil end
     return {
@@ -1978,7 +1985,7 @@ exports('GetZoneDef', function(id)
 end)
 
 --- Get all zones near a point within a radius.
-exports('ZoneGetNearby', function(pos, radius)
+exports('GetZonesNearby', function(pos, radius)
     radius = radius or 50.0
     local result = {}
     local radiusSq = radius * radius
@@ -1997,13 +2004,6 @@ exports('ZoneGetNearby', function(pos, radius)
     end
     table.sort(result, function(a, b) return a.dist < b.dist end)
     return result
-end)
-
---- Get total zone count.
-exports('ZoneGetCount', function()
-    local count = 0
-    for _ in pairs(zones) do count = count + 1 end
-    return count
 end)
 
 -- ============================================
@@ -2131,7 +2131,7 @@ end)
 -- Internal: get all zones for dev tool
 -- ============================================
 
-function GetAllZones()
+function GetAllZonesForTool()
     local result = {}
     for _, zone in pairs(zones) do
         result[#result + 1] = {

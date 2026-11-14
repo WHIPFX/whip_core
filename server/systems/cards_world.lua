@@ -282,7 +282,7 @@ define({
 })
 
 define({
-    type = 'car.store', category = 'cars', kind = 'wait', title = 'Put Car Away', api = 'StoreVehicle',
+    type = 'car.store', category = 'cars', kind = 'wait', title = 'Put Car Away', api = 'DespawnVehicle',
     desc = 'Puts THIS pulse\'s player\'s own car in a garage (its key; empty: the car\'s own garage). Nobody may be in it.',
     props = { { key = 'garage', kind = 'text', label = 'Garage (empty: its own)', maxLength = 64 } },
     outputs = { 'done', 'refused', 'timeout' },
@@ -449,7 +449,7 @@ define({
 })
 
 define({
-    type = 'door.mayOpen', category = 'world', kind = 'value', title = 'May Open Door?', api = 'IsAuthorizedForDoor',
+    type = 'door.mayOpen', category = 'world', kind = 'value', title = 'May Open Door?', api = 'CanUseDoor',
     desc = 'Yes or no: may a player open this door (its job, key or item rules), and if not, why.',
     values = { inputs = { { key = 'player', type = 'player', label = 'Player' }, { key = 'door', type = 'door', label = 'Door' } },
                outputs = { { key = 'result', type = 'bool', label = 'Yes?' }, { key = 'why', type = 'text', label = 'Why not' } } },
@@ -477,7 +477,7 @@ local function trustedZone(key)
 end
 
 define({
-    type = 'area.has', category = 'world', kind = 'value', title = 'Is It in the Area?', api = 'ZoneContains',
+    type = 'area.has', category = 'world', kind = 'value', title = 'Is It in the Area?', api = 'IsPointInZone',
     desc = 'Yes or no: is a place inside a zone (its key). Only zones the server keeps count.',
     props = { { key = 'area', kind = 'text', label = 'Zone key', required = true, maxLength = 64 } },
     values = { inputs = { { key = 'place', type = 'vector', label = 'Place' } },

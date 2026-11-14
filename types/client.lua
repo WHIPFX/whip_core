@@ -51,13 +51,13 @@ function whip_core:HasDevTools() end
 
 --- Say where your UI sits in the HUD's corner, so whip's HUD (the vehicle dial) moves out of its way; nil (or false)
 --- takes it back. Fractions of the screen. Held under your resource and `key`, and let go when your resource stops.
---- It hides nothing and takes no keys (SetUIOpen does that).
----     exports.whip_core:SetUIArea({ left = 0.78, top = 0.46, right = 0.98, bottom = 1.0 }, 'phone')
+--- It hides nothing and takes no keys (SetScreenOpen does that).
+---     exports.whip_core:SetScreenArea({ left = 0.78, top = 0.46, right = 0.98, bottom = 1.0 }, 'phone')
 ---@param area { left: number, top: number, right: number, bottom: number }|false|nil
 ---@param key string|nil  default 'default'
 ---@return boolean ok
 ---@return string|nil why
-function whip_core:SetUIArea(area, key) end
+function whip_core:SetScreenArea(area, key) end
 
 --- Remove everything YOU registered on this client under one run tag, and close the tag. Same rule
 --- as the server's ReleaseTag.
@@ -69,7 +69,7 @@ function whip_core:ReleaseTag(tag) end
 --- What you hold on this client under one run tag.
 ---@param tag string
 ---@return { registry: string, key: string|number }[]
-function whip_core:ListTagged(tag) end
+function whip_core:GetTagged(tag) end
 
 -- ============================================
 -- Client Hooks & Readiness
@@ -173,7 +173,7 @@ function whip_core:IsReady() end
 --- change, and isDead, health and armour read live when you call. A copy; {} before a
 --- character is loaded.
 ---@return table playerData { charId, fullName, cash, metadata, isDead, health, armour, ... }
-function whip_core:GetPlayerData() end
+function whip_core:GetPlayer() end
 
 --- Check if the player is fully loaded (character selected, spawned).
 ---@return boolean
@@ -217,7 +217,7 @@ function whip_core:GetStat(name) end
 
 --- Get all synced stats, as a copy.
 ---@return table<string, number>
-function whip_core:GetAllStats() end
+function whip_core:GetStats() end
 
 --- Register a listener for stat changes. Pass '*' as the name to hear every
 --- stat; wildcard listeners receive (name, value, old) instead of (value, old).
@@ -232,7 +232,7 @@ function whip_core:GetAllStats() end
 ---@param opts { table?: boolean, now?: boolean }|nil
 ---@return boolean registered
 ---@return string|nil err
-function whip_core:OnStatChange(name, callback, id, opts) end
+function whip_core:OnStatChanged(name, callback, id, opts) end
 
 --- Check if an effect is active on the local player.
 ---@param name string Effect name
@@ -369,7 +369,7 @@ function whip_core:PermitNativeWeapon(weapon, on) end
 ---
 ---     AddEventHandler('whip_core:ui:stateChanged', function(e) ... e.open ... end)
 ---
---- e.open: true when a screen or dialog (whip's, or a satellite's via SetUIOpen) is now up (WhipEvtUiState)
+--- e.open: true when a screen or dialog (whip's, or a satellite's via SetScreenOpen) is now up (WhipEvtUiState)
 
 --- Declare that this resource's own NUI is open or closed. whip then treats your
 --- screen exactly like one of its own: the HUD hides, prompts stop, nothing opens
@@ -378,11 +378,14 @@ function whip_core:PermitNativeWeapon(weapon, on) end
 --- resource stops.
 ---
 --- A resource with more than one screen names each with `key`, so closing one leaves the other
---- held: `SetUIOpen(true, 'shop')` / `SetUIOpen(false, 'shop')`.
+--- held: `SetScreenOpen(true, 'shop')` / `SetScreenOpen(false, 'shop')`.
+--- `{ keepHud = true }` (the phone) leaves the status HUD, minimap and vehicle dial up for this screen; chat,
+--- prompts and hotkeys still make way.
 ---@param open boolean True when you show your NUI, false when you hide it
 ---@param key? string Which of your screens; leave it out if you only have one
+---@param opts? { keepHud?: boolean }
 ---@return boolean accepted False if there was no calling resource to attribute this to
-function whip_core:SetUIOpen(open, key) end
+function whip_core:SetScreenOpen(open, key, opts) end
 
 --- Nothing on screen but the game's picture, for filming: GTA's HUD and map, whip's page, and the
 --- prompts, /me bubbles and bay marks in the world all go (chat stays: F6). Held per resource under
@@ -462,7 +465,7 @@ function whip_core:GetItemDef(key) end
 
 --- Get all registered item definitions.
 ---@return table<string, WhipItemDef>
-function whip_core:GetAllItemDefs() end
+function whip_core:GetItemDefs() end
 
 -- ============================================
 -- UI Library
@@ -535,7 +538,7 @@ function whip_core:IsComposerOpen() end
 -- One at a time; a call while another is up answers `false, 'busy'` without showing anything.
 -- Every one answers a second value when there is no answer: 'busy' | 'cancelled' | 'timeout', and
 -- 'failed' for a SkillCheck the player missed. They close the inventory first, will not open over
--- another resource's SetUIOpen screen ('busy'), and are cancelled when the resource that opened
+-- another resource's SetScreenOpen screen ('busy'), and are cancelled when the resource that opened
 -- them stops. Each takes its arguments positionally or as one table.
 
 --- Show a progress bar (blocking). Can play an animation, hold a prop, and hold off the controls
@@ -1188,11 +1191,11 @@ function whip_core:GetActiveShopId() end
 --- Get the current client-side time.
 ---@return number hour
 ---@return number minute
-function whip_core:GetCurrentTime() end
+function whip_core:GetTime() end
 
 --- Get the current client-side weather.
 ---@return string weather
-function whip_core:GetCurrentWeather() end
+function whip_core:GetWeather() end
 
 --- Check if time is frozen.
 ---@return boolean
@@ -1229,94 +1232,61 @@ function whip_core:GetWeatherLayers() end
 -- Zones
 -- ============================================
 
---- Create a box zone.
----@param data WhipZoneBoxData Zone configuration
----@return string id Registered zone ID
-function whip_core:ZoneBox(data) end
+--- Register a client zone: a box, a sphere or a polygon, by its `type`. Returns its id (yours, or one made for it).
+---
+---     local id = exports.whip_core:RegisterZone({ type = 'sphere', pos = vector3(0, 0, 70), radius = 5.0,
+---         onEnter = function() print('in') end })
+---@param data WhipZoneBoxData|WhipZoneSphereData|WhipZonePolyData Zone configuration, with its `type`
+---@return string|false id Registered zone ID
+---@return string|nil why
+function whip_core:RegisterZone(data) end
 
---- Create a sphere zone.
----@param data WhipZoneSphereData Zone configuration
----@return string id Registered zone ID
-function whip_core:ZoneSphere(data) end
-
---- Create a polygon zone.
----@param data WhipZonePolyData Zone configuration
----@return string id Registered zone ID
-function whip_core:ZonePoly(data) end
-
---- Remove a zone by ID.
+--- Remove one of your zones by ID.
 ---@param id string Zone ID
-function whip_core:ZoneRemove(id) end
+---@return boolean ok
+---@return string|nil why
+function whip_core:RemoveZone(id) end
 
---- Remove all zones in a group.
+--- Remove all your zones in a group.
 ---@param group string Group name
-function whip_core:ZoneRemoveGroup(group) end
+---@return boolean ok
+---@return number|string countOrWhy
+function whip_core:RemoveZoneGroup(group) end
 
---- Move a zone to a new position. Re-indexes spatial grid automatically.
----@param id string Zone ID
----@param pos vector3 New center position
-function whip_core:ZoneUpdatePosition(id, pos) end
+---@class WhipZonePatch
+---@field pos vector3|nil New center position (re-indexes the spatial grid; a poly's points move with it)
+---@field size vector3|number|nil A box's new size, or a sphere's new radius (a poly is resized by its points)
+---@field condition (fun(): boolean)|false|nil The zone only fires while it returns true; false takes it off
+---@field debug boolean|nil Render the zone's outline
+---@field trackVehicles boolean|nil Vehicle enter/exit detection
+---@field label string|nil Display name
+---@field priority number|nil Where zones overlap, every zone's rules hold together; priority decides the speed limit (the highest that sets one; a tie, the lower limit), the weather, and the enter/exit callback order
+---@field notify boolean|nil Enter/exit notifications
+---@field rules WhipZoneRules|false|nil Replaces the rules; false: none
 
---- Resize a zone. For box: new size vector3. For sphere: new radius (as vector3 x component or number).
----@param id string Zone ID
----@param size vector3|number New size
-function whip_core:ZoneUpdateSize(id, size) end
+--- Change one of your zones: only the keys you give. A key it doesn't know changes nothing.
+---
+---     exports.whip_core:UpdateZone(id, { pos = GetEntityCoords(PlayerPedId()), label = 'Here' })
+---@param id string Zone id, or a saved zone's key (EnsureZone)
+---@param patch WhipZonePatch
+---@return boolean ok
+---@return string|nil why
+function whip_core:UpdateZone(id, patch) end
 
---- Check if a point is inside a zone (instant, no polling).
+--- Is a point inside a zone (instant, no polling)?
 ---@param id string Zone id, or a saved zone's key (EnsureZone)
 ---@param point vector3 Point to test
 ---@return boolean
-function whip_core:ZoneContains(id, point) end
+function whip_core:IsPointInZone(id, point) end
 
---- Check if the local player is currently inside a zone.
+--- Is the local player inside a zone right now?
 ---@param id string Zone id, or a saved zone's key (EnsureZone)
 ---@return boolean
-function whip_core:ZoneIsInside(id) end
+function whip_core:IsInZone(id) end
 
---- Get all zone IDs the local player is currently inside.
+--- Every zone ID the local player is inside right now.
 ---@return string[]
-function whip_core:ZoneGetInside() end
-
---- Update the condition function of a zone.
----@param id string Zone ID
----@param fn fun(): boolean New condition function
-function whip_core:ZoneSetCondition(id, fn) end
-
---- Toggle debug rendering for a zone.
----@param id string Zone ID
----@param enabled boolean
-function whip_core:ZoneSetDebug(id, enabled) end
-
---- Enable or disable vehicle tracking for a zone.
----@param id string Zone ID
----@param enabled boolean
-function whip_core:ZoneSetTrackVehicles(id, enabled) end
-
---- Update a zone's label text.
----@param id string Zone ID
----@param label string New label
-function whip_core:ZoneSetLabel(id, label) end
-
---- Set a zone's priority. Where zones overlap, every zone's rules hold together; priority decides the speed
---- limit (the highest that sets one; a tie, the lower limit), the weather, and the enter/exit callback order.
----@param id string Zone ID
----@param priority number Priority value
-function whip_core:ZoneSetPriority(id, priority) end
-
---- Enable or disable enter/exit notifications for a zone.
----@param id string Zone ID
----@param enabled boolean
-function whip_core:ZoneSetNotify(id, enabled) end
-
---- Replace the rules table on a zone.
----@param id string Zone ID
----@param rules table<string, boolean> New rules
-function whip_core:ZoneSetRules(id, rules) end
-
---- Toggle a single rule key on a zone.
----@param id string Zone ID
----@param ruleKey string Rule to toggle
-function whip_core:ZoneToggleRule(id, ruleKey) end
+function whip_core:GetZonesInside() end
 
 --- Get a zone's full definition (client-side).
 ---
@@ -1325,17 +1295,13 @@ function whip_core:ZoneToggleRule(id, ruleKey) end
 --- not returned: it belongs to whoever set it, and the poll loop owns when it runs.
 ---@param id string Zone ID
 ---@return table|nil
-function whip_core:GetZoneDef(id) end
+function whip_core:GetZone(id) end
 
---- Get all zones near a point, sorted by distance.
+--- Every zone near a point, sorted by distance.
 ---@param pos vector3 Center position
 ---@param radius? number Search radius (default: 50)
 ---@return table[] Array of { id, type, label, pos, dist }
-function whip_core:ZoneGetNearby(pos, radius) end
-
---- Get the total number of registered client zones.
----@return number count
-function whip_core:ZoneGetCount() end
+function whip_core:GetZonesNearby(pos, radius) end
 
 -- ============================================
 -- Doors
@@ -1503,16 +1469,16 @@ function whip_core:ReportVehicleStat(vehicle, name, value) end
 --- Every stat on a vehicle, as a plain table.
 ---@param vehicle number|WhipVehicleRef A vehicleId, or a vehicle reference — an entity is { entity = veh }
 ---@return table<string, number> stats A copy — mutating it changes nothing
-function whip_core:GetAllVehicleStats(vehicle) end
+function whip_core:GetVehicleStats(vehicle) end
 
 --- Be told when a vehicle stat changes, on ANY vehicle streamed to this client.
 ---
---- The vehicle counterpart of OnStatChange. Push, not poll: the server writes the stat block once
+--- The vehicle counterpart of OnStatChanged. Push, not poll: the server writes the stat block once
 --- and every client with that vehicle in scope is notified, so a satellite never needs its own
 --- loop. Listeners are dropped automatically when the resource that registered them stops.
 ---
 --- ```lua
---- exports.whip_core:OnVehicleStatChange('nos', function(vehicleId, value, old, entity)
+--- exports.whip_core:OnVehicleStatChanged('nos', function(vehicleId, value, old, entity)
 ---     if value < 10 then exports.whip_core:Notify('Nos running low', 'error') end
 --- end)
 --- ```
@@ -1528,7 +1494,7 @@ function whip_core:GetAllVehicleStats(vehicle) end
 ---@param id? string|WhipVehicleListenOpts Registration key within your resource; registering the same id again replaces it
 ---@param opts? WhipVehicleListenOpts
 ---@return boolean registered false if the arguments were not a string and a function
-function whip_core:OnVehicleStatChange(name, callback, id, opts) end
+function whip_core:OnVehicleStatChanged(name, callback, id, opts) end
 
 --- Run code while a vehicle in scope carries a stat, without writing a presence cache.
 ---
@@ -1776,17 +1742,12 @@ function whip_core:HoldVehicleAppearance(vehicleId, held) end
 
 --- Read one value off a vehicle, exactly as stored — a stored `false` reads as false. No default
 --- to fall back to, unlike a stat: nothing declares what data a vehicle OUGHT to carry, so nil
---- means the car does not have it and the caller decides what that means.
+--- means the car does not have it and the caller decides what that means. With no key, everything
+--- it carries, as a plain copy ({} when the vehicle is not streamed in or carries nothing).
 ---@param vehicle number|WhipVehicleRef A vehicleId, or a vehicle reference — an entity is { entity = veh }
----@param key string Data key
+---@param key? string Data key
 ---@return any value
 function whip_core:GetVehicleData(vehicle, key) end
-
---- Everything a vehicle carries, as a plain copy. Empty table when the vehicle
---- is not streamed in or carries nothing.
----@param vehicle number|WhipVehicleRef A vehicleId, or a vehicle reference — an entity is { entity = veh }
----@return table data
-function whip_core:GetAllVehicleData(vehicle) end
 
 --- Be told when a piece of vehicle data changes, on any vehicle streamed to this client.
 --- The server exports the SAME NAME, with one difference in the callback: it is told
@@ -1802,7 +1763,7 @@ function whip_core:GetAllVehicleData(vehicle) end
 ---@param id string|WhipVehicleListenOpts|nil Defaults to the key
 ---@param opts WhipVehicleListenOpts|nil
 ---@return boolean registered
-function whip_core:OnVehicleDataChange(key, callback, id, opts) end
+function whip_core:OnVehicleDataChanged(key, callback, id, opts) end
 
 -- ============================================
 -- CONTROLLER
@@ -1953,7 +1914,7 @@ function whip_core:SetWalkOverride(clipset) end
 --- screen or a HUD. `countdown` is the seconds left on its band's clock, or nil. The local events
 --- whip_core:run:joined / :updated / :left / :ended say when it changes (types/events.lua).
 ---@return { runId: number, scenario: string, name: string, objective: string|nil, countdown: number|nil }[]
-function whip_core:GetMyRuns() end
+function whip_core:GetPlayerScenarioRuns() end
 
 --- What the game's browser can do (FiveM's Chromium 103 or 144), as whip_core's page reported it: a
 --- copy. Before the page has reported: false, 'not_detected_yet' — whip_core:nui:capsDetected says when.

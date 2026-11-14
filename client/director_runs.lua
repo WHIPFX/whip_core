@@ -4,7 +4,7 @@
 --
 -- The server tells this game about the Director runs its player is in (server/director/api.lua,
 -- Director.tellPlayer): they joined one, what its band says now, they left it, it ended. Kept here so
--- a phone's job screen or a HUD can ask (GetMyRuns) and hear (local events), without asking the
+-- a phone's job screen or a HUD can ask (GetPlayerScenarioRuns) and hear (local events), without asking the
 -- server or reading a statebag:
 --
 --   whip_core:run:joined   { runId, scenario, name, objective, countdown }
@@ -13,7 +13,7 @@
 --   whip_core:run:ended    { runId, scenario, name, outcome, payout }
 --
 -- Only this player's runs, and never a builder's Test. `countdown` is the seconds left on the band's
--- clock when it was sent; GetMyRuns counts it down.
+-- clock when it was sent; GetPlayerScenarioRuns counts it down.
 
 local mine = {}   -- [runId] = { runId, scenario, name, objective, endsAt (GetGameTimer ms) | nil }
 
@@ -45,7 +45,7 @@ RegisterNetEvent('whip_core:client:directorRun', function(op, info, extra)
 end)
 
 --- The runs this player is in now, newest first: { { runId, scenario, name, objective, countdown } }.
-exports('GetMyRuns', function()
+exports('GetPlayerScenarioRuns', function()
     local out = {}
     for _, r in pairs(mine) do out[#out + 1] = viewOf(r) end
     table.sort(out, function(a, b) return a.runId > b.runId end)

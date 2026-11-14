@@ -7,7 +7,7 @@
 
 local ClientStats = {}
 local ClientEffects = {}
-local _changeListeners = {}  -- [name] = { ['<resource>:<id>'] = { fn, owner } } — keyed, see OnStatChange
+local _changeListeners = {}  -- [name] = { ['<resource>:<id>'] = { fn, owner } } — keyed, see OnStatChanged
 -- Run a stat's change listeners. Defined further down, beside callListener; declared here because
 -- the sync handlers above it call it.
 local _fireListeners
@@ -260,7 +260,7 @@ local function callListener(reg, wildcard, name, value, old)
         local key = ('%s|%s|%s'):format(tostring(reg.owner), tostring(name), tostring(err))
         if not _saidListenerError[key] then
             _saidListenerError[key] = true
-            ErrorTap.caught(('[whip_core:stats] ERROR in %s\'s OnStatChange("%s"): %s')
+            ErrorTap.caught(('[whip_core:stats] ERROR in %s\'s OnStatChanged("%s"): %s')
                 :format(tostring(reg.owner), tostring(name), tostring(err)), reg.owner)
         end
     end
@@ -290,7 +290,7 @@ exports('GetStat', function(name)
     return ClientStats[name]
 end)
 
---- The same read for whip_core's own client files (GetPlayerData in client/player.lua), without a
+--- The same read for whip_core's own client files (the GetPlayer export in client/player.lua), without a
 --- trip through the export.
 ---@param name string
 ---@return number|nil
@@ -298,15 +298,15 @@ function ClientStatValue(name)
     return ClientStats[name]
 end
 
---- A copy of every stat. Global: whip_core's own /mystatus reads it without the export.
-function GetAllStats()
+--- A copy of every stat.
+local function allStats()
     local copy = {}
     for k, v in pairs(ClientStats) do
         copy[k] = v
     end
     return copy
 end
-exports('GetAllStats', GetAllStats)
+exports('GetStats', allStats)
 
 exports('HasEffect', function(name)
     return ClientEffects[name] ~= nil
@@ -325,9 +325,9 @@ end)
 --- Keyed, not appended: `<your resource>:<id>`, where `id` defaults to the stat name, so a second
 --- call with the same id REPLACES the first (registering from onReady is safe). Pass a distinct `id`
 --- to hold two listeners on one stat. Cleared when your resource stops. The same shape as
---- OnVehicleStatChange (client/vehicle_stats.lua).
+--- OnVehicleStatChanged (client/vehicle_stats.lua).
 ---
---- Options, the same as the server's OnStatChange and OnVehicleStatChange, third or fourth after an
+--- Options, the same as the server's OnStatChanged and OnVehicleStatChanged, third or fourth after an
 --- `id`:
 ---   * `table = true` — one table instead: { key, value, old }.
 ---   * `now = true`   — also called once straight away with the current value (old = nil).
@@ -338,7 +338,7 @@ end)
 ---@param opts table|nil       { table?: boolean, now?: boolean }
 ---@return boolean registered
 ---@return string|nil err
-exports('OnStatChange', function(name, callback, id, opts)
+exports('OnStatChanged', function(name, callback, id, opts)
     local owner = GetInvokingResource() or GetCurrentResourceName()
     if type(name) ~= 'string' or name == '' then return false, "name is required (a stat name, or '*')" end
     -- `callback ~= nil`, not a type test: a callback that crossed the export is not type 'function'.

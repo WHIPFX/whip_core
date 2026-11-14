@@ -267,7 +267,7 @@ end)
 --- isDead, health and armour are read from the live sources at call time. A copy, so a caller in
 --- this resource cannot edit PlayerData by accident.
 ---@return table
-function GetPlayerData()   -- global: whip_core's own files read it without the export
+local function playerData()
     if not PlayerLoaded then return {} end
     local out = {}
     for k, v in pairs(PlayerData) do out[k] = v end
@@ -277,7 +277,7 @@ function GetPlayerData()   -- global: whip_core's own files read it without the 
     if armour ~= nil then out.armour = armour end
     return out
 end
-exports('GetPlayerData', GetPlayerData)
+exports('GetPlayer', playerData)
 
 exports('IsPlayerLoaded', function()
     return PlayerLoaded

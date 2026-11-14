@@ -560,7 +560,7 @@ function Registry.get(name) return _all[name] end
 local _releasers = {}
 
 --- Join tag releases. whip_core files only; `release` must not yield (slow work in its own thread).
----@param name string    shown in ListTagged and in a failure print
+---@param name string    shown in GetTagged and in a failure print
 ---@param order number   lower goes first (registries default to 50)
 ---@param release fun(owner: string, tag: string): number
 ---@param list fun(owner: string, tag: string): table|nil
@@ -666,7 +666,7 @@ exports('ReleaseTag', function(tag)
 end)
 
 --- What you hold under one run tag: { { registry, key }, ... }.
-exports('ListTagged', function(tag)
+exports('GetTagged', function(tag)
     local owner = Registry.caller()
     if badTag(tag) then return {} end
     return Registry.listTagged(owner, tag)

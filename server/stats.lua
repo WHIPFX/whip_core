@@ -674,7 +674,7 @@ function Stats.set(source, name, value, changeSource, pedDelta)
     Stats._syncStat(source, name, value, config.type == 'vital' and pedDelta or nil,
         loss and lossCause(changeSource) or nil)
 
-    -- And to anyone on the server listening (OnStatChange). A vital re-set to the same value is
+    -- And to anyone on the server listening (OnStatChanged). A vital re-set to the same value is
     -- a correction, not a change, so it is not announced.
     if delta ~= 0 then Stats._announce(source, name, value, old, changeSource or 'direct') end
     return true
@@ -726,7 +726,7 @@ end
 
 --- Server-side stat subscribers: [statName or '*']['<resource>:<id>'] = { fn, owner, asTable }.
 ---
---- The server half of OnStatChange, the same shape as the client's and OnVehicleStatChange: keyed by
+--- The server half of OnStatChanged, the same shape as the client's and OnVehicleStatChanged: keyed by
 --- `<resource>:<id>` (so the onReady re-fire replaces rather than stacks), the owner kept with the
 --- callback, swept when the owner stops.
 Stats._listeners = {}
@@ -747,7 +747,7 @@ local function callListener(reg, wildcard, source, name, value, old, reason)
         ok, err = pcall(reg.fn, source, value, old, reason)
     end
     if not ok then
-        print(('[whip_core:stats] OnStatChange listener (%s) for "%s" errored: %s')
+        print(('[whip_core:stats] OnStatChanged listener (%s) for "%s" errored: %s')
             :format(tostring(reg.owner), name, tostring(err)))
     end
 end
@@ -802,7 +802,7 @@ Registry.addLister('statListener', function()
 end)
 
 --- whip_core's OWN files hear a stat change here (the Systems Creator's "a player is hurt"), on the
---- path OnStatChange's listeners take (Stats._announce: every set, and the vitals report combat
+--- path OnStatChanged's listeners take (Stats._announce: every set, and the vitals report combat
 --- damage comes by). `fn({ source, key, value, old, reason })` must not wait. Keyed `whip_core:<id>`:
 --- the same id again replaces it.
 ---@param name string  a stat's name, or '*'
@@ -1520,7 +1520,7 @@ end)
 --- a single-value read answers nothing rather than a stand-in (Return Patterns).
 exports('GetStat', function(source, name) return Stats.get(source, name) end)
 
---- The label a stat change carries into the change log (and to OnStatChange): the caller's own,
+--- The label a stat change carries into the change log (and to OnStatChanged): the caller's own,
 --- or 'by <resource>' so the debug overlay still says who, when they gave none.
 ---@param reason any
 ---@param caller string
@@ -1542,25 +1542,25 @@ exports('AddStat', function(source, name, delta, reason)
     return Stats.add(source, name, delta, statReason(reason, caller))
 end)
 --- Every stat, or `{}, 'Player not loaded'` — a list read answers the empty list and why.
-exports('GetAllStats', function(source)
+exports('GetStats', function(source)
     local all = Stats.getAll(source)
     if not all then return {}, 'Player not loaded' end
     return all
 end)
 
---- Be told when a player's stat changes, on the server: the client's OnStatChange, with the
+--- Be told when a player's stat changes, on the server: the client's OnStatChanged, with the
 --- player's source first:
 ---
----     exports.whip_core:OnStatChange('hunger', function(source, value, old, reason)
+---     exports.whip_core:OnStatChanged('hunger', function(source, value, old, reason)
 ---         if value <= 0 then ... end
 ---     end)
 ---
----     exports.whip_core:OnStatChange('*', function(source, name, value, old, reason) end)
+---     exports.whip_core:OnStatChanged('*', function(source, name, value, old, reason) end)
 ---
 --- `reason` is what caused it: 'decay', 'item:food', 'combat (reported): Pistol', 'by my_resource'...
 --- Every change is heard — decay ticks, item use, effects, combat damage, other resources' SetStat.
 ---
---- OPTIONS, the same as OnVehicleStatChange's, third or fourth after an `id`:
+--- OPTIONS, the same as OnVehicleStatChanged's, third or fourth after an `id`:
 ---   * `table = true` — one table instead: { source, key, value, old, reason }.
 ---   * `now = true`   — also called once straight away for every loaded player who has the stat
 ---                      (old = nil, reason = 'now'), so there is no separate "read them all" step.
@@ -1574,7 +1574,7 @@ end)
 ---@param opts table|nil  { table?: boolean, now?: boolean }
 ---@return boolean ok
 ---@return string|nil err
-exports('OnStatChange', function(name, callback, id, opts)
+exports('OnStatChanged', function(name, callback, id, opts)
     local owner = Registry.caller()   -- first, before anything can yield
     if type(name) ~= 'string' or name == '' then return false, "name is required (a stat name, or '*')" end
     -- `~= nil`, never a type test: a function from another resource arrives as a callable table.
@@ -1740,7 +1740,7 @@ SecureEvent('whip_core:server:reportVitals', {
                 Stats._logChange(source, 'health', delta, label)
                 -- Owed to disk, like every other health write (Stats.set marks it).
                 if PlayerRows and PlayerRows.markDirty then PlayerRows.markDirty(source) end
-                -- And announced (OnStatChange): this is the path combat damage takes.
+                -- And announced (OnStatChanged): this is the path combat damage takes.
                 Stats._announce(source, 'health', health, before, label)
             end
 

@@ -21,7 +21,7 @@
 //     dial places itself in window pixels;
 //   - /vehiclehud (client/vehicles.lua) switches the whole HUD off for a performance test: vehicleHudEnabled. Off,
 //     the dial is disposed (its WebGL context and GPU memory freed, the canvas removed); on, it is built again;
-//   - IT MAKES ROOM for another resource's UI in its corner (uiAreas: SetUIArea, client/hud.lua; Josh, 7 Nov 2026: the
+//   - IT MAKES ROOM for another resource's UI in its corner (uiAreas: SetScreenArea, client/hud.lua; Josh, 7 Nov 2026: the
 //     phone's notifications peeking up push it up, the phone itself pushes it left, next to it). See makeRoom below.
 //
 // THE DIAL AND three.js ARE IMPORTED THE FIRST TIME A VEHICLE IS ENTERED, so a player on foot pays nothing; the
@@ -204,7 +204,7 @@ if (statusHud) new MutationObserver(update).observe(statusHud, { attributes: tru
 // Making room: other resources' UIs in its corner
 // ============================================
 //
-// An area (SetUIArea, client/hud.lua) is where another resource's UI will sit once still, as fractions of the screen.
+// An area (SetScreenArea, client/hud.lua) is where another resource's UI will sit once still, as fractions of the screen.
 // One that overlaps the dial moves it, by the SHORTER of two ways: up, to stand above it, or left, to stand beside it.
 // The phone's notifications peeking up from the bottom edge are short, so the dial goes up over them; the phone itself
 // is half the screen tall, so the dial goes left, next to it. A move that would take the dial off the screen is no

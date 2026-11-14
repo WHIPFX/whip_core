@@ -2333,7 +2333,7 @@ local function purchaseInner(source, paymentMethod, accountId, expectedTotal)
             refundDue = refundDue + (line.unit * line.amount)
         else
             -- Made for the buyer: off an infinite shelf an item was made for nobody (reason 'shelf');
-            -- one whose generator asks for it (RegisterItemDefaultMeta ... { forBuyer = true }: a SIM
+            -- one whose generator asks for it (RegisterItemDefaultMetadata ... { forBuyer = true }: a SIM
             -- with its buyer's number) is made again now. Stocked goods are real items and keep what
             -- they are.
             if def.mode ~= 'stocked' and Inventory.MetaForBuyer[entry.item] then

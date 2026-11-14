@@ -1512,8 +1512,8 @@ exports('GetNpc', function(ref)
     return Npcs.get(ref)
 end)
 
---- Your NPCs (or those under one of your tags): ListNpcs({ tag }) -> table[].
-exports('ListNpcs', function(filter)
+--- Your NPCs (or those under one of your tags): GetNpcs({ tag }) -> table[].
+exports('GetNpcs', function(filter)
     local owner = Registry.caller()
     local f = { owner = owner }
     if type(filter) == 'table' and type(filter.tag) == 'string' then f.tag = filter.tag end

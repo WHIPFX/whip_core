@@ -698,7 +698,7 @@ end
 -- Who a new item is for
 -- ============================================
 --
--- An item's default metadata (RegisterItemDefaultMeta) is made when the item comes into being. The
+-- An item's default metadata (RegisterItemDefaultMetadata) is made when the item comes into being. The
 -- generator gets a second argument, ctx, so it can depend on who it is for (a SIM card carrying its
 -- buyer's new number):
 --   ctx.source, ctx.charId   the player receiving it, when there is one (nil into a stash, a boot...)
@@ -708,7 +708,7 @@ end
 -- must cope without one.
 --
 -- Bought off an infinite shelf, an item is made again for the buyer only if its generator asked
--- (RegisterItemDefaultMeta(key, fn, { forBuyer = true })); every other item keeps the shelf's metadata.
+-- (RegisterItemDefaultMetadata(key, fn, { forBuyer = true })); every other item keeps the shelf's metadata.
 
 --- [itemKey] = true: its generator runs again for the buyer at purchase (see above).
 Inventory.MetaForBuyer = {}
@@ -2691,11 +2691,11 @@ end
 --- The generator is `function(itemKey, ctx)`: ctx says who it is for (Inventory.metaContext, above
 --- Inventory.addItem). opts.forBuyer: bought off an infinite shelf, it runs again for the buyer.
 --- Answers `true` or `false, reason`.
-exports('RegisterItemDefaultMeta', function(itemKey, generator, opts)
+exports('RegisterItemDefaultMetadata', function(itemKey, generator, opts)
     return Inventory.registerDefaultMeta(itemKey, generator, Registry.caller(), opts)   -- the caller first
 end)
 
---- RegisterItemDefaultMeta's body, with its owner. Owned, so the registry's sweep takes it away with
+--- RegisterItemDefaultMetadata's body, with its owner. Owned, so the registry's sweep takes it away with
 --- its resource (a forBuyer mark left behind with no generator does nothing: the purchase asks for both).
 ---@param owner string
 ---@param opts table|nil  { forBuyer = true }
@@ -2960,7 +2960,7 @@ exports('GetItemDef', function(key)
     return Config.Items[key]
 end)
 
-exports('GetAllItemDefs', function()
+exports('GetItemDefs', function()
     return Config.Items
 end)
 

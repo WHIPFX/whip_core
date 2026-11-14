@@ -705,7 +705,7 @@ local _panelItems = Registry.new('PanelItem', {
 })
 
 --- The "empty slots" metadata generators RegisterPanelItem made itself, so a re-registration can
---- tell its own from one the satellite registered with RegisterItemDefaultMeta. Weak: a generator
+--- tell its own from one the satellite registered with RegisterItemDefaultMetadata. Weak: a generator
 --- the registry has dropped needs no remembering.
 local _panelGenerators = setmetatable({}, { __mode = 'k' })
 
@@ -1126,7 +1126,7 @@ function Panels.registerItem(itemKey, config, resource)
 
     -- Auto-generate empty metadata on item creation, only for the plain slot-array registrations
     -- that use storageKey (a read/write registration owns its shape, and says so with
-    -- RegisterItemDefaultMeta).
+    -- RegisterItemDefaultMetadata).
     --
     -- Through the owned registry, as the registering resource: it only fills an EMPTY place (or one
     -- this function filled before), and it goes with its owner.

@@ -189,8 +189,8 @@ exports('__RemoveSkillCheckGame', function(id)
     return Games:remove(owner, id)
 end)
 
---- ListSkillCheckGames() -> { { id, label, desc, levels, needs, owner }, ... }: every game but the ring.
-exports('ListSkillCheckGames', function() return SkillGames.list() end)
+--- GetSkillCheckGames() -> { { id, label, desc, levels, needs, owner }, ... }: every game but the ring.
+exports('GetSkillCheckGames', function() return SkillGames.list() end)
 
 --- How fast can this check honestly be answered?
 ---
@@ -496,7 +496,7 @@ end)
 ---     -- safe to hand over the reward here
 --- end
 --- ```
---- Another resource's game instead of the ring (ListSkillCheckGames names them):
+--- Another resource's game instead of the ring (GetSkillCheckGames names them):
 ---
 --- ```lua
 --- local passed, why = exports.whip_core:SkillCheck(source, 'hard', { game = 'phone.reroute' })

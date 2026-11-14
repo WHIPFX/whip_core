@@ -305,11 +305,11 @@ exports('GetWeatherLayers', function()
     return out
 end)
 
-exports('GetCurrentTime', function()
+exports('GetTime', function()
     return math.floor(clientHour), math.floor(clientMinute)
 end)
 
-exports('GetCurrentWeather', function()
+exports('GetWeather', function()
     return (resolve('weather'))
 end)
 

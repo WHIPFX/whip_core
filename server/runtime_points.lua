@@ -865,8 +865,8 @@ exports('RemovePoint', function(pointId)
     return RuntimePoints.remove(owner, pointId)
 end)
 
---- Your points, or those under one of your tags: ListPoints({ tag }) -> table[].
-exports('ListPoints', function(filter)
+--- Your points, or those under one of your tags: GetPoints({ tag }) -> table[].
+exports('GetPoints', function(filter)
     local owner = Registry.caller()
     local f = {}
     if type(filter) == 'table' and type(filter.tag) == 'string' then f.tag = filter.tag end

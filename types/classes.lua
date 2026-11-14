@@ -479,10 +479,10 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field resource string|nil Server data only: the resource that made the change
 ---@field entity number|nil Client only: the entity it happened on
 
---- Options for OnVehicleStatChange / OnVehicleDataChange.
+--- Options for OnVehicleStatChanged / OnVehicleDataChanged.
 ---@class WhipVehicleListenOpts
 ---@field table boolean|nil Hand the callback one WhipVehicleChange table instead of positional arguments
----@field now boolean|'all'|nil Also call it once straight away for every car that already carries the stat or key; 'all' (OnVehicleStatChange on the server, a named stat): every car whip has, its default included
+---@field now boolean|'all'|nil Also call it once straight away for every car that already carries the stat or key; 'all' (OnVehicleStatChanged on the server, a named stat): every car whip has, its default included
 
 --- Options for SpawnTempVehicle.
 ---@class WhipTempVehicleOpts
@@ -698,6 +698,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field exitNotify string|nil|false Custom exit notification (false = disable)
 
 ---@class WhipZoneBoxData
+---@field type 'box'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field pos vector3 Center position
 ---@field size vector3 Width (X), length (Y), height (Z)
@@ -716,6 +717,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field onVehicleExit (fun(entity: number, plate: string, zone: WhipZoneBoxData))|nil
 
 ---@class WhipZoneSphereData
+---@field type 'sphere'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field pos vector3 Center position
 ---@field radius number Radius in meters
@@ -733,6 +735,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field rules WhipZoneRules|nil Declarative zone rules (framework-enforced)
 
 ---@class WhipZonePolyData
+---@field type 'poly'
 ---@field id string|nil Custom ID (auto-generated if nil)
 ---@field points vector2[] Array of polygon vertices
 ---@field minZ number|nil Minimum Z height

@@ -667,15 +667,15 @@ end)
 local externalUIs = {}
 
 --- Declare that this resource's own UI is open or closed; whip then treats it like one of its own screens.
----     exports.whip_core:SetUIOpen(true)  /  SetUIOpen(false)
---- With more than one screen, name each: SetUIOpen(true, 'shop'). No need to unset on stop or restart.
+---     exports.whip_core:SetScreenOpen(true)  /  SetScreenOpen(false)
+--- With more than one screen, name each: SetScreenOpen(true, 'shop'). No need to unset on stop or restart.
 --- `{ keepHud = true }` (the phone) leaves the status HUD, minimap and vehicle dial up; chat, prompts and hotkeys
---- still make way. If it sits where the HUD is, say where with SetUIArea (client/hud.lua).
+--- still make way. If it sits where the HUD is, say where with SetScreenArea (client/hud.lua).
 ---@param open boolean
 ---@param key string|nil  which of your screens; leave it out if you only have one
 ---@param opts table|nil  { keepHud = true }: the HUD stays up for this screen
 ---@return boolean accepted  false if there was no calling resource to attribute this to
-exports('SetUIOpen', function(open, key, opts)
+exports('SetScreenOpen', function(open, key, opts)
     local res = GetInvokingResource()
     -- nil means the call came from inside whip_core, which sets its own state directly.
     if not res then return false end

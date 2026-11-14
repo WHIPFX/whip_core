@@ -207,7 +207,7 @@ define({
 })
 
 define({
-    type = 'door.release', category = 'world', kind = 'action', title = 'Give Door Back', api = 'ReleaseHeldDoor',
+    type = 'door.release', category = 'world', kind = 'action', title = 'Give Door Back', api = 'ReleaseDoor',
     power = false,
     desc = 'Hands a door this system took charge of back to its own rules (as it was). A door it does not hold is left alone.',
     values = { inputs = { { key = 'door', type = 'door', label = 'Door' } } },
@@ -490,7 +490,7 @@ local WORLD_EVERY_S = 10
 local lastWorldChange = {}   -- [instance id] = when this copy last changed the world
 
 define({
-    type = 'world.set', category = 'world', kind = 'wait', title = 'Change the World', api = { 'SetTime', 'SetWeather', 'SetFrozen', 'SetBlackout' },
+    type = 'world.set', category = 'world', kind = 'wait', title = 'Change the World', api = { 'SetTime', 'SetWeather', 'SetTimeFrozen', 'SetBlackout' },
     desc = 'Changes the time, the weather, the clock or the city\'s lights for everyone on the server. Once every 10 seconds a system at most; it stays as it is when the system is switched off.',
     props = { { key = 'what', kind = 'select', label = 'Do', options = WORLD_DO, default = WORLD_DO[2] },
               { key = 'weather', kind = 'select', label = 'Weather', options = Config.WeatherTypes or { 'CLEAR' }, default = 'CLEAR' } },

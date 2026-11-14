@@ -469,7 +469,7 @@
 --    whip_core:scenario:switchedOn { scenario, name, rev, replaced, by } -- replaced = another revision
 --    of it was on; by = { source, name } (a player) | { resource } (SwitchScenario) | nil (the server)
 --    whip_core:scenario:switchedOff { scenario, name, rev, why, by }
--- C (this player's own runs, from client/director_runs.lua; GetMyRuns): whip_core:run:joined /
+-- C (this player's own runs, from client/director_runs.lua; GetPlayerScenarioRuns): whip_core:run:joined /
 --    :updated { runId, scenario, name, objective, countdown }, :left { runId, scenario, name, why },
 --    :ended { runId, scenario, name, outcome, payout }
 -- C (local, the world builder, client/furnish_builder.lua): whip_core:director:builderCopy { id, kind, model, entity,

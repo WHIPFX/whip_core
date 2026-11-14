@@ -156,7 +156,7 @@ Whip.register(function()
         end
 
         runs[source] = nil
-        exports.whip_core:RemoveBlip(blipId(source))
+        exports.whip_core:HideBlip(blipId(source))
         exports.whip_core:DespawnVehicle(run.vanId)
         exports.whip_core:RefundPlayer(run.receipt)
         takeBackPackages(source)
@@ -170,7 +170,7 @@ AddEventHandler('whip_core:player:logout', function(e)
     local run = runs[e.source]
     if not run then return end
     runs[e.source] = nil
-    exports.whip_core:RemoveBlip(blipId(e.source))
+    exports.whip_core:HideBlip(blipId(e.source))
     if run.vanId then exports.whip_core:DespawnVehicle(run.vanId) end
     takeBackPackages(e.source)
 end)
@@ -181,7 +181,7 @@ AddEventHandler('whip_core:vehicle:released', function(e)
     for source, run in pairs(runs) do
         if run.vanId == e.vehicleId then
             runs[source] = nil
-            exports.whip_core:RemoveBlip(blipId(source))
+            exports.whip_core:HideBlip(blipId(source))
             takeBackPackages(source)
             exports.whip_core:NotifyPlayer(source, 'The depot took the van back. Your deposit is kept', 'error')
             return

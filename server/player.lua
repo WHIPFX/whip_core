@@ -203,7 +203,7 @@ function WhipPlayer:setMetadata(key, value)
     PlayerRows.markDirty(self.source)
     self._metadataDirty = (self.source and PlayerRows._dirty[self.source]) or true
 
-    -- And to the player's own client (GetPlayerData), which had the whole table at login anyway. Only
+    -- And to the player's own client (the client's GetPlayer), which had the whole table at login anyway. Only
     -- for a player in the world under this object (an offline character's sheet has no client).
     if Players[self.source] == self then
         TriggerClientEvent('whip_core:client:metadataChanged', self.source, key, value)

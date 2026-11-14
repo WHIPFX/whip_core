@@ -545,12 +545,12 @@ VehicleStats._batchChanges = {}
 
 --- Server-side per-stat subscribers: [statName or '*']['<resource>:<id>'] = { fn, owner }
 ---
---- Keyed, not an array, so re-registering replaces (see OnVehicleStatChange). The owner is stored
+--- Keyed, not an array, so re-registering replaces (see OnVehicleStatChanged). The owner is stored
 --- with each callback. '*' hears every stat.
 VehicleStats._statListeners = {}
 
 --- whip_core's OWN files hear one vehicle stat change here (the Systems Creator's "the engine starts"),
---- on the path OnVehicleStatChange's listeners take (announce, below: once per transaction).
+--- on the path OnVehicleStatChanged's listeners take (announce, below: once per transaction).
 --- `fn({ vehicleId, key, value, old, cleared, source })` must not wait. Keyed `whip_core:<id>`: the
 --- same id again replaces it.
 ---@param name string
@@ -564,7 +564,7 @@ function VehicleStats.onChange(name, id, fn)
 end
 
 --- Call one listener, one table or positional as it registered. A '*' listener is also told which
---- stat moved: positional, the name comes second, as OnStatChange's '*' does for players.
+--- stat moved: positional, the name comes second, as OnStatChanged's '*' does for players.
 ---@param reg table
 ---@param wildcard boolean
 local function callListener(reg, wildcard, vehicleId, name, entry)
@@ -588,7 +588,7 @@ local function callListener(reg, wildcard, vehicleId, name, entry)
 end
 
 --- Tell the listeners what moved, once per transaction (`batched`), in the order it was written.
---- Only a stat someone subscribed to (OnVehicleStatChange, VehicleStats.onChange) costs more than a
+--- Only a stat someone subscribed to (OnVehicleStatChanged, VehicleStats.onChange) costs more than a
 --- lookup. There is no broadcast event: one entered every running resource on every change, heard
 --- or not.
 ---
@@ -1680,9 +1680,13 @@ exports('GetVehicleStat', function(vehicleId, name)
     return VehicleStats.get(vehicleId, name)
 end)
 
-exports('GetAllVehicleStats', function(vehicleId)
+--- Every stat on a vehicle, defaults filled in. `{ stored = true }`: only what it has a stored value for, no defaults
+--- (`nil` for a stat means "not fitted", for an installable, which a default would hide).
+exports('GetVehicleStats', function(vehicleId, opts)
+    local stored = type(opts) == 'table' and opts.stored == true
     vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return nil end
+    if not vehicleId then return stored and {} or nil end
+    if stored then return VehicleStats.getStored(vehicleId) end
     return VehicleStats.getAll(vehicleId)
 end)
 
@@ -1719,7 +1723,7 @@ exports('SetVehicleStats', function(vehicleId, values, changeSource)
     if type(values) ~= 'table' then return false, 'values must be a table of [statName] = number' end
 
     -- Unregistered names are skipped (as non-numbers are) and named in the console; the rest lands.
-    -- The reason is returned only when nothing landed (as SetVehicleDataMany).
+    -- The reason is returned only when nothing landed (as SetVehicleData with a table).
     local known, unknown = {}, nil
     for name, value in pairs(values) do
         if unknownStatName(name) then
@@ -1781,22 +1785,12 @@ exports('PurgeVehicleStat', function(name)
     return VehicleStats.purge(name)
 end)
 
---- Everything a vehicle actually has a stored value for, without defaults filled in.
----
---- `nil` for a stat means no stored value: "not fitted", for an installable. (GetAllVehicleStats
---- fills in defaults, so it can't say.)
-exports('GetStoredVehicleStats', function(vehicleId)
-    vehicleId = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return {} end
-    return VehicleStats.getStored(vehicleId)
-end)
-
 --- Be told when ONE stat changes, on any vehicle, without being woken for the rest.
 ---
---- The server half of OnVehicleStatChange (the same name on both sides). Entered only when that
+--- The server half of OnVehicleStatChanged (the same name on both sides). Entered only when that
 --- name moved, on any car, whoever registered the stat: another resource's stat is heard the same.
 ---
----     exports.whip_core:OnVehicleStatChange('fuel', function(vehicleId, value, previous, cleared)
+---     exports.whip_core:OnVehicleStatChanged('fuel', function(vehicleId, value, previous, cleared)
 ---         if value < 10 then ... end
 ---     end)
 ---
@@ -1807,9 +1801,9 @@ end)
 --- The callback's fourth argument differs by side: the server knows whether the stat was CLEARED,
 --- the client which ENTITY it happened on.
 ---
---- Options, the same on both sides and on OnVehicleDataChange:
+--- Options, the same on both sides and on OnVehicleDataChanged:
 ---
----     exports.whip_core:OnVehicleStatChange('fuel', function(change)
+---     exports.whip_core:OnVehicleStatChanged('fuel', function(change)
 ---         -- change.vehicleId, change.key, change.value, change.old, change.cleared, change.source
 ---     end, { table = true, now = true })
 ---
@@ -1828,9 +1822,9 @@ end)
 ---@return boolean registered
 ---@param id any|nil  only when a caller genuinely wants two listeners on one stat
 ---@param opts table|nil  { table?: boolean, now?: boolean|'all' }
-exports('OnVehicleStatChange', function(name, callback, id, opts)
+exports('OnVehicleStatChanged', function(name, callback, id, opts)
     -- `callback ~= nil`, not a type check: it arrived through this export as a callable.
-    -- `false, why`, as OnStatChange answers.
+    -- `false, why`, as OnStatChanged answers.
     if type(name) ~= 'string' or name == '' then return false, 'name is required (a vehicle stat name)' end
     if callback == nil then return false, 'callback is required' end
     if type(id) == 'table' and opts == nil then id, opts = nil, id end

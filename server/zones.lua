@@ -98,11 +98,11 @@ end
 ---
 --- Two kinds of zone live here and they are governed differently:
 ---
----   Server-registered (`reporter` is nil): created by server code via the ZoneRegister
+---   Server-registered (`reporter` is nil): created by server code via the RegisterZone
 ---   export. `_reporters` stays nil. Authoritative. Clients can never overwrite or remove one.
 ---
 ---   Client-mirrored (`reporter` is a player source): `client/zones.lua` reports every
----   locally-registered zone up so server code can query it with ZoneContains. The SAME
+---   locally-registered zone up so server code can query it with IsPointInZone. The SAME
 ---   zone is reported by EVERY player who has it (the login sync and the editor broadcast both
 ---   call registerZone on each client), so this is not ownership: it is a set of reports. The
 ---   zone survives until the last reporter is gone.
@@ -289,7 +289,7 @@ function Zones.contains(id, point)
     return safeContains(zone, point.x, point.y, point.z)
 end
 
---- The same question, asked of the server's OWN zones only — saved ones and ZoneRegister's —
+--- The same question, asked of the server's OWN zones only — saved ones and RegisterZone's —
 --- never a client-reported mirror. For a gate: a mirror's shape is whatever its reporters said (a
 --- lone modified client could make it a 2 km sphere). A zone only clients know answers false.
 ---@param id string
@@ -799,7 +799,7 @@ function Zones.deleteZone(keyOrId, caller)
     local zone = resolve(keyOrId)
     if not zone then return false, 'Zone not found' end
     if not zone.dbZone then
-        return false, 'not a saved zone — ZoneRemove removes your own server zones'
+        return false, 'not a saved zone — RemoveZone removes your own server zones'
     end
     local ens = type(zone.metadata) == 'table' and zone.metadata.ensured or nil
     local by = type(ens) == 'table' and ens.by or nil
@@ -867,7 +867,7 @@ end
 --- these fields, and unknown keys must not ride into the registry: field-by-field reconstruction,
 --- nothing unverified survives, in value or in key.
 ---
---- Server zones too: ZoneRegister reads the shape here as well, and the caller hears what
+--- Server zones too: RegisterZone reads the shape here as well, and the caller hears what
 --- was wrong.
 ---@param data table
 ---@return table|nil zone
@@ -941,7 +941,7 @@ end
 --- What the mirror is, stated plainly: the shape most of its reporters hold (see
 --- Zones.register — a move or resize is reported again, with this same event). A hostile client
 --- is outvoted by the honest ones, but a zone only it reports is whatever it says. Server code
---- that must not be lied to registers its zones server-side (ZoneRegister / EnsureZone) —
+--- that must not be lied to registers its zones server-side (RegisterZone / EnsureZone) —
 --- those are off limits to clients entirely; the mirror is a convenience view of client-side
 --- zones and should be trusted exactly as far as its reporters. The same caveat applies to zone
 --- RULES (noPvP, speed limits, eject): they are enforced by each client on itself, in
@@ -1078,7 +1078,7 @@ end)
 -- ============================================
 --
 -- The client's own zoneEnter/zoneExit can't be believed by a server. A zone that sets `trackPlayers = true`
--- (ZoneRegister or EnsureZone) is swept here every Config.ZoneTrackInterval ms:
+-- (RegisterZone or EnsureZone) is swept here every Config.ZoneTrackInterval ms:
 --
 --     AddEventHandler('whip_core:zone:entered', function(e) end)   -- { zoneId, key?, source }
 --     AddEventHandler('whip_core:zone:exited',  function(e) end)   -- { zoneId, key?, source, dropped?, removed? }
@@ -1227,7 +1227,7 @@ end)
 -- A server zone belongs to the resource that registered it, and goes when that resource stops —
 -- the one registration rule (shared/registry.lua). The registry holds WHO owns each id; the zone
 -- itself lives in serverZones with the client-mirrored ones. A second resource registering the same
--- id is refused, and ZoneRemove removes the caller's own only.
+-- id is refused, and RemoveZone removes the caller's own only.
 local _zoneIds = Registry.new('ServerZone', {
     label    = 'server zone',
     prefixed = true,    -- one list for the server (shared/registry.lua)
@@ -1236,14 +1236,14 @@ local _zoneIds = Registry.new('ServerZone', {
     onRemove = function(id) Zones.remove(id) end,
 })
 
---- Register a server-side zone. Answers (true) or (false, reason).
-exports('ZoneRegister', function(id, data)
+--- Register a server-side zone. Returns (true) or (false, reason).
+exports('RegisterZone', function(id, data)
     local owner = Registry.caller()   -- first, before anything can yield
-    if type(data) ~= 'table' then return false, 'ZoneRegister: data must be a table' end
+    if type(data) ~= 'table' then return false, 'RegisterZone: data must be a table' end
     -- The shape read as a client's report is: a zone nothing can ever be inside is refused
     -- with what was wrong, not stored. trackPlayers is a server zone's own word.
     local shape, bad = readZoneShape(data)
-    if not shape then return false, ('ZoneRegister "%s": %s'):format(tostring(id), bad) end
+    if not shape then return false, ('RegisterZone "%s": %s'):format(tostring(id), bad) end
     shape.trackPlayers = data.trackPlayers == true or nil
 
     -- data.tag: a run's area, removed by ReleaseTag with the rest of the run.
@@ -1256,22 +1256,22 @@ exports('ZoneRegister', function(id, data)
     return true
 end)
 
---- Remove one of YOUR server zones. Answers (true) or (false, reason).
-exports('ZoneRemove', function(id)
+--- Remove one of YOUR server zones. Returns (true) or (false, reason).
+exports('RemoveZone', function(id)
     local owner = Registry.caller()   -- first, before anything can yield
     return _zoneIds:remove(owner, id)
 end)
---- Is `point` inside zone `id`? `trusted = true` answers only from a zone the SERVER holds (a saved
---- zone, or one made with ZoneRegister) and says false for a client-made one — the question to
---- ask for anti-cheat. Without it, a client-made zone answers as its players report it.
-exports('ZoneContains', function(id, point, trusted)
+--- Is `point` inside zone `id`? `trusted = true` reads only a zone the SERVER holds (a saved zone, or
+--- one made with RegisterZone) and says false for a client-made one — the question to ask for
+--- anti-cheat. Without it, a client-made zone counts as its players report it.
+exports('IsPointInZone', function(id, point, trusted)
     if trusted == true then return Zones.containsTrusted(id, point) end
     return Zones.contains(id, point)
 end)
 exports('GetPlayersInZone', function(id) return Zones.getPlayersInZone(id) end)
 exports('GetVehiclesInZone', function(id) return Zones.getVehiclesInZone(id) end)
-exports('GetAllZones', function() return Zones.getAll() end)
-exports('GetZoneDef', function(id) return Zones.getDef(id) end)
+exports('GetZones', function() return Zones.getAll() end)
+exports('GetZone', function(id) return Zones.getDef(id) end)
 --- A saved zone, declared by key: made, or brought up to date when the declaration changed.
 --- The zone, or false and why. See Zones.ensureZone. Waits for whip_core to finish starting.
 exports('EnsureZone', function(key, data)

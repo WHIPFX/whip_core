@@ -153,11 +153,11 @@ function whip_core:HidePlayerText(source) end
 ---@return string|nil reason
 function whip_core:ShowBlip(audience, id, spec) end
 
---- Take one of your blips down.
+--- Take one of your blips down, the pair of ShowBlip.
 ---@param id string|number
 ---@return boolean ok
 ---@return string|nil reason
-function whip_core:RemoveBlip(id) end
+function whip_core:HideBlip(id) end
 
 --- GTA's own waypoint (the one a player can set on the map), set on one player's map.
 ---@param source number
@@ -345,7 +345,7 @@ function whip_core:CheckPicture(url, frame) end
 --- Every lore character in use, by name.
 ---@param withRetired? boolean   the retired ones as well
 ---@return LoreCharacter[]
-function whip_core:ListLoreCharacters(withRetired) end
+function whip_core:GetLoreCharacters(withRetired) end
 
 --- A lore character pays a player into their bank: a transfer from its own account, so their statement reads
 --- like any other; the money is made on the spot (its account's statement says by which resource).
@@ -373,7 +373,7 @@ function whip_core:GetScenarioRun(runId, opts) end
 --- The runs going now.
 ---@param filter? { scenario?: string, player?: number|{ charId: number }, kind?: string, tests?: boolean }
 ---@return DirectorRunView[]
-function whip_core:ListScenarioRuns(filter) end
+function whip_core:GetScenarioRuns(filter) end
 
 --- The runs a player is in now.
 ---@param who number|{ charId: number }
@@ -411,7 +411,7 @@ function whip_core:GetScenario(key) end
 --- Every scenario, short (no cards, world or vars).
 ---@param filter? { on?: boolean, kind?: string, startMode?: string }
 ---@return DirectorScenarioView[]
-function whip_core:ListScenarios(filter) end
+function whip_core:GetScenarios(filter) end
 
 --- How a stored scenario's runs have gone (tests left out). WAITS on the database: call it from a thread.
 ---@param key string
@@ -423,7 +423,7 @@ function whip_core:GetScenarioStats(key) end
 --- The Director's card types, each with its owner: whip_core's own, and other resources' (Whip.card).
 ---@param filter? { category?: string, owner?: string }
 ---@return table[]
-function whip_core:ListDirectorCards(filter) end
+function whip_core:GetDirectorCards(filter) end
 
 --- Take one of your code scenarios off the Shipped list (what was accepted stays in the store).
 ---@param key string
@@ -670,7 +670,7 @@ function whip_core:ReleaseTag(tag) end
 --- What you hold under one run tag, across whip's modules.
 ---@param tag string
 ---@return { registry: string, key: string|number }[]
-function whip_core:ListTagged(tag) end
+function whip_core:GetTagged(tag) end
 
 -- ============================================
 -- SecureEvent / SecureCallback
@@ -767,7 +767,7 @@ function whip_core:SetDeveloperMode(source, on) end
 
 --- Put one of YOUR statebag keys under the Sentinel's watch: forged client writes
 --- are corrected and logged as tampers. Player family needs no truth function (the
---- ledger — what you last wrote via SentinelSetPlayerKey — is the truth). Entity
+--- ledger — what you last wrote via SetSentinelPlayerKey — is the truth). Entity
 --- family REQUIRES def.truth: function(entity) -> value|nil, where nil means "this
 --- entity should not carry the key" (it gets stripped). Register inside
 --- Whip.register; registering your own key again is fine, another resource's is
@@ -788,7 +788,7 @@ function whip_core:RegisterSentinelKey(def) end
 ---@param value any
 ---@return boolean ok
 ---@return string? err 'no such player', 'key "x" is owned by <resource>'...
-function whip_core:SentinelSetPlayerKey(src, key, value) end
+function whip_core:SetSentinelPlayerKey(src, key, value) end
 
 --- The sanctioned WRITE for YOUR entity-bag keys. Change your truth (the table your
 --- truth function reads) FIRST, then write through this: it carries the flag whip's own
@@ -800,7 +800,7 @@ function whip_core:SentinelSetPlayerKey(src, key, value) end
 ---@param value any
 ---@return boolean ok
 ---@return string? err 'no such entity', 'key "x" is owned by <resource>'...
-function whip_core:SentinelSetEntityKey(entity, key, value) end
+function whip_core:SetSentinelEntityKey(entity, key, value) end
 
 --- The sanctioned server-side READ: what the server last wrote, as opposed to the
 --- bag, which the described player can forge. Server gates use this; clients keep
@@ -808,7 +808,7 @@ function whip_core:SentinelSetEntityKey(entity, key, value) end
 ---@param src number Player server ID
 ---@param key string Bag key
 ---@return any
-function whip_core:SentinelGetTruth(src, key) end
+function whip_core:GetSentinelTruth(src, key) end
 
 -- ============================================
 -- Bank
@@ -1438,7 +1438,7 @@ function whip_core:UnretireItem(key) end
 ---@param opts { forBuyer: boolean|nil }|nil forBuyer: bought off an infinite shelf, it is made again for the buyer
 ---@return boolean ok
 ---@return string|nil err
-function whip_core:RegisterItemDefaultMeta(itemKey, generator, opts) end
+function whip_core:RegisterItemDefaultMetadata(itemKey, generator, opts) end
 
 --- Register a context menu action handler. Called when the player selects a custom context action.
 --- Same handler shape as RegisterUseHandler: `(source, player, slotData, addr)`, and a fifth, `how`: nil from the
@@ -1581,7 +1581,7 @@ function whip_core:GetItemDef(key) end
 
 --- Get all registered item definitions.
 ---@return table<string, WhipItemDef>
-function whip_core:GetAllItemDefs() end
+function whip_core:GetItemDefs() end
 
 -- ============================================
 -- Vehicles
@@ -1826,16 +1826,14 @@ function whip_core:SetVehiclePlate(vehicle, plate) end
 --- Put a vehicle into the world.
 ---
 --- Idempotent: calling it on a vehicle that is already out moves it rather than cloning it.
---- Omit the position to use the vehicle's own saved one. (vehicleId, coords, heading) and (vehicleId, vector4)
---- work too.
+--- Omit `coords` to use the vehicle's own saved position; a vector4 carries the heading in w.
+---
+---     exports.whip_core:SpawnVehicle(vehicleId, vector4(215.0, -810.0, 30.7, 90.0))
 ---@param vehicleId number|WhipVehicleRef
----@param x number|vector3|vector4|nil
----@param y number|nil
----@param z number|nil
----@param heading number|nil
+---@param coords vector3|vector4|nil
 ---@return number|false netId, string|nil err
 ---@async
-function whip_core:SpawnVehicle(vehicleId, x, y, z, heading) end
+function whip_core:SpawnVehicle(vehicleId, coords) end
 
 --- Take a vehicle out of the world and put it away in its garage (state 'garaged', no position), its record and
 --- its storage contents intact — even with somebody inside. Storage is flushed before the entity is removed. It
@@ -1846,21 +1844,17 @@ function whip_core:SpawnVehicle(vehicleId, x, y, z, heading) end
 --- try again), or a garage save that did not go through. A temporary car (SpawnTempVehicle) is
 --- removed for good; a street car is handed back to GTA (left where it is) and forgotten, its
 --- storage logged as lost.
+---
+--- `opts.garage` puts the car away in that garage instead of its own. Then only an owned car that is `out` is taken:
+--- a street or temporary car is refused (neither has a garage row), as is one already put away, or a key that
+--- names no garage. `opts.refuseOccupied` refuses a car with somebody inside.
+---
+---     exports.whip_core:DespawnVehicle(vehicleId, { garage = 'impound', refuseOccupied = true })
 ---@param vehicleId number|WhipVehicleRef
+---@param opts? { garage?: string, refuseOccupied?: boolean }
 ---@return boolean ok, string|nil err
 ---@async
-function whip_core:DespawnVehicle(vehicleId) end
-
---- Put a vehicle away in a garage: out of the world, position cleared, state `garaged`.
----
---- DespawnVehicle files an owned car in its garage too. This one takes a garageKey and refuses a car
---- that is not `out` or has somebody inside; Despawn uses the garage the car already has, goes ahead
---- with somebody inside, removes a temporary car for good and hands a street car back to GTA.
----@param vehicleId number|WhipVehicleRef
----@param garageKey string|nil  defaults to the garage it is already assigned to (or the default
----                             garage); a key that names no garage is refused
----@return boolean ok, string|nil err  a street or temporary car is refused: it has no garage row
-function whip_core:StoreVehicle(vehicleId, garageKey) end
+function whip_core:DespawnVehicle(vehicleId, opts) end
 
 --- Take a vehicle out of a garage. Marks it `out` and locked; it still has to be spawned.
 ---
@@ -1918,7 +1912,7 @@ function whip_core:DeleteVehicle(vehicleId) end
 ---@param id string|WhipVehicleListenOpts|nil Defaults to the key
 ---@param opts WhipVehicleListenOpts|nil
 ---@return boolean registered
-function whip_core:OnVehicleDataChange(key, callback, id, opts) end
+function whip_core:OnVehicleDataChanged(key, callback, id, opts) end
 
 -- ============================================
 -- Vehicle Data
@@ -1935,37 +1929,28 @@ function whip_core:OnVehicleDataChange(key, callback, id, opts) end
 --- Attach a value to a vehicle. Anything json-encodable (false included); nil removes it.
 --- Refused with a reason when the key is malformed or another resource's, the vehicle is unknown,
 --- or the block would bust your key budget or the size ceiling.
+---
+--- A table in place of the key sets several in one replication and one database write, and returns how many
+--- were applied: keys past your key budget are skipped; a batch that busts the size ceiling, or touches a key
+--- another resource owns, is refused whole (false, reason). A nil value cannot be expressed in a Lua table: use
+--- ClearVehicleData to remove one.
+---
+---     exports.whip_core:SetVehicleData(vehicleId, { kit = 'street', kitAt = os.time() })
 ---@param vehicleId number|WhipVehicleRef
----@param key string Letters, digits and underscore only
----@param value any Json-encodable, or nil to clear
----@return boolean ok
+---@param key string|table<string, any> Letters, digits and underscore only; or { [key] = value }
+---@param value any Json-encodable, or nil to clear (not with a table)
+---@return boolean|number ok true, or with a table how many keys were applied; false when none were
 ---@return string|nil err
 ---@async
 function whip_core:SetVehicleData(vehicleId, key, value) end
 
---- Attach several values in one replication and one database write. Keys past
---- your key budget are skipped; a batch that busts the size ceiling, or touches a key
---- another resource owns, is refused whole (false, reason).
----@param vehicleId number|WhipVehicleRef
----@param values table<string, any> A nil value cannot be expressed in a Lua table — use ClearVehicleData for removal
----@return number|false written How many keys were applied; false when none were
----@return string|nil err Why, only with false
----@async
-function whip_core:SetVehicleDataMany(vehicleId, values) end
-
 --- One value, or nil when this vehicle does not carry it. There is no
 --- registered default here, unlike a stat — absent means absent, and the
---- caller decides what that means.
+--- caller decides what that means. With no key, everything it carries, as a plain copy ({} for none).
 ---@param vehicleId number|WhipVehicleRef
----@param key string
+---@param key? string
 ---@return any value
 function whip_core:GetVehicleData(vehicleId, key) end
-
---- Everything this vehicle carries, as a plain copy. Empty table for a vehicle
---- with no data.
----@param vehicleId number|WhipVehicleRef
----@return table data
-function whip_core:GetAllVehicleData(vehicleId) end
 
 --- Remove one value — only a key your resource wrote. True when the key is absent afterwards,
 --- including when it was never there.
@@ -2012,7 +1997,7 @@ function whip_core:ClearAllVehicleData(vehicleId) end
 --- lasts as long as the car does. A seller can tell the buyer.
 ---
 --- `opts.data` / `opts.clearData`: VehicleData keys (your resource's) set and removed IN THE SAME WRITE
---- as the look, checked as SetVehicleDataMany checks them — parts and the data that goes with them land
+--- as the look, checked as SetVehicleData checks a table of them — parts and the data that goes with them land
 --- together, with the payment, or not at all. False: none of it changed.
 ---@param vehicleId number|WhipVehicleRef
 ---@param props table  appearance fields to apply over the current ones ({} for none)
@@ -2097,7 +2082,7 @@ function whip_core:CanUseGarage(key, who) end
 
 --- Move a vehicle to a different garage without taking it out of storage.
 ---
---- NOT StoreVehicle, which refuses anything that is not currently `out`. This is the one that moves
+--- NOT DespawnVehicle with a garage, which refuses anything that is not currently `out`. This is the one that moves
 --- a car that is already put away — an impound releasing to a home garage, a dealership delivering
 --- to the buyer's garage of choice.
 ---@param vehicleId number|WhipVehicleRef
@@ -2164,10 +2149,16 @@ function whip_core:RegisterVehicleStat(name, config) end
 ---@return number|nil
 function whip_core:GetVehicleStat(vehicleId, name) end
 
---- Every registered stat on a vehicle, defaults filled in.
+--- Every registered stat on a vehicle, defaults filled in. With `{ stored = true }`, every stat it actually
+--- CARRIES, with no defaults filled in.
+---
+--- The difference is the whole of how "fitted" works: an absent key means no value stored, and a filled-in
+--- default would read as "fitted and empty". A car with no nitrous and a car with a spent bottle both report 0
+--- from GetVehicleStat; only one of them appears in the stored stats.
 ---@param vehicleId number|WhipVehicleRef
----@return table|nil
-function whip_core:GetAllVehicleStats(vehicleId) end
+---@param opts? { stored?: boolean }
+---@return table|nil stats { [name] = value }; with stored, {} for an unknown vehicle
+function whip_core:GetVehicleStats(vehicleId, opts) end
 
 --- Set a stat. Clamped to the range it was registered with, saved, and replicated.
 --- Refused, with a reason, for an unknown car, a value that is not a number, or a stat nobody
@@ -2236,16 +2227,6 @@ function whip_core:ClearVehicleDamage(vehicle) end
 ---@return boolean
 function whip_core:IsVehicleWrecked(vehicle) end
 
---- Every stat a vehicle actually CARRIES, with no defaults filled in.
----
---- The difference from GetAllVehicleStats is the whole of how "fitted" works: an
---- absent key means no value stored, and a filled-in default would read as
---- "fitted and empty". A car with no nitrous and a car with a spent bottle both
---- report 0 from GetVehicleStat; only one of them appears here.
----@param vehicleId number|WhipVehicleRef
----@return table  { [name] = value }
-function whip_core:GetStoredVehicleStats(vehicleId) end
-
 --- Does this vehicle actually CARRY this stat?
 ---
 --- The question GetVehicleStat cannot answer, and the mirror of the client
@@ -2276,7 +2257,7 @@ function whip_core:HasVehicleStat(vehicleId, name) end
 ---@param id? string|WhipVehicleListenOpts Registration key within your resource; registering the same id again replaces it
 ---@param opts? WhipVehicleListenOpts
 ---@return boolean registered
-function whip_core:OnVehicleStatChange(name, callback, id, opts) end
+function whip_core:OnVehicleStatChanged(name, callback, id, opts) end
 
 --- Delete a stat's values from EVERY vehicle, permanently.
 ---
@@ -2609,7 +2590,7 @@ function whip_core:FindItemByUid(uid) end
 ---@param key string
 ---@param value any
 ---@return WhipStoreAddr|{ kind: 'ground', id: number }|nil
-function whip_core:FindItemByMeta(key, value) end
+function whip_core:FindItemByMetadata(key, value) end
 
 --- Block a player's hands from the server (jail, an arrest): sent to their game, kept here for AreHandsBlocked.
 --- Gone at logout, a drop, or when your resource stops. opts as the client's: { label?, only? = 'weapons' }.
@@ -2824,7 +2805,7 @@ function whip_core:SetWeather(w) end
 --- Freeze or unfreeze server time.
 ---@param f boolean True to freeze
 ---@return boolean ok
-function whip_core:SetFrozen(f) end
+function whip_core:SetTimeFrozen(f) end
 
 --- Enable or disable blackout (no lights).
 ---@param b boolean True to enable blackout
@@ -2887,22 +2868,22 @@ function whip_core:GetPlayerWeatherLayers(src) end
 ---@param data table Zone data (type, pos, size, heading, radius, points, minZ, maxZ, group, label, trackPlayers, tag)
 ---@return boolean ok
 ---@return string? reason
-function whip_core:ZoneRegister(id, data) end
+function whip_core:RegisterZone(id, data) end
 
 --- Remove one of YOUR server-side zones.
 ---@param id string Zone ID
 ---@return boolean ok
 ---@return string? reason not registered, or registered by another resource
-function whip_core:ZoneRemove(id) end
+function whip_core:RemoveZone(id) end
 
 --- Check if a point is inside a zone (server zone or saved zone, by id or key). A client-made zone
 --- answers as its players report it; `trusted = true` answers only from the server's own zones
---- (saved, or ZoneRegister) — the one to use for anti-cheat.
+--- (saved, or RegisterZone) — the one to use for anti-cheat.
 ---@param id string Zone id, or a saved zone's key
 ---@param point vector3 Point to test
 ---@param trusted boolean|nil
 ---@return boolean
-function whip_core:ZoneContains(id, point, trusted) end
+function whip_core:IsPointInZone(id, point, trusted) end
 
 --- Get all player source IDs currently inside a zone.
 ---@param id string Zone id, or a saved zone's key
@@ -2916,12 +2897,12 @@ function whip_core:GetVehiclesInZone(id) end
 
 --- Get all registered server-side zones.
 ---@return table[]
-function whip_core:GetAllZones() end
+function whip_core:GetZones() end
 
 --- Get a specific zone definition.
 ---@param id string Zone id, or a saved zone's key
 ---@return table|nil
-function whip_core:GetZoneDef(id) end
+function whip_core:GetZone(id) end
 
 --- A saved zone, declared by a key you choose: made the first time, and brought up to date when
 --- your declaration CHANGES. The same declaration again writes nothing, so an admin's edits in the
@@ -2969,7 +2950,7 @@ function whip_core:CommitWithAction(queries, opts) end
 function whip_core:GiveOnLogin(who, item, amount, metadata, reason) end
 
 --- Delete a saved zone by key or id. Not one another running resource declares (it would be made
---- again), and not a server zone (ZoneRemove removes your own).
+--- again), and not a server zone (RemoveZone removes your own).
 ---@param keyOrId string
 ---@return boolean ok
 ---@return string|nil reason
@@ -3058,7 +3039,7 @@ function whip_core:GetDoorByPosition(x, y, z, range) end
 
 --- Get all registered doors.
 ---@return WhipDoorDef[]
-function whip_core:GetAllDoors() end
+function whip_core:GetDoors() end
 
 --- Create a new door. Always created LOCKED — `data.locked` is not consulted.
 ---
@@ -3075,36 +3056,6 @@ function whip_core:CreateDoor(data) end
 ---@field id any          which of your things holds the door (a property id, a business id)
 ---@field key? string     the door's name within it ('entrance', 'garage')
 ---@field label? string   what the Door Manager shows ("Business #4 · Bean Machine")
-
---- Take charge of the door at a spot, making it if there is none.
----
---- A MANAGED door's requirements, link, autolock and metadata are yours alone: the Door Manager and
---- every other resource are refused, because you would write your own values back anyway. The
---- manager is always the CALLING resource (stored as 'resource:<name>'), whatever you pass.
----
----   no door there               one is made          → door, 'created'
----   a door there, nobody's      it is adopted        → door, 'adopted'  (ReleaseDoor restores it)
----   a door there, already yours nothing changes      → door, 'already'
----   someone else's, or another model                 → false, why, the door in the way's id
----
---- Your doors stay yours when your resource stops: reconcile them when it starts again. The Door
---- Manager can release a door whose resource is no longer running.
----@param data table Door data (model, x, y, z, heading, label, folder, requirements)
----@param manager WhipDoorManager
----@return WhipDoorDef|false door
----@return string howOrError 'created' | 'adopted' | 'already', or why not
----@return number|nil conflictDoorId
----@async
-function whip_core:AdoptOrCreateDoor(data, manager) end
-
---- Give a door back: deleted if it was made for you, restored to what it was if it was adopted.
---- True for a door nobody manages; refused for another manager's.
----@param doorId number
----@param manager WhipDoorManager  the one that holds it (its `id` is what counts)
----@return boolean success
----@return string|nil error
----@async
-function whip_core:ReleaseDoor(doorId, manager) end
 
 --- Hold a door while you need it (a heist's vault): the door at the spot, saved or not (a temporary
 --- one, never saved, where there is none). In memory only. Nobody may press it until you say who; it
@@ -3124,11 +3075,11 @@ function whip_core:HoldDoor(data, opts) end
 ---@return string|nil why
 function whip_core:SetHeldDoorAccess(doorId, requirements) end
 
---- Give a held door back now (its old lock; a temporary one is gone).
+--- Give a door you hold back now, the pair of HoldDoor (its old lock; a temporary one is gone).
 ---@param doorId number
 ---@return boolean ok
 ---@return string|nil why
-function whip_core:ReleaseHeldDoor(doorId) end
+function whip_core:ReleaseDoor(doorId) end
 
 --- Who holds a door, or nil.
 ---@param doorId number
@@ -3154,7 +3105,7 @@ function whip_core:GetManagedDoors(id) end
 --- creation. To remove a link, UnlinkDoors.
 ---
 --- A managed door's requirements, linkedDoorId, autolock, autolockDelay and metadata are refused
---- unless `manager` is the one holding it (see AdoptOrCreateDoor). Label and folder are open.
+--- unless `manager` is the one holding it (a door you declared with EnsureDoors). Label and folder are open.
 ---@param doorId number Door ID
 ---@param updates table Fields to update
 ---@param manager? WhipDoorManager  yours, when you manage this door
@@ -3165,7 +3116,7 @@ function whip_core:UpdateDoor(doorId, updates, manager) end
 
 --- Delete a door. Unlinking any door paired with it happens in the same transaction, so this
 --- either removes the door and clears its pairings or changes nothing. A managed door is deleted
---- only by its manager (or given back with ReleaseDoor).
+--- only by its manager.
 ---@param doorId number Door ID
 ---@param manager? WhipDoorManager  yours, when you manage this door
 ---@return boolean success
@@ -3190,7 +3141,7 @@ function whip_core:IsDoorLocked(doorId) end
 ---@param doorId number Door ID
 ---@return boolean authorized
 ---@return string|nil reason  'Door not found', 'Requires job: police (on duty)', ...
-function whip_core:IsAuthorizedForDoor(source, doorId) end
+function whip_core:CanUseDoor(source, doorId) end
 
 --- Link two doors together (locking one locks the other). Both halves are written in one
 --- transaction, so a failure leaves neither linked rather than a one-way pairing.
@@ -3326,7 +3277,7 @@ function whip_core:IsCharacterBeingInspected(charId) end
 --- a cheater who waits the honest time can still lie, so do not gate anything
 --- that must be uncheatable on a minigame.
 ---
---- `opts.game`: another resource's game instead of the ring (ListSkillCheckGames names them; `difficulty` is then one
+--- `opts.game`: another resource's game instead of the ring (GetSkillCheckGames names them; `difficulty` is then one
 --- of that game's levels). One the player cannot start (whip_phone's: no phone) shows nothing, tells them why
 --- (`opts.quiet`: not told), and answers false, 'not started': never a fail.
 ---@param source number Player server ID
@@ -3341,7 +3292,7 @@ function whip_core:SkillCheck(source, difficulty, opts) end
 --- Skill Check card can name. `levels` is the game's level NAMES (its timings stay its own); `needs`: it has a
 --- canStart (something to have before it starts).
 ---@return { id: string, label: string, desc: string|nil, levels: string[], needs: boolean|nil, owner: string }[]
-function whip_core:ListSkillCheckGames() end
+function whip_core:GetSkillCheckGames() end
 
 --- The ring's settings as they are now (config.lua's, or what an admin changed in /whip Config), for a tool that
 --- shows them. A copy. The client has the same export.
@@ -3432,7 +3383,7 @@ function whip_core:GetStat(source, name) end
 ---@param source number Player server ID
 ---@param name string Stat name
 ---@param value number New value
----@param reason string|nil What caused it, e.g. 'quest reward' (the change log and OnStatChange show it; default 'by <your resource>')
+---@param reason string|nil What caused it, e.g. 'quest reward' (the change log and OnStatChanged show it; default 'by <your resource>')
 ---@return boolean ok
 ---@return string|nil err 'Player not loaded', 'no stat named "x" (RegisterStat it first)', 'value must be a number'
 function whip_core:SetStat(source, name, value, reason) end
@@ -3450,7 +3401,7 @@ function whip_core:AddStat(source, name, delta, reason) end
 ---@param source number Player server ID
 ---@return table<string, number> stats {} if the player is not loaded
 ---@return string|nil why  'Player not loaded'
-function whip_core:GetAllStats(source) end
+function whip_core:GetStats(source) end
 
 ---@class WhipStatChange
 ---@field source number The player
@@ -3464,22 +3415,22 @@ function whip_core:GetAllStats(source) end
 --- `<your resource>:<id>` (id defaults to the name), so calling it again from
 --- Whip.register replaces rather than doubles. Cleared when your resource stops.
 ---
----     exports.whip_core:OnStatChange('hunger', function(source, value, old, reason) end)
----     exports.whip_core:OnStatChange('*', function(source, name, value, old, reason) end)
----     exports.whip_core:OnStatChange('hunger', function(change) end, { table = true, now = true })
+---     exports.whip_core:OnStatChanged('hunger', function(source, value, old, reason) end)
+---     exports.whip_core:OnStatChanged('*', function(source, name, value, old, reason) end)
+---     exports.whip_core:OnStatChanged('hunger', function(change) end, { table = true, now = true })
 ---
 --- `table = true`: one WhipStatChange instead. `now = true`: also called once
 --- straight away for every loaded player who has the stat (old = nil, reason = 'now').
 --- A listener that sets the stat it listens to is not re-announced (the set still lands).
 ---@param name string A stat name, or '*' for every stat
---- PREFER `table = true`: the positional orders of OnStatChange, OnVehicleStatChange
---- and OnVehicleDataChange differ, and `'*'` shifts every argument by one.
+--- PREFER `table = true`: the positional orders of OnStatChanged, OnVehicleStatChanged
+--- and OnVehicleDataChanged differ, and `'*'` shifts every argument by one.
 ---@param callback fun(source: number, value: number, old: number|nil, reason: string|nil)|fun(source: number, name: string, value: number, old: number|nil, reason: string|nil)|fun(change: WhipStatChange) The second shape is for '*'
 ---@param id any|nil Only to hold two listeners on one stat; the options may go here instead
 ---@param opts { table?: boolean, now?: boolean }|nil
 ---@return boolean ok
 ---@return string|nil err
-function whip_core:OnStatChange(name, callback, id, opts) end
+function whip_core:OnStatChanged(name, callback, id, opts) end
 
 --- Apply a temporary effect to a player. Nothing stacks: a second apply under
 --- the same name REPLACES the effect. `replaceSilently = true` skips the replaced
@@ -3783,7 +3734,7 @@ function whip_core:RemovePoint(pointId) end
 --- Your points, or those under one of your tags.
 ---@param filter? { tag?: string }
 ---@return WhipPointInfo[]
-function whip_core:ListPoints(filter) end
+function whip_core:GetPoints(filter) end
 
 -- ============================================
 -- Conversations — an NPC talks, a player answers (server/conversations.lua, the dialog capsule)
@@ -3942,7 +3893,7 @@ function whip_core:GetNpc(ref) end
 --- Your NPCs, or those under one of your tags.
 ---@param filter? { tag?: string }
 ---@return WhipNpcInfo[]
-function whip_core:ListNpcs(filter) end
+function whip_core:GetNpcs(filter) end
 
 -- ============================================
 -- The voice system (server/voice_system.lua)

@@ -8,7 +8,7 @@
 -- ============================================
 
 RegisterNUICallback('zmTeleportToZone', function(data, cb)
-    local allZones = GetAllZones()
+    local allZones = GetAllZonesForTool()
     for _, z in ipairs(allZones) do
         if z.id == data.id and z.pos then
             SetEntityCoords(PlayerPedId(), z.pos.x, z.pos.y, z.pos.z, false, false, false, false)
@@ -20,14 +20,14 @@ end)
 
 RegisterNUICallback('zmToggleDebug', function(data, cb)
     -- Find zone's current debug state and toggle it
-    local allZones = GetAllZones()
+    local allZones = GetAllZonesForTool()
     for _, z in ipairs(allZones) do
         if z.id == data.id then
-            Zones.setDebug(data.id, not z.debug)
+            Zones.update(data.id, { debug = not z.debug })
             break
         end
     end
-    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
     cb('ok')
 end)
 
@@ -41,7 +41,7 @@ AddEventHandler('whip_core:client:zoneDbDeleted', function(id)
     -- After client/zones.lua's own handler has taken it out of the list
     CreateThread(function()
         Wait(0)
-        SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+        SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
     end)
 end)
 
@@ -56,7 +56,7 @@ RegisterNUICallback('zmDeleteZone', function(data, cb)
                 Wait(5000)
                 if _deletePending == pending then
                     _deletePending = nil
-                    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+                    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
                 end
             end)
             cb('ok')
@@ -65,18 +65,18 @@ RegisterNUICallback('zmDeleteZone', function(data, cb)
         -- Memory-only zones: just remove client-side
         Zones.remove(data.id)
     end
-    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
     cb('ok')
 end)
 
 -- The zones wizard's Save (zwUpdate) is the one way the page changes a zone.
 
 RegisterNUICallback('zmToggleAllDebug', function(data, cb)
-    local allZones = GetAllZones()
+    local allZones = GetAllZonesForTool()
     for _, z in ipairs(allZones) do
-        Zones.setDebug(z.id, data.enabled)
+        Zones.update(z.id, { debug = data.enabled })
     end
-    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
     cb('ok')
 end)
 
@@ -211,8 +211,8 @@ function EnterZoneEditor()
     zeDraftRadius = 10.0
 
     -- Force debug on all existing zones
-    for _, z in ipairs(GetAllZones()) do
-        Zones.setDebug(z.id, true)
+    for _, z in ipairs(GetAllZonesForTool()) do
+        Zones.update(z.id, { debug = true })
     end
 
     -- Show the editor HUD. The /whip panel is already suspended (zmEnterEditor calls
@@ -257,32 +257,32 @@ function ExitZoneEditor()
     SendNUIMessage({ action = 'zeHide' })
 
     -- Turn off debug on all zones
-    for _, z in ipairs(GetAllZones()) do
-        Zones.setDebug(z.id, false)
+    for _, z in ipairs(GetAllZonesForTool()) do
+        Zones.update(z.id, { debug = false })
     end
 
     -- Hand the screen back to the /whip panel, with the section's data refreshed —
     -- the editor may have created/moved/deleted zones while the panel was suspended.
     WhipPanelResume()
-    WhipPanelData('zones', 'all', { zones = GetAllZones() })
+    WhipPanelData('zones', 'all', { zones = GetAllZonesForTool() })
 end
 
 -- Format zone code for clipboard
 local function zeFormatCode(zone)
     local code = ''
     if zone.type == 'box' then
-        code = "local id = exports.whip_core:ZoneBox({\n"
+        code = "local id = exports.whip_core:RegisterZone({\n    type    = 'box',\n"
         code = code .. ("    pos     = vec3(%.2f, %.2f, %.2f),\n"):format(zone.pos.x, zone.pos.y, zone.pos.z)
         code = code .. ("    size    = vec3(%.2f, %.2f, %.2f),\n"):format(zone.size.x, zone.size.y, zone.size.z)
         if zone.heading and zone.heading ~= 0 then
             code = code .. ("    heading = %.1f,\n"):format(zone.heading)
         end
     elseif zone.type == 'sphere' then
-        code = "local id = exports.whip_core:ZoneSphere({\n"
+        code = "local id = exports.whip_core:RegisterZone({\n    type   = 'sphere',\n"
         code = code .. ("    pos    = vec3(%.2f, %.2f, %.2f),\n"):format(zone.pos.x, zone.pos.y, zone.pos.z)
         code = code .. ("    radius = %.2f,\n"):format(zone.radius)
     elseif zone.type == 'poly' then
-        code = "local id = exports.whip_core:ZonePoly({\n"
+        code = "local id = exports.whip_core:RegisterZone({\n    type   = 'poly',\n"
         code = code .. "    points = {\n"
         if zone.points then
             for _, p in ipairs(zone.points) do
@@ -451,7 +451,7 @@ end
 
 local function getSelectedZone()
     if not zeSelected then return nil end
-    for _, z in ipairs(GetAllZones()) do
+    for _, z in ipairs(GetAllZonesForTool()) do
         if z.id == zeSelected then return z end
     end
     return nil
@@ -902,7 +902,7 @@ local function zeLoop()
                     end
                 elseif not zeVertexMode and not zeCapture then
                     -- (Not while the wizard captures a shape: its keys are the wizard's.)
-                    local allZones = GetAllZones()
+                    local allZones = GetAllZonesForTool()
                     local bestId, bestDist = nil, 999999
                     if groundPos then
                         for _, z in ipairs(allZones) do
@@ -925,7 +925,7 @@ local function zeLoop()
 
             -- R: Delete selected (the free editor's: never inside a wizard's capture)
             if IsDisabledControlJustPressed(0, 45) and zeSelected and not zeCreating and not rsScanActive and not zeCapture then
-                local allZones = GetAllZones()
+                local allZones = GetAllZonesForTool()
                 local isDb = false
                 for _, z in ipairs(allZones) do
                     if z.id == zeSelected and z.id:find('^dbzone_') then isDb = true; break end
@@ -942,7 +942,7 @@ local function zeLoop()
             -- H: Copy code OR Room Scanner toggle
             if IsDisabledControlJustPressed(0, 74) then
                 if zeSelected and not zeCreating and not rsScanActive and not zeCapture then
-                    local allZones = GetAllZones()
+                    local allZones = GetAllZonesForTool()
                     for _, z in ipairs(allZones) do
                         if z.id == zeSelected then
                             CopyToClipboard(zeFormatCode(z))
@@ -1335,7 +1335,7 @@ local function zeLoop()
 
             -- Draw labels on existing zones
             if zeLabelVis then
-                for _, z in ipairs(GetAllZones()) do
+                for _, z in ipairs(GetAllZonesForTool()) do
                     if z.pos then
                         local dist = #(vector3(z.pos.x, z.pos.y, z.pos.z) - camCoords)
                         if dist < 100.0 then
@@ -1372,7 +1372,7 @@ local function zeLoop()
                     polyPts = zeAdjust and #zeAdjust.points or #zePolyPoints,
                     polyClosed = zePolyClosed,
                     speed  = math.floor(zeSpeed * 10) / 10,
-                    zoneCount = #GetAllZones(),
+                    zoneCount = #GetAllZonesForTool(),
                     scanActive = rsScanActive,
                     scanScanning = rsScanning,
                     scanPreview = rsPreview,
@@ -1510,7 +1510,7 @@ end
 
 local function refreshSoon()
     Wait(500)   -- the server's broadcast of the change lands first
-    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZones() })
+    SendNUIMessage({ action = 'zmRefresh', zones = GetAllZonesForTool() })
 end
 
 RegisterNUICallback('zwCreate', function(data, cb)
@@ -2392,13 +2392,13 @@ end)
 -- ============================================
 --
 -- Registered HERE rather than in tools/panel_sections/ because both payload builders
--- (GetAllZones, GetAllDoorsForTool) are file-locals of this runtime — the same
+-- (GetAllZonesForTool, GetAllDoorsForTool) are file-locals of this runtime — the same
 -- own-the-private-state rule the Sentinel truth functions follow. Both sections are
 -- client-local: no server round-trip, the data is already in this Lua state.
 
 PanelSections['zones'] = {
     enter = function()
-        WhipPanelData('zones', 'all', { zones = GetAllZones() })
+        WhipPanelData('zones', 'all', { zones = GetAllZonesForTool() })
     end,
     leave = function() end,
 }

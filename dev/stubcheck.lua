@@ -3,8 +3,7 @@
 --- The stubs in types/server.lua and types/client.lua are what a developer's editor knows of whip: an export without
 --- one is invisible to autocomplete, and a stub without an export is a call that throws. This compares them, side by
 --- side: server/ is the server, client/ and tools/ the client, shared/ both (fxmanifest.lua loads them so). An export
---- is `exports('Name', ...)` and the zone setters made through zoneSetter('Name', ...); a stub is
---- `function whip_core:Name(...)`. Names starting __ are internal (whip_test's __Test seams, and the plumbing behind
+--- is `exports('Name', ...)`; a stub is `function whip_core:Name(...)`. Names starting __ are internal (whip_test's __Test seams, and the plumbing behind
 --- lib/satellite.lua's Whip.* helpers), not public, and are skipped.
 --- Not loaded by fxmanifest.lua.
 ---
@@ -43,9 +42,6 @@ for _, path in ipairs(files) do
         for line in (src .. '\n'):gmatch('([^\n]*)\n') do
             local code = line:gsub('%-%-.*$', '')
             for name in code:gmatch("exports%(%s*['\"]([%w_]+)['\"]") do
-                for _, s in ipairs(sides) do exportsOf[s][name] = path end
-            end
-            for name in code:gmatch("zoneSetter%(%s*['\"]([%w_]+)['\"]") do
                 for _, s in ipairs(sides) do exportsOf[s][name] = path end
             end
         end

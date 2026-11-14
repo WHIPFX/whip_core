@@ -1,5 +1,5 @@
 -- ============================================
--- BLIPS — the client half of server/blips.lua (ShowBlip, RemoveBlip, SetPlayerWaypoint)
+-- BLIPS — the client half of server/blips.lua (ShowBlip, HideBlip, SetPlayerWaypoint)
 -- ============================================
 --
 -- The server says which blips this player sees; this makes them, and nothing else. No frame loop:

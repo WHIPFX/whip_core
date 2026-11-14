@@ -561,7 +561,7 @@ end)
 --- Set one stat on one vehicle.
 ---
 --- Through VehicleStats.set, never the column. That is what puts the value on the entity's
---- statebag and tells its OnVehicleStatChange listeners — an admin editing fuel on a car somebody is
+--- statebag and tells its OnVehicleStatChanged listeners — an admin editing fuel on a car somebody is
 --- sitting in should move the gauge in front of them, not just the database.
 SecureEvent('whip_core:server:vmSetStat', {
     ace = VM_ACE,

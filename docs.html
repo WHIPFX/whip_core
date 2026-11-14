@@ -1678,7 +1678,7 @@ end)</code></pre>
 <table class="event-table">
 <tr><th>You want to</th><th>Use</th><th>Example</th></tr>
 <tr><td>Hear that something happened</td><td>An event: <code>AddEventHandler('whip_core:…', fn)</code>. After the fact; it can't be stopped. On the server any resource can fire one, so check <code>GetInvokingResource()</code> where it matters (<a href="#server-events">Server Events</a>)</td><td><code>whip_core:player:loaded</code></td></tr>
-<tr><td>Hear a value change</td><td>A listener: <code>OnStatChange</code>, <code>OnVehicleStatChange</code>, <code>WatchVehicleStat</code>. Only WHIP calls it, and it's removed when your resource stops</td><td>A HUD that follows hunger</td></tr>
+<tr><td>Hear a value change</td><td>A listener: <code>OnStatChanged</code>, <code>OnVehicleStatChanged</code>, <code>WatchVehicleStat</code>. Only WHIP calls it, and it's removed when your resource stops</td><td>A HUD that follows hunger</td></tr>
 <tr><td>Act just before WHIP does something on the player's game</td><td>A client hook: <a href="#registerclienthook"><code>RegisterClientHook</code></a>. WHIP waits for it (up to a second) but it can't refuse</td><td>Put the phone away before a gun is drawn</td></tr>
 <tr><td>Refuse something of your own</td><td>A check you pass in: <code>canUse</code>, <code>canInteract</code>, a panel's <code>onValidate</code></td><td>No drinking in a car</td></tr>
 <tr><td>Add something to WHIP</td><td><code>Register…</code>, <code>Add…</code>, <code>Ensure…</code>, in <code>Whip.register</code></td><td><code>RegisterItem</code>, <code>AddAction</code></td></tr>
@@ -1858,7 +1858,7 @@ if not ok then return false, why end</code></pre>
 <tr><th>Kind of call</th><th>Success</th><th>Failure</th></tr>
 <tr><td>Change something</td><td><code>true</code>, or something more useful (<code>AddItem</code> returns <code>'inventory'</code> or <code>'ground'</code>, <code>StoreGive</code> the slot). Still truthy, so <code>if not ok</code> works</td><td><code>false, why</code></td></tr>
 <tr><td>Read about a player</td><td>The value</td><td>A list, count or yes/no returns its empty form and why: <code>{}, why</code> · <code>0, why</code> · <code>false, why</code>. A single value (a stat, coordinates, the player sheet) returns <code>nil</code></td></tr>
-<tr><td>Check (may they?)</td><td><code>true</code></td><td><code>false, why</code>: <code>CanUseBankAccount</code>, <code>HasPropertyAccess</code>, <code>HasJobPermission</code>, <code>IsAuthorizedForDoor</code></td></tr>
+<tr><td>Check (may they?)</td><td><code>true</code></td><td><code>false, why</code>: <code>CanUseBankAccount</code>, <code>HasPropertyAccess</code>, <code>HasJobPermission</code>, <code>CanUseDoor</code></td></tr>
 <tr><td>Create</td><td>The new thing as a table; a vehicle returns its <code>vehicleId</code> (<code>CreateOwnedVehicle</code>, <code>SpawnTempVehicle</code>, <code>AdoptVehicle</code>)</td><td><code>false, why</code></td></tr>
 <tr><td>Delete</td><td><code>true</code></td><td><code>false, why</code></td></tr>
 <tr><td>Look up</td><td>A table</td><td><code>nil</code> when there's nothing; <code>false, why</code> when the question is wrong (a bad address)</td></tr>
@@ -1944,7 +1944,7 @@ local ok, count = exports.whip_core:ReleaseTag(tag)</code></pre>
 </div></div>
 
 <div class="export-card" data-search="list tagged run tag scenario director">
-<div class="export-header"><span class="export-name">ListTagged(tag)</span><span class="export-side side-client">CLIENT</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">GetTagged(tag)</span><span class="export-side side-client">CLIENT</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>What your resource holds under a run tag, across WHIP's modules.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -2007,7 +2007,7 @@ end)</code></pre>
 <tr><td><strong>The server decides.</strong> Every message from a game is a <code>SecureEvent</code> or <code>SecureCallback</code> that names its values, with <code>near</code> where it matters</td><td>A modified game can send anything, from anywhere (<a href="#guide-secure">Secure Events</a>)</td></tr>
 <tr><td><strong>Return <code>false, 'why'</code></strong>; never throw or return a bare <code>nil</code></td><td>Callers can tell a refusal from a bug, and players can read why (<a href="#patterns">Return values</a>)</td></tr>
 <tr><td><strong>Save a <code>charId</code>, never a server id</strong></td><td>Server ids are reused by the next player to join</td></tr>
-<tr><td><strong>Ask WHIP for what players share</strong>: the screen (<code>SetUIOpen</code>), controls (<code>BlockControls</code>), hands (<code>FreeHands</code>)</td><td>One owner each, released when your resource stops (<a href="#ui-screens">Screens, input and controls</a>)</td></tr>
+<tr><td><strong>Ask WHIP for what players share</strong>: the screen (<code>SetScreenOpen</code>), controls (<code>BlockControls</code>), hands (<code>FreeHands</code>)</td><td>One owner each, released when your resource stops (<a href="#ui-screens">Screens, input and controls</a>)</td></tr>
 <tr><td><strong>React to events; don't poll</strong> with <code>while true do Wait(0)</code></td><td>A per-frame loop costs every player all the time (<a href="#whipcost">Timing your loops</a>)</td></tr>
 <tr><td><strong>One call per action</strong>: <code>StoreMove</code>, not <code>RemoveItem</code> then <code>AddItem</code>; your own rows with <code>CommitWithAction</code></td><td>One action, one transaction (<a href="#save-system">Save System</a>)</td></tr>
 <tr><td><strong>Prefix names</strong> with your resource's: <code>mycafe_coffee</code>, <code>mycafe:buy</code></td><td>Names are server-wide, first come first served (<a href="#patterns-registering">Registering</a>)</td></tr>
@@ -2097,7 +2097,7 @@ end)</code></pre>
 <tr><td>The look of every screen</td><td>A theme: a resource with a <code>theme.css</code>, chosen by <code>Config.Theme</code> or <code>SetActiveTheme</code> (<a href="#guide-theming">Theming</a>)</td></tr>
 <tr><td>Inventory</td><td>Set <code>Config.InventoryRenderer</code> to your resource, which then draws it (<a href="#inventory-renderer">the renderer seat</a>)</td></tr>
 <tr><td>Death screen</td><td><code>Config.DeathScreen = false</code>, and draw your own from <code>whip_core:death:screenChanged</code> (<a href="#guide-death">Death &amp; Revive</a>)</td></tr>
-<tr><td>Phone</td><td>Stop <code>whip_phone</code> and run your own, using <code>SetUIOpen</code>, <code>SetUIArea</code> and <code>FreeHands</code></td></tr>
+<tr><td>Phone</td><td>Stop <code>whip_phone</code> and run your own, using <code>SetScreenOpen</code>, <code>SetScreenArea</code> and <code>FreeHands</code></td></tr>
 <tr><td>Chat</td><td>Any chat resource that handles the stock chat's events</td></tr>
 <tr><td>Loading screen</td><td>Any FiveM loading screen; whip_core closes it when the player arrives</td></tr>
 <tr><td>Status HUD, character select and creator, spawn picker, notifications, progress bar</td><td>A theme only</td></tr>
@@ -2489,7 +2489,7 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
 
 <h3>For resource developers</h3>
 <ul>
-  <li><strong>On the server, read the player sheet or <code>SentinelGetTruth</code></strong>, never the statebag. Names are never in one: use <a href="#getplayerfullname-client"><code>GetPlayerFullName</code></a>.</li>
+  <li><strong>On the server, read the player sheet or <code>GetSentinelTruth</code></strong>, never the statebag. Names are never in one: use <a href="#getplayerfullname-client"><code>GetPlayerFullName</code></a>.</li>
   <li><strong>Never write WHIP's keys</strong> with <code>Player(src).state:set</code>: the player is struck. Use WHIP's calls (its revive, for <code>whipDead</code>).</li>
   <li><strong>Guard your own statebag facts</strong> with the exports below, or send them as server events.</li>
 </ul>
@@ -2497,7 +2497,7 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
 <div class="export-card" data-search="registersentinelkey sentinel register watch statebag key tamper anticheat guard">
 <div class="export-header"><span class="export-name">RegisterSentinelKey(def)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Puts one of your statebag keys under the Sentinel. A player key's truth is what you last wrote with <code>SentinelSetPlayerKey</code>; an entity key's comes from your <code>truth</code> function, since entities come and go.</p>
+  <p>Puts one of your statebag keys under the Sentinel. A player key's truth is what you last wrote with <code>SetSentinelPlayerKey</code>; an entity key's comes from your <code>truth</code> function, since entities come and go.</p>
   <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
   <tr><td>def.key</td><td>string</td><td>The key. One another resource watches is refused</td></tr>
   <tr><td>def.family</td><td>string</td><td><code>'player'</code> or <code>'entity'</code></td></tr>
@@ -2506,8 +2506,8 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
 <pre><code class="lang-lua">exports.whip_core:RegisterSentinelKey({ key = 'mygang_tag', family = 'player' })   -- inside Whip.register</code></pre>
 </div></div>
 
-<div class="export-card" data-search="sentinelsetplayerkey sentinelgettruth sentinel write read player statebag ledger truth">
-<div class="export-header"><span class="export-name">SentinelSetPlayerKey(src, key, value) / SentinelGetTruth(src, key)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="setsentinelplayerkey getsentineltruth sentinel write read player statebag ledger truth">
+<div class="export-header"><span class="export-name">SetSentinelPlayerKey(src, key, value) / GetSentinelTruth(src, key)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Set records a value on the server, then writes the statebag. Truth reads that record, never the statebag: gate server checks on it. It reads WHIP's keys too.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -2517,8 +2517,8 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
   <div class="return-info"><strong>Returns: </strong>set: <code>true</code>, or <code>false, reason</code> (<code>'no such player'</code>, <code>'key "whipDead" is owned by whip_core'</code>) · truth: the value written (<code>false</code> and <code>nil</code> differ)</div>
 </div></div>
 
-<div class="export-card" data-search="sentinelsetentitykey sentinel write entity vehicle statebag key truth strike driver">
-<div class="export-header"><span class="export-name">SentinelSetEntityKey(entity, key, value)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="setsentinelentitykey sentinel write entity vehicle statebag key truth strike driver">
+<div class="export-header"><span class="export-name">SetSentinelEntityKey(entity, key, value)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Writes one of your entity keys. Update the table your <code>truth</code> reads first; if they disagree, the console warns, nobody is struck, and the key is set back to your truth.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -2527,7 +2527,7 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
   <tr><td>value</td><td>any</td><td><code>nil</code> removes it</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'no such entity'</code>, <code>'key "x" is owned by …'</code>)</div>
 <pre><code class="lang-lua">tunes[plate] = t                                                -- your table, first
-exports.whip_core:SentinelSetEntityKey(veh, 'mytune_data', t)   -- then the key</code></pre>
+exports.whip_core:SetSentinelEntityKey(veh, 'mytune_data', t)   -- then the key</code></pre>
   <div class="info-box warn"><strong>Not <code>Entity(e).state:set</code>.</strong> A bare write strikes whoever runs the entity: for a car, its driver.</div>
 </div></div>
 <h2 id="permissions">Permissions</h2>
@@ -2677,7 +2677,7 @@ if not player then return end
 -- firstName, lastName, fullName ("First Last"), dateOfBirth ("YYYY-MM-DD"), gender
 -- cash (on hand), position ({ x, y, z, w }), health (0-200, 200 full), armour, isDead
 -- metadata (not on the sheet a SecureEvent handler gets)</code></pre>
-<p>The client gets the same sheet, so identifiers stay off it (<code>GetPlayerIdentifiers</code>). Pockets and stats aren't on it either: use <code>GetInventory</code> and <a href="#guide-stats"><code>GetAllStats</code></a>.</p>
+<p>The client gets the same sheet, so identifiers stay off it (<code>GetPlayerIdentifiers</code>). Pockets and stats aren't on it either: use <code>GetInventory</code> and <a href="#guide-stats"><code>GetStats</code></a>.</p>
 
 <h3>Finding players</h3>
 <div class="export-card" data-search="isready ready loaded startup register core">
@@ -2817,8 +2817,8 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
 </div></div>
 
-<div class="export-card" id="showblip" data-search="showblip removeblip setplayerwaypoint blip map marker waypoint route gps area server">
-<div class="export-header"><span class="export-name">ShowBlip(audience, id, spec) · RemoveBlip(id) · SetPlayerWaypoint(source, coords)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="showblip" data-search="showblip hideblip setplayerwaypoint blip map marker waypoint route gps area server">
+<div class="export-header"><span class="export-name">ShowBlip(audience, id, spec) · HideBlip(id) · SetPlayerWaypoint(source, coords)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>A blip for <code>'everyone'</code>, <code>{ people = { serverId | { charId = n } } }</code> or <code>{ job = 'police', onDuty = true }</code>. The same <code>id</code> updates it; it goes when your resource stops or your tag is released. <code>SetPlayerWaypoint</code> sets one player's GPS waypoint.</p>
   <table class="param-table"><tr><th>spec</th><th>Type</th><th>Description</th></tr>
@@ -2927,8 +2927,8 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
 </div></div>
 
-<div class="export-card" data-search="getplayerdata player data client sheet">
-<div class="export-header"><span class="export-name">GetPlayerData()</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getplayer player data client sheet">
+<div class="export-header"><span class="export-name">GetPlayer()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>A copy of the local player's sheet: <code>cash</code> and <code>metadata</code> follow the server, and <code>isDead</code>, <code>health</code> and <code>armour</code> are read live. <code>position</code> is where they loaded; use <code>GetEntityCoords(PlayerPedId())</code> for now.</p>
   <div class="return-info"><strong>Returns: </strong><code>{ source, userId, charId, firstName, lastName, fullName, dateOfBirth, gender, cash, position, health, armour, isDead, metadata }</code>, or <code>{}</code> before a character loads</div>
@@ -2979,16 +2979,16 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>number|nil</code>: <code>nil</code> if never set</div>
 </div></div>
 
-<div class="export-card" data-search="getallstats stats all client getstatuses status hunger thirst">
-<div class="export-header"><span class="export-name">GetAllStats()</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getstats stats all client getstatuses status hunger thirst">
+<div class="export-header"><span class="export-name">GetStats()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>A copy of every stat the client knows.</p>
   <div class="return-info"><strong>Returns: </strong><code>{ [name] = number }</code></div>
   <div class="info-box tip"><strong>Needs count down.</strong> <code>hunger</code> and <code>thirst</code> start at <code>100</code> and cost health at <code>10</code> or below, so <code>AddStat(source, 'hunger', 25)</code> <em>feeds</em> the player.</div>
 </div></div>
 
-<div class="export-card" data-search="onstatchange stat listener watch client">
-<div class="export-header"><span class="export-name">OnStatChange(name, callback, id?, opts?)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="onstatchanged stat listener watch client">
+<div class="export-header"><span class="export-name">OnStatChanged(name, callback, id?, opts?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>Runs a function whenever a stat changes, instead of polling. The server has the same export, for every player.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -2997,7 +2997,7 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
   <tr><td>id</td><td>any?</td><td>Only to hold two listeners on one stat (or the options)</td></tr>
   <tr><td>opts</td><td>table?</td><td><code>table = true</code>: one table <code>{ key, value, old }</code> · <code>now = true</code>: also called at once (<code>old = nil</code>)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code></div>
-<pre><code class="lang-lua">exports.whip_core:OnStatChange('hunger', function(new, old)
+<pre><code class="lang-lua">exports.whip_core:OnStatChanged('hunger', function(new, old)
     if new &lt;= 20 and (old or 100) &gt; 20 then exports.whip_core:Notify('You are starving.', 'error') end
 end)</code></pre>
 </div></div>
@@ -3107,11 +3107,11 @@ end)</code></pre>
 local hunger = exports.whip_core:GetStat(source, 'hunger')
 exports.whip_core:SetStat(source, 'hunger', 100)              -- full
 exports.whip_core:AddStat(source, 'hunger', 25, 'quest reward')  -- restore 25
-local all = exports.whip_core:GetAllStats(source)             -- { health = 200, hunger = 74, ... }
+local all = exports.whip_core:GetStats(source)             -- { health = 200, hunger = 74, ... }
 
 -- client
 local hunger = exports.whip_core:GetStat('hunger')</code></pre>
-<p>The setters return <code>true</code>, or <code>false</code> and a reason: an unregistered name is refused. The optional last <code>reason</code> shows in the debug change log and is passed to <code>OnStatChange</code>.</p>
+<p>The setters return <code>true</code>, or <code>false</code> and a reason: an unregistered name is refused. The optional last <code>reason</code> shows in the debug change log and is passed to <code>OnStatChanged</code>.</p>
 
 <h3>A consumable item</h3>
 <p>The item's use handler calls <code>AddStat</code>. Return its refusal and the player keeps the item. whip_core's own <code>food</code> item (<code>server/items/food.lua</code>) works this way.</p>
@@ -3125,14 +3125,14 @@ Whip.register(function()
 end)</code></pre>
 
 <h3>Listening for changes</h3>
-<p><code>OnStatChange</code> works on both sides and hears every change: decay, items, effects, combat damage and other resources' writes. On the server the callback gets the player's <code>source</code> first and the <code>reason</code> last. Declare it in <code>Whip.register</code>: running it again replaces it, and it goes when your resource stops.</p>
+<p><code>OnStatChanged</code> works on both sides and hears every change: decay, items, effects, combat damage and other resources' writes. On the server the callback gets the player's <code>source</code> first and the <code>reason</code> last. Declare it in <code>Whip.register</code>: running it again replaces it, and it goes when your resource stops.</p>
 <pre><code class="lang-lua">-- server: every player
-exports.whip_core:OnStatChange('hunger', function(source, value, old, reason)
+exports.whip_core:OnStatChanged('hunger', function(source, value, old, reason)
     if value &lt;= 0 then --[[ starving ]] end
 end)
 
 -- client: the local player. old is nil for the first value after login.
-exports.whip_core:OnStatChange('reputation', function(value, old)
+exports.whip_core:OnStatChanged('reputation', function(value, old)
     if old and value &gt;= 100 and old &lt; 100 then
         exports.whip_core:Notify('Reputation: Trusted! New routes unlocked.', 'success')
     end
@@ -3175,7 +3175,7 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 </ul>
 <div class="info-box warn"><strong>Hit causes are reported, not proven.</strong> The debug log's <code>combat (reported): Carbine Rifle by John Smith (#3)</code> comes from the hurt player's own game, so a modified game can make it say anything: never decide anything from it. For who killed a player, use <code>killer</code> on the server's <code>whip_core:player:died</code> (<a href="#guide-death">Death &amp; Revive</a>).</div>
 <h2 id="server-stats">Stats API</h2>
-<p class="lede">Server exports for stats and effects. New to stats? Read <a href="#guide-stats">Stats &amp; Effects</a> first. The client's read-only <code>GetStat</code>, <code>GetAllStats</code>, <code>HasEffect</code>, <code>GetEffects</code> and <code>OnStatChange</code> are on <a href="#client-player">Player &amp; Status (Client)</a>.</p>
+<p class="lede">Server exports for stats and effects. New to stats? Read <a href="#guide-stats">Stats &amp; Effects</a> first. The client's read-only <code>GetStat</code>, <code>GetStats</code>, <code>HasEffect</code>, <code>GetEffects</code> and <code>OnStatChanged</code> are on <a href="#client-player">Player &amp; Status (Client)</a>.</p>
 
 <h3>Stats</h3>
 
@@ -3196,14 +3196,14 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 <div class="info-box warn"><strong>Names are owned</strong> (<a href="#patterns-registering">the registration rule</a>). <code>health</code>, <code>armour</code>, <code>oxygen</code> and another resource's stats are refused with the reason. Registering your own again is fine: the same definition changes nothing, a changed one replaces it.</div>
 </div></div>
 
-<div class="export-card" data-search="getstat getallstats server read stat value hunger thirst health cache">
-<div class="export-header"><span class="export-name">GetStat(source, name) / GetAllStats(source)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getstat getstats server read stat value hunger thirst health cache">
+<div class="export-header"><span class="export-name">GetStat(source, name) / GetStats(source)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>One stat, or a copy of all, from the server's cache. Reported combat damage lands here too, so <code>health</code> is current without reading the ped.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Player server ID</td></tr>
 <tr><td>name</td><td>string</td><td>Stat name (<code>GetStat</code> only)</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>number|nil</code> / <code>table</code>. With no character loaded, <code>GetStat</code> returns <code>nil</code> and <code>GetAllStats</code> <code>{}, 'Player not loaded'</code></div>
+<div class="return-info"><strong>Returns: </strong><code>number|nil</code> / <code>table</code>. With no character loaded, <code>GetStat</code> returns <code>nil</code> and <code>GetStats</code> <code>{}, 'Player not loaded'</code></div>
 </div></div>
 
 <div class="export-card" id="setstat" data-search="setstat set stat value write clamp sync server reason">
@@ -3214,7 +3214,7 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 <tr><td>source</td><td>number</td><td>Player server ID</td></tr>
 <tr><td>name</td><td>string</td><td>A registered stat</td></tr>
 <tr><td>value</td><td>number</td><td>The new value</td></tr>
-<tr><td>reason</td><td>string?</td><td>What caused it (<code>'quest reward'</code>), for the debug change log and <code>OnStatChange</code>. Default <code>'by &lt;your resource&gt;'</code></td></tr></table>
+<tr><td>reason</td><td>string?</td><td>What caused it (<code>'quest reward'</code>), for the debug change log and <code>OnStatChanged</code>. Default <code>'by &lt;your resource&gt;'</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>: <code>'Player not loaded'</code>, <code>'no stat named "x" (RegisterStat it first)'</code>, <code>'value must be a number'</code></div>
 </div></div>
 
@@ -3230,8 +3230,8 @@ return exports.whip_core:ApplyEffect(source, 'mydoc_iron_tonic', {
 <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>: as <code>SetStat</code>, or <code>'amount must be a number'</code></div>
 </div></div>
 
-<div class="export-card" data-search="onstatchange server stat change listener hunger health decay combat watch subscribe">
-<div class="export-header"><span class="export-name">OnStatChange(name, callback, id?, opts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="onstatchanged server stat change listener hunger health decay combat watch subscribe">
+<div class="export-header"><span class="export-name">OnStatChanged(name, callback, id?, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Calls you when any player's stat changes, by any path. Declare it in <code>Whip.register</code>: it's keyed by your resource and <code>id</code>, so running it again replaces it, and it goes when your resource stops.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -3365,7 +3365,7 @@ end
 
 -- a listener is a registration; now = true calls it at once
 Whip.register(function()
-    Whip.core:OnStatChange('drunk', setWalk, nil, { now = true })
+    Whip.core:OnStatChanged('drunk', setWalk, nil, { now = true })
 end)
 AddEventHandler('whip_core:player:logout', function() setWalk(0) end)   -- logging out ends the night</code></pre>
 <h2 id="guide-death">Death &amp; Revive</h2>
@@ -3877,7 +3877,7 @@ The bag weighs 2.2 kg, and every container above it agrees.</code></pre>
 
 local found = exports.whip_core:FindItem(source, 'jerry_can')   -- { item, amount, metadata, addr }
 if found then exports.whip_core:SetItemMetadata(found.addr, { fuel = 50 }) end   -- changes fuel only</code></pre>
-<p>For starting metadata on every new item of yours (a radio's frequency, a gun's serial), register a generator with <a href="#registeritemdefaultmeta"><code>RegisterItemDefaultMeta</code></a>.</p>
+<p>For starting metadata on every new item of yours (a radio's frequency, a gun's serial), register a generator with <a href="#registeritemdefaultmetadata"><code>RegisterItemDefaultMetadata</code></a>.</p>
 
 <h3 id="guide-persistence">Saving</h3>
 <p>Inventories save <em>write-behind</em>: a change is in memory at once and written within about a second (<code>Config.FlushInterval</code>). Only changed rows are written (none on the first save after a load), and both halves of a move share one transaction.</p>
@@ -4145,8 +4145,8 @@ if found then exports.whip_core:StoreTake(found.addr, 1, { reason = 'lockpick sn
 <div class="info-box tip"><strong>Items stay when your resource stops</strong>, since players still carry them, but the keys stop being yours and another resource may take them over.</div>
 </div></div>
 
-<div class="export-card" id="registeritemdefaultmeta" data-search="registeritemdefaultmeta default metadata generator">
-<div class="export-header"><span class="export-name">RegisterItemDefaultMeta(itemKey, generator, opts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="registeritemdefaultmetadata" data-search="registeritemdefaultmetadata default metadata generator">
+<div class="export-header"><span class="export-name">RegisterItemDefaultMetadata(itemKey, generator, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Makes an item's metadata when it's created without any: given (<code>AddItem</code>, <code>StoreGive</code>), picked up, shown on an infinite shop's shelf, or bought.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -4155,7 +4155,7 @@ if found then exports.whip_core:StoreTake(found.addr, 1, { reason = 'lockpick sn
 <tr><td>opts</td><td>table?</td><td><code>{ forBuyer = true }</code>: bought off an infinite shop's shelf, it's made again for the buyer. Stocked shops sell real items, which keep their metadata</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code>: another resource has a generator for that item</div>
 <pre><code class="lang-lua">-- A SIM card with its buyer's new number (whip_phone)
-exports.whip_core:RegisterItemDefaultMeta('sim_card', function(itemKey, ctx)
+exports.whip_core:RegisterItemDefaultMetadata('sim_card', function(itemKey, ctx)
     if not (ctx and ctx.charId) then return {} end   -- for nobody yet: blank
     return { phoneNumber = NewNumber(), owner = ctx.charId }
 end, { forBuyer = true })</code></pre>
@@ -4257,8 +4257,8 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
-<div class="export-card" data-search="getallitemdefs all items config definitions lookup">
-<div class="export-header"><span class="export-name">GetAllItemDefs()</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getitemdefs all items config definitions lookup">
+<div class="export-header"><span class="export-name">GetItemDefs()</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Every item definition.</p>
 <div class="return-info"><strong>Returns: </strong><code>{ [key] = definition }</code></div>
@@ -4685,10 +4685,10 @@ if at and at.kind == 'player' then exports.whip_core:NotifyPlayer(at.id, 'The po
 <div class="info-box warn"><strong>It searches what's loaded:</strong> online players, stashes, boots and panels in memory, and the ground. Not a stash untouched since the restart, nor inside a bag.</div>
 </div></div>
 
-<div class="export-card" id="finditembymeta" data-search="finditembymeta find item metadata serial where is search value">
-<div class="export-header"><span class="export-name">FindItemByMeta(key, value)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="finditembymetadata" data-search="finditembymetadata find item metadata serial where is search value">
+<div class="export-header"><span class="export-name">FindItemByMetadata(key, value)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Where the first item whose metadata <code>key</code> holds <code>value</code> is, searching the same places as <code>FindItemByUid</code>: <code>FindItemByMeta('serial', 'AB12CD34EF56')</code> runs a gun's serial.</p>
+<p>Where the first item whose metadata <code>key</code> holds <code>value</code> is, searching the same places as <code>FindItemByUid</code>: <code>FindItemByMetadata('serial', 'AB12CD34EF56')</code> runs a gun's serial.</p>
 <div class="return-info"><strong>Returns: </strong>an <a href="#store-addresses">address</a> or <code>nil</code></div>
 </div></div>
 
@@ -5301,9 +5301,9 @@ end)</code></pre>
 <p>Full lists: <a href="#server-events">Server Events</a> and <a href="#client-events">Client Events</a>.</p>
 
 <h3 id="guide-stats-changed">Hearing a stat change</h3>
-<p>A stat changing has no event. On the server, <a href="#onvehiclestatchange"><code>OnVehicleStatChange</code></a> calls you when a named stat moves on any car, whoever registered it. It's called on a change, not on a clock: "full for ten seconds" needs your own timer.</p>
+<p>A stat changing has no event. On the server, <a href="#onvehiclestatchanged"><code>OnVehicleStatChanged</code></a> calls you when a named stat moves on any car, whoever registered it. It's called on a change, not on a clock: "full for ten seconds" needs your own timer.</p>
 <pre><code class="lang-lua">-- A coolant add-on reacting to whip_autos' boost
-exports.whip_core:OnVehicleStatChange('boost', function(vehicleId, value, previous)
+exports.whip_core:OnVehicleStatChanged('boost', function(vehicleId, value, previous)
     if value &gt;= 20 then --[[ flat out ]] end
 end)</code></pre>
 <h2 id="vehicles">Vehicles API</h2>
@@ -5572,33 +5572,25 @@ if not vehicleId then exports.whip_core:RefundPlayer(receipt) return false, why 
 <h3>In and out of the world</h3>
 
 <div class="export-card" data-search="spawnvehicle despawnvehicle getvehiclenetid vehicle spawn world create place">
-<div class="export-header"><span class="export-name">SpawnVehicle(vehicleId, x, y, z, heading)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">SpawnVehicle(vehicleId, coords?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Put a vehicle in the world; the server creates the entity. A car already out is moved, not cloned.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number</td><td>The vehicle to place</td></tr>
-  <tr><td>x, y, z, heading</td><td>number?</td><td>Default its saved position. Refused if occupied: <code>'Something is already parked in that spot'</code>, <code>'Someone is standing in that spot'</code></td></tr></table>
+  <tr><td>coords</td><td>vector3|vector4?</td><td>Default its saved position; a vector4's <code>w</code> is the heading. Refused if occupied: <code>'Something is already parked in that spot'</code>, <code>'Someone is standing in that spot'</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>number|false</code>: the network ID, or <code>false</code> and an error</div>
 </div></div>
 
-<div class="export-card" data-search="despawnvehicle vehicle remove world delete entity">
-<div class="export-header"><span class="export-name">DespawnVehicle(vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="despawnvehicle vehicle remove world delete entity garage put away impound">
+<div class="export-header"><span class="export-name">DespawnVehicle(vehicleId, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Take a vehicle out of the world into the garage it's filed under, even with somebody inside; storage is flushed first. It stays put away after a restart. A temp car is removed for good.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr></table>
+  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
+  <tr><td>opts.garage</td><td>string?</td><td>Put it away in this garage instead (an impound). Only an owned car that is out: <code>'A street car cannot be put in a garage'</code>, <code>'A temporary car cannot be put in a garage'</code>, <code>'Vehicle is already stored'</code>, <code>'No such garage: …'</code></td></tr>
+  <tr><td>opts.refuseOccupied</td><td>boolean?</td><td>Refuse a car with somebody inside: <code>'Somebody is still in that vehicle'</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>: success if already out of the world; <code>false, 'Vehicle is busy'</code> mid-spawn, store or delete (retry shortly)</div>
   <div class="info-box warn"><strong>A street car stays in the world.</strong> WHIP hands it back to GTA and forgets it: its id means nothing, its boot and glovebox items are logged as lost, and <code>released</code> fires.</div>
-</div></div>
-
-<div class="export-card" data-search="storevehicle garage put away impound">
-<div class="export-header"><span class="export-name">StoreVehicle(vehicleId, garageKey)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>Put a vehicle away in a garage: state <code>garaged</code>, position cleared. Unlike <code>DespawnVehicle</code>, it refuses a car with somebody inside.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr>
-  <tr><td>garageKey</td><td>string?</td><td>Default its own garage, else the default one. Unknown: <code>false, 'No such garage: …'</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>: <code>'A street car cannot be put in a garage'</code>, <code>'A temporary car cannot be put in a garage'</code></div>
 </div></div>
 
 <div class="export-card" data-search="retrievevehicle garage take out">
@@ -5610,7 +5602,7 @@ if not vehicleId then exports.whip_core:RefundPlayer(receipt) return false, why 
   <tr><td>garageKey</td><td>string?</td><td>Default: its own garage</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code></div>
 <pre><code class="lang-lua">local ok, err = exports.whip_core:RetrieveVehicle(vehicleId)
-if ok then exports.whip_core:SpawnVehicle(vehicleId, x, y, z, heading) end</code></pre>
+if ok then exports.whip_core:SpawnVehicle(vehicleId, vector4(x, y, z, heading)) end</code></pre>
 </div></div>
 
 <h3>Ownership</h3>
@@ -5862,9 +5854,9 @@ end)</code></pre>
 <h3>Vehicle data</h3>
 
 <div class="export-card" data-search="setvehicledata getvehicledata vehicle data attach store per vehicle key value">
-<div class="export-header"><span class="export-name">SetVehicleData / GetVehicleData / GetAllVehicleData / ClearVehicleData</span><span class="export-side side-server">SERVER</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-header"><span class="export-name">SetVehicleData / GetVehicleData / ClearVehicleData</span><span class="export-side side-server">SERVER</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Attach data to a vehicle by name: saved in the car's row and replicated to every client with the car in scope. Set and Clear are server only; Get and GetAll work on both sides.</p>
+  <p>Attach data to a vehicle by name: saved in the car's row and replicated to every client with the car in scope. Set and Clear are server only; Get works on both sides, and with no key returns a copy of everything the car carries.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a> (<code>{ entity = veh }</code> for a handle)</td></tr>
   <tr><td>key</td><td>string</td><td>1–40 characters of <code>[A-Za-z0-9_]</code></td></tr>
@@ -5873,13 +5865,13 @@ end)</code></pre>
   <div class="info-box warn"><strong>A key belongs to the resource that wrote it first.</strong> Writing or clearing another resource's key is refused, naming the owner. Each resource gets 32 keys per car.</div>
 </div></div>
 
-<div class="export-card" data-search="setvehicledatamany vehicle data batch many keys one replication install kit">
-<div class="export-header"><span class="export-name">SetVehicleDataMany(vehicleId, values)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="setvehicledata vehicle data batch many keys one replication install kit">
+<div class="export-header"><span class="export-name">SetVehicleData(vehicleId, values)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Set several keys in one replication and one database write, for installing a kit. Each key still fires its own <code>whip_core:vehicle:dataChanged</code> after the commit.</p>
+  <p>A table in place of the key sets several keys in one replication and one database write, for installing a kit. Each key still fires its own <code>whip_core:vehicle:dataChanged</code> after the commit.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
-  <tr><td>values</td><td>table</td><td><code>{ [key] = value }</code>, keys as for <code>SetVehicleData</code></td></tr></table>
+  <tr><td>values</td><td>table</td><td><code>{ [key] = value }</code>, keys as for one</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>number written</code>, or <code>false, reason</code> when nothing was written</div>
   <div class="info-box warn"><strong>A batch can't remove keys</strong> (use <code>ClearVehicleData</code>). Keys past your 32 are skipped and logged; a batch that would take the block past 8 KB, or touches another resource's key, is refused whole.</div>
 </div></div>
@@ -5893,8 +5885,8 @@ end)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: why not is no such vehicle, or the write failed</div>
 </div></div>
 
-<div class="export-card" data-search="onvehicledatachange server subscribe data key change listener cleared">
-<div class="export-header"><span class="export-name">OnVehicleDataChange(key, callback, id, opts)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="onvehicledatachanged server subscribe data key change listener cleared">
+<div class="export-header"><span class="export-name">OnVehicleDataChanged(key, callback, id, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Be called when one data key changes, on any vehicle: the server half of the client export, and cheaper than handling every <code>dataChanged</code> broadcast. Dropped when your resource stops.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -5904,11 +5896,11 @@ end)</code></pre>
   <tr><td>opts</td><td>table?</td><td><code>{ table = true, now = true }</code>; may go third, in place of <code>id</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code> registered</div>
 <pre><code class="lang-lua">Whip.register(function()
-    Whip.core:OnVehicleDataChange('kit', function(change)
+    Whip.core:OnVehicleDataChanged('kit', function(change)
         if change.cleared then --[[ the kit came off; change.old is what it was ]] end
     end, { table = true, now = true })
 end)</code></pre>
-  <div class="info-box tip"><strong>Use <code>table = true</code></strong>: <code>{ vehicleId, key, value, old, cleared, resource }</code> (plus <code>entity</code> on the client). Positional order differs: the client's callback gets <code>(vehicleId, value, old, entity)</code>, and <code>OnVehicleStatChange</code>'s <code>(vehicleId, value, previous, cleared, source)</code>. <code>now = true</code> also calls it at once for every car with the key.</div>
+  <div class="info-box tip"><strong>Use <code>table = true</code></strong>: <code>{ vehicleId, key, value, old, cleared, resource }</code> (plus <code>entity</code> on the client). Positional order differs: the client's callback gets <code>(vehicleId, value, old, entity)</code>, and <code>OnVehicleStatChanged</code>'s <code>(vehicleId, value, previous, cleared, source)</code>. <code>now = true</code> also calls it at once for every car with the key.</div>
 </div></div>
 
 <div class="export-card" data-search="watchvehicledata watch vehicle data ongained onchanged onlost onstart onstop driveronly tuning sound stance every client">
@@ -6048,16 +6040,16 @@ exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></p
 
 <h3>Reading and writing</h3>
 
-<div class="export-card" data-search="getvehiclestat setvehiclestat addvehiclestat getallvehiclestats vehicle stat read write">
-<div class="export-header"><span class="export-name">GetVehicleStat / SetVehicleStat / AddVehicleStat / GetAllVehicleStats</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getvehiclestat setvehiclestat addvehiclestat getvehiclestats vehicle stat read write">
+<div class="export-header"><span class="export-name">GetVehicleStat / SetVehicleStat / AddVehicleStat / GetVehicleStats</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Read and write stats. Writes are clamped to the stat's range, saved and replicated. <code>GetVehicleStat</code> and <code>GetAllVehicleStats</code> also work on the client, for a car streamed in nearby.</p>
+  <p>Read and write stats. Writes are clamped to the stat's range, saved and replicated. <code>GetVehicleStat</code> and <code>GetVehicleStats</code> also work on the client, for a car streamed in nearby.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
   <tr><td>name</td><td>string</td><td>A registered stat name</td></tr>
   <tr><td>value / delta</td><td>number</td><td>What to set it to, or add to it</td></tr>
   <tr><td>changeSource</td><td>string?</td><td>A label for the change, e.g. <code>'refuel:pump'</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>GetVehicleStat</code> → <code>number|nil</code>; <code>GetAllVehicleStats</code> → <code>{ [name] = value }</code>, defaults filled in; writes → <code>boolean, string|nil</code> (no such car, not a number, unregistered stat)</div>
+  <div class="return-info"><strong>Returns: </strong><code>GetVehicleStat</code> → <code>number|nil</code>; <code>GetVehicleStats</code> → <code>{ [name] = value }</code>, defaults filled in (stored only: below); writes → <code>boolean, string|nil</code> (no such car, not a number, unregistered stat)</div>
 <pre><code class="lang-lua">exports.whip_core:SetVehicleStat(vehicleId, 'fuel', 100.0, 'refuel:pump')</code></pre>
 </div></div>
 
@@ -6083,12 +6075,13 @@ exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></p
   <div class="info-box warn"><strong><code>GetVehicleStat(veh, name) &gt; 0</code> isn't the same.</strong> An absent stat reads as its default, so a stat resting above zero would read as fitted on every car.</div>
 </div></div>
 
-<div class="export-card" data-search="getstoredvehiclestats stored stats no defaults fitted installed presence garage card">
-<div class="export-header"><span class="export-name">GetStoredVehicleStats(vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getvehiclestats stored stats no defaults fitted installed presence garage card">
+<div class="export-header"><span class="export-name">GetVehicleStats(vehicleId, { stored = true })</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Only the stats a car actually stores, no defaults: <code>nil</code> for an installable means not fitted. The vehicle-list payloads send this, so a garage card can tell a spent bottle from none.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr></table>
+  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
+  <tr><td>opts.stored</td><td>boolean</td><td><code>true</code>: stored values only</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>{ [name] = value }</code>, a copy; empty for an unknown vehicle</div>
 </div></div>
 
@@ -6123,8 +6116,8 @@ exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></p
 
 <h3>Listening for changes</h3>
 
-<div class="export-card" id="onvehiclestatchange" data-search="onvehiclestatchange onvehiclestatchanged server per stat subscription listen any stat wildcard statschanged">
-<div class="export-header"><span class="export-name">OnVehicleStatChange(name, callback, id, opts)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" id="onvehiclestatchanged" data-search="onvehiclestatchanged onvehiclestatchanged server per stat subscription listen any stat wildcard statschanged">
+<div class="export-header"><span class="export-name">OnVehicleStatChanged(name, callback, id, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Be called when <em>one</em> stat changes, on any car, yours or another resource's. Declare it in <code>Whip.register</code> with your stats, so it comes back after a whip_core restart; it's dropped when your resource stops.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -6133,14 +6126,14 @@ exports.whip_core:AddVehicleStat(vehicleId, 'nos', -10, 'mynos:boost')</code></p
   <tr><td>id</td><td>any?</td><td>Only for two listeners on one stat; the same id replaces</td></tr>
   <tr><td>opts</td><td>table?</td><td><code>{ table = true, now = true }</code>; may go third. <code>now</code> reports every car carrying the stat at once, with <code>source = 'now'</code>. <code>now = 'all'</code> (named stat) visits every car WHIP has, defaults included, for decisions from the value (an engine hold); registering again after the default changed visits them again</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code> registered</div>
-<pre><code class="lang-lua">exports.whip_core:OnVehicleStatChange('fuel', function(change)
+<pre><code class="lang-lua">exports.whip_core:OnVehicleStatChanged('fuel', function(change)
     -- change.vehicleId, change.key, change.value, change.old, change.cleared, change.source
 end, { table = true, now = true })</code></pre>
   <div class="info-box warn"><strong>The callback must not wait.</strong> It runs inside the stat write: put slow work (a database write) in a <code>CreateThread</code>.</div>
 </div></div>
 
-<div class="export-card" data-search="onvehiclestatchange listen vehicle stat change any vehicle scope">
-<div class="export-header"><span class="export-name">OnVehicleStatChange(name, callback, id, opts)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="onvehiclestatchanged listen vehicle stat change any vehicle scope">
+<div class="export-header"><span class="export-name">OnVehicleStatChanged(name, callback, id, opts)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>Be called when a stat's value changes on any car in scope. Use it for the <em>number</em>; use <code>WatchVehicleStat</code> for a car <em>having</em> the stat. Takes the server's <code>table</code> and <code>now</code> options, third or after an <code>id</code>.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -6381,7 +6374,7 @@ end)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>string|nil key, number|nil distance</code></div>
 <pre><code class="lang-lua">local c = GetEntityCoords(GetPlayerPed(source))
 local key = exports.whip_core:GetNearestGarage(c.x, c.y, c.z, 15.0)
-if key then exports.whip_core:StoreVehicle(vehicleId, key) end</code></pre>
+if key then exports.whip_core:DespawnVehicle(vehicleId, { garage = key, refuseOccupied = true }) end</code></pre>
 </div></div>
 
 <div class="export-card" data-search="getgaragevehicles garage contents stored cars">
@@ -6419,7 +6412,7 @@ exports.whip_core:DeleteGarage('impound')</code></pre>
 <div class="export-card" data-search="setvehiclegarage move vehicle between garages impound transfer">
 <div class="export-header"><span class="export-name">SetVehicleGarage(vehicleId, garageKey)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Move a stored vehicle to another garage: an impound releasing a car, a dealer delivering to the buyer's garage. <code>StoreVehicle</code> refuses a car already put away (<code>"Vehicle is already stored"</code>); this moves it.</p>
+  <p>Move a stored vehicle to another garage: an impound releasing a car, a dealer delivering to the buyer's garage. <code>DespawnVehicle</code> with a <code>garage</code> refuses a car already put away (<code>"Vehicle is already stored"</code>); this moves it.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
   <tr><td>garageKey</td><td>string</td><td>The garage it now belongs to</td></tr></table>
@@ -7353,8 +7346,8 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>boolean</code>, or <code>nil</code> for no such door</div>
 </div></div>
 
-<div class="export-card" data-search="isauthorizedfordoor door auth check requirements jobs onduty">
-<div class="export-header"><span class="export-name">IsAuthorizedForDoor(source, doorId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="canusedoor door auth check requirements jobs onduty">
+<div class="export-header"><span class="export-name">CanUseDoor(source, doorId)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Whether this player may open this door, by its <a href="#doors-requirements">any-of requirements</a>, and if not, the reason they're shown.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7375,8 +7368,8 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
-<div class="export-card" data-search="getalldoors doors list server">
-<div class="export-header"><span class="export-name">GetAllDoors()</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getdoors doors list server">
+<div class="export-header"><span class="export-name">GetDoors()</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Every door on the server (a client only knows the doors it streamed in).</p>
 <div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
@@ -7447,31 +7440,7 @@ end)</code></pre>
 </div></div>
 
 <h3 id="doors-managed">Managed and held doors</h3>
-<p>A <strong>managed</strong> door belongs to one resource: the Doors page and other resources can't change its requirements, link or auto-lock. A <strong>held</strong> door is yours only while a job runs.</p>
-
-<div class="export-card" data-search="adoptorcreatedoor managed door manager adopt property business">
-<div class="export-header"><span class="export-name">AdoptOrCreateDoor(data, manager)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>Takes charge of the door at a spot, making one if there's none. Your resource is always the manager, and keeps the door while stopped. Waits up to 60 s for whip_core to start, so it finds an existing door rather than making a second.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>data</td><td>table</td><td><code>{ model, x, y, z, heading, label, folder, requirements }</code></td></tr>
-<tr><td>manager</td><td>table</td><td><code>{ id, key?, label? }</code>: which of your things holds it</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>table|false, string, number|nil</code>: the door and <code>'created'</code>, <code>'adopted'</code> or <code>'already'</code>; or <code>false</code>, a reason and the id of the door in the way</div>
-<pre><code class="lang-lua">local door, how = exports.whip_core:AdoptOrCreateDoor({
-    model = 'v_ilev_gc_door01', x = -1200.4, y = -890.1, z = 13.9, heading = 35.0,
-    label = 'Bean Machine', requirements = { jobs = { 'beanmachine' } },
-}, { id = 4, key = 'front', label = 'Business #4 · Bean Machine' })</code></pre>
-</div></div>
-
-<div class="export-card" data-search="releasedoor managed door manager release give back">
-<div class="export-header"><span class="export-name">ReleaseDoor(doorId, manager)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>Gives a managed door back: one made for you is deleted, an adopted one gets its old requirements, name, folder and auto-lock. <code>true</code> for an unmanaged door; refused for another manager's.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>doorId</td><td>number|table</td><td>Door id, or <code>{ key = … }</code> for a door you declared</td></tr>
-<tr><td>manager</td><td>table</td><td><code>{ id }</code></td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code></div>
-</div></div>
+<p>A <strong>managed</strong> door belongs to one resource, as the doors you declare with <code>EnsureDoors</code> do: the Doors page and other resources can't change its requirements, link or auto-lock. A <strong>held</strong> door is yours only while a job runs.</p>
 
 <div class="export-card" data-search="getmanageddoors managed doors list manager">
 <div class="export-header"><span class="export-name">GetManagedDoors(id)</span><span class="export-side side-server">SERVER</span></div>
@@ -7482,14 +7451,14 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
 </div></div>
 
-<div class="export-card" data-search="holddoor held door run heist vault temporary setheldooraccess releaseheldoor getdoorhold">
+<div class="export-card" data-search="holddoor held door run heist vault temporary setheldooraccess releasedoor getdoorhold">
 <div class="export-header"><span class="export-name">HoldDoor(data, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Holds the door within half a metre of a spot (a heist's vault), making a <strong>temporary</strong> unsaved door for everyone if there's none. While held, <strong>nobody may press it</strong> until you say who and it <strong>never relocks itself</strong>; both leaves of a pair are held. When the hold ends (<code>ReleaseHeldDoor</code>, <code>ReleaseTag</code>, or your resource stopping) it returns to its old lock. A property's door, another resource's managed door and an already held door are refused.</p>
+<p>Holds the door within half a metre of a spot (a heist's vault), making a <strong>temporary</strong> unsaved door for everyone if there's none. While held, <strong>nobody may press it</strong> until you say who and it <strong>never relocks itself</strong>; both leaves of a pair are held. When the hold ends (<code>ReleaseDoor</code>, <code>ReleaseTag</code>, or your resource stopping) it returns to its old lock. A property's door, another resource's managed door and an already held door are refused.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>data</td><td>table</td><td><code>{ model, x, y, z, heading?, label? }</code>, as the Door Editor reads them</td></tr>
 <tr><td>opts</td><td>table?</td><td><code>{ tag?, requirements? }</code>: <code>tag</code> releases it with your run; <code>requirements</code> is who may press it (nobody if left out)</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>doorId, how</code> (<code>'held'</code>, <code>'made'</code>, <code>'already'</code>), or <code>false, reason</code>. Also <code>SetHeldDoorAccess(doorId, requirements)</code> (<code>nil</code> = nobody, <code>{}</code> = anyone), <code>ReleaseHeldDoor(doorId)</code> and <code>GetDoorHold(doorId)</code> → <code>{ owner, tag, doorId, made }</code> or <code>nil</code>.</div>
+<div class="return-info"><strong>Returns: </strong><code>doorId, how</code> (<code>'held'</code>, <code>'made'</code>, <code>'already'</code>), or <code>false, reason</code>. Also <code>SetHeldDoorAccess(doorId, requirements)</code> (<code>nil</code> = nobody, <code>{}</code> = anyone), <code>ReleaseDoor(doorId)</code> and <code>GetDoorHold(doorId)</code> → <code>{ owner, tag, doorId, made }</code> or <code>nil</code>.</div>
 <pre><code class="lang-lua">local vault = exports.whip_core:HoldDoor({ model = vaultModel, x = pos.x, y = pos.y, z = pos.z }, { tag = 'heist:' .. jobId })
 exports.whip_core:SetDoorLocked(vault, false)
 exports.whip_core:SetHeldDoorAccess(vault, { charIds = crewCharIds })</code></pre>
@@ -7520,7 +7489,7 @@ exports.whip_core:SetHeldDoorAccess(vault, { charIds = crewCharIds })</code></pr
 <div class="export-card" data-search="getloadeddoors doors list all">
 <div class="export-header"><span class="export-name">GetLoadedDoors()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Every door the client has streamed in, <strong>not every door</strong>: the server's <code>GetAllDoors</code> has those.</p>
+<p>Every door the client has streamed in, <strong>not every door</strong>: the server's <code>GetDoors</code> has those.</p>
 <div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
 </div></div>
 
@@ -7537,10 +7506,10 @@ exports.whip_core:SetHeldDoorAccess(vault, { charIds = crewCharIds })</code></pr
 <p class="lede">A zone is an area of the world (a box, sphere or polygon) that knows when players enter and leave, and can enforce rules inside with no code of your own.</p>
 
 <h3>Making a zone</h3>
-<p>On the client, make one with <code>ZoneBox</code>, <code>ZoneSphere</code> or <code>ZonePoly</code> (an outline with a min and max Z). The client checks its zones every <code>Config.ZonePollInterval</code> (300 ms). A zone every player shares, or the server must trust, is declared on the server with <a href="#server-zones"><code>EnsureZone</code></a> or drawn in the Zone Editor; it's saved, and you use its key everywhere (<code>require = { zone = 'mrpd' }</code> on an <a href="#interactions-require">action</a>).</p>
+<p>On the client, make one with <code>RegisterZone</code>: a <code>'box'</code>, a <code>'sphere'</code> or a <code>'poly'</code> (an outline with a min and max Z). The client checks its zones every <code>Config.ZonePollInterval</code> (300 ms). A zone every player shares, or the server must trust, is declared on the server with <a href="#server-zones"><code>EnsureZone</code></a> or drawn in the Zone Editor; it's saved, and you use its key everywhere (<code>require = { zone = 'mrpd' }</code> on an <a href="#interactions-require">action</a>).</p>
 <pre><code class="lang-lua">-- Client, in Whip.register: a safe zone
-exports.whip_core:ZoneBox({
-    id = 'myres_station', pos = vec3(440, -980, 30), size = vec3(20, 20, 10),
+exports.whip_core:RegisterZone({
+    type = 'box', id = 'myres_station', pos = vec3(440, -980, 30), size = vec3(20, 20, 10),
     label = 'Police Station', group = 'police', notify = true,
     rules = { noPvP = true, noWeapons = true, heal = true },
     onEnter = function(zone) end,
@@ -7578,8 +7547,8 @@ AddEventHandler('whip_core:zone:exited', function(zone) end)</code></pre>
 <li id="zones-vertex-editor"><strong>Vertex editor.</strong> <kbd>4</kbd> moves a poly's points and <kbd>5</kbd> sets each point's own height (<kbd>E</kbd> grabs, <kbd>G</kbd> confirms, <kbd>Esc</kbd> reverts), so one zone can cover a garage lower than the house.</li>
 </ul>
 <h2 id="server-zones">Zones API (server)</h2>
-<p class="lede">The server holds <strong>saved zones</strong> (<code>EnsureZone</code> and the Zone Editor, synced to every client) and <strong>server zones</strong> a resource registers with <code>ZoneRegister</code>. Every lookup takes a saved zone's <strong>key</strong> as well as its <code>'dbzone_&lt;n&gt;'</code> id. New to zones? Read <a href="#guide-zones">Zones</a>.</p>
-<div class="info-box warn"><strong>The server also knows client zones, as most players report them.</strong> One modified client is outvoted, but a zone only one player has is whatever they say. Use <code>EnsureZone</code> or <code>ZoneRegister</code> for a zone the server must trust, and <code>trusted = true</code> on <code>ZoneContains</code>. A client zone id needs letters, digits, <code>_</code> and <code>-</code>, 60 at most, to reach the server.</div>
+<p class="lede">The server holds <strong>saved zones</strong> (<code>EnsureZone</code> and the Zone Editor, synced to every client) and <strong>server zones</strong> a resource registers with <code>RegisterZone</code>. Every lookup takes a saved zone's <strong>key</strong> as well as its <code>'dbzone_&lt;n&gt;'</code> id. New to zones? Read <a href="#guide-zones">Zones</a>.</p>
+<div class="info-box warn"><strong>The server also knows client zones, as most players report them.</strong> One modified client is outvoted, but a zone only one player has is whatever they say. Use <code>EnsureZone</code> or <code>RegisterZone</code> for a zone the server must trust, and <code>trusted = true</code> on <code>IsPointInZone</code>. A client zone id needs letters, digits, <code>_</code> and <code>-</code>, 60 at most, to reach the server.</div>
 
 <h3 id="zones-server-events">Server events</h3>
 <p>Give a zone of either kind <code>trackPlayers = true</code> and the server checks it every <code>Config.ZoneTrackInterval</code> ms (1000), firing local server events. A player in the character creator or logging out is in no zone; one in another routing bucket still counts.</p>
@@ -7610,7 +7579,7 @@ end)</code></pre>
 <div class="export-card" data-search="deletezone zone delete saved key remove database">
 <div class="export-header"><span class="export-name">DeleteZone(keyOrId)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Deletes a saved zone for everyone. Refused for a zone a <em>running</em> resource declares, and for a server zone (use <code>ZoneRemove</code>).</p>
+<p>Deletes a saved zone for everyone. Refused for a zone a <em>running</em> resource declares, and for a server zone (use <code>RemoveZone</code>).</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>keyOrId</td><td>string</td><td>Key, or <code>'dbzone_&lt;n&gt;'</code> id</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
@@ -7618,8 +7587,8 @@ end)</code></pre>
 
 <h3>Server zones</h3>
 
-<div class="export-card" data-search="zoneregisterserver zone register server create trackplayers">
-<div class="export-header"><span class="export-name">ZoneRegister(id, data)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="registerzone zone register server create trackplayers">
+<div class="export-header"><span class="export-name">RegisterZone(id, data)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Registers a zone for server-side checks, with no tick unless <code>trackPlayers</code>. The id is yours (<a href="#patterns-registering">the registration rule</a>), and your zones go when your resource stops. A bad shape is refused, saying what's wrong.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7628,8 +7597,8 @@ end)</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
 </div></div>
 
-<div class="export-card" data-search="zoneremoveserver zone remove delete server">
-<div class="export-header"><span class="export-name">ZoneRemove(id)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="removezone zone remove delete server">
+<div class="export-header"><span class="export-name">RemoveZone(id)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Removes one of <strong>your</strong> server zones. A client zone of the same id is separate and stays.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7639,8 +7608,8 @@ end)</code></pre>
 
 <h3>Queries</h3>
 
-<div class="export-card" data-search="zonecontainsserver zone contains point inside">
-<div class="export-header"><span class="export-name">ZoneContains(id, point, trusted)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="ispointinzone zone contains point inside">
+<div class="export-header"><span class="export-name">IsPointInZone(id, point, trusted)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Whether a point is inside a zone.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7648,7 +7617,7 @@ end)</code></pre>
 <tr><td>point</td><td>vector3</td><td>Point to test</td></tr>
 <tr><td>trusted</td><td>boolean?</td><td><code>true</code>: only server-held zones answer; a client-made one is <code>false</code>. For anti-cheat</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
-<pre><code class="lang-lua">if not exports.whip_core:ZoneContains('mrpd', GetEntityCoords(GetPlayerPed(source)), true) then
+<pre><code class="lang-lua">if not exports.whip_core:IsPointInZone('mrpd', GetEntityCoords(GetPlayerPed(source)), true) then
     return false, 'You need to be at the station'
 end</code></pre>
 </div></div>
@@ -7671,15 +7640,15 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>{ vehicleId, entity }[]</code></div>
 </div></div>
 
-<div class="export-card" data-search="getallzones zones list all server">
-<div class="export-header"><span class="export-name">GetAllZones()</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getzones zones list all server">
+<div class="export-header"><span class="export-name">GetZones()</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Every zone the server knows, as a list: <code>GetAllZones()[id]</code> is always <code>nil</code>, so use <code>GetZoneDef</code>.</p>
+<p>Every zone the server knows, as a list: <code>GetZones()[id]</code> is always <code>nil</code>, so use <code>GetZone</code>.</p>
 <div class="return-info"><strong>Returns: </strong><code>{ zoneDef, zoneDef, … }</code></div>
 </div></div>
 
-<div class="export-card" data-search="getzonedef zone definition inspect server">
-<div class="export-header"><span class="export-name">GetZoneDef(id)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getzone zone definition inspect server">
+<div class="export-header"><span class="export-name">GetZone(id)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>One zone's definition.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7691,35 +7660,23 @@ end</code></pre>
 
 <h3>Making and removing zones</h3>
 
-<div class="export-card" data-search="zonebox zone box create">
-<div class="export-header"><span class="export-name">ZoneBox(data)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="registerzone zone box sphere poly polygon create">
+<div class="export-header"><span class="export-name">RegisterZone(data)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Makes a box zone. Give it an <code>id</code> (letters, digits, <code>_</code> and <code>-</code>, 60 at most): the same id again replaces it, and the server only learns of a zone with an id like that.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>data</td><td>table</td><td><code>{ id, pos, size, heading, onEnter, onExit, inside, condition, priority, group, label, debug, <a href="#zones-rules">rules</a>, notify, weather, trackVehicles, onVehicleEnter, onVehicleExit }</code></td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>string</code> zone id, or <code>false, why</code> when the id is another resource's</div>
+<p>Makes a zone: <code>type</code> is <code>'box'</code>, <code>'sphere'</code> or <code>'poly'</code>. Give it an <code>id</code> (letters, digits, <code>_</code> and <code>-</code>, 60 at most): the same id again replaces it, and the server only learns of a zone with an id like that.</p>
+<table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>type</td><td>string</td><td><code>'box'</code>, <code>'sphere'</code> or <code>'poly'</code></td></tr>
+<tr><td>pos, size, heading</td><td>vector3, vector3, number</td><td>A box: its centre, size and heading</td></tr>
+<tr><td>pos, radius</td><td>vector3, number</td><td>A sphere</td></tr>
+<tr><td>points, minZ, maxZ</td><td>vec2[], number, number</td><td>A poly: its outline and heights</td></tr>
+<tr><td>the rest</td><td>any</td><td><code>id</code>, <code>onEnter</code>, <code>onExit</code>, <code>inside</code>, <code>condition</code>, <code>priority</code>, <code>group</code>, <code>label</code>, <code>debug</code>, <a href="#zones-rules"><code>rules</code></a>, <code>notify</code>, <code>weather</code>, <code>trackVehicles</code>, <code>onVehicleEnter</code>, <code>onVehicleExit</code></td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>string</code> zone id, or <code>false, why</code> (no <code>type</code>, or the id is another resource's)</div>
+<pre><code class="lang-lua">local id = exports.whip_core:RegisterZone({ type = 'sphere', pos = vec3(200, -800, 30), radius = 8.0,
+    onEnter = function(zone) end })</code></pre>
 </div></div>
 
-<div class="export-card" data-search="zonesphere zone sphere create">
-<div class="export-header"><span class="export-name">ZoneSphere(data)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Makes a sphere zone.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>data</td><td>table</td><td><code>ZoneBox</code>'s fields, with <code>radius</code> for <code>size</code></td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>string</code> zone id, or <code>false, why</code></div>
-</div></div>
-
-<div class="export-card" data-search="zonepoly zone polygon create">
-<div class="export-header"><span class="export-name">ZonePoly(data)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Makes a polygon zone.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>data</td><td>table</td><td><code>ZoneBox</code>'s fields, with <code>points</code> (vec2[]), <code>minZ</code> and <code>maxZ</code> for <code>pos</code> and <code>size</code></td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>string</code> zone id, or <code>false, why</code></div>
-</div></div>
-
-<div class="export-card" data-search="zoneremove zone delete">
-<div class="export-header"><span class="export-name">ZoneRemove(id)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="removezone zone delete">
+<div class="export-header"><span class="export-name">RemoveZone(id)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Deletes one of your zones (another resource's is refused), firing <code>onExit</code> if the player was inside.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7727,8 +7684,8 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
 </div></div>
 
-<div class="export-card" data-search="zoneremovegroup zone group delete">
-<div class="export-header"><span class="export-name">ZoneRemoveGroup(group)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="removezonegroup zone group delete">
+<div class="export-header"><span class="export-name">RemoveZoneGroup(group)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Deletes all your zones in a group; other resources' stay.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7739,8 +7696,8 @@ end</code></pre>
 <h3>Where the player is</h3>
 <p>These take a zone id or a saved zone's key.</p>
 
-<div class="export-card" data-search="zonecontains zone point check key">
-<div class="export-header"><span class="export-name">ZoneContains(id, point)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="ispointinzone zone point check key contains">
+<div class="export-header"><span class="export-name">IsPointInZone(id, point)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Whether a point is inside a zone: instant maths, no polling.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7749,8 +7706,8 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
-<div class="export-card" data-search="zoneisinside zone player inside key">
-<div class="export-header"><span class="export-name">ZoneIsInside(id)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="isinzone zone player inside key">
+<div class="export-header"><span class="export-name">IsInZone(id)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Whether the local player is inside, as of the last poll.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7758,15 +7715,15 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
-<div class="export-card" data-search="zonegetinside zone all inside">
-<div class="export-header"><span class="export-name">ZoneGetInside()</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getzonesinside zone all inside">
+<div class="export-header"><span class="export-name">GetZonesInside()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Every zone id the local player is inside.</p>
 <div class="return-info"><strong>Returns: </strong><code>string[]</code></div>
 </div></div>
 
-<div class="export-card" data-search="zonegetnearby zone nearby distance">
-<div class="export-header"><span class="export-name">ZoneGetNearby(pos, radius)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getzonesnearby zone nearby distance">
+<div class="export-header"><span class="export-name">GetZonesNearby(pos, radius)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>Every zone within a radius of a point, nearest first.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7775,8 +7732,8 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>{ id, type, label, pos, dist }[]</code></div>
 </div></div>
 
-<div class="export-card" data-search="getzonedef zonegetdef zone definition inspect">
-<div class="export-header"><span class="export-name">GetZoneDef(id)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getzone zone definition inspect">
+<div class="export-header"><span class="export-name">GetZone(id)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>A zone as the client holds it: shape, size, rules, label, priority, <code>inside</code>, <code>debug</code> and <code>hasCondition</code> (the function itself isn't returned).</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -7784,105 +7741,24 @@ end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
-<div class="export-card" data-search="zonegetcount zone count how many">
-<div class="export-header"><span class="export-name">ZoneGetCount()</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>How many zones this client tracks: a check that a resource cleaned up.</p>
-<div class="return-info"><strong>Returns: </strong><code>number</code></div>
-</div></div>
-
 <h3 id="zones-setters">Changing a zone</h3>
-<p>The setters take a zone id or a saved zone's key, and change only zones your resource made. Each returns <code>true</code>, or <code>false, why</code> (<code>'no zone "x"'</code>, <code>'zone "x" belongs to …'</code>).</p>
 
-<div class="export-card" data-search="zonesetrules zone rules set">
-<div class="export-header"><span class="export-name">ZoneSetRules(id, rules)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="updatezone zone move resize rules condition label priority notify debug trackvehicles">
+<div class="export-header"><span class="export-name">UpdateZone(id, patch)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Replaces a zone's rules.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>rules</td><td>table</td><td>The <a href="#zones-rules">rules</a></td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonetogglerule zone rule toggle">
-<div class="export-header"><span class="export-name">ZoneToggleRule(id, ruleKey)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Turns one rule on or off.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>ruleKey</td><td>string</td><td>e.g. <code>'noWeapons'</code></td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zoneupdateposition zone move">
-<div class="export-header"><span class="export-name">ZoneUpdatePosition(id, pos)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Moves a zone.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>pos</td><td>vector3</td><td>New centre</td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zoneupdatesize zone resize grow shrink">
-<div class="export-header"><span class="export-name">ZoneUpdateSize(id, size)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Resizes a zone in place, keeping its shape.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>size</td><td>number | vector3</td><td>A sphere's radius, or a box's dimensions</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code> for a poly (resize it by its points) or a size its shape doesn't take</div>
-</div></div>
-
-<div class="export-card" data-search="zonesetcondition zone condition predicate active">
-<div class="export-header"><span class="export-name">ZoneSetCondition(id, fn)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Swaps the zone's <code>condition</code>: while it returns <code>false</code>, the player counts as outside (rules off, no events).</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>fn</td><td>function</td><td><code>() → boolean</code></td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonesetlabel zone label name">
-<div class="export-header"><span class="export-name">ZoneSetLabel(id, label)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Changes the name shown on entry.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>label</td><td>string</td><td>New label</td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonesetpriority zone priority overlap">
-<div class="export-header"><span class="export-name">ZoneSetPriority(id, priority)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Where zones overlap, all their rules apply; priority settles only the <strong>speed limit</strong> (highest priority that sets one; ties take the lower), the <strong>weather</strong> layer, and callback order (enters highest first, exits lowest first). A car park's 20 km/h inside a district's 60 needs the higher priority.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>priority</td><td>number</td><td>Higher wins</td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonesetnotify zone notify enter exit message">
-<div class="export-header"><span class="export-name">ZoneSetNotify(id, enabled)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Turns the on-screen enter and exit notice on or off; events fire either way.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>enabled</td><td>boolean</td><td>Show it</td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonesettrackvehicles zone vehicle track">
-<div class="export-header"><span class="export-name">ZoneSetTrackVehicles(id, enabled)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Tests the player's vehicle position instead of the ped's, which at speed can skip over a thin zone.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>enabled</td><td>boolean</td><td>Track the vehicle</td></tr></table>
-</div></div>
-
-<div class="export-card" data-search="zonesetdebug zone debug draw visualise">
-<div class="export-header"><span class="export-name">ZoneSetDebug(id, enabled)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-<p>Draws the zone's outline every frame. For development only.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>id</td><td>string</td><td>Zone id</td></tr>
-<tr><td>enabled</td><td>boolean</td><td>Draw it</td></tr></table>
+<p>Changes one of your zones: only the keys in <code>patch</code>. A key it doesn't know is refused and nothing changes.</p>
+<table class="param-table"><tr><th>Key</th><th>Type</th><th>Description</th></tr>
+<tr><td>pos</td><td>vector3</td><td>Moves the zone (a poly's points move with it)</td></tr>
+<tr><td>size</td><td>number | vector3</td><td>A sphere's radius, or a box's dimensions. A poly is resized by its points</td></tr>
+<tr><td>rules</td><td>table|false</td><td>Replaces the <a href="#zones-rules">rules</a>; <code>false</code> for none. To turn one rule off, send the rules without it</td></tr>
+<tr><td>condition</td><td>function|false</td><td><code>() → boolean</code>: while it returns <code>false</code>, the player counts as outside (rules off, no events). <code>false</code> takes it off</td></tr>
+<tr><td>label</td><td>string</td><td>The name shown on entry</td></tr>
+<tr><td>priority</td><td>number</td><td>Where zones overlap, all their rules apply; priority settles only the <strong>speed limit</strong> (highest priority that sets one; ties take the lower), the <strong>weather</strong> layer, and callback order (enters highest first, exits lowest first). A car park's 20 km/h inside a district's 60 needs the higher priority</td></tr>
+<tr><td>notify</td><td>boolean</td><td>The on-screen enter and exit notice; events fire either way</td></tr>
+<tr><td>trackVehicles</td><td>boolean</td><td>Tests the player's vehicle position instead of the ped's, which at speed can skip over a thin zone</td></tr>
+<tr><td>debug</td><td>boolean</td><td>Draws the outline every frame. For development only</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code> (<code>'no zone "x"'</code>, <code>'zone "x" belongs to …'</code>, a size its shape doesn't take)</div>
+<pre><code class="lang-lua">exports.whip_core:UpdateZone('myres_station', { label = 'Closed', rules = { noWeapons = true } })</code></pre>
 </div></div>
 <h2 id="guide-timeweather">Time &amp; Weather</h2>
 <p class="lede">The server keeps one clock and one weather for everyone, and every player's game follows it. Layers show one player something else: night in a club, fog in a zone, a storm during a mission.</p>
@@ -7981,8 +7857,8 @@ exports.whip_core:SetWeatherLayer('zone:swamp', { weather = 'FOGGY', priority = 
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'Invalid weather type'</code>, or not a string)</div>
 </div></div>
 
-<div class="export-card" data-search="setfrozen freeze time toggle pause">
-<div class="export-header"><span class="export-name">SetFrozen(frozen)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="settimefrozen freeze time toggle pause">
+<div class="export-header"><span class="export-name">SetTimeFrozen(frozen)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Freezes or unfreezes the clock for everyone, and fires <code>whip_core:time:freezeChanged</code> <code>{ frozen }</code>.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -8063,15 +7939,15 @@ exports.whip_core:SetWeatherLayer('zone:swamp', { weather = 'FOGGY', priority = 
 <h3 id="client-timeweather">Client</h3>
 <p>What this player sees, layers included.</p>
 
-<div class="export-card" data-search="getcurrenttime time client hour minute">
-<div class="export-header"><span class="export-name">GetCurrentTime()</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="gettime time client hour minute">
+<div class="export-header"><span class="export-name">GetTime()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>The time as the local player sees it.</p>
 <div class="return-info"><strong>Returns: </strong><code>number hour, number minute</code></div>
 </div></div>
 
-<div class="export-card" data-search="getcurrentweather weather client">
-<div class="export-header"><span class="export-name">GetCurrentWeather()</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="getweather weather client">
+<div class="export-header"><span class="export-name">GetWeather()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>The weather as the local player sees it.</p>
 <div class="return-info"><strong>Returns: </strong><code>string</code></div>
@@ -8150,10 +8026,10 @@ exports.whip_core:SetNpcState(hostageId, { follow = source, pace = 'run' })    -
 <h3>Reading and events</h3>
 <p>Events: <code>whip_core:npc:spawned</code>, <code>:despawned { reason }</code>, <code>:damaged { amount, attacker }</code>, <code>:killed { killer, weapon, coords }</code>.</p>
 
-<div class="export-card" data-search="getnpc listnpcs npc read entity netid">
-<div class="export-header"><span class="export-name">GetNpc(ref) · ListNpcs({ tag })</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getnpc getnpcs npc read entity netid">
+<div class="export-header"><span class="export-name">GetNpc(ref) · GetNpcs({ tag })</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p><code>GetNpc</code> returns a copy or <code>nil</code>: <code>{ npcId, owner, tag, model, netId, alive, health, armour, behaviour, conditions, targets, focus, range, group, killer, killedAt, weapon, coords, post, pace, follow, flee, interior }</code>. <code>killer</code> is the server's reading (a car's driver for a run-over). <code>ref</code> is an npcId, or <code>{ entity = }</code> or <code>{ netId = }</code> while that is still the NPC's ped. <code>ListNpcs</code> returns yours, or one tag's.</p>
+<p><code>GetNpc</code> returns a copy or <code>nil</code>: <code>{ npcId, owner, tag, model, netId, alive, health, armour, behaviour, conditions, targets, focus, range, group, killer, killedAt, weapon, coords, post, pace, follow, flee, interior }</code>. <code>killer</code> is the server's reading (a car's driver for a run-over). <code>ref</code> is an npcId, or <code>{ entity = }</code> or <code>{ netId = }</code> while that is still the NPC's ped. <code>GetNpcs</code> returns yours, or one tag's.</p>
 <pre><code class="lang-lua">local paid = {}
 AddEventHandler('whip_core:npc:killed', function(e)
     local npc = exports.whip_core:GetNpc(e.npcId)   -- the server's reading, not the event's
@@ -8433,7 +8309,7 @@ style = { base = 'subtle', badgeScale = 1.3, tint = '#ffc850', fadeMs = 250 }</c
 <h3 id="interactions-runtime">Points from the server: AddPoint</h3>
 <p>A prompt your <strong>server</strong> adds while it runs (a Talk on an NPC, a hand-in spot), for everyone or named players. Pressing it runs <code>onUse</code> on the server after WHIP checks distance, audience and requirements. It's gone when your resource stops, and isn't saved.</p>
 
-<div class="export-card" data-search="addpoint updatepoint removepoint listpoints runtime point interaction server npc talk audience tag menu submenu nested back vehicle car ground pile container">
+<div class="export-card" data-search="addpoint updatepoint removepoint getpoints runtime point interaction server npc talk audience tag menu submenu nested back vehicle car ground pile container">
 <div class="export-header"><span class="export-name">AddPoint(def)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Adds a prompt from the server.</p>
@@ -8448,7 +8324,7 @@ style = { base = 'subtle', badgeScale = 1.3, tint = '#ffc850', fadeMs = 250 }</c
 <tr><td>quietFor</td><td>audience?</td><td>With <code>talk</code>: who sees nothing, not "busy", while it's disabled</td></tr>
 <tr><td>tag</td><td>string?</td><td>Your run tag (<code>ReleaseTag</code>)</td></tr>
 <tr><td>onUse</td><td>function(source, use)</td><td><code>use = { pointId, option, path, useId, coords, netId }</code>. Return <code>false, 'why'</code> to refuse; the player is told why. Keep it quick: start a thread for slow work</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>pointId, false, warnings</code>, or <code>false, reason, warnings</code>: <code>warnings</code> lists unknown fields (<code>onSelect</code>, <code>lable</code>) and a clamped <code>reach</code> or <code>seeFrom</code>, also in the server console; a wrong value is refused. Also <code>UpdatePoint(pointId, patch)</code> (<code>false</code> clears a field; the tag stays), <code>RemovePoint(pointId)</code>, <code>ListPoints({ tag })</code>.</div>
+<div class="return-info"><strong>Returns: </strong><code>pointId, false, warnings</code>, or <code>false, reason, warnings</code>: <code>warnings</code> lists unknown fields (<code>onSelect</code>, <code>lable</code>) and a clamped <code>reach</code> or <code>seeFrom</code>, also in the server console; a wrong value is refused. Also <code>UpdatePoint(pointId, patch)</code> (<code>false</code> clears a field; the tag stays), <code>RemovePoint(pointId)</code>, <code>GetPoints({ tag })</code>.</div>
 <pre><code class="lang-lua">local pointId = exports.whip_core:AddPoint({
     at = { netId = npcNetId, offset = vector3(0.0, 0.0, 0.3) },
     label = 'Talk',
@@ -8510,7 +8386,7 @@ end</code></pre>
 <tr><td>Show a mode's controls, or an objective</td><td><a href="#ui-showtext"><code>ShowText</code></a>, <a href="#ui-objective"><code>ShowObjective</code></a></td></tr>
 <tr><td>Let the player type one line</td><td><a href="#ui-composer"><code>OpenComposer</code></a> (<a href="#which-text-input">which input?</a>)</td></tr>
 <tr><td>Know if the player is busy, or a hotkey may act</td><td><a href="#ui-isgameinputfree"><code>IsGameInputFree</code></a></td></tr>
-<tr><td>Open your own NUI screen</td><td><a href="#ui-setuiopen"><code>SetUIOpen</code></a></td></tr>
+<tr><td>Open your own NUI screen</td><td><a href="#ui-setscreenopen"><code>SetScreenOpen</code></a></td></tr>
 <tr><td>Hold controls off, or freeze or hide the ped</td><td><a href="#ui-blockcontrols"><code>BlockControls</code></a>, <a href="#ui-holdplayerped"><code>HoldPlayerPed</code></a></td></tr>
 <tr><td>Show WHIP's yes or no questions on your own screen</td><td><a href="#registeraskchannel"><code>RegisterAskChannel</code></a></td></tr></table>
 
@@ -8518,7 +8394,7 @@ end</code></pre>
 <p>A progress bar, <code>Input</code>, <code>Confirm</code>, <code>Alert</code> and <code>SkillCheck</code> wait for the player, so call them from a command or your own thread. They share these rules:</p>
 <ul>
   <li><strong>One at a time.</strong> A call while another is up returns <code>false, 'busy'</code>. Other reasons come second the same way: <code>'cancelled'</code>, <code>'timeout'</code>, <code>'failed'</code> (<code>SkillCheck</code>).</li>
-  <li><strong>Other screens.</strong> It closes the inventory, and is <code>'busy'</code> over another resource's <code>SetUIOpen</code> screen. A dialog is also <code>'busy'</code> over the chat composer, radial wheel, <code>/whip</code> panel, character screen, appearance creator or furnisher.</li>
+  <li><strong>Other screens.</strong> It closes the inventory, and is <code>'busy'</code> over another resource's <code>SetScreenOpen</code> screen. A dialog is also <code>'busy'</code> over the chat composer, radial wheel, <code>/whip</code> panel, character screen, appearance creator or furnisher.</li>
   <li><strong>Your own screen</strong> doesn't block your dialogs, but a dialog drops the focus when it closes: call <code>SetNuiFocus(true, true)</code> when it returns.</li>
   <li><strong>It's yours.</strong> When your resource stops, WHIP cancels your bar or dialog and hides your text.</li>
   <li><strong>Positional or one table:</strong> <code>Confirm('Sell?', 'Sure?')</code> or <code>Confirm({ title = 'Sell?', message = 'Sure?' })</code>. While one is up, <code>IsGameInputFree()</code> is <code>false</code>.</li>
@@ -8716,7 +8592,7 @@ if not passed then return false, why == 'busy' and 'Finish what you are doing fi
 </div></div>
 
 <div class="export-card" id="ui-skillcheck-games" data-search="skill check games phone minigame skillcheckgame register game tablet hack reroute safe crack">
-<div class="export-header"><span class="export-name">Whip.skillCheckGame(id, def) · ListSkillCheckGames()</span><span class="export-side side-server">SERVER</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-header"><span class="export-name">Whip.skillCheckGame(id, def) · GetSkillCheckGames()</span><span class="export-side side-server">SERVER</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>Your own game for the server and client <code>SkillCheck</code> and the Director's <strong>Skill Check</strong> card; whip_core keeps the token, timings and answer. Call it in a file both sides load, or once per side with the same id, <code>'&lt;yours&gt;.&lt;name&gt;'</code>. whip_phone adds <code>phone.bruteforce</code>, <code>phone.coderecall</code>, <code>phone.fragmentmatch</code>, <code>phone.override</code>, <code>phone.reroute</code>, <code>phone.safecrack</code> and <code>phone.stabilise</code>.</p>
   <table class="param-table"><tr><th>Field</th><th>Side</th><th>Description</th></tr>
@@ -8727,7 +8603,7 @@ if not passed then return false, why == 'busy' and 'Finish what you are doing fi
   <tr><td>canStart()</td><td>client</td><td>Optional: the same for the client <code>SkillCheck</code>; must not wait</td></tr>
   <tr><td>run(difficulty, token)</td><td>client</td><td>Play it (may wait); return <code>passed, why</code>. Holds WHIP's blocking slot</td></tr>
   <tr><td>cancel(token)</td><td>client</td><td>Optional: called off; make <code>run</code> return</td></tr></table>
-  <p>Re-sent when whip_core restarts; removed when your resource stops (a running check is <code>'cancelled'</code>) or by <code>Whip.removeSkillCheckGame(id)</code>. <code>ListSkillCheckGames()</code> (server) returns <code>{ id, label, desc, levels, needs, owner }</code> each.</p>
+  <p>Re-sent when whip_core restarts; removed when your resource stops (a running check is <code>'cancelled'</code>) or by <code>Whip.removeSkillCheckGame(id)</code>. <code>GetSkillCheckGames()</code> (server) returns <code>{ id, label, desc, levels, needs, owner }</code> each.</p>
 <pre><code class="lang-lua">Whip.skillCheckGame('mygame.wires', {
     label = 'Cut the Wires',
     levels = { easy = { minMs = 2000, timeoutMs = 30000 } },
@@ -8852,8 +8728,8 @@ end, false)</code></pre>
   <div class="info-box warn"><strong>A key mapping fires under a screen.</strong> Disabled controls don't stop it, and <code>SetNuiFocusKeepInput</code> screens (the furnisher, whip_autos) pass every key. Check this once per press in every world-acting key command.</div>
 </div></div>
 
-<div class="export-card" id="ui-setuiopen" data-search="setuiopen satellite nui ui open declare screen hud hide external keephud">
-<div class="export-header"><span class="export-name">SetUIOpen(open, key?, opts?)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" id="ui-setscreenopen" data-search="setscreenopen satellite nui ui open declare screen hud hide external keephud">
+<div class="export-header"><span class="export-name">SetScreenOpen(open, key?, opts?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>Declares your NUI open or closed, so the HUD and chat hide, prompts stop and nothing opens on top. Other resources' dialogs are <code>'busy'</code> over it; after one of your own, or <code>OpenComposer</code>, call <code>SetNuiFocus(true, true)</code> again.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -8862,15 +8738,15 @@ end, false)</code></pre>
   <tr><td>opts.keepHud</td><td>boolean?</td><td>Leave the status HUD, minimap and dial up (the phone does); chat and prompts still hide</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code>: <code>false</code> only with no calling resource</div>
 <pre><code class="lang-lua">SetNuiFocus(true, true)
-exports.whip_core:SetUIOpen(true)
+exports.whip_core:SetScreenOpen(true)
 -- on every close path:
 SetNuiFocus(false, false)
-exports.whip_core:SetUIOpen(false)</code></pre>
+exports.whip_core:SetScreenOpen(false)</code></pre>
   <div class="info-box warn"><strong>Call both halves.</strong> Skip the open and the HUD and prompts stay over your UI; skip the close and they stay hidden. A stopped resource's claim is dropped.</div>
 </div></div>
 
-<div class="export-card" data-search="setuiarea satellite nui ui area screen corner hud room dial move phone">
-<div class="export-header"><span class="export-name">SetUIArea(area, key?)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-card" data-search="setscreenarea satellite nui ui area screen corner hud room dial move phone">
+<div class="export-header"><span class="export-name">SetScreenArea(area, key?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
   <p>Says where your UI sits; the vehicle dial slides up or left out of it (or fades). Hides nothing. Send it when it changes, not every frame, and from <code>Whip.register</code>: whip_core forgets areas on restart.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -9820,7 +9696,7 @@ end)</code></pre>
 <p>A gun is an ordinary item: <a href="#additem"><code>AddItem</code></a> gives one empty, <a href="#removeitem"><code>RemoveItem</code></a> takes one, and <a href="#giveweapon"><code>GiveWeapon</code></a> adds a magazine, rounds or your own serial. The held gun is <a href="#getheld"><code>GetHeldItem(source)</code></a> on the server and <a href="#getdrawnweapon"><code>GetDrawnWeapon</code></a> on the client.</p>
 
 <h4 id="gunny-give-take">Give a gun, and take that one back</h4>
-<p>For an armory or a mission's kit, note the serials you hand out and take back those. <a href="#finditembymeta"><code>FindItemByMeta</code></a> finds each, and <a href="#storetake"><code>StoreTake</code></a> takes it (a drawn gun is put away first, its magazine with it). A spare magazine put into a gun is inside it, so its serial finds nothing until it comes out.</p>
+<p>For an armory or a mission's kit, note the serials you hand out and take back those. <a href="#finditembymetadata"><code>FindItemByMetadata</code></a> finds each, and <a href="#storetake"><code>StoreTake</code></a> takes it (a drawn gun is put away first, its magazine with it). A spare magazine put into a gun is inside it, so its serial finds nothing until it comes out.</p>
 <pre><code class="lang-lua">local issued = {}   -- [source] = the serials handed out
 
 local function issue(source)
@@ -9833,7 +9709,7 @@ end
 
 local function takeBack(source)   -- exactly what was issued
     for _, serial in ipairs(issued[source] or {}) do
-        local at = exports.whip_core:FindItemByMeta('serial', serial)
+        local at = exports.whip_core:FindItemByMetadata('serial', serial)
         if at and at.kind == 'player' and at.id == source then
             exports.whip_core:StoreTake(at, 1, { reason = 'returned to the armory' })
         end
@@ -9965,7 +9841,7 @@ end</code></pre>
 <p>Loading a magazine runs the server <a href="#server-progress"><code>Progress</code></a> through <code>Whip.call</code> and loads only when it returns <code>true</code>; a finish sooner than the bar could fill is refused (<code>'too fast'</code>). It waits, so run it from a SecureEvent or right-click action, never a SecureCallback (the game gives up after 10 seconds), and read the item again after. To use an item at the end of a bar, give <code>RegisterUseHandler</code> a table instead (<a href="#declared-use">a use with a progress bar</a>).</p>
 
 <h3>Go by the server's own record</h3>
-<p>Shots, throws and holstering go by where the server saw the gun drawn and its serial (<code>GunnyDrawnWeapon</code>), never a slot the client names. Every gun and magazine gets a serial as it's made (<a href="#registeritemdefaultmeta"><code>RegisterItemDefaultMeta</code></a>). Give your own findable items an id the same way: WHIP's <code>uid</code> only comes the first time an item is logged.</p>
+<p>Shots, throws and holstering go by where the server saw the gun drawn and its serial (<code>GunnyDrawnWeapon</code>), never a slot the client names. Every gun and magazine gets a serial as it's made (<a href="#registeritemdefaultmetadata"><code>RegisterItemDefaultMetadata</code></a>). Give your own findable items an id the same way: WHIP's <code>uid</code> only comes the first time an item is logged.</p>
 
 <h3>Calling whip_core</h3>
 <p>Call an export straight when it returns at once, inside a handler whip_core runs (<code>GetItemAt</code>, <code>SetItemMetadata</code>). Use <code>Whip.call</code> for a call that can wait (<code>AddItem</code>, <code>Progress</code>), for everything after such a wait, and outside whip_core's handlers; it returns <code>false, why</code> instead of throwing. The full rule is in <a href="#patterns-calling">Calling whip_core</a>, and at the top of gunny's <code>server/main.lua</code> and <code>client/main.lua</code>.</p>
@@ -10463,7 +10339,7 @@ buildServices()
 Whip.onConfigChanged('Services', buildServices)</code></pre>
 
 <h3>A page of its own</h3>
-<p>The shop is whip_autos' own NUI page. <code>nui_callback_strict_mode 'true'</code> lets only that page call its callbacks (the purchase spends money), and every callback replies, even on an error, or the page's fetch hangs (<code>cb</code>, <code>client/ui.lua</code>). <a href="#whip-padscreen"><code>Whip.padScreen</code></a> gives it a controller and cursor, and <code>SetUIOpen</code> stands WHIP's HUD down while it's up.</p>
+<p>The shop is whip_autos' own NUI page. <code>nui_callback_strict_mode 'true'</code> lets only that page call its callbacks (the purchase spends money), and every callback replies, even on an error, or the page's fetch hangs (<code>cb</code>, <code>client/ui.lua</code>). <a href="#whip-padscreen"><code>Whip.padScreen</code></a> gives it a controller and cursor, and <code>SetScreenOpen</code> stands WHIP's HUD down while it's up.</p>
 
 <h3>Director cards</h3>
 <p>whip_autos adds two <a href="#director-cards"><code>Whip.card</code>s</a>, a car task and a builder button (<a href="#director-tasks-buttons">tasks and buttons</a>) to the Director; the files are in the table below.</p>
@@ -10566,7 +10442,7 @@ end)</code></pre>
 <li><strong>Never mid-run.</strong> Events are sent just after the Director's scheduler has done its work, so your handler never runs in the middle of a run's cards.</li>
 </ul>
 <p>Two cards let a builder work with your script without a card of yours: <strong>Send Signal</strong> (you hear <code>whip_core:run:signalled</code>) and <strong>Wait for Script Event</strong> (the run carries on when you call <code>SendDirectorEvent</code>).</p>
-<p><strong>On the player's game</strong> (a phone's job screen, a HUD), <code>exports.whip_core:GetMyRuns()</code> returns the runs that player is in: <code>{ { runId, scenario, name, objective, countdown } }</code>. The local events <code>whip_core:run:joined</code>, <code>:updated</code> (their objective or clock changed), <code>:left</code> and <code>:ended</code> (<code>{ outcome, payout }</code>) say when that changes. Never a Test.</p>
+<p><strong>On the player's game</strong> (a phone's job screen, a HUD), <code>exports.whip_core:GetPlayerScenarioRuns()</code> returns the runs that player is in: <code>{ { runId, scenario, name, objective, countdown } }</code>. The local events <code>whip_core:run:joined</code>, <code>:updated</code> (their objective or clock changed), <code>:left</code> and <code>:ended</code> (<code>{ outcome, payout }</code>) say when that changes. Never a Test.</p>
 
 <h3>Shipping scenarios in a resource</h3>
 <p>A resource can bring scenarios as data, with no scripts: one manifest line per file.</p>
@@ -10686,8 +10562,8 @@ if not runId then exports.whip_core:NotifyPlayer(source, why, 'error') end</code
 </div></div>
 
 <h3>Reading runs and scenarios</h3>
-<div class="export-card" data-search="getscenariorun listscenarioruns director run view players objective vars tag">
-<div class="export-header"><span class="export-name">GetScenarioRun(runId, opts?) · ListScenarioRuns(filter?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getscenariorun getscenarioruns director run view players objective vars tag">
+<div class="export-header"><span class="export-name">GetScenarioRun(runId, opts?) · GetScenarioRuns(filter?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>A run going now, or all of them, as a <strong>DirectorRunView</strong>: <code>{ id, tag, scenario, name, rev, test, kinds, where, players = { {source, charId, name} }, starter, startedAt, seconds, endsIn, vars, objectives = { {source, text, countdown} }, things = { [placedThingId] = { kind, netId, npcId, vehicleId, ... } } }</code>. Give its <code>tag</code> to what you make for the run (ShowBlip, AddPoint, SpawnNpc's opts): it goes when the run ends.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -10695,8 +10571,8 @@ if not runId then exports.whip_core:NotifyPlayer(source, why, 'error') end</code
   <tr><td>filter.player</td><td>number | { charId }?</td><td>Runs a player is in</td></tr>
   <tr><td>filter.kind</td><td>string?</td><td>Runs of scenarios of that Kind (Settings)</td></tr>
   <tr><td>filter.tests / opts.tests</td><td>boolean?</td><td>Include builders' Tests</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong>GetScenarioRun: the view, or <code>false, reason</code>. ListScenarioRuns: a list (empty when none)</div>
-<pre><code class="lang-lua">for _, run in ipairs(exports.whip_core:ListScenarioRuns({ kind = 'heist' })) do
+  <div class="return-info"><strong>Returns: </strong>GetScenarioRun: the view, or <code>false, reason</code>. GetScenarioRuns: a list (empty when none)</div>
+<pre><code class="lang-lua">for _, run in ipairs(exports.whip_core:GetScenarioRuns({ kind = 'heist' })) do
     print(run.name, run.where and run.where.label, #run.players)
 end</code></pre>
 </div></div>
@@ -10718,8 +10594,8 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong>the run's DirectorRunView, or <code>false, reason</code> (not part of a run going now)</div>
 </div></div>
 
-<div class="export-card" data-search="getscenario listscenarios director scenario kind where start mode cards">
-<div class="export-header"><span class="export-name">GetScenario(key) · ListScenarios(filter?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getscenario getscenarios director scenario kind where start mode cards">
+<div class="export-header"><span class="export-name">GetScenario(key) · GetScenarios(filter?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>A scenario as a <strong>DirectorScenarioView</strong>: <code>{ key, name, description, kinds, where, on, rev, draftRev, startMode, source, runs }</code>; GetScenario adds <code>cards</code> (the card types it uses), <code>world</code> (its placed things) and <code>vars</code>. It describes the revision switched on, or the draft when it's off, and never waits. <code>filter</code>: <code>{ on, kind, startMode }</code>.</p>
   <div class="return-info"><strong>Returns: </strong>the view, or <code>false, reason</code> · a list</div>
@@ -10732,8 +10608,8 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong>the numbers, or <code>false, reason</code></div>
 </div></div>
 
-<div class="export-card" data-search="listdirectorcards director cards catalogue">
-<div class="export-header"><span class="export-name">ListDirectorCards(filter?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="getdirectorcards director cards catalogue">
+<div class="export-header"><span class="export-name">GetDirectorCards(filter?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>The editor's card types, each with its <code>owner</code>: <code>{ type, title, desc, category, inputs, outputs, labels, props, owner }</code>. <code>filter</code>: <code>{ category }</code>.</p>
   <div class="return-info"><strong>Returns: </strong>a list</div>
@@ -11979,7 +11855,7 @@ end)</code></pre>
 <tr><th>Event</th><th>Payload</th><th>When</th></tr>
 <tr><td>whip_core:job:clockedOn / clockedOff</td><td><code>{ jobId, key }</code></td><td>Went on or off duty</td></tr>
 <tr><td>whip_core:job:listChanged</td><td><code>{ jobs }</code></td><td>Hired, fired, promoted, a job renamed. <code>jobs</code> is what <code>GetPlayerJobs</code> returns</td></tr>
-<tr><td>whip_core:run:joined / :updated</td><td><code>{ runId, scenario, name, objective, countdown }</code></td><td>In a Director run / its objective or clock changed. Never a Test. <code>GetMyRuns()</code> returns the same</td></tr>
+<tr><td>whip_core:run:joined / :updated</td><td><code>{ runId, scenario, name, objective, countdown }</code></td><td>In a Director run / its objective or clock changed. Never a Test. <code>GetPlayerScenarioRuns()</code> returns the same</td></tr>
 <tr><td>whip_core:run:left / :ended</td><td><code>{ runId, scenario, name, why }</code> / <code>{ runId, scenario, name, outcome, payout }</code></td><td>Left a run / it ended for them</td></tr>
 </table>
 
@@ -12493,7 +12369,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

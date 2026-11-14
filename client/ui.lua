@@ -84,7 +84,7 @@ local function _release(id)
     end
 end
 
---- Would this component open on top of somebody else's screen (declared with SetUIOpen)? Its owner may.
+--- Would this component open on top of somebody else's screen (declared with SetScreenOpen)? Its owner may.
 ---@param owner string|nil
 ---@return boolean
 local function _screenInTheWay(owner)

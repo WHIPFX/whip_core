@@ -696,16 +696,16 @@ function buildZoneCode(z) {
     const p = xyz(z.pos) || { x: 0, y: 0, z: 0 };
     if (z.type === 'box') {
         const s = xyz(z.size) || { x: 0, y: 0, z: 0 };
-        code = "local id = exports.whip_core:ZoneBox({\n";
+        code = "local id = exports.whip_core:RegisterZone({\n    type    = 'box',\n";
         code += "    pos     = vec3(" + fmt(p.x) + ", " + fmt(p.y) + ", " + fmt(p.z) + "),\n";
         code += "    size    = vec3(" + fmt(s.x) + ", " + fmt(s.y) + ", " + fmt(s.z) + "),\n";
         if (z.heading) code += "    heading = " + fmt(z.heading) + ",\n";
     } else if (z.type === 'sphere') {
-        code = "local id = exports.whip_core:ZoneSphere({\n";
+        code = "local id = exports.whip_core:RegisterZone({\n    type   = 'sphere',\n";
         code += "    pos    = vec3(" + fmt(p.x) + ", " + fmt(p.y) + ", " + fmt(p.z) + "),\n";
         code += "    radius = " + fmt(z.radius) + ",\n";
     } else if (z.type === 'poly') {
-        code = "local id = exports.whip_core:ZonePoly({\n";
+        code = "local id = exports.whip_core:RegisterZone({\n    type   = 'poly',\n";
         code += "    points = {\n";
         for (const pt of z.points || []) {
             const px = pt.x !== undefined ? pt.x : pt[1];

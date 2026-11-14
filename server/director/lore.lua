@@ -6,7 +6,7 @@
 -- own: the NPC that starts it, else its only lore NPC (DirectorLore.defaultOf).
 -- Its bank account is owned by no character. Send Money pays the player from it as a transfer; the money is made on
 -- the spot and the lore account's statement says so (Bank.SystemPayFrom).
--- Other resources: GetLoreCharacter, ListLoreCharacters, PayAsLore, and whip_core:lore:changed. Retiring one keeps
+-- Other resources: GetLoreCharacter, GetLoreCharacters, PayAsLore, and whip_core:lore:changed. Retiring one keeps
 -- its records and takes it out of the pickers; saving it again brings it back.
 -- Voice lines: director/lore_voice.lua.
 -- Its look is made in the character editor: a freemode ped with a face, hair and clothes, checked by
@@ -787,7 +787,7 @@ exports('CheckPicture', function(url, frame)
 end)
 
 --- Every lore character in use, by name (`withRetired`: the retired ones too).
-exports('ListLoreCharacters', function(withRetired)
+exports('GetLoreCharacters', function(withRetired)
     return DirectorLore.list(withRetired == true)
 end)
 

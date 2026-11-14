@@ -1639,7 +1639,7 @@ function Vehicles.saveProperties(vehicleId, props, opts)
 end
 
 -- Fuel is an ordinary stat (whip_fuel's), set with SetVehicleStat(vehicleId, 'fuel', value, 'refuel:pump') and
--- heard through OnVehicleStatChange('fuel', function(vehicleId, value, previous) ... end).
+-- heard through OnVehicleStatChanged('fuel', function(vehicleId, value, previous) ... end).
 
 -- Vehicle positions, write-behind like VehicleStats: the server reads its own vehicles' positions (no client is
 -- trusted with where a car is after a restart), marks what moved, and each car's save unit writes it.
@@ -3906,17 +3906,19 @@ end)
 --- Put a vehicle into the world. Idempotent: on a vehicle already out it moves it. Returns `false` rather than nil
 --- on failure (an export's return list stops at the first nil).
 ---@param vehicleId number|WhipVehicleRef|nil
----@param x number|vector3|vector4|nil  defaults to the vehicle's saved position; or a vector3 (then y is the
----                                     heading) or a vector4 (its w is)
----@param y number|nil
----@param z number|nil
----@param heading number|nil
+---@param coords vector3|vector4|table|nil  defaults to the vehicle's saved position; a vector4's w (a table's w or
+---                                         heading) is the heading
 ---@return number|false netId, string|nil err
-exports('SpawnVehicle', function(vehicleId, x, y, z, heading)
-    if type(x) == 'vector3' or type(x) == 'vector4' or type(x) == 'table' then
-        local c = x
-        heading = tonumber(y) or tonumber(c.w) or tonumber(c.heading)
-        x, y, z = tonumber(c.x), tonumber(c.y), tonumber(c.z)
+exports('SpawnVehicle', function(vehicleId, coords)
+    local x, y, z, heading
+    if coords ~= nil then
+        local kind = type(coords)
+        if kind ~= 'vector3' and kind ~= 'vector4' and kind ~= 'table' then
+            return false, 'SpawnVehicle(vehicleId, coords): coords is a vector3, or a vector4 with the heading in w'
+        end
+        x, y, z = tonumber(coords.x), tonumber(coords.y), tonumber(coords.z)
+        -- (a vector3 has no w to read)
+        if kind ~= 'vector3' then heading = tonumber(coords.w) or tonumber(coords.heading) end
     end
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
@@ -3933,17 +3935,33 @@ exports('SpawnVehicle', function(vehicleId, x, y, z, heading)
     return netIdOrErr
 end)
 
---- Take a vehicle out of the world and put it away in its garage, its record and storage kept
---- (Vehicles.despawnToGarage). Storage is flushed first. SpawnVehicle brings it out again.
---- `(ok, err)` like every other verb.
+--- Take a vehicle out of the world, its record and storage kept (Vehicles.despawnToGarage); storage is flushed
+--- first. With no garage it goes where it belongs: someone's own car into its garage, a temporary car is forgotten,
+--- a street car handed back to GTA. `opts.garage` puts an owned car that is out away in that garage, the
+--- Vehicles.store rules: a street or temporary car is refused, as neither has a row to be garaged in.
+--- `opts.refuseOccupied` refuses a car with somebody in it. SpawnVehicle brings it out again. `(ok, err)` like every
+--- other verb.
 ---@param vehicleId number|WhipVehicleRef|nil
+---@param opts { garage?: string, refuseOccupied?: boolean }|nil
 ---@return boolean ok, string|nil err
-function Vehicles.despawnByRef(vehicleId)
+function Vehicles.despawnByRef(vehicleId, opts)
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'Vehicle not found' end
+    opts = type(opts) == 'table' and opts or {}
+    local refuseOccupied = opts.refuseOccupied == true
+
+    -- Into a garage named: an owned car that is out, into a garage that exists (a key that names none is refused)
+    if opts.garage ~= nil then
+        return Vehicles.store(vehicleId, opts.garage, { occupied = not refuseOccupied })
+    end
+
+    if refuseOccupied then
+        local entity = Vehicles.getEntity(vehicleId)
+        if entity and #serverOccupants(entity) > 0 then return false, 'Somebody is still in that vehicle' end
+    end
 
     -- A temporary car (SpawnTempVehicle) has nowhere to be put away, so taking it out of the world
     -- is the end of it: removed, forgotten, and its key taken back.
@@ -3958,7 +3976,7 @@ function Vehicles.despawnByRef(vehicleId)
     if err then return false, err end
     return true
 end
-exports('DespawnVehicle', Vehicles.despawnByRef)
+exports('DespawnVehicle', function(vehicleId, opts) return Vehicles.despawnByRef(vehicleId, opts) end)
 
 --- Take a car out of the world, whoever's it is: someone's own car goes into its garage, a temporary one is
 --- forgotten, and a street car whip only noticed is deleted too (letting it go would hand it back to GTA where it
@@ -3974,22 +3992,6 @@ function Vehicles.removeFromWorld(vehicleId)
     if def.session and not def.temp and entity and DoesEntityExist(entity) then DeleteEntity(entity) end   -- (its keys were stripped)
     return true
 end
-
---- Put a vehicle away in a garage: out of the world, position cleared, state 'garaged'. Unlike DespawnVehicle it
---- takes a garageKey and refuses a car that is not 'out' (DespawnVehicle files it in its own garage, works with
---- somebody inside, removes a temporary car and hands a street car back to GTA). For an impound, or a test.
----@param vehicleId number|WhipVehicleRef|nil
----@param garageKey string|nil  defaults to wherever it is already assigned, or the default garage;
----                             a key that names no garage is refused
----@return boolean ok, string|nil err
-exports('StoreVehicle', function(vehicleId, garageKey)
-    local refErr
-    vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
-    if not vehicleId then return false, refErr end
-
-    local ok, err = Vehicles.store(vehicleId, garageKey)
-    return ok, err
-end)
 
 --- Take a vehicle out of a garage. Marks it 'out' and locked; it still has to be spawned (retrieving decides the car
 --- may come out, spawning decides where).
@@ -4612,7 +4614,7 @@ exports('SetVehicleAppearance', function(vehicleId, props, opts)
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'vehicle not found' end
 
-    -- The data goes into memory first, checked as SetVehicleDataMany checks it; the look's write carries it.
+    -- The data goes into memory first, checked as SetVehicleData checks a table of them; the look's write carries it.
     local change
     if data or clearData then
         local stageErr

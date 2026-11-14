@@ -558,7 +558,7 @@ exports('__TestPersistedStatNames', function()
     return names
 end)
 
---- Take a test's vehicle stat listener off again. OnVehicleStatChange has no unregister (a listener
+--- Take a test's vehicle stat listener off again. OnVehicleStatChanged has no unregister (a listener
 --- goes when its resource stops), and whip_test keeps running: a '*' listener left behind would be
 --- entered on every stat change on the server until a restart.
 ---@param name string  the stat name, or '*'
