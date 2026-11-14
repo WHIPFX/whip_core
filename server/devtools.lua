@@ -489,6 +489,41 @@ SecureEvent('whip_core:server:requestThemeSwap', {
     TriggerClientEvent('whip_core:client:applyTheme', source, resource)
 end)
 
+-- ---- Who may act on whom ----
+--
+-- Nobody kicks or bans someone of their own rank or above, nor lifts a ban that someone above them placed. The ranks:
+-- an admin from server.cfg ('permanent'), someone given dev tools from the panel until the restart ('temporary'),
+-- everyone else (nil). An owner kicked or banned from the panel could be locked out of their own server.
+
+local RANK = { temporary = 1, permanent = 2 }
+
+---@return string|nil
+local function higherRank(a, b) return (RANK[b] or 0) > (RANK[a] or 0) and b or a end
+
+--- Does the rank `actor` stand above the rank `target`?
+local function outranks(actor, target) return (RANK[actor] or 0) > (RANK[target] or 0) end
+
+--- A connected player's rank, from their own session.
+---@param src number
+---@return string|nil
+local function rankOfSource(src)
+    if not IsPlayerAceAllowed(src, 'whip.devtools') then return nil end
+    return DevTools.isTemporary(src) and 'temporary' or 'permanent'
+end
+
+--- An account's rank: by its identifiers, which still answer while its session is leaving (a dropped session stays in
+--- Players through its final save, and FiveM's ACE check answers false for it), and by its live sessions, which also
+--- catch a server.cfg line naming an identifier the table doesn't keep (license2, xbl...).
+---@param account table  a `users` row
+---@return string|nil
+local function accountRank(account)
+    local rank = devtoolsStatus(account, nil)
+    for _, src in ipairs(sessionsOf(account.userId)) do
+        if GetPlayerName(src) then rank = higherRank(rank, devtoolsStatus(account, src)) end
+    end
+    return rank
+end
+
 -- Kick player
 --
 -- 'id', not 'int': the int type CLAMPS, and an id is an address (a clamped id kicks whoever holds
@@ -502,6 +537,13 @@ SecureEvent('whip_core:server:pmKick', {
     if not GetPlayerName(targetSource) then
         NotifyPlayer(source, 'They are not on the server', 'error')
         return
+    end
+    -- Only someone below the kicking admin (Who may act on whom, above).
+    local theirs = rankOfSource(targetSource)
+    if not outranks(rankOfSource(source), theirs) then
+        return false, theirs == 'permanent' and 'They are an admin in server.cfg: they cannot be kicked from the panel'
+            or theirs == 'temporary' and 'Only an admin from server.cfg can kick someone who has dev tools'
+            or 'You cannot kick yourself'
     end
     local loaded = Players[targetSource]
     local userId = (loaded or PendingPlayers[targetSource] or {}).userId
@@ -523,15 +565,10 @@ SecureEvent('whip_core:server:pmKick', {
     print(('[whip_core:admin] %s kicked %s: %s'):format(player.fullName, tostring(name), reason))
 end)
 
-local RANK = { temporary = 1, permanent = 2 }
-
 --- Everyone a ban on this account would turn away, and the highest dev-tools rank among them ('permanent',
 --- 'temporary' or nil). The ban row keeps the account's license, steam, discord and fivem, and the connect check
 --- refuses a match on any one, so another account sharing one of them (the owner's second Rockstar account, with the
---- same Discord) is shut out with it. Each account is asked by its identifiers, which still answers while its session
---- is leaving (a dropped session stays in Players through its final save, and FiveM's ACE check answers false for it),
---- and by its live sessions, which also catch a server.cfg line naming an identifier the table doesn't keep
---- (license2, xbl...).
+--- same Discord) is shut out with it. Each account is ranked by accountRank.
 ---@param user table  the `users` row being banned
 ---@return table[] accounts, string|nil rank, string|nil own  own: the banned account's rank alone
 local function banReach(user)
@@ -548,13 +585,9 @@ local function banReach(user)
     if not accounts or #accounts == 0 then accounts = { user } end
 
     local best, own
-    local function higher(a, b) return (RANK[b] or 0) > (RANK[a] or 0) and b or a end
     for _, account in ipairs(accounts) do
-        local rank = devtoolsStatus(account, nil)
-        for _, src in ipairs(sessionsOf(account.userId)) do
-            if GetPlayerName(src) then rank = higher(rank, devtoolsStatus(account, src)) end
-        end
-        best = higher(best, rank)
+        local rank = accountRank(account)
+        best = higherRank(best, rank)
         if account.userId == user.userId then own = rank end
     end
     return accounts, best, own
@@ -640,6 +673,33 @@ SecureEvent('whip_core:server:pmUnban', {
     ace = 'whip.devtools',
     params = { {'banId', 'id', 0}, {'userId', 'id', 0} },   -- 0 = not given
 }, function(source, player, banId, userId)
+    -- Not a ban that someone above this admin placed (Who may act on whom). The placer is the account behind the
+    -- character that placed it, ranked now. A ban with no placer on record (none written, the character gone) counts
+    -- as an admin from server.cfg's.
+    local placed
+    if banId > 0 then
+        placed = MySQL.query.await('SELECT `bannedBy` FROM `bans` WHERE `banId` = ? AND `active` = 1', { banId })
+    elseif userId > 0 then
+        placed = MySQL.query.await('SELECT `bannedBy` FROM `bans` WHERE `userId` = ? AND `active` = 1', { userId })
+    end
+    -- (if/else, not `a and b or c`: a placer with no rank at all is a nil the shortcut would turn into 'permanent')
+    local mine, asked = rankOfSource(source), {}   -- asked: [charId] = rank, or false for none
+    for _, row in ipairs(placed or {}) do
+        local by = tonumber(row.bannedBy)
+        local placer = 'permanent'
+        if by then
+            if asked[by] == nil then
+                local account = MySQL.single.await([[SELECT u.* FROM `characters` c JOIN `users` u ON u.`userId` = c.`userId`
+                    WHERE c.`charId` = ?]], { by })
+                if account then asked[by] = accountRank(account) or false else asked[by] = 'permanent' end
+            end
+            placer = asked[by]
+        end
+        if outranks(placer, mine) then
+            return false, 'An admin above you placed that ban: only someone of their rank can lift it'
+        end
+    end
+
     if banId > 0 then
         local ok, err = pcall(MySQL.update.await,
             'UPDATE `bans` SET `active` = 0, `unbannedAt` = NOW(), `unbannedBy` = ?, `unbannedByName` = ? WHERE `banId` = ?',

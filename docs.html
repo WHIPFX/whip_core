@@ -15367,7 +15367,7 @@ add_ace identifier.license:xxxx whip.devtools allow</code></pre>
 
 <h3>Bans</h3>
 <p>Bans are enforced on connect: banned players cannot join the server. The ban check uses <strong>all identifiers</strong> (license, steam, discord, fivem). If ANY identifier matches an active ban, the player is blocked.</p>
-<p>Nobody bans someone who outranks them. An admin from server.cfg cannot be banned from the panel: take them out of server.cfg first. Nor can an account that shares a license, Steam, Discord or FiveM identifier with one, since the ban would turn the admin away too. Someone given dev tools from the panel can be banned only by an admin from server.cfg, and the ban takes those tools away.</p>
+<p>Nobody kicks or bans someone of their own rank or above, or lifts a ban that someone above them placed. An admin from server.cfg cannot be kicked or banned from the panel: take them out of server.cfg first. Nor can an account that shares a license, Steam, Discord or FiveM identifier with one, since the ban would turn the admin away too. Someone given dev tools from the panel can be kicked or banned only by an admin from server.cfg, and a ban takes those tools away. A ban an admin from server.cfg placed (or one with no placer on record) is lifted only by one of them.</p>
 <p>A temporary ban ends by itself. When a banned player tries to connect, they see:</p>
 <pre><code>You are banned from this server.
 
