@@ -1161,7 +1161,7 @@ body.searching .main > h2 { margin-top: 56px; }
 
 <h3>1. What you need</h3>
 <ul>
-  <li><strong>FiveM's server with txAdmin</strong>, on any recent version: <strong>Legacy</strong> (the <code>FXServer</code> server) or <strong>Enhanced</strong> (the <code>cfx-server</code> server). whip runs on both.</li>
+  <li><strong>FiveM's server with txAdmin</strong>: <strong>Legacy</strong> (the <code>FXServer</code> server, artifact 38435 or newer) or <strong>Enhanced</strong> (the <code>cfx-server</code> server). WHIP runs on both.</li>
   <li><strong>MariaDB 10.2.3 or newer, or MySQL 8.0.16 or newer</strong>, and a login that may create a database.</li>
   <li><strong>About 1 GB of disk, and at least 10 Mbit/s to GitHub.</strong> txAdmin gives each download 150 seconds, and the largest of whip's is about 145 MB.</li>
 </ul>
@@ -1186,6 +1186,9 @@ https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-enhanced.yaml<
 
 <span class="cm"># Legacy only: the game build whip's car, prop and clothing lists are made for (or newer)</span>
 <span class="kw">sv_enforceGameBuild</span> 3407
+
+<span class="cm"># Players need a Steam account linked to their Cfx.re account</span>
+<span class="kw">set</span> sv_enforceSteamAuth true
 
 <span class="kw">ensure</span> oxmysql
 <span class="kw">ensure</span> whip_core
@@ -1214,7 +1217,7 @@ https://raw.githubusercontent.com/WHIPFX/txAdmin-recipe/main/whip-enhanced.yaml<
 <h3 id="quickstart-check">3. Check it works</h3>
 <ol style="margin:8px 0 12px 20px;font-size:calc(var(--read) * 0.933);line-height:1.8">
   <li>Start the server. A few seconds after <code>Framework loaded successfully!</code>, the console prints a <strong>whip setup</strong> block: what whip found, and a line marked FIX for anything you need to change, with the line that fixes it. Type <code>whipsetup</code> in the server console to see it again.</li>
-  <li>Join the server. You should see the character screen. Make a character, and the appearance creator opens.</li>
+  <li>Join the server. Your Cfx.re account needs a Steam account linked to it: the recipe turns on <code>sv_enforceSteamAuth</code>, and FiveM asks players who have none to link one. You should see the character screen. Make a character, and the appearance creator opens.</li>
   <li>You are an admin already: the recipe put your txAdmin account in <code>group.admin</code>. For another admin, they type <strong>/w</strong>, and the server console prints their <code>add_ace</code> line. Type it into the console (it works at once), and put it in <code>server.cfg</code> to keep it.</li>
   <li>In game, <strong>F2</strong> opens the inventory and <strong>Tab</strong> shows the hotbar. <strong>/w</strong> has the quick tools (noclip, coordinates) and <strong>/whip</strong> opens the admin panel.</li>
 </ol>
