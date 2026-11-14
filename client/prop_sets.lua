@@ -191,6 +191,8 @@ despawn = function(key)
     deleteObj(obj)
 end
 
+local followParents -- defined below, with the attached props
+
 StreamProps.addStream({
     name = 'propSets',
     defs = function() return pieces end,
@@ -198,7 +200,10 @@ StreamProps.addStream({
     isSpawned = function(key) return ents[key] ~= nil end,
     spawn = spawn,
     despawn = despawn,
-    beforePass = lookHere,
+    beforePass = function()
+        lookHere()
+        followParents()
+    end,
 })
 
 -- A prop taken away waits briefly for its replacement, since the server takes a changed set down and puts the new one
@@ -575,6 +580,23 @@ local function parentOf(att)
     end
     local e = att.wire and ents[att.wire .. ':' .. tostring(att.i)]
     return e and DoesEntityExist(e) and e or nil
+end
+
+--- Before each streaming pass: a piece riding a networked car or NPC is measured from where its parent is NOW,
+--- whether or not this game has made it. (Its spot followed the parent only while made — watchAttached below — so a
+--- speaker on a car that drove more than RANGE away was taken away and kept the spot where it was left: when the car
+--- came back it was never made again, and a game never near where it was put down never made it at all. 14 Nov 2026.)
+--- A parent this game does not have (out of its scope) leaves the spot where it was last seen.
+followParents = function()
+    for key, p in pairs(pieces) do
+        if p.att and p.att.net and not ents[key] then
+            local parent = parentOf(p.att)
+            if parent then
+                local c = GetEntityCoords(parent)
+                p.x, p.y, p.z = c.x, c.y, c.z
+            end
+        end
+    end
 end
 
 watchAttached = function()
