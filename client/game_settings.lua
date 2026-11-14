@@ -68,7 +68,8 @@ local gen = 0                 -- bumped on every open and close: a job from an o
 local busy = false            -- a job is running
 local drawn = false           -- GTA's menu drawn this frame (a press is on its way)
 local pressing = nil          -- the control held down this frame, or nil
-local onRow = nil             -- 'tab:row' GTA's menu is on after a step there; nil once anything else may have moved it
+local onRow = nil             -- 'tab:row' GTA's menu was clicked onto; nil once anything else may have moved it
+local wantRow = nil           -- 'tab:row' chosen on the page last: GTA's menu follows only the newest
 local asked = nil             -- the hash of the question GTA is asking now, or nil
 local answering = false       -- an answer to GTA's question is being pressed: another waits for the next question
 local chosen = nil            -- the answer pressed to the question up: { question, ends }, until that question goes
@@ -511,13 +512,17 @@ local function rowNow(id, rowId, g)
     return found
 end
 
---- The row clicked in GTA's menu, so a press lands on it. Twice: the first click into the list moves GTA there, the
---- second tells GTA which row it is on.
-local function focusRow(row, g)
+--- Tab `id`'s row clicked in GTA's menu, so a press lands on it. Twice: the first click into the list moves GTA there,
+--- the second tells GTA which row it is on. Not at all when GTA is on it already: each click is an input to GTA too,
+--- with its menu sound.
+local function focusRow(id, row, g)
+    local at = id .. ':' .. row.id
+    if onRow == at then return end
     ask(('whip|click|2|%d'):format(row.index), g)
     Wait(50)
     ask(('whip|click|2|%d'):format(row.index), g)
     Wait(100)
+    onRow = at
 end
 
 --- One step left (-1) or right (1) on a row, pressed again if GTA dropped it. Answers whether it moved. A graphics
@@ -527,12 +532,7 @@ local function stepRow(id, rowId, dir, g)
     assert(row.state ~= 0, 'GTA does not let that one change here')
     local max = tonumber((options[id] and options[id][rowId] and options[id][rowId].texts[1]) or '') or 10
     if row.type == 2 and ((dir > 0 and row.value >= max) or (dir < 0 and row.value <= 0)) then return false end
-    -- Clicked onto only when GTA is not on it already: each click is an input to GTA too, with its menu sound.
-    local at = id .. ':' .. rowId
-    if onRow ~= at then
-        focusRow(row, g)
-        onRow = at
-    end
+    focusRow(id, row, g)
     -- A graphics row waits for Apply, keeping what it was; stepped back to it, it waits no more. The tab's lists are read
     -- again: one row can change another's choices.
     local function moved()
@@ -619,10 +619,27 @@ RegisterNUICallback('gameSettingsOpen', function(data, cb)
 end)
 
 RegisterNUICallback('gameSettingsTab', function(data, cb)
+    wantRow = nil
     cb(job(function(g)
         ensureOpen(g)
         return answer(assert(tabArg(data), 'GTA has no such settings tab'), g)
     end))
+end)
+
+--- The row chosen on the page (hovered, or moved to with the keys or pad): GTA's menu put on it too, as its own follows
+--- the mouse and pad, so a change after is one press. A row chosen while this waits takes its place.
+RegisterNUICallback('gameSettingsFocus', function(data, cb)
+    cb({})
+    local id, rowId = tabArg(data), rowArg(data)
+    if not (id and rowId) then return end
+    local at = id .. ':' .. rowId
+    wantRow = at
+    job(function(g)
+        if wantRow ~= at or onRow == at then return end
+        ensureOpen(g)
+        local row = rowNow(id, rowId, g)
+        if row and row.state ~= 0 and wantRow == at then focusRow(id, row, g) end
+    end)
 end)
 
 --- One step on a slider or a list: `dir` -1 or 1.
@@ -659,7 +676,7 @@ RegisterNUICallback('gameSettingsPress', function(data, cb)
         local id = assert(tabArg(data), 'GTA has no such settings tab')
         local row = assert(rowNow(id, assert(rowArg(data), 'no such setting'), g), 'that setting is gone')
         assert(row.state ~= 0, 'GTA does not let that one be used here')
-        focusRow(row, g)
+        focusRow(id, row, g)
         press(KEY.accept, g, 150)
         Wait(200)
         return answer(id, g)
@@ -722,7 +739,7 @@ RegisterNUICallback('gameSettingsApply', function(data, cb)
             if pending[id][r.id] then row = r break end
         end
         assert(row, 'there is nothing to apply')
-        focusRow(row, g)
+        focusRow(id, row, g)
         local before = changedCount(g)
         local canTell = before ~= nil and before > 0
         for _ = 1, canTell and 2 or 1 do

@@ -218,7 +218,7 @@ export class SettingsPage {
             const r = e.target.closest('.st-row');
             if (!r || this.question || this.drag) return;
             const i = Number(r.dataset.i);
-            if (i !== this.sel) { this.sel = i; this.draw(); }
+            if (i !== this.sel) { this.sel = i; this.draw(); this.follow(); }
         });
         this.rowsEl.addEventListener('click', (e) => {
             if (this.question) return;
@@ -891,6 +891,22 @@ export class SettingsPage {
         this.sel = (this.sel + d + n) % n;
         this.note = '';
         this.draw();
+        this.follow();
+    }
+
+    /** GTA's menu put on the row chosen here once the choice settles (not every row passed on the way), as GTA's own
+     *  follows the mouse and pad: a change after is then one press to GTA. */
+    follow() {
+        clearTimeout(this.followTimer);
+        const cur = this.current();
+        const row = this.row();
+        if (cur?.section !== 'game' || cur.keys || !row || row.locked) return;
+        const key = this.tabKey;
+        this.followTimer = setTimeout(() => {
+            if (this.isOpen && this.tabKey === key && this.row()?.id === row.id) {
+                nuiCallback('gameSettingsFocus', { tab: cur.id, id: row.id });
+            }
+        }, 150);
     }
 
     askReset() {
