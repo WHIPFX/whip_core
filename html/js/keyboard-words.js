@@ -4,7 +4,7 @@
 // LANGUAGE PACKS. A language is html/keyboard/<code>.json (its name, its three rows of letters, its accents)
 // and <code>.txt (its words, most common first). English comes with whip; a server offers more in
 // Config.Keyboard.Languages (html/keyboard/README.md says how). The one a player types in: their own choice
-// (Server Settings → Keyboard language, or the keyboard's language key), else the language GTA is set to when
+// (Settings → Server → Controller → Keyboard language, or the keyboard's language key), else the language GTA is set to when
 // the server offers it, else the server's default. client/keyboard.lua tells this page the list.
 //
 // SUGGESTIONS for the word being typed, up to three: the player's own words first (learned, below), then the

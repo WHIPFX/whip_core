@@ -2263,7 +2263,7 @@ function whip_core:GetItemSetting(item, key) end
 function whip_core:OnItemSettingChanged(item, key, fn) end
 
 -- ============================================
--- Player settings (each player's own: the pause menu's Server Settings page)
+-- Player settings (each player's own: the pause menu's Settings page, under Server)
 -- ============================================
 
 ---@class WhipPlayerSettingDef
@@ -2281,7 +2281,7 @@ function whip_core:OnItemSettingChanged(item, key, fn) end
 ---@field step? number Default 1
 ---@field unit? string What a slider shows after the number
 
---- A row of yours on the Server Settings page; the value stays yours (get / set). Put it in Whip.register,
+--- A row of yours on the Settings page, under Server; the value stays yours (get / set). Put it in Whip.register,
 --- or use Whip.playerSetting, which does. Refused: a key another running resource holds, one of
 --- whip_core's own, a row with no get or set, or with no default value. The row goes when your resource stops.
 ---@param def WhipPlayerSettingDef

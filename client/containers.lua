@@ -75,7 +75,7 @@ end
 
 -- Where a stash's prompt sits on its prop
 -- Placed from the prop's model box (GetModelDimensions) in one of three ways, each player's choice (pause menu,
--- Server Settings, Map & HUD, Stash prompt), defaulting to the server's Config.ContainerPrompt:
+-- Settings, Server, Map & HUD, Stash prompt), defaulting to the server's Config.ContainerPrompt:
 --   'middle'  A billboard at the middle of the box, pulled toward the camera (Interactions `pull`) by as far as
 --             the box reaches toward you, so it shows from every side. The default.
 --   'side'    A sign flat on the middle of the nearest wall (Interactions `heading`), at the camera's height,

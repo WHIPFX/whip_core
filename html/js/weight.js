@@ -1,8 +1,8 @@
 // ========================================
 // WEIGHTS AS A PLAYER READS THEM
 //
-// Every weight whip holds is in kilograms. They are shown in the player's unit (Server Settings → Map & HUD → Weight
-// unit, whose default is Config.WeightUnit): grams under a kilo and kilograms from one up, or ounces under a pound and
+// Every weight whip holds is in kilograms. They are shown in the player's unit (Settings → Server → Map & HUD →
+// Weight unit, whose default is Config.WeightUnit): grams under a kilo and kilograms from one up, or ounces under a pound and
 // pounds from one up.
 //
 //     weightText(0.05)       // "50 g", or "1.8 oz"

@@ -90,7 +90,7 @@ local PAD_CURVE = 1.6          -- a light push is slow and exact: a stick's spee
 local PAD_FAST = 209           -- L3 (client/pad.lua)
 -- (The triggers: WhipPadTrigger, client/controller.lua.)
 
--- EACH PLAYER'S OWN (the pause menu's Server Settings, Controller): how fast a full push looks and flies, as a
+-- EACH PLAYER'S OWN (the pause menu's Settings → Server → Controller): how fast a full push looks and flies, as a
 -- share of PAD_LOOK and of the fly speed. Kept here as numbers, changed by their rows, so a frame reads no setting.
 PlayerPrefs.define({
     key = 'pad.lookSpeed', group = 'Controller', type = 'slider', label = 'Camera look speed',

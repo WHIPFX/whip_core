@@ -2,7 +2,7 @@
 
 local isInVehicle = false
 
--- The minimap on foot and in a vehicle: the player's own choice (pause menu, Server Settings, Minimap) unless the
+-- The minimap on foot and in a vehicle: the player's own choice (pause menu, Settings → Server → Minimap) unless the
 -- server decides (Config.MapOptions.onFoot / .inVehicle: 'on', 'off' or 'player').
 
 --- The server's answer for one of them, or nil while each player chooses.

@@ -31,7 +31,7 @@ export function pref(key, fallback) {
     return v === undefined || v === null ? fallback : v;
 }
 
-/** The page's own guess at a value, until Lua's answer replaces it: the Server Settings page, while a slider is dragged
+/** The page's own guess at a value, until Lua's answer replaces it: the Settings page's Server rows, while a slider is dragged
  *  or a change is on its way, so what reads it (the minimap's preview) follows at once. */
 export function setPref(key, value) {
     values[key] = value;

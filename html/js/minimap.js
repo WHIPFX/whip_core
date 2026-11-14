@@ -16,7 +16,7 @@
 // It also follows the HUD's own fade (#status-hud .visible), as the vehicle dial does: a screen up, or dead, and it
 // goes with the rest.
 //
-// THE PLAYER'S SETTINGS (the pause menu's Server Settings → Minimap; client/minimap.lua declares them, page = true): the
+// THE PLAYER'S SETTINGS (the pause menu's Settings → Server → Minimap; client/minimap.lua declares them, page = true): the
 // frame rate, how much of the map shows on foot, in a vehicle when slow and at top speed (metres across the box, so
 // every screen shows the same), the speeds the zoom runs between, the tilt on foot and in a vehicle, and a tilt that
 // changes with speed. The camera's own numbers are set from them on every pose (tune).

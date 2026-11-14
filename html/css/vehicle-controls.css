@@ -115,7 +115,7 @@
     height: 24px;
 }
 
-/* NO KEY (each player's Server Settings: pad.vehicleControlsKeys): the button's own picture, a little larger,
+/* NO KEY (each player's Settings, under Server: pad.vehicleControlsKeys): the button's own picture, a little larger,
    kept off the ground by a dark edge and drop as the words are. */
 .vc-bare .vc-key {
     min-width: 0;

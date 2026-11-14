@@ -30,7 +30,7 @@ local FRAME_DICT = 'whipframe_'
 --- see-through; the black makes it solid). stream/whipring_<shape>.ytd: 'ring', the same frame
 --- with the middle left clear (dev/map_tiles/hud_frame.js ring). Solid: the frame alone, as ever (one draw). Part
 --- way: the frame at the player's strength, then the ring over it at full, so only the middle fades (two). None: the
---- ring alone (one). The pause menu's Server Settings → Map & HUD → Map background (map.background, below).
+--- ring alone (one). The pause menu's Settings → Server → Map & HUD → Map background (map.background, below).
 local RING_DICT = 'whipring_'
 local ROUTE_COLOUR = 142             -- HUD_COLOUR_WAYPOINT: the waypoint, its blip and the GPS line
 local ROUTE_BLUE = { 96, 165, 250 }  -- whip's Signal Blue (--ui-accent)
@@ -303,8 +303,8 @@ end
 --- The tuner opened or closed (client/radar_debug.lua): GTA's radar dressing on or off with it.
 function HudSkinTunerChanged() applySkin() end
 
--- The border is each player's own: map.border, declared by client/minimap.lua (the pause menu's Server Settings →
--- Minimap), whose minimap draws it. This file's game-drawn frame is only for /radardebug, where GTA's radar is up, and
+-- The border is each player's own: map.border, declared by client/minimap.lua (the pause menu's Settings → Server
+-- → Minimap), whose minimap draws it. This file's game-drawn frame is only for /radardebug, where GTA's radar is up, and
 -- is drawn for any border but none.
 
 -- The black behind the map (RING_DICT, above): each player's own, from solid (100%, the look as it was) to none (0%,

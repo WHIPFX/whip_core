@@ -37,7 +37,7 @@ import { escapeHtml } from './utils.js';
 import { pref } from './prefs.js';
 
 // the circle at a full push: screen heights a second (the inventory's), times the player's own "Menu cursor speed"
-// (Server Settings: 50-200%, read each frame)
+// (Settings → Server: 50-200%, read each frame)
 const SPEED = 1.3;
 const CURVE = 1.6;      // a light push is slow and exact: speed grows as push ^ this
 const SLOW = 0.45;      // over something it can press, it slows to this share

@@ -1,10 +1,8 @@
 -- ============================================
--- PLAYER PREFERENCES — the pause menu's Server Settings page
+-- PLAYER PREFERENCES — the Server section of the pause menu's Settings page
 -- ============================================
 --
--- "We have the normal GTA settings, but now we need client 'server' settings ... anything that should be
--- configurable for the player should go into the pause menu under 'server settings', just below the normal
--- 'Settings' menu." Each player's own choices about how whip looks and handles on THEIR screen: the menu
+-- GTA's own settings are the page's Game section; these are the Server section. Each player's own choices about how whip looks and handles on THEIR screen: the menu
 -- cursor's speed on a pad, which dial the car shows, the speed unit, the map's border. Kept on the player's
 -- PC (resource KVP), like the Controller screen's layout.
 --

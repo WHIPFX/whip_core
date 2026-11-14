@@ -34,7 +34,7 @@
 --
 -- 'default' is Config.Interact3D (its fadeMs, flashMs, gap and the rest) with whatever
 -- Config.Interact3D.styles.default sets on top. The named ones are Config.Interact3D.styles.
--- Its theme is the player's own shape (Server Settings → Prompt shape), which follows
+-- Its theme is the player's own shape (Settings → Server → Prompt shape), which follows
 -- Config.Interact3D.theme until they pick: square by default.
 --
 -- Resolved once, read every frame. A style resolves into a flat table of numbers, kept until the
@@ -54,7 +54,7 @@ local fromTable = setmetatable({}, { __mode = 'k' })
 local warnedConfig = {}
 
 --- The shapes prompts come in by default, for the server (Config.Interact3D.theme) and each player
---- (pause menu, Server Settings → Map & HUD → Prompt shape). The other themes are a style's to name.
+--- (pause menu, Settings → Server → Map & HUD → Prompt shape). The other themes are a style's to name.
 local SHAPES = { keycap = true, classic = true }
 
 --- The theme 'default' wears: the player's own choice, which follows the server's until they make
@@ -67,8 +67,8 @@ local function baseTheme()
     return 'keycap'
 end
 
---- Whether 'default' is dark: the player's own switch (pause menu, Server Settings → Map & HUD → Dark
---- prompts), which follows the server's (Config.Interact3D.dark) until they flip it.
+--- Whether 'default' is dark: the player's own switch (pause menu, Settings → Server → Map & HUD →
+--- Dark prompts), which follows the server's (Config.Interact3D.dark) until they flip it.
 local function baseDark()
     local mine = PlayerPrefs ~= nil and PlayerPrefs.get ~= nil and PlayerPrefs.get('prompts.dark') or nil
     if type(mine) == 'boolean' then return mine end
@@ -298,7 +298,7 @@ Settings.onChange('Interact3D', function() InteractStyle.flush() end)
 -- ============================================
 --
 -- The square is the default, and a player who prefers the round prompts can have them. One row on
--- the pause menu's Server Settings page; it changes every prompt that does not name
+-- the pause menu's Settings page, under Server; it changes every prompt that does not name
 -- a theme of its own, at once (the renderer's own atlas is redrawn in the new shape).
 PlayerPrefs.define({
     key = 'prompts.shape', group = 'Map & HUD', type = 'choice', label = 'Prompt shape',

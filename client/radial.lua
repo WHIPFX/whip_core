@@ -464,7 +464,7 @@ end, false)
 -- the hotkeys 1-5 on the right, one stick in control at a time.
 local padHeld, padPress = false, 0
 
--- How long the hold is: each player's own (Server Settings, client/player_prefs.lua), the server's figure the default.
+-- How long the hold is: each player's own (Settings → Server, client/player_prefs.lua), the server's figure the default.
 PlayerPrefs.define({
     key = 'pad.radialHoldMs', group = 'Controller', type = 'slider', label = 'Hold for the radial menu',
     help = 'How long D-pad down is held before the radial menu opens.',

@@ -1,4 +1,4 @@
--- Driving camera: a chase camera for players who switch it on (pause menu: Server Settings, Vehicles), when the server
+-- Driving camera: a chase camera for players who switch it on (pause menu: Settings → Server → Vehicles), when the server
 -- allows it (Config.DrivingCamera). In a car, bike or quad it takes over with the camera system's chase shot
 -- (client/cam_shots.lua). On top: free look (mouse or right stick, drifts back a second after release), look back
 -- (GTA's look-behind, C), shake (Config.DrivingCamera.Shake) and a soft entry.

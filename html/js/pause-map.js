@@ -289,7 +289,7 @@ export class PauseMap {
         this.root.classList.toggle('pmap-live', this.interactive);
     }
 
-    /** Out of sight (pause.js: behind the Controller and Server Settings screens): not drawn at all, so the page's one 3D
+    /** Out of sight (pause.js: behind the Controller and Settings screens): not drawn at all, so the page's one 3D
      *  map is left to what is on screen (the minimap's preview). Drawn again, as it is now, when it comes back. */
     setHidden(on) {
         this.hidden = !!on;

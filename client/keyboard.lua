@@ -19,7 +19,7 @@
 -- Words and languages (html/js/keyboard-words.js): the keyboard suggests how to finish
 -- the word being typed, in the player's language, from that language's pack in html/keyboard/. Which
 -- languages there are is Config.Keyboard; this file tells the page those, and the one GTA is set to. Each
--- player's own choice of language, and suggestions on or off, are theirs (Server Settings → Controller).
+-- player's own choice of language, and suggestions on or off, are theirs (Settings → Server → Controller).
 --
 -- It is whip's page that shows it, over any resource's own page: the focus is taken here while it is
 -- up and given back after (FiveM keeps one focus vote per resource, so a satellite's own focus stands

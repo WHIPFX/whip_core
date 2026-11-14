@@ -19,7 +19,7 @@
 -- moving thing is followed between scans. A blip the game made short-range shows only inside the box; any other is
 -- pinned to its edge when far (minimap.js), as on GTA's radar. A blip's rotation and flashing go with it.
 --
--- THE PLAYER'S SETTINGS are declared here (the pause menu's Server Settings → Minimap, client/player_prefs.lua), all
+-- THE PLAYER'S SETTINGS are declared here (the pause menu's Settings → Server → Minimap, client/player_prefs.lua), all
 -- read by the page (page = true). The Minimap tab shows a preview of the minimap on a drive (html/js/minimap.js
 -- MinimapPreview), and while it is up this file sends it the blips, route and waypoint round the player
 -- ('minimapPreview'). /minimapblips says what the blip scan finds.
@@ -52,7 +52,7 @@ local ROUTE_STEP, ROUTE_MAX = 20.0, 150
 --- The box when hud_skin.lua is not there to ask: its shipped frame (posX, posY up from the bottom, sizeX, sizeY).
 local FRAME_DEFAULT = { 0.0060, 0.0700, 0.1720, 0.1655 }
 
--- ---- the player's settings (Server Settings → Minimap) ----
+-- ---- the player's settings (Settings → Server → Minimap) ----
 --
 -- Read by html/js/minimap.js (page = true) as they change; the views are metres across the box, so every screen shows
 -- the same; the speeds are in the dial's unit (Config.VehicleHud.speedUnit, sent with the box). The defaults are the
@@ -196,7 +196,7 @@ Settings.onChange('MapOptions', function() PlayerPrefs.recheck(DECIDED) end)
 
 local shown = false
 local feedGen = 0               -- each show is a new generation; a loop from an older one stops
-local previewGen = 0            -- the same for the Server Settings preview's feed
+local previewGen = 0            -- the same for the Settings page preview's feed
 local movers = {}               -- the blips on moving things, from the last scan
 local moverAt = {}              -- [blip] = { x, y } as last sent
 local sentBox = nil
@@ -365,7 +365,7 @@ local function sendBox(force)
     SendNUIMessage(box)
 end
 
--- A border chosen in Server Settings shows at once (on the preview too, where the minimap itself is hidden).
+-- A border chosen in Settings shows at once (on the preview too, where the minimap itself is hidden).
 PlayerPrefs.onChange('map.border', function() sendBox(false) end)
 
 -- ---- the feed ----
@@ -479,7 +479,7 @@ function MinimapShow(on)
     CreateThread(function() dataLoop(alive) end)
 end
 
--- The Server Settings page's preview is up ({ on = true }) or gone: the blips, route and waypoint round the player for
+-- The Settings page's minimap preview is up ({ on = true }) or gone: the blips, route and waypoint round the player for
 -- it, as the minimap gets them. The minimap itself is hidden while the pause menu is open, so the two never both run.
 RegisterNUICallback('minimapPreview', function(data, cb)
     cb('ok')

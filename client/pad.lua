@@ -17,7 +17,7 @@ local function log(source, label, what)
     if WhipPadDebugFire then WhipPadDebugFire(source, label, what) end
 end
 
--- Per-player settings (pause menu, Server Settings); the server's Config.Controller figures are the defaults.
+-- Per-player settings (pause menu, Settings → Server); the server's Config.Controller figures are the defaults.
 PlayerPrefs.define({
     key = 'pad.sprintOnA', group = 'Controller', type = 'toggle', label = 'A sprints too',
     help = 'Hold A to sprint, as GTA does, as well as clicking the left stick twice.',

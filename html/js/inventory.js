@@ -3482,7 +3482,7 @@ function padFrame(now) {
 
     if (push > 0) {
         padShowCursor();
-        // times the player's own "Menu cursor speed" (Server Settings, prefs.js), read each frame
+        // times the player's own "Menu cursor speed" (Settings → Server, prefs.js), read each frame
         const speed = PAD_CURSOR_SPEED * (pref('pad.cursorSpeed', 100) / 100) * innerHeight * Math.pow(push, PAD_CURSOR_CURVE)
             * (padSlowsOver(pad.over) ? PAD_CURSOR_SLOW : 1);
         pad.cx = Math.min(innerWidth - 1, Math.max(0, pad.cx + x / push * speed * dt));

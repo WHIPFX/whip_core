@@ -26,7 +26,7 @@ local NO_DIAL = { [13] = true, [21] = true }
 local KIND = { [14] = 'boat', [15] = 'air', [16] = 'air' }
 
 local ATTITUDE, BANK_SIGN, DASH_SKINS
-local DIAL_ON = true   -- false: the player chose no dial (Server Settings): none shown, nothing read
+local DIAL_ON = true   -- false: the player chose no dial (Settings → Server): none shown, nothing read
 
 -- Each player's own choice (client/player_prefs.lua: custom dials, whip's, or none); Config.VehicleHud is the default.
 PlayerPrefs.define({
@@ -498,7 +498,7 @@ local function hudConfigChanged()
     end
 end
 Settings.onChange('VehicleHud', hudConfigChanged)
--- And the player's own choices (Server Settings).
+-- And the player's own choices (Settings → Server).
 PlayerPrefs.onChange('dial.style', hudConfigChanged)
 PlayerPrefs.onChange('dial.speedUnit', hudConfigChanged)
 PlayerPrefs.onChange('dial.horizon', hudConfigChanged)

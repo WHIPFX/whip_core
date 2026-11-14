@@ -50,7 +50,7 @@ Config.MaxWeight = {   -- Kilograms
     accessory = 10.0,   -- the strip on its own, inside the 80
 }
 
--- What the inventory and shops show weights in, until a player picks their own (Server Settings → Map & HUD).
+-- What the inventory and shops show weights in, until a player picks their own (Settings → Server → Map & HUD).
 --   'kg' = grams under a kilo, kilograms from one up
 --   'lb' = ounces under a pound, pounds from one up
 -- Weights in this file and in RegisterItem are kilograms either way.
@@ -385,7 +385,7 @@ Config.IdleCam = {
     ResetMs = 10000,
 }
 
--- A chase camera each player can switch on for themselves (pause menu: Server Settings, Vehicles): it follows the
+-- A chase camera each player can switch on for themselves (pause menu: Settings → Server → Vehicles): it follows the
 -- car on a spring, leans into slides, widens with speed and shakes a little. C looks behind; first person stays GTA's.
 --   Enabled   false: nobody can switch it on
 --   Default   what a player who never chose gets
@@ -1115,11 +1115,11 @@ Config.Interact3D = {
     previewScale = 3.4,
 
     -- The prompt's shape: 'keycap' is a rounded square (the default), 'classic' is a round disc. Players can pick
-    -- their own in the pause menu (Server Settings > Map & HUD > Prompt shape).
+    -- their own in the pause menu (Settings > Server > Map & HUD > Prompt shape).
     theme = 'keycap',
 
     -- Dark prompts: black with a white outline and symbol, black words with a white outline. Players can switch it
-    -- in the pause menu (Server Settings > Map & HUD > Dark prompts).
+    -- in the pause menu (Settings > Server > Map & HUD > Dark prompts).
     dark = false,
 
     -- Styles: a set of looks a prompt can wear. Everything above is the 'default' style; another style changes
@@ -1399,8 +1399,8 @@ Config.PlayerManagerSessionWarn = false
 
 Config.ContainerInteractRange = 2.5     -- How close to stand to open a stash or other container
 Config.ContainerStreamRange   = 100.0   -- How far away its prop still appears
--- Where a stash's E prompt sits on its prop, for a player who has not picked their own (pause menu, Server Settings,
--- Map & HUD, Stash prompt):
+-- Where a stash's E prompt sits on its prop, for a player who has not picked their own (pause menu, Settings,
+-- Server, Map & HUD, Stash prompt):
 --   'middle'  over the middle of the prop, seen through it from every side
 --   'side'    flat on the middle of the side you are nearest, like a sign at eye level; snaps to another side as you walk round
 --   'face'    the same sign sliding round the prop with you, wrapping round corners

@@ -5,7 +5,7 @@
    client/hud_skin.lua: minimap.js places it in px). At body level, not in #status-hud: that layer is zoomed, and the
    box is in the screen's own px. It follows #status-hud's fade (minimap.js), on the same 0.5s.
 
-   .mm IS ANY MINIMAP: the HUD's (#minimap3d) and the Server Settings page's preview (.mm-preview-map), which is the
+   .mm IS ANY MINIMAP: the HUD's (#minimap3d) and the Settings page's preview (.mm-preview-map), which is the
    same thing bigger. --mm-k is how much bigger (1 on the HUD): the marks and the border grow with it. --mm-mk is the
    player's Marker size (minimap.js sets it): the marks only.
 
@@ -13,7 +13,7 @@
    border, standing a little past it, rather than being cut in half by it.
 
    THE LOOK: the mask's shape (Config.MinimapMask) as the box's corners, and with the black HUD the border the player
-   chose (Server Settings → Minimap → Map border; client/minimap.lua sends it, set as data-border):
+   chose (Settings → Server → Minimap → Map border; client/minimap.lua sends it, set as data-border):
      full     the white frame: black, white, black from the map's edge out — the bands hud_skin.lua drew in the game,
               1.2, 3.4 and 1.8 thousandths of the screen's height
      outline  an EMPTY GAUGE'S rim (css/hud-skin.css): the track's faint grey, then the black edge. The track is

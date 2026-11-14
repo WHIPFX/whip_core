@@ -474,7 +474,7 @@ ConfigSchema = {
             { path = 'WeightUnit', type = 'enum',
               options = { { value = 'kg', label = 'Kilograms and grams' }, { value = 'lb', label = 'Pounds and ounces' } },
               label = 'Weight unit',
-              help = 'What the inventory and shops show weights in, until a player picks their own in Server Settings. Weights typed in config.lua and on these pages are kilograms either way.' },
+              help = 'What the inventory and shops show weights in, until a player picks their own in Settings, under Server. Weights typed in config.lua and on these pages are kilograms either way.' },
             -- A plain on/off; its slots are code (shared/inventory_shape.lua, AccessoryStripSlots).
             { path = 'AccessoryStrip', type = 'bool', apply = 'restart',
               why = 'Which containers a character has is fixed when whip_core starts.',
@@ -505,7 +505,7 @@ ConfigSchema = {
         settings = {
             { path = 'DrivingCamera.Enabled', type = 'bool',
               label = 'Smooth driving camera',
-              help = 'Lets players switch on the smooth driving camera for themselves (pause menu: Server Settings, Vehicles): a chase camera on a spring that leans into slides and widens with speed. Off: nobody can, and anyone using it goes back to GTA\'s.' },
+              help = 'Lets players switch on the smooth driving camera for themselves (pause menu: Settings → Server → Vehicles): a chase camera on a spring that leans into slides and widens with speed. Off: nobody can, and anyone using it goes back to GTA\'s.' },
             { path = 'DrivingCamera.Default', type = 'bool',
               shownWhen = { path = 'DrivingCamera.Enabled', equals = true },
               label = 'Smooth driving camera to start with',
@@ -705,13 +705,13 @@ ConfigSchema = {
               label = 'Minimap shape',
               help = 'The shape of the minimap.' },
             -- The minimap, decided by the server instead of each player (client/minimap.lua, client/hud.lua). A player's
-            -- row the server decides shows greyed in their Server Settings, "Disabled by server admin" (PlayerPrefs `forced`).
+            -- row the server decides shows greyed in their Settings (Server), "Disabled by server admin" (PlayerPrefs `forced`).
             { path = 'MapOptions.onFoot', type = 'enum', options = SHOWN_WHEN,
               label = 'Minimap on foot',
-              help = 'Whether players see the minimap on foot. "Each player chooses" leaves it to their Server Settings (Show on foot); the others decide it for everyone.' },
+              help = 'Whether players see the minimap on foot. "Each player chooses" leaves it to their own Settings (Server → Minimap → Show on foot); the others decide it for everyone.' },
             { path = 'MapOptions.inVehicle', type = 'enum', options = SHOWN_WHEN,
               label = 'Minimap in a vehicle',
-              help = 'Whether players see the minimap in a vehicle. "Each player chooses" leaves it to their Server Settings (Show in a vehicle).' },
+              help = 'Whether players see the minimap in a vehicle. "Each player chooses" leaves it to their own Settings (Server → Minimap → Show in a vehicle).' },
             { path = 'Interact3D', type = 'record',
               fields = {
                   { key = 'theme', type = 'enum',
@@ -725,7 +725,7 @@ ConfigSchema = {
                   { key = 'labelPx', type = 'number', min = 20, max = 200, step = 1, unit = 'px', label = 'Label size' },
               },
               label = 'Prompts',
-              help = 'How the E prompts in the world look to players who have not chosen their own (pause menu, Server Settings → Map & HUD). Dark swaps black and white: a black square with a white outline and symbol, and black words with a white outline. The sizes are how tall the circle and its label are on screen at the distance a prompt can be used from (measured at 1440p); further away they shrink like any object.' },
+              help = 'How the E prompts in the world look to players who have not chosen their own (pause menu, Settings → Server → Map & HUD). Dark swaps black and white: a black square with a white outline and symbol, and black words with a white outline. The sizes are how tall the circle and its label are on screen at the distance a prompt can be used from (measured at 1440p); further away they shrink like any object.' },
             { path = 'InteractVisibleRange', type = 'number', min = 1, max = 25, step = 0.5, unit = 'm',
               label = 'Prompt visible from',
               help = 'How far away an E prompt\'s circle appears. Keep it above the distance a prompt can be used from.' },
