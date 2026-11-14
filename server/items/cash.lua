@@ -44,7 +44,7 @@ end
 
 --- A whole number of banknotes, 1 or more, or nil.
 ---
---- The exports (AddPlayerCash, RemovePlayerCash) hand these methods whatever a satellite passed.
+--- The money exports (PayPlayer, ChargePlayer) hand these methods whatever a satellite passed.
 --- Refused, not floored: Sanitize.amount, the rule every item and bank call uses (strings, NaN,
 --- infinity and fractions refused).
 ---@param amount any

@@ -759,8 +759,6 @@ function IsAnyScreenOpen(forHud)
         or (UI ~= nil and UI.IsBusy ~= nil and UI.IsBusy() and not UI.IsProgressActive())
 end
 
-exports('IsAnyUIOpen', IsAnyUIOpen)
-
 -- Exported so an overlay resource (whip_chat) can seed from it, then follow the push below.
 exports('IsAnyScreenOpen', IsAnyScreenOpen)
 

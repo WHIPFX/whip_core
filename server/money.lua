@@ -26,7 +26,7 @@ Money._receipts = {}
 local _nextId = math.floor(os.time()) * 1000
 
 --- How long a payment stays refundable. Refunds undo the step right after a charge; anything later
---- is a new payment the other way, and should be one (BankSystemDeposit, AddPlayerCash).
+--- is a new payment the other way, and should be one (BankSystemDeposit, PayPlayer).
 local RECEIPT_TTL_MS = 30 * 60 * 1000
 --- A Systems Creator system's payment (owner 'system:<id>') is refunded by the system's walker when
 --- the pulse that took it is called off, and a pulse lives up to an hour (shared/systems/walk.lua's

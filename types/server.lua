@@ -130,21 +130,6 @@ function whip_core:GetPlayerIdentifiers(source) end
 ---@return string|nil why  'Player not loaded'
 function whip_core:GetPlayerCash(source) end
 
---- Cash NEVER drops: pockets too full for the notes means (false, reason) and nothing was paid.
----@param source number
----@param amount number  whole dollars, 1 or more; a fraction is refused (floor it yourself)
----@param reason? string  for the activity log, beside your resource's name: 'rental refund · by my_rentals'
----@return boolean added
----@return string|nil err
-function whip_core:AddPlayerCash(source, amount, reason) end
-
----@param source number
----@param amount number  whole dollars, 1 or more; a fraction is refused
----@param reason? string  for the activity log (see AddPlayerCash)
----@return boolean removed  false when they did not have it
----@return string|nil err  'Not enough cash', 'Player not loaded', ...
-function whip_core:RemovePlayerCash(source, amount, reason) end
-
 --- Show a player one of whip's toasts, of any kind, from the server.
 ---@param source number  a player, or -1 for everyone
 ---@param text string
@@ -1082,7 +1067,7 @@ function whip_core:RevokeBankAccess(accountId, who, revokedBy) end
 function whip_core:BankDeposit(accountId, amount, actor, reason) end
 
 --- A PLAYER withdraws: their withdraw permission is checked. BANK MONEY ONLY: no cash is given; for a cash
---- withdrawal, AddPlayerCash the notes once this answers true. To charge a player for something,
+--- withdrawal, pay the notes with PayPlayer (method 'cash') once this answers true. To charge a player for something,
 --- use ChargePlayer instead — it handles cash too, and hands back a receipt RefundPlayer can undo.
 ---@param accountId number Target account ID
 ---@param amount number Whole number, 1 or more
@@ -3543,38 +3528,6 @@ function whip_core:RegisterAskChannel(name, deliver) end
 ---@return string|nil why 'That question is gone' | 'That question was not asked through you' | 'That question was for another character'
 function whip_core:AnswerAsk(source, token, yes) end
 
---- Start the server's own clock for a progress bar THE CLIENT runs. Usually you want the server
---- Progress above (one call) or a RegisterUseHandler table instead; this pair is for a bar the
---- client must run itself (nothing in whip does any more). Starting the same action again restarts its clock.
---- Names only need to be unique within your resource.
----
---- ```lua
---- exports.whip_core:StartTimedAction(source, 'search', 6000, { bin = binId })
---- ```
----@param source number Player server ID
----@param name string Action name, unique within the calling resource
----@param durationMs number The progress bar's length, the same number the client shows
----@param match? table Plain values (numbers, strings, booleans) — an address is fine; the finish hands them back
----@return boolean started
----@return string|nil reason  no loaded player, no name, or a duration that is not above 0
-function whip_core:StartTimedAction(source, name, durationMs, match) end
-
---- The client says the bar finished. Answers what StartTimedAction was given (a table, `{}` if
---- nothing) only if the action was started, at least 90% of its duration ago, no more than 15
---- seconds past its duration — and, if you pass `match`, with the same values. One-shot. Refusals
---- are recorded in the Event Monitor. Hand nothing over unless it answers.
----
---- ```lua
---- local started = exports.whip_core:FinishTimedAction(source, 'search')
---- if not started then return end
---- -- started.bin is what the start remembered; the client never had to name it
---- ```
----@param source number Player server ID
----@param name string The name StartTimedAction was given
----@param match? table Optional: values that must equal the start's
----@return table|false started  the start's values
----@return string|nil reason Why it was refused
-function whip_core:FinishTimedAction(source, name, match) end
 
 -- ============================================
 -- Player Stats & Effects

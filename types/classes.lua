@@ -757,7 +757,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 --- Where a stack is, in the one shape whip uses for it everywhere — THE handle for a slot. Every slot
 --- call takes one (GetItemAt, SetItemMetadata, StoreGive, StoreTake, StoreMove, LogActivity), and
 --- whip hands you one wherever it knows where an item is (a use handler, a context action, FindItem,
---- FindItemByUid, FinishTimedAction when the start was given one, GetOpenStores).
+--- FindItemByUid, GetOpenStores).
 ---
 --- THE POINT OF THIS TYPE EXISTING is that the address was already a parameter — the note on the
 --- 'addr' param type in server/secure.lua records that it had been "declared 21 times across four

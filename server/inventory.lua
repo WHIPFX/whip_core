@@ -2002,8 +2002,8 @@ function Inventory.useItem(source, player, container, slot)
         local owner = _uses:ownerOf(itemKey)
         local handedPlayer = (owner and owner ~= GetCurrentResourceName() and player.handlerSheet)
             and player:handlerSheet() or player
-        -- The handler gets the item's address (what GetItemAt, StoreTake, SetItemMetadata and
-        -- StartTimedAction's match take). Actions.call: what it saves lands with this use.
+        -- The handler gets the item's address (what GetItemAt, StoreTake and SetItemMetadata
+        -- take). Actions.call: what it saves lands with this use.
         --
         -- One use of an item at a time per player: the cooldown is stamped only after the handler
         -- answers, so a waiting handler could otherwise be entered twice. A second press meanwhile is
@@ -2549,7 +2549,7 @@ end
 --- registered without it). Registering the handler before the item is fine.
 ---
 --- The handler gets `(source, player, slotData, addr)`: `addr` is the used item's address, for
---- GetItemAt / StoreTake / SetItemMetadata / StartTimedAction. Return `false` to keep the item.
+--- GetItemAt / StoreTake / SetItemMetadata. Return `false` to keep the item.
 ---
 --- Or a table, for a use with a progress bar: see "A timed use, declared" above.
 ---@param itemKey string

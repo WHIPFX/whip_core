@@ -993,37 +993,6 @@ exports('GetPlayerCash', function(source)
     return player:getCash()
 end)
 
---- `reason` is optional and goes in the activity log beside your resource's name — 'rental
---- refund · by my_rentals' — so an admin can tell a wage from a refund. Without one the row says
---- only which resource it was.
----
---- Cash never drops: pockets too full for the notes means `false, reason`, and nothing was paid.
----@param reason string|nil
----@return boolean added
----@return string|nil err
-exports('AddPlayerCash', function(source, amount, reason)
-    local why = Log.reasonFrom(reason)   -- first, before anything can yield (house rule 10)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
-    local ok, err = player:addCash(amount, why)
-    if not ok then return false, err or 'Could not add the cash' end
-    return true
-end)
-
----@param reason string|nil  see AddPlayerCash
----@return boolean removed  false when they did not have it
----@return string|nil err
-exports('RemovePlayerCash', function(source, amount, reason)
-    local why = Log.reasonFrom(reason)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
-    -- Not the notes of an ATM withdrawal still waiting on its debit (Inventory.pocketsFrozen).
-    if Inventory.pocketsFrozen(source) then return false, 'Paying — wait a moment' end
-    local ok, err = player:removeCash(amount, why)
-    if not ok then return false, err or 'Could not take the cash' end
-    return true
-end)
-
 local NOTIFY_KINDS = { 'info', 'success', 'warning', 'error' }
 
 --- Show a player one of whip's toasts, of any kind, from the server.

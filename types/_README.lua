@@ -35,7 +35,7 @@
 -- USAGE:
 --   local player = exports.whip_core:GetPlayer(source)
 --   player.charId       -- autocomplete shows all WhipPlayer fields
---   -- (a player sheet has fields only, no methods: act through exports such as AddPlayerCash)
+--   -- (a player sheet has fields only, no methods: act through exports such as PayPlayer)
 --
 --   local where, err = exports.whip_core:AddItem(source, 'drink', 2)
 --   -- editor shows: (source: number, item: string, amount?: number, metadata?: table, opts?: string|WhipAddItemOpts)

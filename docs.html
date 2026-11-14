@@ -1720,7 +1720,7 @@ end)</code></pre>
 <ul>
   <li><strong>Declarations go through <code>Whip.declare</code></strong> (or in <code>Whip.register</code>), not straight to whip_core at the top of a file (<a href="#quickstart-satellite">the one rule</a>).</li>
   <li><strong>"Their job" means on duty.</strong> <code>GetPlayerJob</code> is <code>nil</code> off duty; <code>GetPlayerRole</code> answers "works there at all". Players clock on in the phone's Business app, or your resource calls <code>ClockOn</code>.</li>
-  <li><strong>Pay with <code>PayPlayer</code>.</strong> <code>AddPlayerCash</code>, the low-level call, refuses when the pockets are full.</li>
+  <li><strong>Pay with <code>PayPlayer</code>, charge with <code>ChargePlayer</code>.</strong> There is no lower-level cash call.</li>
   <li><strong>A receipt lasts 30 minutes.</strong> After that, give money back with <code>PayPlayer</code>.</li>
   <li><strong>A bar on the player's game is their word.</strong> For anything handed out at the end, use the server's <code>Progress</code> or a timed use.</li>
   <li><strong>Exports return <code>false, 'why'</code></strong> instead of throwing (<a href="#patterns">Return values</a>).</li>
@@ -2801,27 +2801,6 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>number</code>; <code>0, 'Player not loaded'</code></div>
 </div></div>
 
-<div class="export-card" data-search="addplayercash give cash money reason log">
-<div class="export-header"><span class="export-name">AddPlayerCash(source, amount, reason?)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>Banknotes into their pockets, or nothing. <strong>To pay a player, use <a href="#payplayer"><code>PayPlayer</code></a></strong>; this is for change from a till and the like.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>amount</td><td>number</td><td>A positive whole number</td></tr>
-  <tr><td>reason</td><td>string?</td><td>For the activity log, beside your resource's name</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code>: no room, no such player, or not a whole number</div>
-  <div class="info-box warn"><strong>Cash never drops.</strong> Notes that don't fit are refused, not dropped, and so is <code>12.5</code> (round first): on <code>false</code> nothing was paid.</div>
-</div></div>
-
-<div class="export-card" data-search="removeplayercash take cash money charge reason log">
-<div class="export-header"><span class="export-name">RemovePlayerCash(source, amount, reason?)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>Takes cash, or nothing if they don't have enough: check the return.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>amount</td><td>number</td><td>A positive whole number</td></tr>
-  <tr><td>reason</td><td>string?</td><td>For the activity log</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'Not enough cash'</code>)</div>
-</div></div>
-
 <h3>Messages, blips and props</h3>
 <div class="export-card" id="notifyplayer" data-search="notifyplayer notify toast message info warning success error tell player">
 <div class="export-header"><span class="export-name">NotifyPlayer(source, text, kind?, duration?)</span><span class="export-side side-server">SERVER</span></div>
@@ -3726,7 +3705,7 @@ if not holdId then return false, why end
 <tr><td>actor</td><td>number|table</td><td>The <a href="#person-refs">person</a> withdrawing (required): <code>withdraw</code> or higher</td></tr>
 <tr><td>reason</td><td>string?</td><td>Shown on the statement</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code></div>
-<div class="info-box warn"><strong>No cash is given.</strong> For a cash withdrawal, give the notes with <code>AddPlayerCash</code> once this returns <code>true</code>. Otherwise the money leaves the account and they get nothing.</div>
+<div class="info-box warn"><strong>No cash is given.</strong> For a cash withdrawal, give the notes with <code>PayPlayer(source, amount, { method = 'cash' })</code> once this returns <code>true</code>. Otherwise the money leaves the account and they get nothing.</div>
 </div></div>
 
 <div class="export-card" id="banktransfer" data-search="banktransfer transfer bank money send">
@@ -4464,7 +4443,7 @@ if blocked then return false, why end</code></pre>
 <div class="export-card" data-search="isinventoryopen inventory open ui busy">
 <div class="export-header"><span class="export-name">IsInventoryOpen()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Whether the plain inventory screen is open. To ask whether the player is busy, use <code>IsAnyUIOpen</code>, or <code>IsGameInputFree</code> for a hotkey (<a href="#ui-screens">Screens, input and controls</a>).</p>
+<p>Whether the plain inventory screen is open. To ask whether the player is busy, use <code>IsGameInputFree</code> (<a href="#ui-screens">Screens, input and controls</a>).</p>
 <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
 </div></div>
 
@@ -8586,7 +8565,7 @@ end</code></pre>
 <tr><td>Run a minigame</td><td><a href="#ui-skillcheck"><code>SkillCheck</code></a>; your own game: <a href="#ui-skillcheck-games"><code>Whip.skillCheckGame</code></a></td></tr>
 <tr><td>Show a mode's controls, or an objective</td><td><a href="#ui-showtext"><code>ShowText</code></a>, <a href="#ui-objective"><code>ShowObjective</code></a></td></tr>
 <tr><td>Let the player type one line</td><td><a href="#ui-composer"><code>OpenComposer</code></a> (<a href="#which-text-input">which input?</a>)</td></tr>
-<tr><td>Know if the player is busy, or a hotkey may act</td><td><a href="#ui-isanyuiopen"><code>IsAnyUIOpen</code></a>, <a href="#ui-isgameinputfree"><code>IsGameInputFree</code></a></td></tr>
+<tr><td>Know if the player is busy, or a hotkey may act</td><td><a href="#ui-isgameinputfree"><code>IsGameInputFree</code></a></td></tr>
 <tr><td>Open your own NUI screen</td><td><a href="#ui-setuiopen"><code>SetUIOpen</code></a></td></tr>
 <tr><td>Hold controls off, or freeze or hide the ped</td><td><a href="#ui-blockcontrols"><code>BlockControls</code></a>, <a href="#ui-holdplayerped"><code>HoldPlayerPed</code></a></td></tr>
 <tr><td>Show WHIP's yes or no questions on your own screen</td><td><a href="#registeraskchannel"><code>RegisterAskChannel</code></a></td></tr></table>
@@ -8598,7 +8577,7 @@ end</code></pre>
   <li><strong>Other screens.</strong> It closes the inventory, and is <code>'busy'</code> over another resource's <code>SetUIOpen</code> screen. A dialog is also <code>'busy'</code> over the chat composer, radial wheel, <code>/whip</code> panel, character screen, appearance creator or furnisher.</li>
   <li><strong>Your own screen</strong> doesn't block your dialogs, but a dialog drops the focus when it closes: call <code>SetNuiFocus(true, true)</code> when it returns.</li>
   <li><strong>It's yours.</strong> When your resource stops, WHIP cancels your bar or dialog and hides your text.</li>
-  <li><strong>Positional or one table:</strong> <code>Confirm('Sell?', 'Sure?')</code> or <code>Confirm({ title = 'Sell?', message = 'Sure?' })</code>. While one is up, <code>IsAnyUIOpen()</code> is <code>true</code>.</li>
+  <li><strong>Positional or one table:</strong> <code>Confirm('Sell?', 'Sure?')</code> or <code>Confirm({ title = 'Sell?', message = 'Sure?' })</code>. While one is up, <code>IsGameInputFree()</code> is <code>false</code>.</li>
 </ul>
 
 <h3>Messages and loading</h3>
@@ -8686,22 +8665,6 @@ SetModelAsNoLongerNeeded(hash)</code></pre>
 })
 if not done then return end</code></pre>
   <div class="info-box warn"><strong>Call waiting exports through <a href="#patterns-satellite"><code>Whip.call</code></a>.</strong> Without <code>dependency 'whip_core'</code>, a whip_core restart leaves <code>exports.whip_core:Progress</code> waiting forever; <code>Whip.call</code> returns <code>false, 'whip_core stopped'</code>. Do the same for <code>SkillCheck</code>, <code>ChargePlayer</code>, <code>Callback</code> and database reads when you hold a flag across the call.</div>
-</div></div>
-
-<div class="export-card" id="timed-use" data-search="progress bar timed action timed use timer server verify cheat skip StartTimedAction FinishTimedAction use handler addr">
-<div class="export-header"><span class="export-name">StartTimedAction(source, name, durationMs, match?) · FinishTimedAction(source, name, match?)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>The server half of a bar your client runs itself. The finish returns the start's <code>match</code> only from 90% of <code>durationMs</code> to 15 s past it. One-shot; refusals go to the Monitor. For items, prefer <a href="#declared-use">a declared timed use</a>; otherwise the server <code>Progress</code>.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>source</td><td>number</td><td>The player</td></tr>
-  <tr><td>name</td><td>string</td><td>Any name, unique in your resource</td></tr>
-  <tr><td>durationMs</td><td>number</td><td>Start only: the client bar's length</td></tr>
-  <tr><td>match</td><td>table?</td><td>Start: values to remember (often the use handler's <code>addr</code>). Finish: omit to get them, or pass what they must equal</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong>Start: <code>true</code> or <code>false, reason</code>. Finish: the values (<code>{}</code> if none) or <code>false, reason</code></div>
-<pre><code class="lang-lua">exports.whip_core:StartTimedAction(source, 'search', 6000, { bin = binId })
--- later, in the SecureEvent the client fires when its bar completes:
-local started = exports.whip_core:FinishTimedAction(source, 'search')
-if not started then return end   -- started.bin is the binId</code></pre>
 </div></div>
 
 <h3 id="which-text-input">Dialogs and text input</h3>
@@ -8925,17 +8888,10 @@ RegisterKeyMapping('+myinput', 'Type something', 'keyboard', 'T')</code></pre>
 <h3 id="ui-screens">Screens, input and controls</h3>
 <p>These keep two resources' screens, keys and HUDs from fighting.</p>
 
-<div class="export-card" id="ui-isanyuiopen" data-search="isanyuiopen ui open busy panel container shop">
-<div class="export-header"><span class="export-name">IsAnyUIOpen()</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>Is the player busy in any UI: a WHIP screen (inventory, container, vehicle storage, shop, panel, character creator), a <code>SetUIOpen</code> screen, a bar or a dialog? Ask this, not <code>IsInventoryOpen()</code> (plain inventory only), before letting them start something; prompts and the radial do.</p>
-  <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
-</div></div>
-
 <div class="export-card" data-search="isanyscreenopen screen open overlay hide hud chat">
 <div class="export-header"><span class="export-name">IsAnyScreenOpen()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p><code>IsAnyUIOpen</code> without a bare progress bar. Ask it to decide whether to hide an overlay, as the HUD, radar and whip_chat do; <code>whip_core:ui:stateChanged</code> follows it.</p>
+  <p>Is a screen or a dialog up (a bare progress bar does not count)? Ask it to decide whether to hide an overlay, as the HUD, radar and whip_chat do; <code>whip_core:ui:stateChanged</code> follows it.</p>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 <pre><code class="lang-lua">local hidden = exports.whip_core:IsAnyScreenOpen()
 AddEventHandler('whip_core:ui:stateChanged', function(e) hidden = e.open end)</code></pre>
@@ -8944,7 +8900,7 @@ AddEventHandler('whip_core:ui:stateChanged', function(e) hidden = e.open end)</c
 <div class="export-card" id="ui-isgameinputfree" data-search="isgameinputfree hotkey key mapping registerkeymapping keepinput furnisher placing input free">
 <div class="export-header"><span class="export-name">IsGameInputFree()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>May a hotkey act? <code>false</code> while <code>IsAnyUIOpen</code>, while anything holds the NUI focus (the wheel, chat, <code>/whip</code>, any resource's screen), and while a mode owns the keys (placing, give mode, throwing). E prompts close while it's <code>false</code>.</p>
+  <p>May a hotkey act, or the player start something? <code>false</code> while a WHIP screen, a bar or a dialog is up, while anything holds the NUI focus (the wheel, chat, <code>/whip</code>, any resource's screen), and while a mode owns the keys (placing, give mode, throwing). E prompts close while it's <code>false</code>.</p>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 <pre><code class="lang-lua">RegisterCommand('+my_horn', function()
     if not exports.whip_core:IsGameInputFree() then return end
@@ -9748,7 +9704,7 @@ Whip.playerSetting({
 <li><strong>Everything.</strong> Every item event, newest first, filtered by person, item, what happened, when (up to <code>Config.ActivityLogDays</code>) and a minimum amount. Click a person, an item's whole life, or a place to teleport there.</li>
 <li><strong>Economy.</strong> One item at a time: how many are in the game now, what came in and went out by reason, and who holds or gained the most. Items inside other items, and a resource's own storage, aren't counted.</li>
 </ul>
-<p>Rows that name no item (logins, dev tool use) stay on the person's timeline in the Player Manager. The reasons are the <code>reason</code> your resource passes to <code>AddItem</code>, <code>AddPlayerCash</code> and the rest.</p>
+<p>Rows that name no item (logins, dev tool use) stay on the person's timeline in the Player Manager. The reasons are the <code>reason</code> your resource passes to <code>AddItem</code>, <code>PayPlayer</code> and the rest.</p>
 
 <h3>Exports</h3>
 

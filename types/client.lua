@@ -363,24 +363,13 @@ function whip_core:GetInventory() end
 ---@return boolean
 function whip_core:IsInventoryOpen() end
 
---- Check if ANY inventory-related UI is open (inventory, container, vehicle storage, panel, shop, player inv).
+--- Is a screen or a dialog up (not a bare progress bar)? The question for hiding an overlay (whip's
+--- status HUD, the radar and whip_chat follow it). To ask whether the player may start something, ask
+--- IsGameInputFree.
 ---
---- ASK IT ONCE, THEN LISTEN. This is cheap to run — a handful of boolean reads — but calling it
---- from another resource is marshalled across the runtime boundary, and the boundary is the cost.
---- Calling it on a timer or in a loop is the mistake: whip_chat did, four times a second, and it
---- showed in a profile as a periodic spike with nothing around it.
----
---- IT COUNTS BARS AND DIALOGS TOO: a Progress bar, Input, Confirm, Alert or
---- SkillCheck makes this true, so "may the player start something else" is one question. To decide
---- whether to HIDE an overlay of your own, ask IsAnyScreenOpen below instead — a bar is watched with
---- the world, and the ui:stateChanged event follows that question.
----
---- Calling it on demand — once, when the player tries to open your menu — is exactly right.
----@return boolean
-function whip_core:IsAnyUIOpen() end
-
---- IsAnyUIOpen minus a bare progress bar: is a screen or a dialog up? The question for hiding an
---- overlay (whip's status HUD, the radar and whip_chat follow it).
+--- ASK IT ONCE, THEN LISTEN. Calling it from another resource is marshalled across the runtime
+--- boundary, and the boundary is the cost: whip_chat once called it four times a second, and it showed
+--- in a profile as a periodic spike.
 ---
 --- Seed a local from this once, then keep it current from `whip_core:ui:stateChanged`:
 ---
@@ -396,8 +385,8 @@ function whip_core:IsAnyUIOpen() end
 ---@return boolean
 function whip_core:IsAnyScreenOpen() end
 
---- May a hotkey act on the world right now? False while any screen, bar or dialog is up
---- (IsAnyUIOpen), while another screen holds the focus (the F1 wheel,
+--- May a hotkey act on the world right now? False while any screen, bar or dialog is up,
+--- while another screen holds the focus (the F1 wheel,
 --- chat, the /whip panel, character select, or ANY resource's screen — IsNuiFocused), and while a
 --- mode owns the keys (placing, give mode,
 --- throwing, an emote's ghost). Ask it first in every RegisterKeyMapping command that acts on the world:

@@ -58,8 +58,6 @@ const LEFT_OUT = {
     GetPlayers: 'every player at once: Players Near and Players in Area find them by place',
     GetPlayerFromIdentifier: 'licence ids are not a builder\'s',
     IsCharacterDeleted: 'a deleted character is never in a pulse',
-    AddPlayerCash: 'Pay is the system\'s (the owner, the log, the receipt)',
-    RemovePlayerCash: 'Charge and Fine are the system\'s (refunded if the pulse is called off)',
     ShowPropSet: 'a held prop is the player\'s game\'s (S4)',
     HidePropSet: 'as ShowPropSet',
     RegisterPermission: 'S3d Registers (admin approved)',
@@ -132,7 +130,6 @@ const LEFT_OUT = {
     GetAllDoors: 'every door at once', ReleaseDoor: 'a manager\'s (Give Door Back is a system\'s)', GetDoorHold: 'Lock / Unlock Door holds for itself',
     GetManagedDoors: 'a manager\'s',
     ClosePlayerInventory: 'goes with OpenPlayerInventory', IsCharacterBeingInspected: 'as ClosePlayerInventory',
-    StartTimedAction: 'an item\'s timed use: Progress Bar is a system\'s', FinishTimedAction: 'as StartTimedAction',
     RegisterStat: 'S3d Registers', GetAllStats: 'every stat at once: Their Stat reads one', GetEffects: 'every effect at once: Has Effect? asks about one',
     // Properties: sales and packs are another session's, and the furnisher's
     GetProperties: 'every property at once', GetCharacterProperties: 'whose homes are whose is private',
