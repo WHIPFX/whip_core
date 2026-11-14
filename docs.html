@@ -3422,8 +3422,8 @@ better, because waiting beats asking repeatedly.</div>
 <tr><th>Stat</th><th>Type</th><th>Range</th><th>Decay</th><th>Threshold</th></tr>
 <tr><td>health</td><td>vital</td><td>0–200</td><td>—</td><td>—</td></tr>
 <tr><td>armour</td><td>vital</td><td>0–100</td><td>—</td><td>—</td></tr>
-<tr><td>hunger</td><td>need</td><td>0–100</td><td>empty in <code>Config.HungerMinutes</code> (42)</td><td>&le;10 → health -1</td></tr>
-<tr><td>thirst</td><td>need</td><td>0–100</td><td>empty in <code>Config.ThirstMinutes</code> (28)</td><td>&le;10 → health -1</td></tr>
+<tr><td>hunger</td><td>need</td><td>0–100</td><td>empty in <code>Config.HungerMinutes</code> (120)</td><td>&le;10 → health -1</td></tr>
+<tr><td>thirst</td><td>need</td><td>0–100</td><td>empty in <code>Config.ThirstMinutes</code> (90)</td><td>&le;10 → health -1</td></tr>
 <tr><td>oxygen</td><td>custom</td><td>0–100</td><td>drains under water, refills above</td><td>0 → drowns</td></tr>
 </table>
 <p>Out of the box <strong>hunger and thirst are on</strong>: each drains, is saved and has a gauge, and at 10 or below costs 1 health per decay tick. Turn one off with <code>Config.Hunger</code> / <code>Config.Thirst</code> (or <code>/whip</code> → Settings → Config → Hunger, thirst and breath, at once). Then it has no gauge, no drain and is not saved, and it reads 100 to anything that asks, so food and drink are still eaten. <code>100 = full, 0 = starving</code>. The gauges' order is <code>Config.StatOrder</code>.</p>
@@ -14823,7 +14823,7 @@ set whip_voicebot_token <span class="str">"..."</span></code></pre>
 <tr><td><code>Hunger</code> / <code>Thirst</code></td><td><code>true</code></td><td>On: it drains over time, is saved, has a gauge, and costs health at 10 or below. Off: no hunger at all (no gauge, drain or damage), though food and drink can still be used. A new character always starts full. What an empty one costs is <code>Config.NeedDamage</code> (health every 10 seconds under 10%; 0 for none)</td></tr>
 <tr><td><code>RespawnTime</code> / <code>RespawnLocations</code></td><td><code>10</code> / three hospitals</td><td>Seconds a dead player waits before they can respawn, and the hospitals they wake up at (<code>vector4</code>s, one at random). A resource can hold one player's respawn longer: <a href="#holdrespawn"><code>HoldRespawn</code></a></td></tr>
 <tr><td><code>DeathScreen</code></td><td><code>true</code></td><td>whip's death screen. <code>false</code>: a resource draws its own from <code>whip_core:death:screenChanged</code></td></tr>
-<tr><td><code>HungerMinutes</code> / <code>ThirstMinutes</code></td><td><code>42</code> / <code>28</code></td><td>Minutes from full to empty while it is on (1 to 1440). A change takes effect at once and moves nobody's level</td></tr>
+<tr><td><code>HungerMinutes</code> / <code>ThirstMinutes</code></td><td><code>120</code> / <code>90</code></td><td>Minutes from full to empty while it is on (1 to 1440). A change takes effect at once and moves nobody's level</td></tr>
 <tr><td><code>StatOrder</code></td><td><code>{ 'health', 'armour', 'hunger', 'thirst', 'oxygen' }</code></td><td>The gauges left to right, by stat name; one not listed goes after. In the panel the gauges are dragged into place</td></tr>
 <tr><td><code>StatHitFlash</code></td><td>health 10, armour 10</td><td>How big a drop (percent of the gauge) brings the gauges back while chat or a notification has the capsule. <code>0</code> never</td></tr>
 <tr><td><code>OxygenSeconds</code></td><td><code>20</code></td><td>How long a full breath lasts under water, in seconds (1 to 45)</td></tr>

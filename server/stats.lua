@@ -265,8 +265,8 @@ local ICONS = {
           .. ' M7 4a2 2 0 1 0 4 0a2 2 0 1 0-4 0z',
 }
 
---- Hunger or thirst. On: drains every 10 seconds at whatever empties a full one in `minutes` (42 minutes
---- is 0.4 a step), is saved, has a gauge, and costs Config.NeedDamage health a step once under 10 (0: none).
+--- Hunger or thirst. On: drains every 10 seconds at whatever empties a full one in `minutes` (120 minutes
+--- is about 0.14 a step), is saved, has a gauge, and costs Config.NeedDamage health a step once under 10 (0: none).
 ---
 --- Off is no hunger at all, but the stat is still registered: food is still eaten, and a script or
 --- Systems card reading it gets 100. No gauge, no drain, no cost, and nothing saved (so turning it back
@@ -278,7 +278,7 @@ local ICONS = {
 ---@return table
 local function need(on, minutes, icon, color)
     if not on then return { type = 'need', default = 100, min = 0, max = 100, persist = false } end
-    local steps = math.max(1.0, (tonumber(minutes) or 42) * 6)   -- six 10-second steps a minute
+    local steps = math.max(1.0, (tonumber(minutes) or 120) * 6)   -- six 10-second steps a minute
     local damage = math.max(0, tonumber(Config.NeedDamage) or 1)
     return {
         type = 'need', default = 100, min = 0, max = 100, persist = true,
