@@ -100,7 +100,7 @@ local function wireType(d)
     return { t = d.t, label = d.label, group = d.group, kinds = kinds, timing = d.timing,
              next = d.next, sec = d.sec, giveUp = d.giveUp, lasting = d.lasting == true,
              fields = d.fields, untilWhen = d.untilWhen, owner = d.owner, desc = d.desc,
-             doneText = d.doneText, secLabel = d.secLabel, length = d.length == true }
+             doneText = d.doneText, secLabel = d.secLabel, length = d.length == true, startSec = d.startSec }
 end
 
 --- The catalogue for the editor: plain data, in picker order (whip_core's, then other resources' by name, each in
@@ -129,8 +129,8 @@ end
 
 local finite, coords = DirectorKit.finite, DirectorKit.place
 
---- A step's time in ms, from what is saved (`v`, seconds; unset: its type's `default`, else 0). 0 is no end (NO_END_MS:
---- it goes on until its list is stopped), or at once for a step whose time is how long its move takes (`length`).
+--- A step's time in ms, from what is saved (`v`, seconds; unset: its type's `default`, as it always played). 0 is no end
+--- (NO_END_MS: it goes on until its list is stopped), or at once for one that is one action (`length`).
 --- shared/director/steps.lua THE TIMING.
 local function msOf(v, default, length)
     local n = tonumber(v)

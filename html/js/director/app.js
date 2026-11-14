@@ -2214,7 +2214,7 @@ async function onAct(act, el) {
             if (!w.def.tasks || typeof w.def.tasks !== 'object') w.def.tasks = { list: [] };
             if (!Array.isArray(w.def.tasks.list)) w.def.tasks.list = [];
             const k = stepKey(w.def.tasks.list, w);
-            w.def.tasks.list.push({ k, t: def.t });
+            w.def.tasks.list.push(newStep(k, def));
             ed.taskPick = null;
             ed.taskCopy = null;
             ed.taskOpen = w.id + '~' + k;
@@ -2915,6 +2915,14 @@ function stepKey(list, w) {
     }
 }
 
+/** A new step of type `def` with key `k`: one that can go on until stopped (Shoot At, Wander) starts at its `startSec`,
+ *  0, no end (shared/director/steps.lua THE TIMING); a step with no time of its own plays its type's. */
+function newStep(k, def) {
+    const s = { k, t: def.t };
+    if (typeof def.startSec === 'number') s.sec = def.startSec;
+    return s;
+}
+
 /** Copy existing: `fromId`'s tasks become `id`'s, their points where `fromId`'s are, asked first when `id` has tasks of
  *  its own (they are replaced). Each step gets a key of its own, so none is taken for one of the old steps' points. */
 async function copyTasks(id, fromId) {
@@ -2960,7 +2968,7 @@ function taskForAll(def) {
         if (!w.def.tasks || typeof w.def.tasks !== 'object') w.def.tasks = { list: [] };
         if (!Array.isArray(w.def.tasks.list)) w.def.tasks.list = [];
         if (w.def.tasks.list.length >= (ed.tasks.max || 40)) continue;
-        const s = { k: stepKey(w.def.tasks.list, w), t: def.t };
+        const s = newStep(stepKey(w.def.tasks.list, w), def);
         if (w === prim) primK = s.k;
         else if (pointed && primK) s.share = pointId(prim.id, primK);
         w.def.tasks.list.push(s);

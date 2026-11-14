@@ -159,13 +159,14 @@ local function buildTask(t, spec)
 
     def.timing = spec.timing == nil and 'timed' or spec.timing
     if not TIMINGS[def.timing] then return nil, t .. ': timing is instant, timed, until or either' end
-    -- (A time of 0, the default, is no end: shared/director/steps.lua THE TIMING.)
+    -- (A time of 0 is no end, a give-up of 0 never: shared/director/steps.lua THE TIMING. Not declared: 3 and 30 seconds,
+    -- as every saved step of the type has always played.)
     if def.timing == 'timed' or def.timing == 'either' then
-        def.sec = finite(spec.sec) or 0
+        def.sec = finite(spec.sec) or 3
         if def.sec ~= 0 and (def.sec < 0.1 or def.sec > MAX_SEC) then return nil, ('%s: sec is 0 (no end) or 0.1 to %d'):format(t, MAX_SEC) end
     end
     if def.timing == 'until' or def.timing == 'either' then
-        def.giveUp = finite(spec.giveUp) or 0
+        def.giveUp = finite(spec.giveUp) or 30
         if def.giveUp ~= 0 and (def.giveUp < 1 or def.giveUp > MAX_SEC) then
             return nil, ('%s: giveUp is 0 (never) or 1 to %d seconds'):format(t, MAX_SEC)
         end

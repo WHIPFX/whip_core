@@ -20,7 +20,9 @@
 --                   (server/task_seq.lua sends the next one with it as `ahead`; client/npcs.lua)
 --   leftByDrives    car state a recorded drive sets too: a drive on a car whose list sets it leaves it alone
 --   internal        played, never saved: the brain's own (an emote played as an animation, a route's look round)
---   length          its time is how long its move takes (a prop's slide): 0 is at once, never no end
+--   length          its time is how long it lasts as one action (a prop's slide, a throw, the horn): 0 is at once,
+--                   never no end
+--   startSec        a NEW one of it is added with this time (the editor's + Task): 0, no end, for one that can go on
 -- What the server works out for it as it starts (server/director/nodes_tasks.lua stepResolver) or as its list is read
 -- (server/director/tasks.lua compile):
 --   fights          the key of its field naming an NPC it fights: that NPC's network id
@@ -39,11 +41,13 @@
 --   timed    lasts `sec` seconds
 --   until    waits for the owner to say it is done (it got there), giving up after `giveUp` seconds
 --   either   the designer picks: `next` = 'done' (as until) or 'time' (as timed)
--- A TIME OF 0 IS NO END, AND IT IS EVERY STEP'S UNTIL ONE IS SET (Josh, 14 Nov 2026: a Shoot At shot for 3 seconds and
--- stopped, its 3 greyed in the box as if nothing were set). It goes on shooting, aiming, waiting for its car, until its
--- list is stopped or the run ends; a designer who wants it on a timer sets one. Sent as NO_END_MS (longer than any run
--- lasts), so the server and every game play it as they play any time: it just never runs out. A `length` step's own
--- time is how long its move takes (0: at once), so it keeps one.
+-- A TIME OF 0 IS NO END (Josh, 14 Nov 2026: a Shoot At shot for 3 seconds and stopped, its 3 greyed in the box as if
+-- nothing were set). It goes on shooting, aiming, wandering until its list is stopped or the run ends. A NEW step that
+-- can go on like that is added at 0 (`startSec`); a designer who wants it on a timer sets one. A step with no time saved
+-- plays its type's `sec` (and `giveUp`), as it always did, so a scenario saved before plays as it was built. One that
+-- does one thing and is over (a throw, the horn, a brake, a prop's slide: `length`) keeps a time, and its 0 is at once:
+-- never no end, or nothing after it would ever start. A give-up is never 0 unless typed (0: it waits until it is done).
+-- Sent as NO_END_MS (longer than any run lasts), so the server and every game play it as any time: it never runs out.
 -- LASTING steps (a wander, a drive) keep going after their slot: a Wait after one keeps the NPC doing it, and a new
 -- owner is sent the lasting step under a Wait so it carries on. ONCE steps (a line of speech, a throw) are never sent
 -- again to a new owner: they would happen twice.
@@ -129,7 +133,7 @@ local function T(t, def)
 end
 
 -- ---- Move ----
-T('goTo', { label = 'Go To', group = 'move', kinds = NPC, timing = 'either', next = 'done', sec = 0, giveUp = 0,
+T('goTo', { label = 'Go To', group = 'move', kinds = NPC, timing = 'either', next = 'done', sec = 10, giveUp = 30,
     moves = true, endsRide = true, flows = true, doneText = 'When it gets there',
     fields = { point('Where'), PACE,
                { key = 'straight', kind = 'bool', label = 'In a straight line', hint = 'Ignores paths and walls', default = false } } })
@@ -137,24 +141,24 @@ T('goTo', { label = 'Go To', group = 'move', kinds = NPC, timing = 'either', nex
 T('walkRoute', { label = 'Walk a Route', group = 'move', kinds = NPC, timing = 'instant', moves = true, endsRide = true, route = 'route',
     fields = { { key = 'route', kind = 'world', worldKind = 'route', label = 'Route', required = true },
                { key = 'loose', kind = 'bool', label = 'Loosely', hint = 'A few metres either side of each point', default = false } } })
-T('wander', { label = 'Wander Nearby', group = 'move', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('wander', { label = 'Wander Nearby', group = 'move', kinds = NPC, timing = 'timed', sec = 20, startSec = 0, lasting = true,
     moves = true, endsRide = true,
     fields = { { key = 'radius', kind = 'number', label = 'Within', hint = 'metres of where it is', min = 2, max = 60, default = 8 } } })
 T('teleport', { label = 'Teleport', group = 'move', kinds = ALL, timing = 'instant',
     moves = true, endsRide = true, whenDead = true, carPreview = true,
     fields = { point('To') } })
-T('face', { label = 'Turn To Face', group = 'move', kinds = NPC, timing = 'timed', sec = 0, faces = true, previewAtCamera = true,
+T('face', { label = 'Turn To Face', group = 'move', kinds = NPC, timing = 'timed', sec = 2, length = true, faces = true, previewAtCamera = true,
     fields = { TARGET } })
-T('follow', { label = 'Follow', group = 'move', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('follow', { label = 'Follow', group = 'move', kinds = NPC, timing = 'timed', sec = 20, startSec = 0, lasting = true,
     moves = true, endsRide = true,
     fields = { WHO, PACE } })
-T('flee', { label = 'Run Away From', group = 'move', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('flee', { label = 'Run Away From', group = 'move', kinds = NPC, timing = 'timed', sec = 10, startSec = 0, lasting = true,
     moves = true, endsRide = true, previewAtCamera = true,
     fields = { TARGET } })
 -- It goes to its point and takes cover there, hiding from what the point faces (turn its marker to set that):
 -- crouched behind something low, or against something tall, facing left or right along it. The next task starts
 -- once it is in cover (or after a time, set so).
-T('cover', { label = 'Take Cover', group = 'move', kinds = NPC, timing = 'either', next = 'done', sec = 0, giveUp = 0,
+T('cover', { label = 'Take Cover', group = 'move', kinds = NPC, timing = 'either', next = 'done', sec = 10, giveUp = 20,
     lasting = true, moves = true, endsRide = true, doneText = 'When it is in cover',
     fields = { point('At', 'where it takes cover: turn the marker to face what it hides from'),
                { key = 'height', kind = 'select', look = 'seg', label = 'Behind', options = { 'something low', 'something tall' }, default = 'something low' },
@@ -167,28 +171,28 @@ T('turnTo', { label = 'Turn To', group = 'move', kinds = PROP, timing = 'timed',
                  unit = '°', min = 0, max = 360, step = 5, default = 0 } } })
 
 -- ---- Look and aim ----
-T('lookAt', { label = 'Look At', group = 'look', kinds = NPC, timing = 'timed', sec = 0, previewAtCamera = true,
+T('lookAt', { label = 'Look At', group = 'look', kinds = NPC, timing = 'timed', sec = 5, startSec = 0, previewAtCamera = true,
     fields = { TARGET, { key = 'eyes', kind = 'bool', label = 'Eyes only', hint = 'The head stays still', default = false } } })
 -- Aim At and Shoot At use the gun it holds, else its best one, else it is handed a pistol (client/npcs.lua armed).
-T('aimAt', { label = 'Aim At', group = 'look', kinds = NPC, timing = 'timed', sec = 0, faces = true, previewAtCamera = true,
+T('aimAt', { label = 'Aim At', group = 'look', kinds = NPC, timing = 'timed', sec = 5, startSec = 0, faces = true, previewAtCamera = true,
     fields = { TARGET } })
 -- How it shoots, for the step's time (S.SHOOTING).
-T('shootAt', { label = 'Shoot At', group = 'look', kinds = NPC, timing = 'timed', sec = 0, faces = true, previewAtCamera = true,
+T('shootAt', { label = 'Shoot At', group = 'look', kinds = NPC, timing = 'timed', sec = 3, startSec = 0, faces = true, previewAtCamera = true,
     standingSkip = 'a standing NPC never shoots (it would hit whoever is near)',
     fields = { TARGET, S.SHOOTING[1], S.SHOOTING[2], S.SHOOTING[3], S.SHOOTING[4] } })
 -- It is handed what it throws as the step starts (its model loaded first), throws it at a point, a placed thing or the
 -- nearest player, and puts it away after.
-T('throw', { label = 'Throw', group = 'look', kinds = NPC, timing = 'timed', sec = 0, once = true, faces = true, previewAtCamera = true,
+T('throw', { label = 'Throw', group = 'look', kinds = NPC, timing = 'timed', sec = 2, length = true, once = true, faces = true, previewAtCamera = true,
     standingSkip = 'a standing NPC never throws (it would hit whoever is near)',
     fields = { { key = 'item', kind = 'select', label = 'What', options = { 'grenade', 'molotov', 'smoke grenade', 'flare', 'snowball', 'ball' },
                  default = 'grenade' },
                { key = 'target', kind = 'target', label = 'At', options = { 'point', 'thing', 'nearest', 'trigger' }, default = 'point' } } })
 
 -- ---- Fight ----
-T('fightPlayers', { label = "Fight the Scenario's Players", group = 'fight', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('fightPlayers', { label = "Fight the Scenario's Players", group = 'fight', kinds = NPC, timing = 'timed', sec = 30, startSec = 0, lasting = true,
     seesPlayers = true, previewSkip = 'it could hit you', standingSkip = 'an Always present NPC has no scenario players to fight',
     fields = {} })
-T('fightNpc', { label = 'Fight an NPC', group = 'fight', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('fightNpc', { label = 'Fight an NPC', group = 'fight', kinds = NPC, timing = 'timed', sec = 30, startSec = 0, lasting = true,
     faces = true, fights = 'npc', previewSkip = 'it could hit you',
     fields = { { key = 'npc', kind = 'world', worldKind = 'npc', label = 'Who', required = true } } })
 
@@ -196,7 +200,7 @@ T('fightNpc', { label = 'Fight an NPC', group = 'fight', kinds = NPC, timing = '
 -- One of /e's emotes (picked from the emote menu, or typed), or any animation by its dictionary and clip: `by` says
 -- which, and a field with a `when` shows (and counts) only while it holds (server/director/fields.lua). Played
 -- as an animation, the step is an 'anim' one (server/director/tasks.lua compile).
-T('emote', { label = 'Play Emote', group = 'act', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('emote', { label = 'Play Emote', group = 'act', kinds = NPC, timing = 'timed', sec = 10, startSec = 0, lasting = true,
     emoteAnim = 'emote', playsAs = { when = BY_ANIM, t = 'anim' },
     fields = { { key = 'by', kind = 'select', look = 'seg', label = 'Plays', options = { 'emote', 'animation' }, default = 'emote' },
                { key = 'emote', kind = 'emote', label = 'Emote', hint = '/e name', max = 40, when = BY_EMOTE },
@@ -237,29 +241,29 @@ T('speech', { label = 'GTA Speech', group = 'act', kinds = NPC, timing = 'instan
     end })
 
 -- ---- Car (an NPC's) ----
-T('getIn', { label = 'Get In', group = 'car', kinds = NPC, timing = 'until', giveUp = 0, moves = true, endsRide = true,
+T('getIn', { label = 'Get In', group = 'car', kinds = NPC, timing = 'until', giveUp = 20, moves = true, endsRide = true,
     seatsIn = 'car', standingSkip = 'getting in a car needs a car a run makes',
     fields = { CAR, SEAT } })
-T('getOut', { label = 'Get Out', group = 'car', kinds = NPC, timing = 'until', giveUp = 0, moves = true, endsRide = true,
+T('getOut', { label = 'Get Out', group = 'car', kinds = NPC, timing = 'until', giveUp = 10, moves = true, endsRide = true,
     fields = {} })
 T('warpIn', { label = 'Sit In (at once)', group = 'car', kinds = NPC, timing = 'instant', moves = true, endsRide = true,
     seatsIn = 'car', standingSkip = 'sitting in a car needs a car a run makes',
     fields = { CAR, SEAT } })
-T('driveTo', { label = 'Drive To', group = 'car', kinds = NPC, timing = 'either', next = 'done', sec = 0, giveUp = 0, moves = true,
+T('driveTo', { label = 'Drive To', group = 'car', kinds = NPC, timing = 'either', next = 'done', sec = 30, giveUp = 120, moves = true,
     doneText = 'When it gets there',
     fields = { point('To'), kmh(60), STYLE } })
-T('cruise', { label = 'Cruise Around', group = 'car', kinds = NPC, timing = 'timed', sec = 0, lasting = true, moves = true,
+T('cruise', { label = 'Cruise Around', group = 'car', kinds = NPC, timing = 'timed', sec = 30, startSec = 0, lasting = true, moves = true,
     fields = { kmh(50), STYLE } })
-T('followCar', { label = 'Follow in a Car', group = 'car', kinds = NPC, timing = 'timed', sec = 0, lasting = true, moves = true,
+T('followCar', { label = 'Follow in a Car', group = 'car', kinds = NPC, timing = 'timed', sec = 30, startSec = 0, lasting = true, moves = true,
     fields = { WHO, kmh(80) } })
 
 -- ---- Car (the car's own) ----
 -- A take: one of the car's recorded drives (its page: Scripted Driving Events), played exactly; done at its last moment.
-T('take', { label = 'Play a Scripted Driving Event', group = 'car', kinds = CAR_K, timing = 'until', giveUp = 0, playsTake = true,
+T('take', { label = 'Play a Scripted Driving Event', group = 'car', kinds = CAR_K, timing = 'until', giveUp = 60, playsTake = true,
     fields = { { key = 'take', kind = 'take', label = 'Driving event', required = true } } })
-T('brake', { label = 'Brake', group = 'car', kinds = CAR_K, timing = 'timed', sec = 0, fields = {} })
-T('speedTo', { label = 'Speed Up To', group = 'car', kinds = CAR_K, timing = 'timed', sec = 0, fields = { kmh(60) } })
-T('everyoneOut', { label = 'Everyone Out', group = 'car', kinds = CAR_K, timing = 'until', giveUp = 0, carPreview = true, fields = {} })
+T('brake', { label = 'Brake', group = 'car', kinds = CAR_K, timing = 'timed', sec = 3, length = true, fields = {} })
+T('speedTo', { label = 'Speed Up To', group = 'car', kinds = CAR_K, timing = 'timed', sec = 3, length = true, fields = { kmh(60) } })
+T('everyoneOut', { label = 'Everyone Out', group = 'car', kinds = CAR_K, timing = 'until', giveUp = 10, carPreview = true, fields = {} })
 T('siren', { label = 'Siren', group = 'car', kinds = CAR_K, timing = 'instant', carPreview = true, leftByDrives = true,
     fields = { { key = 'on', kind = 'bool', label = 'On', default = true } } })
 T('blowUp', { label = 'Blow Up', group = 'car', kinds = CAR_K, timing = 'instant', once = true, fields = {} })
@@ -278,10 +282,10 @@ T('lights', { label = 'Lights', group = 'car', kinds = CAR_K, timing = 'instant'
     fields = { { key = 'lights', kind = 'select', look = 'seg', label = 'Headlights', options = { 'on', 'off', 'as GTA has them' }, default = 'on' },
                { key = 'beam', kind = 'bool', label = 'Full beam', default = false },
                { key = 'inside', kind = 'bool', label = 'Light inside', default = false } } })
-T('flashLights', { label = 'Flash the Lights', group = 'car', kinds = CAR_K, timing = 'timed', sec = 0, fields = {} })
+T('flashLights', { label = 'Flash the Lights', group = 'car', kinds = CAR_K, timing = 'timed', sec = 3, length = true, fields = {} })
 T('indicators', { label = 'Indicators', group = 'car', kinds = CAR_K, timing = 'instant', carPreview = true, leftByDrives = true,
     fields = { { key = 'side', kind = 'select', look = 'seg', label = 'Which', options = { 'left', 'right', 'hazards', 'off' }, default = 'hazards' } } })
-T('horn', { label = 'Sound the Horn', group = 'car', kinds = CAR_K, timing = 'timed', sec = 0, fields = {} })
+T('horn', { label = 'Sound the Horn', group = 'car', kinds = CAR_K, timing = 'timed', sec = 1, length = true, fields = {} })
 T('alarm', { label = 'Set Off the Alarm', group = 'car', kinds = CAR_K, timing = 'instant', fields = {} })
 T('engine', { label = 'Engine', group = 'car', kinds = CAR_K, timing = 'instant', carPreview = true, leftByDrives = true,
     fields = { { key = 'how', kind = 'select', look = 'seg', label = 'It', options = { 'on', 'off', 'smoking, stalled' }, default = 'off' } } })
@@ -302,7 +306,7 @@ T('setHealth', { label = 'Set Health', group = 'body', kinds = { npc = true, veh
     fields = { { key = 'pct', kind = 'number', label = 'Health', hint = '%', min = 1, max = 100, default = 100 } } })
 T('die', { label = 'Die', group = 'body', kinds = NPC, timing = 'instant', fields = {} })
 T('revive', { label = 'Revive', group = 'body', kinds = NPC, timing = 'instant', whenDead = true, fields = {} })
-T('writhe', { label = 'Writhe', group = 'body', kinds = NPC, timing = 'timed', sec = 0, lasting = true,
+T('writhe', { label = 'Writhe', group = 'body', kinds = NPC, timing = 'timed', sec = 10, startSec = 0, lasting = true,
     seesPlayers = true, standingSkip = 'a standing NPC has no run\'s players to writhe at',
     fields = {} })
 T('freeze', { label = 'Freeze', group = 'body', kinds = { npc = true, vehicle = true }, timing = 'instant',
@@ -323,8 +327,9 @@ T('look', { label = 'Change Look', group = 'body', kinds = PROP, timing = 'insta
 -- ---- Wait ----
 -- For a time, or for a card of the run to give one of the outcomes picked (`outs`: its output pins) since the Wait
 -- began (server/director/nodes_tasks.lua). `untilWhen`: that way it waits until then (giving up after its Gives up
--- after, when one is set), not for a time. Not a prop's: its list is a timeline every game plays from one moment.
-T('wait', { label = 'Wait', group = 'wait', kinds = ALL, timing = 'timed', sec = 0, giveUp = 0, untilWhen = BY_CARD,
+-- after: an hour unless set), not for a time. Not a prop's: its list is a timeline every game plays from one moment.
+-- (A Wait is a timer: a new one is 3 seconds, and 0 is no end, a hold until its list is stopped.)
+T('wait', { label = 'Wait', group = 'wait', kinds = ALL, timing = 'timed', sec = 3, giveUp = 3600, untilWhen = BY_CARD,
     whenDead = true, doneText = false,
     fields = { { key = 'by', kind = 'select', look = 'seg', label = 'Waits for', options = { 'time', 'card' }, default = 'time' },
                { key = 'card', kind = 'card', label = 'The card', when = BY_CARD },
