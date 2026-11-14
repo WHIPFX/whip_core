@@ -187,8 +187,9 @@ end)
 -- recordings, so the server tells every game when a line starts and how long it is (whip_core:client:loreTalk), and
 -- the game that OWNS the NPC plays GTA's own standing gestures on it (when Config.LoreVoice.Gestures is on), upper body
 -- only, over whatever it is doing: one that suits the line first (a wave for Hello), then ordinary talking ones until
--- the line ends. Played by the owner, so every game sees them. Not in a car, on the floor or in a scenario. Every line
--- is sent, gestures or not, so a newer one always ends what an older one was doing.
+-- the line ends. Played by the owner, so every game sees them. Not in a car, on the floor or in a scenario. A line said
+-- into something (below) is sent to every game, and so is the line after one, gestures or not, so it ends that hold; a
+-- line with gestures alone goes to the owner (server/director/lore_voice.lua).
 
 local GESTURES = { m = 'gestures@m@standing@casual', f = 'gestures@f@standing@casual' }
 local TALKING = { 'gesture_you_soft', 'gesture_what_soft', 'gesture_hand_right', 'gesture_hand_left', 'gesture_easy_now',
@@ -198,6 +199,7 @@ local FIRST = { hello = 'gesture_hello', goodbye = 'gesture_bye_soft', positive 
                 carStolen = 'gesture_what_hard' }
 local UPPER_ONLY = 16 + 32      -- upper body, over its own task (it keeps standing, walking or guarding)
 local talkGen = {}              -- [netId] = n: a newer line stops the older one's gestures
+local talkN = 0                 -- (every line's n is new: one still loading never takes a later line for its own)
 
 --- The NPC, if this game owns it and it can gesture now; else nil.
 local function gesturable(netId)
@@ -211,38 +213,62 @@ end
 -- player does, with the player's own emote (shared/emote_list.lua: 'megaphone', 'walkie'): its clip on the upper body,
 -- played by the game that owns it, and its prop in the hand. THE PROP IS EVERY GAME'S OWN COPY, made where this game
 -- sees the NPC and let go of by it: one networked prop, made and deleted by the owner, stayed in its hand when the NPC
--- went over to another player's game, whose delete it could not do (WLVF's review).
+-- went over to another player's game, whose delete it could not do (WLVF's review). THE CLIP is the owner's, and the
+-- owner's when the line ends puts it down: every game told of the line knows what it is, so the one the NPC went over to
+-- mid-line keeps it up and then puts it down (WLVF's second review: nobody did, and it kept the pose).
 local HOLD_EMOTE = { megaphone = 'megaphone', radio = 'walkie' }
+local holding = {}              -- [netId] = { hold, dict, anim }: what its line holds up, for the line's end or a newer line
 
---- Hold it up for `ms` (or until a newer line): its prop in the hand on this game, and on the game that owns the NPC its
---- clip looped on the upper body.
-local function holdUp(netId, gen, hold, ms)
-    local e = Emotes.get(HOLD_EMOTE[hold] or '')
-    if not e then return end
-    local ped = DirectorKit.entityOfNet(netId, 1)
-    if not ped then return end   -- (not near this game)
+--- Its clip put down, by this game if it owns the NPC now.
+local function putDown(netId, h)
+    local ped = DirectorKit.entityOfNet(netId)
+    if ped and DirectorKit.mine(ped) and IsEntityPlayingAnim(ped, h.dict, h.anim, 3) then StopAnimTask(ped, h.dict, h.anim, 2.0) end
+end
+
+local function letGo(obj)
+    if obj and DoesEntityExist(obj) then DetachEntity(obj, true, false); DeleteObject(obj) end
+end
+
+--- Hold it up for `ms` (or until a newer line): its prop in the hand on this game while the NPC is near it, and on the
+--- game that owns the NPC (whichever that is, through the line) its clip looped on the upper body.
+local function holdUp(netId, gen, e, h, ms)
     local p = type(e.props) == 'table' and e.props[1] or nil
-    local obj
-    if p and LoadModel(p.model) then
-        if talkGen[netId] ~= gen or not DoesEntityExist(ped) then return end   -- (a newer line while it loaded)
-        local c = GetEntityCoords(ped)
-        obj = CreateObject(GetHashKey(p.model), c.x, c.y, c.z + 0.2, false, false, false)   -- (this game's alone)
-        local o, r = p.offset or { 0.0, 0.0, 0.0 }, p.rot or { 0.0, 0.0, 0.0 }
-        AttachEntityToEntity(obj, ped, GetPedBoneIndex(ped, p.bone), o[1] + 0.0, o[2] + 0.0, o[3] + 0.0,
-            r[1] + 0.0, r[2] + 0.0, r[3] + 0.0, true, true, false, true, 1, true)
-        SetModelAsNoLongerNeeded(GetHashKey(p.model))
-    end
-    local anim = gesturable(netId) == ped and LoadAnimDict(e.dict)
-    if anim then TaskPlayAnim(ped, e.dict, e.anim, 3.0, 3.0, -1, 1 + UPPER_ONLY, 0.0, false, false, false) end
     local ends = GetGameTimer() + math.min(ms, 60000)
-    while talkGen[netId] == gen and GetGameTimer() < ends and DoesEntityExist(ped) and not IsPedDeadOrDying(ped, true) do
+    local obj, dict = nil, false
+    while talkGen[netId] == gen and GetGameTimer() < ends do
+        local ped = DirectorKit.entityOfNet(netId, 1)
+        if ped and IsPedDeadOrDying(ped, true) then break end
+        if not ped then
+            -- (Gone from this game, or not near it yet: its copy goes, and is made if it comes near in time.)
+            letGo(obj)
+            obj = nil
+        else
+            if not obj and p and LoadModel(p.model) then
+                if talkGen[netId] ~= gen or not DoesEntityExist(ped) then break end   -- (a newer line while it loaded)
+                local c = GetEntityCoords(ped)
+                obj = CreateObject(GetHashKey(p.model), c.x, c.y, c.z + 0.2, false, false, false)   -- (this game's alone)
+                local o, r = p.offset or { 0.0, 0.0, 0.0 }, p.rot or { 0.0, 0.0, 0.0 }
+                AttachEntityToEntity(obj, ped, GetPedBoneIndex(ped, p.bone), o[1] + 0.0, o[2] + 0.0, o[3] + 0.0,
+                    r[1] + 0.0, r[2] + 0.0, r[3] + 0.0, true, true, false, true, 1, true)
+                SetModelAsNoLongerNeeded(GetHashKey(p.model))
+            end
+            -- (Up already, a line before held the same: it carries on, no drop between.)
+            if gesturable(netId) == ped and not IsEntityPlayingAnim(ped, e.dict, e.anim, 3) then
+                dict = dict or LoadAnimDict(e.dict)
+                if dict and talkGen[netId] == gen then
+                    TaskPlayAnim(ped, e.dict, e.anim, 3.0, 3.0, -1, 1 + UPPER_ONLY, 0.0, false, false, false)
+                end
+            end
+        end
         Wait(200)
     end
-    if anim then
-        if DoesEntityExist(ped) and DirectorKit.mine(ped) then StopAnimTask(ped, e.dict, e.anim, 2.0) end
-        RemoveAnimDict(e.dict)
+    letGo(obj)
+    -- Its own end puts it down. A newer line's did already, unless it holds the same up (then its own end will).
+    if holding[netId] == h then
+        holding[netId] = nil
+        putDown(netId, h)
     end
-    if obj and DoesEntityExist(obj) then DetachEntity(obj, true, false); DeleteObject(obj) end
+    if dict then RemoveAnimDict(e.dict) end
 end
 
 -- `gestures`: Config.LoreVoice.Gestures (the owner gestures through the line). A line with no time (0) only ends the
@@ -250,12 +276,25 @@ end
 RegisterNetEvent('whip_core:client:loreTalk', function(netId, line, ms, hold, gestures)
     netId, ms = tonumber(netId), tonumber(ms)
     if not netId then return end
-    local gen = (talkGen[netId] or 0) + 1
+    if hold ~= 'megaphone' and hold ~= 'radio' then hold = nil end
+    talkN = talkN + 1
+    local gen = talkN
     talkGen[netId] = gen   -- (whatever an older line was doing ends with this one: its hold, its gestures)
+    -- What a line before held up is put down now, unless this one holds the same up.
+    local was = holding[netId]
+    if was and (was.hold ~= hold or not ms or ms <= 0) then
+        holding[netId] = nil
+        putDown(netId, was)
+    end
     if not ms or ms <= 0 then return end
-    if hold == 'megaphone' or hold == 'radio' then
+    if hold then
+        local e = Emotes.get(HOLD_EMOTE[hold])
+        if not e then return end
+        -- (Its own now, before its thread runs: the line before, waking first, then knows not to put it down.)
+        local h = { hold = hold, dict = e.dict, anim = e.anim }
+        holding[netId] = h
         CreateThread(function()
-            holdUp(netId, gen, hold, ms)
+            holdUp(netId, gen, e, h, ms)
             if talkGen[netId] == gen then talkGen[netId] = nil end
         end)
         return
