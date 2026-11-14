@@ -1,13 +1,13 @@
 # whip_cafe_example
 
-The coffee stand from whip's tutorial, finished: `docs.html` → **Your First Resource** (steps 1 to 7) and **Your First Job** (steps 8 to 11). The code is the tutorial's, line for line, with the coffee's picture added (`html/img/items/mycafe_coffee.webp`, listed under `files` in the manifest).
+The coffee stand from whip's tutorial, finished: `docs.html` → **Your First Resource** (steps 1 to 7) and **Your First Job** (steps 1 to 4). The code is the tutorial's, line for line, with the coffee's picture added (`html/img/items/mycafe_coffee.webp`, listed under `files` in the manifest).
 
 | File | What it holds |
 |---|---|
-| `fxmanifest.lua` | The manifest (step 1) |
-| `shared.lua` | Where the counter is, the price, a barista's pay (steps 2 and 10) |
-| `server.lua` | The coffee item, drinking it, buying it, the job, brewing (steps 3, 4, 5, 8, 10) |
-| `client.lua` | The counter: buy, clock on, brew, clock off (step 9) |
+| `fxmanifest.lua` | The manifest (Your First Resource, step 1) |
+| `shared.lua` | Where the counter is and the price (Your First Resource, step 2); a barista's pay (Your First Job, step 3) |
+| `server.lua` | The coffee item, drinking it, buying it (Your First Resource, steps 3 to 5); the job and brewing (Your First Job, steps 1 and 3) |
+| `client.lua` | The counter: buy, clock on, brew, clock off (Your First Resource, step 6; Your First Job, step 2) |
 
 ## Running it
 

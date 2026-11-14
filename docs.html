@@ -1554,7 +1554,7 @@ end)</code></pre>
 <h2 id="first-job">Your First Job</h2>
 <p class="lede">Add staff to the coffee stand from <a href="#first-resource">Your First Resource</a>: a job, a counter with different options for customers and staff on duty, brewing under a bar the server times, and pay for each cup. About 30 minutes more, in the same four files.</p>
 
-<h3>8. The job</h3>
+<h3>1. The job</h3>
 <p>In <code>server.lua</code>, inside the same <code>Whip.register</code> function, declare the job. The first start creates it; later starts find it again.</p>
 <pre><code class="lang-lua">    local job, why = exports.whip_core:EnsureJob('mycafe', {
         name  = 'Bean Machine',
@@ -1566,7 +1566,7 @@ end)</code></pre>
     if not job then print('[mycafe] no job: ' .. tostring(why)) end</code></pre>
 <p>Hire yourself in <code>/whip</code> → Economy → <strong>Jobs</strong> → <em>Bean Machine</em> → <strong>Change</strong>. (From code, use <code>HirePlayer</code>.)</p>
 
-<h3>9. One counter, several options</h3>
+<h3>2. One counter, several options</h3>
 <p>Customers buy; baristas clock on, brew and clock off. One prompt carries them all as <code>options</code>, and each option's <code>require</code> decides who sees it. In <code>client.lua</code>, replace the counter's <code>AddAction</code>:</p>
 <pre><code class="lang-lua">Whip.register(function()
     exports.whip_core:AddAction({
@@ -1594,7 +1594,7 @@ end)</code></pre>
 end)</code></pre>
 <div class="info-box warn"><strong><code>require</code> only decides what's offered.</strong> Anything that matters is checked again on the server, as the brew below is.</div>
 
-<h3>10. Brewing, and pay</h3>
+<h3>3. Brewing, and pay</h3>
 <p>Add <code>BrewPay = 5</code> to <code>Config</code> in <code>shared.lua</code>. Then, in <code>server.lua</code>'s <code>Whip.register</code>:</p>
 <pre><code class="lang-lua">    exports.whip_core:SecureEvent('mycafe:brew', {
         rateLimit = 2000,
@@ -1625,9 +1625,9 @@ end)</code></pre>
   <li><strong><code>PayPlayer</code></strong> pays cash; whatever doesn't fit their pockets lands at their feet.</li>
 </ul>
 
-<h3>11. Try it</h3>
+<h3>4. Try it</h3>
 <ol>
-  <li><code>restart mycafe</code> and hire yourself (step 8).</li>
+  <li><code>restart mycafe</code> and hire yourself (step 1).</li>
   <li>At the counter, clock on, then brew: a six-second bar, a coffee, $5.</li>
   <li>Walk away during the bar: it stops with "too far", and nothing is given.</li>
   <li><code>/whip</code> → System → <strong>Monitor</strong> shows each <code>mycafe:brew</code> and any refusal's reason.</li>
