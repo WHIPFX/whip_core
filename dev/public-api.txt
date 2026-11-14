@@ -47,6 +47,7 @@ client:GetEffects
 client:GetErrorLog
 client:GetEscortTarget
 client:GetGarageHelperStatus
+client:GetHeldItem
 client:GetInteriorFurnishState
 client:GetInventory
 client:GetItemCount
@@ -145,6 +146,7 @@ client:OrbitCamera
 client:PadComboTakes
 client:PadComboUsed
 client:PermitNativeWeapon
+client:PlaceObject
 client:PlayCamera
 client:PlayCameraPath
 client:PlayCameraSequence

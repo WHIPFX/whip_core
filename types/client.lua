@@ -687,6 +687,16 @@ function whip_core:ShowInterrupted(why, what) end
 ---@async
 function whip_core:Input(title, fields) end
 
+--- Let the player put a prop of yours down exactly (blocking): the item placer's see-through ghost follows where they
+--- look; the wheel turns it, the arrows raise and lower it, Ctrl makes both fine, E puts it there, C cancels. Nothing
+--- is made: your resource puts its prop where the answer says.
+---@param model string|integer The prop's model
+---@param opts? { label?: string, vehicles?: boolean, reach?: number } label: what the hint calls it; vehicles: it may go on a car; reach: metres from the camera (1-10)
+---@return { coords: vector3, rot: vector3, netId?: integer, offset?: vector3, offsetRot?: vector3 }|false spot Where it was put (rot: tilt forward, tilt sideways, heading); on a car, the car and where on it
+---@return 'cancelled'|'busy'|'model'|'dead'|nil why
+---@async
+function whip_core:PlaceObject(model, opts) end
+
 --- Run a skill check (blocking): the ring. The player pushes the dot onto the lit part of a ring and
 --- holds it there until it fills, once a round (the difficulty's `rounds`, each part smaller); touching the ring
 --- outside the lit part fails. Mouse (just moved, no cursor) or a pad's right stick; not the keyboard. The player's
