@@ -46,8 +46,9 @@ There's no SQL to import: whip_core creates its tables on its first start. **Qui
 
 ## First run
 
-1. Start the server. After `Framework loaded successfully!`, the console prints a `whip setup` report. Each line
-   marked **FIX** says what to change. Type `whipsetup` in the console to see it again.
+1. Start the server. Once everything has started, the console prints a `whip setup` report. Each line marked
+   **FIX** says what to change. When nothing needs fixing, `Framework loaded successfully!` follows it. Type
+   `whipsetup` in the console to see the report again.
 2. Join and make a character. The recipe enforces Steam, so your Cfx.re account needs a linked Steam account.
 3. Type `/w` and turn on developer mode. Your txAdmin account is already an admin.
 

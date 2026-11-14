@@ -3,7 +3,8 @@
 -- ============================================
 --
 -- One block in the server console once a start has settled: what whip found about this server, and for each problem
--- the line that fixes it. For a server owner setting whip up; `whipsetup` in the server console prints it again.
+-- the line that fixes it, then "Framework loaded successfully!" when nothing needs fixing. For a server owner setting
+-- whip up; `whipsetup` in the server console prints the report again.
 --
 -- PRINTED SETTLE_MS AFTER THE LAST RESOURCE STARTED since whip_core was ready (whip_core:onReady fires for every start
 -- while it is up), so whatever was ensured with whip has started by then: a pack that starts after whip_core is not
@@ -274,12 +275,13 @@ end
 
 local MARK = { ok = '^2  ok  ^0', fix = '^1  FIX ^0', note = '^3  note^0' }
 
---- Print the report.
+--- Print the report. Answers how many lines need fixing, or nil when the report itself failed.
+---@return integer|nil fixes
 local function printReport()
     local ok, lines = pcall(gather)
     if not ok then
         print(('^1[whip] the setup report failed: %s^0'):format(tostring(lines)))
-        return
+        return nil
     end
     local fixes, notes = 0, 0
     print('[whip] ==================== whip setup ====================')
@@ -290,6 +292,16 @@ local function printReport()
     print(('[whip] %s, %d note%s. Type whipsetup in this console to see this again.')
         :format(fixes == 0 and '^2Nothing to fix^0' or ('^1' .. fixes .. ' to fix^0'), notes, notes == 1 and '' or 's'))
     print('[whip] =====================================================')
+    return fixes
+end
+
+--- After the start's report, only when it found nothing to fix.
+local function printLoaded()
+    print('[whip_core] ============================================')
+    print(('[whip_core] whip_core Beta %s — public release')
+        :format(GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'))
+    print('[whip_core] Framework loaded successfully!')
+    print('[whip_core] ============================================')
 end
 
 -- Once per start, when the starts have settled (see the top).
@@ -303,7 +315,7 @@ AddEventHandler('whip_core:onReady', function()
         timer = nil
         if printed then return end
         printed = true
-        printReport()
+        if printReport() == 0 then printLoaded() end
     end)
 end)
 

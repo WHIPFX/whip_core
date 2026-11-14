@@ -1498,12 +1498,6 @@ AddEventHandler('onResourceStart', function(resourceName)
         end
     end
 
-    print('[whip_core] ============================================')
-    print(('[whip_core] whip_core Beta %s — public release')
-        :format(GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'))
-    print('[whip_core] Framework loaded successfully!')
-    print('[whip_core] ============================================')
-
     -- The readiness signal. Everything whip_core owns (the item registry, panels, use handlers)
     -- lives in memory, so a satellite re-declares after a whip_core restart.
     --
