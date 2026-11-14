@@ -11,6 +11,8 @@ local _changeListeners = {}  -- [name] = { ['<resource>:<id>'] = { fn, owner } }
 -- Run a stat's change listeners. Defined further down, beside callListener; declared here because
 -- the sync handlers above it call it.
 local _fireListeners
+-- Remember why the server took health, for the death report. Defined beside the damage tracker below.
+local _noteScriptedLoss
 
 -- What this client last applied to its OUTGOING damage (see Outgoing Damage Modifiers below).
 local _outGun, _outMelee = 1.0, 1.0
@@ -59,7 +61,7 @@ end)
 --- Single stat update from a FRAMEWORK change (item use, respawn, effect).
 --- This is the ONLY event that applies health/armour to the ped.
 --- Combat damage flows the other direction: ped → reportVitals → server.
-RegisterNetEvent('whip_core:client:statUpdate', function(name, value, delta)
+RegisterNetEvent('whip_core:client:statUpdate', function(name, value, delta, cause)
     local old = ClientStats[name]
 
     -- Apply vitals to ped ONLY from framework changes.
@@ -67,12 +69,14 @@ RegisterNetEvent('whip_core:client:statUpdate', function(name, value, delta)
     -- By the amount, when the server sent one: added to the ped's LIVE health or armour, not
     -- replaced with the server's figure (which trails the ped, and would undo damage taken since the
     -- last report). An amount never lifts a dead ped: a revive arrives as an absolute value.
+    -- A loss comes with its `cause` (Starvation, an effect's name...), noted before the ped takes it.
     if delta ~= nil and (name == 'health' or name == 'armour') then
         local ped = PlayerPedId()
         if name == 'health' then
             if not (delta > 0 and IsEntityDead(ped)) then
                 local max = GetEntityMaxHealth(ped)
                 value = math.max(0, math.min(max > 0 and max or 200, GetEntityHealth(ped) + delta))
+                if delta < 0 and not IsEntityDead(ped) then _noteScriptedLoss(cause) end
                 SetEntityHealth(ped, math.floor(value))
             else
                 value = GetEntityHealth(ped)
@@ -89,7 +93,9 @@ RegisterNetEvent('whip_core:client:statUpdate', function(name, value, delta)
         -- ped's health itself (client/death.lua).
         if not PlayerIsDead then
             if name == 'health' then
-                SetEntityHealth(PlayerPedId(), math.floor(value))
+                local ped = PlayerPedId()
+                if math.floor(value) < GetEntityHealth(ped) then _noteScriptedLoss(cause) end
+                SetEntityHealth(ped, math.floor(value))
             elseif name == 'armour' then
                 SetPedArmour(PlayerPedId(), math.floor(value))
             end
@@ -557,6 +563,20 @@ function GetLastDamageSource()
     return _lastDamageSource, _lastDamageTime
 end
 
+-- Health the server took (a need at empty, an effect, a script: statUpdate above), and when. GTA reports a script's
+-- SetEntityHealth as a fall with no attacker, so for SCRIPTED_LOSS_MS such a "fall" is read as this cause instead:
+-- a player who starves dies of Starvation, not Fall.
+local _scriptedLoss, _scriptedLossAt = nil, 0
+local SCRIPTED_LOSS_MS = 500
+local WEAPON_FALL = GetHashKey('WEAPON_FALL')
+
+---@param cause string|nil
+_noteScriptedLoss = function(cause)
+    if type(cause) ~= 'string' or cause == '' then return end
+    _scriptedLoss, _scriptedLossAt = cause, GetGameTimer()
+    _lastDamageSource, _lastDamageTime = cause, _scriptedLossAt
+end
+
 AddEventHandler('gameEventTriggered', function(eventName, args)
     if eventName ~= 'CEventNetworkEntityDamage' then return end
 
@@ -567,11 +587,19 @@ AddEventHandler('gameEventTriggered', function(eventName, args)
     local attacker   = args[2]
     local weaponHash = args[7]
 
+    -- The server's loss landing (_noteScriptedLoss): keep its cause.
+    local byOther = attacker and attacker ~= 0 and attacker ~= myPed and DoesEntityExist(attacker)
+    if weaponHash == WEAPON_FALL and not byOther and _scriptedLoss
+        and GetGameTimer() - _scriptedLossAt < SCRIPTED_LOSS_MS then
+        _lastDamageSource, _lastDamageTime = _scriptedLoss, GetGameTimer()
+        return
+    end
+
     -- ---- Damage Source Tracking (for debug overlay / death log) ----
     local weaponLabel = GetWeaponLabel(weaponHash)
     local dmgSource = weaponLabel
 
-    if attacker and attacker ~= 0 and attacker ~= myPed and DoesEntityExist(attacker) then
+    if byOther then
         local entityType = GetEntityType(attacker)
 
         if entityType == 1 then
