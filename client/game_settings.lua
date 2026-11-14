@@ -68,6 +68,7 @@ local gen = 0                 -- bumped on every open and close: a job from an o
 local busy = false            -- a job is running
 local drawn = false           -- GTA's menu drawn this frame (a press is on its way)
 local pressing = nil          -- the control held down this frame, or nil
+local onRow = nil             -- 'tab:row' GTA's menu is on after a step there; nil once anything else may have moved it
 local asked = nil             -- the hash of the question GTA is asking now, or nil
 local answering = false       -- an answer to GTA's question is being pressed: another waits for the next question
 local chosen = nil            -- the answer pressed to the question up: { question, ends }, until that question goes
@@ -298,6 +299,7 @@ end
 --- A control pressed for `holdMs` (100) and let go, with the menu drawn around it: GTA takes some presses as they are
 --- let go.
 local function press(control, g, holdMs)
+    if control ~= KEY.left and control ~= KEY.right then onRow = nil end
     drawn = true
     Wait(150)
     pressing = control
@@ -320,7 +322,7 @@ end
 --- changes waiting for Apply (GTA drops them with its menu), go with the old one.
 local function ensureOpen(g)
     if tabs and IsPauseMenuActive() then return end
-    tabs = nil
+    tabs, onRow = nil, nil
     labels, options, pending, rowIndex = {}, {}, {}, {}
     if IsPauseMenuActive() then
         SetFrontendActive(false)
@@ -371,6 +373,7 @@ local function showTab(id, g)
     local h = assert(head(g), 'GTA\'s settings page did not answer')
     if h.tab == t.index and h.rows > 0 then return h end
     local before = h.sig
+    onRow = nil
     ask(('whip|click|1|%d'):format(t.index), g)
     local deadline = GetGameTimer() + 3000
     repeat
@@ -524,7 +527,12 @@ local function stepRow(id, rowId, dir, g)
     assert(row.state ~= 0, 'GTA does not let that one change here')
     local max = tonumber((options[id] and options[id][rowId] and options[id][rowId].texts[1]) or '') or 10
     if row.type == 2 and ((dir > 0 and row.value >= max) or (dir < 0 and row.value <= 0)) then return false end
-    focusRow(row, g)
+    -- Clicked onto only when GTA is not on it already: each click is an input to GTA too, with its menu sound.
+    local at = id .. ':' .. rowId
+    if onRow ~= at then
+        focusRow(row, g)
+        onRow = at
+    end
     -- A graphics row waits for Apply, keeping what it was; stepped back to it, it waits no more. The tab's lists are read
     -- again: one row can change another's choices.
     local function moved()
