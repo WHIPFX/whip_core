@@ -32,7 +32,7 @@ PlayerPrefs.define({
 
 PlayerPrefs.define({
     key = 'pad.vehicleControls', group = 'Controller', type = 'toggle', label = 'Show a vehicle\'s controls',
-    help = 'Taking the driver\'s seat shows that vehicle\'s buttons beside the dial for a few seconds: the engine, the headlights, and what it is fitted with, like nitrous.',
+    help = 'Taking the driver\'s seat shows that vehicle\'s buttons beside the dial for a few seconds: the engine and what it is fitted with, like nitrous. On a keyboard, the engine\'s key.',
     default = function() return not (Config.Controller ~= nil and Config.Controller.VehicleControls == false) end,
 })
 -- Each player's own only: no server default
@@ -626,9 +626,9 @@ end)
 
 -- A vehicle's controls over the dial: taking the driver's seat with a pad shows a column for
 -- Config.Controller.VehicleControlsMs (html/js/vehicle-controls.js): the engine (on whichever button the
--- layout has it), the headlights (D-pad right), and every other ready car action. A bicycle has no engine
--- or lights. A car action coming ready while driving shows it again with the new row.
--- Each player can switch it off (pad.vehicleControls).
+-- layout has it) and every other ready car action. A bicycle has no engine. A car action coming ready while
+-- driving shows it again with the new row. On a keyboard the column is the engine alone, on its binding
+-- (keyboardControls). Each player can switch it off (pad.vehicleControls).
 
 --- A button's pictures (html/img/pad): LB's first for the LB layer; A for A in a vehicle, B for B on foot.
 ---@return string[]
@@ -644,14 +644,13 @@ end
 local function vehicleControls(veh)
     local rows = {}
     local bicycle = GetVehicleClass(veh) == 13
-    -- The engine, then the headlights, then the rest in button order.
+    -- The engine, then the rest in button order.
     for _, s in ipairs(SLOTS) do
         if layout[s.id] == 'engine' and not bicycle then
             local engineOn = GetIsVehicleEngineRunning(veh)
             rows[#rows + 1] = { glyphs = slotGlyphs(s), label = (engineOn == 1 or engineOn == true) and 'Engine off' or 'Start engine' }
         end
     end
-    if not bicycle then rows[#rows + 1] = { glyphs = { 'dpad_right' }, label = 'Headlights' } end
     for _, s in ipairs(SLOTS) do
         local id = layout[s.id]
         local a = id and id ~= 'engine' and actionOf(id)
@@ -662,22 +661,46 @@ local function vehicleControls(veh)
     return rows
 end
 
-local vcUntil = 0   -- GetGameTimer() until which the column is up
+--- The key a binding is on, as GTA's help text names it ('t_E' -> 'E'), or nil for one with no short name
+--- (a mouse wheel) or none at all.
+---@return string|nil
+local function boundKey(command)
+    local s = GetControlInstructionalButton(0, GetHashKey(command) | 0x80000000, true)
+    local key = type(s) == 'string' and s:match('^t_(.+)$') or nil
+    return (key and key ~= '' and #key <= 8) and key:upper() or nil
+end
+
+--- The keyboard's column: the engine on its binding. The toggle when a key is bound to it (none by default),
+--- else the directional binding for what it would do now: wheel up starts (client/vehicles.lua), down stops.
+--- A row's `keys` are words in the key, where a pad's `glyphs` are pictures.
+---@return table[]
+local function keyboardControls(veh)
+    if GetVehicleClass(veh) == 13 then return {} end
+    local engineOn = GetIsVehicleEngineRunning(veh)
+    engineOn = engineOn == 1 or engineOn == true
+    local key = boundKey('+whip_ignition_toggle')
+        or boundKey(engineOn and '+whip_ignition_off' or '+whip_ignition_on')
+        or (engineOn and 'SCROLL \u{25BC}' or 'SCROLL \u{25B2}')
+    return { { keys = { key }, label = engineOn and 'Engine off' or 'Start engine' } }
+end
+
+local vcUntil = 0  -- GetGameTimer() until which the column is up
 
 -- Where the vehicle's dial sits (client/vehicle_hud.lua's KIND).
 local VC_KIND = { [14] = 'boat', [15] = 'air', [16] = 'air' }
 
---- Show the column for the vehicle the player drives, if a pad is the device and they have it on.
+--- Show the column for the vehicle the player drives, if they have it on: the pad's buttons, or on a keyboard
+--- the engine's key.
 local function showVehicleControls(veh)
-    if not reading or PlayerPrefs.get('pad.vehicleControls') == false then return end
+    if PlayerPrefs.get('pad.vehicleControls') == false then return end
     if not veh or veh == 0 or not DoesEntityExist(veh) or GetPedInVehicleSeat(veh, -1) ~= PlayerPedId() then return end
-    local rows = vehicleControls(veh)
+    local rows = reading and vehicleControls(veh) or keyboardControls(veh)
     if #rows == 0 then return end
     local ms = math.max(500, tonumber(Config.Controller and Config.Controller.VehicleControlsMs) or 5000)
     vcUntil = GetGameTimer() + ms
     -- shape: the 3D prompts' key shape; keys: whether it wears one (pad.vehicleControlsKeys)
     SendNUIMessage({ action = 'vehicleControls', rows = rows, ms = ms, kind = VC_KIND[GetVehicleClass(veh)] or 'car',
-                     shape = InteractStyle.baseTheme(), keys = PlayerPrefs.get('pad.vehicleControlsKeys') == true })
+                     shape = InteractStyle.baseTheme(), keys = not reading or PlayerPrefs.get('pad.vehicleControlsKeys') == true })
 end
 
 local function hideVehicleControls()

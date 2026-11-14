@@ -13,8 +13,10 @@
 // PLACED IN WINDOW PIXELS FROM THE DIAL ITSELF: its canvas is BOX.w radii wide (js/vehicle_hud/dial.js), so its
 // radius and middle come off its box whatever its size, skin or kind. Before the dial is up — it fades in after the
 // rows arrive, and loads on first use — where the dial will sit for the vehicle's kind (Lua sends it): hud.js
-// place() with vehicle-dial.js's DIAL_RIGHT. Only on a pad (css: html[data-input="pad"]), and only while the HUD
-// layer is on screen.
+// place() with vehicle-dial.js's DIAL_RIGHT. Only while the HUD layer is on screen.
+//
+// ON A KEYBOARD a row carries `keys` (words: the key it is bound to, 'E', 'SCROLL ▲') in place of `glyphs`, each
+// set in the same white key; Lua sends the engine alone.
 // ========================================
 
 import { NuiRouter } from './router.js';
@@ -74,7 +76,8 @@ function place() {
     root.style.bottom = Math.round(innerHeight - (d.cy - d.R) + GAP * d.R) + 'px';
 }
 
-const keyOf = (row) => row.glyphs.join('+') + '|' + row.label;
+const buttons = (row) => row.glyphs || row.keys;
+const keyOf = (row) => (row.glyphs ? 'g:' : 'k:') + buttons(row).join('+') + '|' + row.label;
 
 /** One row: its button's pictures, each in a prompt's key (LB's first, joined by a +), then what it does. */
 function rowEl(row) {
@@ -83,8 +86,15 @@ function rowEl(row) {
     el.dataset.key = keyOf(row);
     const btns = document.createElement('span');
     btns.className = 'vc-btns';
-    row.glyphs.forEach((g, i) => {
-        const img = padGlyph(g, 'vc-glyph');
+    buttons(row).forEach((g) => {
+        let img = null;
+        if (row.glyphs) {
+            img = padGlyph(g, 'vc-glyph');
+        } else {
+            img = document.createElement('span');
+            img.className = 'vc-keytext';
+            img.textContent = g;
+        }
         if (!img) return;
         if (btns.childElementCount > 0) {
             const plus = document.createElement('span');
@@ -141,7 +151,7 @@ function show(rows, ms) {
 }
 
 const valid = (row) => row && typeof row.label === 'string' && row.label !== ''
-    && Array.isArray(row.glyphs) && row.glyphs.length > 0 && row.glyphs.every((g) => typeof g === 'string');
+    && [row.glyphs, row.keys].some((b) => Array.isArray(b) && b.length > 0 && b.every((g) => typeof g === 'string' && g !== ''));
 
 NuiRouter.register('vehicleControls', (d) => {
     const rows = (d && Array.isArray(d.rows)) ? d.rows.filter(valid) : [];
@@ -151,7 +161,7 @@ NuiRouter.register('vehicleControls', (d) => {
     const shape = d.shape === 'classic' ? 'classic' : 'keycap';
     root.classList.toggle('vc-classic', shape === 'classic');
     root.classList.toggle('vc-keycap', shape === 'keycap');
-    root.classList.toggle('vc-bare', d.keys === false);   // no white key: the button pictures alone
+    root.classList.toggle('vc-bare', d.keys === false && rows.every((r) => r.glyphs));   // no white key: the button pictures alone
     show(rows, Math.max(500, Number(d.ms) || 5000));
 });
 

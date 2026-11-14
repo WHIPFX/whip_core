@@ -11,7 +11,8 @@
    bold in white with a hard black outline and a soft drop, since there is no panel behind it.
 
    AT BODY LEVEL, like the dial, so its place is not multiplied by the HUD's zoom; the column inside
-   carries that zoom (--ui-scale x 1.25, as #status-hud does). Only on a pad: a keyboard never sees it.
+   carries that zoom (--ui-scale x 1.25, as #status-hud does). On a keyboard the key holds words (the engine's
+   binding: 'E', 'SCROLL ▲'), .vc-keytext.
    ============================================ */
 
 #vehicle-controls {
@@ -26,7 +27,7 @@
     transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html[data-input="pad"] #vehicle-controls.up {
+#vehicle-controls.up {
     display: block;
 }
 
@@ -96,6 +97,16 @@ html[data-input="pad"] #vehicle-controls.up {
     box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.9),
                 0 0 0 3px rgba(255, 255, 255, 0.30),
                 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.vc-keytext {
+    padding: 0 5px;
+    font-family: 'Barlow', 'Segoe UI', sans-serif;
+    font-weight: 800;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: 0.5px;
+    color: #10131a;
 }
 
 .vc-glyph {
