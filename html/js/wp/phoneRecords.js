@@ -9,7 +9,12 @@
 //   02 CALLS     every call, newest first: who, which way, how it ended, how long it rang and how long they
 //                talked. A row opens to all of it.
 //   03 ACTIVITY  how much and when: the totals, the hours of the day (the admin's own clock), the last fortnight.
-//   04 PEOPLE    everyone the number deals with, texted, called or saved, and who they really are.
+//   04 PEOPLE    everyone the number deals with, texted, called or saved, and who they really are; on top, its
+//                blocks both ways (the numbers it blocked, the numbers that blocked it) and when.
+//
+// HELD BACK: a text or call that came while its receiver had blocked the sender (whip_phone's block list). The
+// receiver never saw it, so their own phone leaves it out; here it stays, marked, as the evidence when someone
+// reports being harassed.
 //
 // PICK A PERSON ANYWHERE (a conversation, a call, a contact, a row in People) and every screen turns to them:
 // the phone opens your conversation with them, the calls narrow to theirs, People marks them. "Open their
@@ -176,6 +181,13 @@ function people() {
 function threadOf(number) { return data && data.threads.find((t) => t.number === number); }
 function callsWith(number) { return data ? data.callsBy.find((c) => c.number === number) : null; }
 
+/** Its blocks with one number, either way: when this phone blocked them, when they blocked this phone (0: never). */
+function blockWith(number) {
+    const mine = data && data.blocks.find((b) => b.number === number);
+    const theirs = data && data.blockedBy.find((b) => b.number === number);
+    return { mine: mine ? mine.at : 0, theirs: theirs ? theirs.at : 0 };
+}
+
 // ---- loading ----
 
 function load(number) {
@@ -196,7 +208,7 @@ function load(number) {
             failed = (res && res.why) || 'The records could not be read.';
         } else {
             data = res;
-            for (const k of ['contacts', 'threads', 'calls', 'callsBy', 'others', 'days', 'hours']) {
+            for (const k of ['contacts', 'threads', 'calls', 'callsBy', 'blocks', 'blockedBy', 'others', 'days', 'hours']) {
                 if (!Array.isArray(data[k])) data[k] = [];
             }
             if (!data.owners || typeof data.owners !== 'object' || Array.isArray(data.owners)) data.owners = {};
@@ -426,7 +438,8 @@ function drawThreads(app) {
         top.appendChild(WP.el('span', 'pr-t-time', short(t.lastAt)));
         main.appendChild(top);
         main.appendChild(WP.el('span', 'pr-t-prev', t.last ? (t.last.me ? 'You: ' : '') + t.last.text : ''));
-        main.appendChild(WP.el('span', 'pr-t-meta', plural(t.n, 'text') + (t.unread ? '  ·  ' + t.unread + ' unread' : '')));
+        main.appendChild(WP.el('span', 'pr-t-meta', plural(t.n, 'text') + (t.unread ? '  ·  ' + t.unread + ' unread' : '')
+            + (t.held ? '  ·  ' + t.held + ' held back' : '')));
         b.appendChild(main);
         app.appendChild(b);
     }
@@ -480,13 +493,17 @@ function drawThread(app, os, number) {
             const day = dayWord(m.at);
             if (day !== lastDay) { list.appendChild(WP.el('div', 'pr-day', day)); lastDay = day; }
             const wrap = WP.el('div', 'pr-bub-wrap ' + (m.me ? 'me' : 'them'));
-            wrap.appendChild(WP.el('div', 'pr-bub ' + (m.me ? 'me' : 'them'), m.text));
-            // What the desk wants beside every text: when, and whether the other side has read it.
+            wrap.appendChild(WP.el('div', 'pr-bub ' + (m.me ? 'me' : 'them') + (m.held ? ' held' : ''), m.text));
+            // What the desk wants beside every text: when, and whether the other side has read it. A held text never
+            // reached them, so it has nothing to be read.
             let meta = hm(asDate(m.at));
-            if (m.me) meta += m.readAt ? '  ·  read ' + stamp(m.readAt) : '  ·  not read yet';
+            if (m.held) meta += '  ·  held back';
+            else if (m.me) meta += m.readAt ? '  ·  read ' + stamp(m.readAt) : '  ·  not read yet';
             else meta += m.readAt ? '' : '  ·  unread';
-            const line = WP.el('div', 'pr-bub-meta', meta);
-            line.title = full(m.at) + (m.readAt ? '\nRead ' + full(m.readAt) : '');
+            const line = WP.el('div', 'pr-bub-meta' + (m.held ? ' held' : ''), meta);
+            line.title = full(m.at) + (m.readAt ? '\nRead ' + full(m.readAt) : '')
+                + (!m.held ? '' : m.me ? '\nHeld back: ' + nameOf(number) + ' had blocked this phone, so it never reached them'
+                    : '\nHeld back: this phone had blocked them, so its owner never saw it');
             wrap.appendChild(line);
             list.appendChild(wrap);
         }
@@ -507,8 +524,13 @@ const OUTCOME = {
     ringing:     { word: 'Never closed', pill: '' },
 };
 
-function outcome(c) { return OUTCOME[c.status] || { word: c.status || 'Unknown', pill: '' }; }
-function missedIn(c) { return !c.out && c.status !== 'answered'; }
+const HELD = { word: 'Held back', pill: 'err' };
+
+/** How it ended for the desk. A held call (the callee had blocked the caller) ended however it seemed to the caller,
+ * but it did not ring for the callee, or stopped when they blocked it: that is what the desk sees first. */
+function outcome(c) { return c.held ? HELD : (OUTCOME[c.status] || { word: c.status || 'Unknown', pill: '' }); }
+/** Missed by this phone: it rang here and nobody answered (a held call was blocked here, not missed). */
+function missedIn(c) { return !c.out && !c.held && c.status !== 'answered'; }
 function talked(c) { return c.status === 'answered' && c.answeredAt && c.endedAt ? c.endedAt - c.answeredAt : 0; }
 function rang(c) {
     if (c.answeredAt) return c.answeredAt - c.startedAt;
@@ -528,7 +550,7 @@ function drawRecents(app) {
         b.appendChild(icon(c.out ? 'out' : 'in', 'pr-rec-dir'));
         const main = WP.el('span', 'pr-t-main');
         main.appendChild(WP.el('span', 'pr-t-name', nameOf(c.other)));
-        const how = c.status === 'answered' ? (c.out ? 'Outgoing' : 'Incoming') + '  ·  ' + clock(talked(c)) : outcome(c).word;
+        const how = c.status === 'answered' && !c.held ? (c.out ? 'Outgoing' : 'Incoming') + '  ·  ' + clock(talked(c)) : outcome(c).word;
         main.appendChild(WP.el('span', 'pr-rec-sub', how));
         b.appendChild(main);
         b.appendChild(WP.el('span', 'pr-t-time', short(c.startedAt)));
@@ -603,6 +625,9 @@ function drawContact(app, number) {
     row('Calls', c ? plural(c.n, 'call') + '  ·  ' + lasting(c.talk) + ' talking' : 'none');
     const last = Math.max(t ? t.lastAt : 0, c ? c.lastAt : 0);
     row('Last contact', last ? stamp(last) + '  (' + ago(last) + ')' : 'never');
+    const b = blockWith(number);
+    if (b.mine) row('Blocked by this phone', stamp(b.mine) + '  (' + ago(b.mine) + ')');
+    if (b.theirs) row('Blocked this phone', stamp(b.theirs) + '  (' + ago(b.theirs) + ')');
     app.appendChild(info);
 }
 
@@ -612,7 +637,8 @@ function callPasses(c) {
     if (focus && c.other !== focus) return false;
     if (callFilter === 'out') return c.out;
     if (callFilter === 'in') return !c.out;
-    if (callFilter === 'missed') return c.status !== 'answered';
+    if (callFilter === 'missed') return !c.held && c.status !== 'answered';
+    if (callFilter === 'held') return !!c.held;
     return true;
 }
 
@@ -623,9 +649,12 @@ function renderCalls() {
     const t = data.totals;
     s.sub.textContent = data.hasCalls
         ? plural(t.calls || 0, 'call') + '  ·  ' + (t.callsOut || 0) + ' made  ·  ' + (t.callsIn || 0) + ' received  ·  '
-            + (t.missedIn || 0) + ' not answered  ·  ' + lasting(t.talk) + ' talking'
+            + (t.missedIn || 0) + ' not answered  ·  ' + (t.callsHeld ? t.callsHeld + ' held back  ·  ' : '')
+            + lasting(t.talk) + ' talking'
         : '';
-    for (const [key, label] of [['all', 'All'], ['out', 'Made'], ['in', 'Received'], ['missed', 'Not answered']]) {
+    const filters = [['all', 'All'], ['out', 'Made'], ['in', 'Received'], ['missed', 'Not answered']];
+    if (t.callsHeld) filters.push(['held', 'Held back']);   // only on a number a block touched
+    for (const [key, label] of filters) {
         s.tools.appendChild(chip(label, 'prCallFilter', key, callFilter === key));
     }
 
@@ -706,6 +735,15 @@ function callDetail(c) {
 
 function explain(c) {
     const them = nameOf(c.other);
+    if (c.held) {
+        // Nothing tells the caller (whip_phone): to them it ended as an unblocked call would have.
+        const seemed = (OUTCOME[c.status] || { word: c.status || 'Unknown' }).word;
+        return c.out
+            ? them + ' had blocked this phone, so it did not ring for them (or stopped when they blocked it). This phone '
+                + 'was not told: to it, the call ended "' + seemed + '".'
+            : 'This phone had blocked ' + them + ', so it did not ring here (or stopped when the block was made) and is '
+                + 'not in its Recents. ' + them + ' was not told: to them, the call ended "' + seemed + '".';
+    }
     switch (c.status) {
     case 'answered':
         return c.endedAt ? 'Picked up and talked.' : 'Picked up; no end was recorded (still going, or the server stopped).';
@@ -799,6 +837,42 @@ function renderActivity() {
 
 // ---- 04 people ----
 
+/** One person's row: their face, who really owns the number, what this phone saved it as, then `stats`. Picked,
+ * it offers Open their phone, unless `go` is false (they have a row lower down that offers it). */
+function personRow(body, number, saved, stats, go) {
+    const o = ownerOf(number);
+    const row = WP.el('button', 'pr-person' + (focus === number ? ' active' : ''));
+    row.type = 'button';
+    row.dataset.action = 'prFocus';
+    row.dataset.arg = focus === number ? '' : number;
+    row.appendChild(avatar((o && o.name) || saved || '#', o && !o.retired ? !!o.online : undefined, o && !o.retired ? o.charId : undefined));
+    const main = WP.el('span', 'pr-person-main');
+    const top = WP.el('span', 'pr-person-top');
+    top.appendChild(WP.el('span', 'pr-person-name', (o && o.name) || saved || phoneNumber(number)));
+    if (!o) top.appendChild(WP.el('span', 'wp-pill wp-pill-warn', 'NOT ON SERVER'));
+    else if (o.retired) top.appendChild(WP.el('span', 'wp-pill', 'RETIRED'));
+    else if (o.online) top.appendChild(WP.el('span', 'wp-pill wp-pill-ok', 'ONLINE'));
+    main.appendChild(top);
+    main.appendChild(WP.el('span', 'pr-person-sub', phoneNumber(number)
+        + (saved ? (o && o.name && o.name !== saved ? '  ·  saved as "' + saved + '"' : '') : '  ·  not saved')));
+    main.appendChild(WP.el('span', 'pr-person-stats', stats));
+    row.appendChild(main);
+    body.appendChild(row);
+    if (go !== false && focus === number && o && !o.retired && number !== current) {
+        const wrap = WP.el('div', 'pr-person-go');
+        wrap.appendChild(WP.btn('Open their phone', 'prJump', 'primary', number));
+        body.appendChild(wrap);
+    }
+}
+
+/** A group's label, with how many are in it. */
+function groupTitle(body, title, n) {
+    const t = WP.el('div', 'pr-group');
+    t.appendChild(WP.el('span', null, title));
+    t.appendChild(WP.el('span', 'pr-group-n', String(n)));
+    body.appendChild(t);
+}
+
 function renderPeople() {
     const s = els.people;
     s.tools.innerHTML = '';
@@ -810,36 +884,31 @@ function renderPeople() {
     const body = s.body;
     body.innerHTML = '';
     els.peopleBody = body;
+
+    // Its blocks first, both ways, the latest first: who this phone keeps out, and who keeps it out.
+    const listed = new Set(list.map((p) => p.number));
+    const blocks = (title, rows, words) => {
+        if (!rows.length) return;
+        groupTitle(body, title, rows.length);
+        for (const b of rows) {
+            personRow(body, b.number, savedAs(b.number), words + ' ' + stamp(b.at) + '  ·  ' + ago(b.at), !listed.has(b.number));
+        }
+    };
+    blocks('Blocked by this phone', data.blocks, 'blocked');
+    blocks('Blocked this phone', data.blockedBy, 'blocked it');
+    if (data.blocks.length || data.blockedBy.length) groupTitle(body, 'Everyone', list.length);
+
     if (!list.length) { body.appendChild(WP.empty('No one: it has texted, called and saved nobody.')); return; }
     for (const p of list) {
-        const o = ownerOf(p.number);
-        const row = WP.el('button', 'pr-person' + (focus === p.number ? ' active' : ''));
-        row.type = 'button';
-        row.dataset.action = 'prFocus';
-        row.dataset.arg = focus === p.number ? '' : p.number;
-        row.appendChild(avatar((o && o.name) || p.saved || '#', o && !o.retired ? !!o.online : undefined, o && !o.retired ? o.charId : undefined));
-        const main = WP.el('span', 'pr-person-main');
-        const top = WP.el('span', 'pr-person-top');
-        top.appendChild(WP.el('span', 'pr-person-name', (o && o.name) || p.saved || phoneNumber(p.number)));
-        if (!o) top.appendChild(WP.el('span', 'wp-pill wp-pill-warn', 'NOT ON SERVER'));
-        else if (o.retired) top.appendChild(WP.el('span', 'wp-pill', 'RETIRED'));
-        else if (o.online) top.appendChild(WP.el('span', 'wp-pill wp-pill-ok', 'ONLINE'));
-        main.appendChild(top);
-        main.appendChild(WP.el('span', 'pr-person-sub', phoneNumber(p.number)
-            + (p.saved ? (o && o.name && o.name !== p.saved ? '  ·  saved as "' + p.saved + '"' : '') : '  ·  not saved')));
         const bits = [];
         if (p.texts) bits.push(plural(p.texts, 'text'));
         if (p.calls) bits.push(plural(p.calls, 'call'));
         if (p.unread) bits.push(p.unread + ' unread');
         bits.push(p.lastAt ? ago(p.lastAt) : 'only saved');
-        main.appendChild(WP.el('span', 'pr-person-stats', bits.join('  ·  ')));
-        row.appendChild(main);
-        body.appendChild(row);
-        if (focus === p.number && o && !o.retired && p.number !== current) {
-            const go = WP.el('div', 'pr-person-go');
-            go.appendChild(WP.btn('Open their phone', 'prJump', 'primary', p.number));
-            body.appendChild(go);
-        }
+        const b = blockWith(p.number);
+        if (b.mine) bits.push('blocked by this phone');
+        if (b.theirs) bits.push('blocked this phone');
+        personRow(body, p.number, p.saved, bits.join('  ·  '));
     }
 }
 

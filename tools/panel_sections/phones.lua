@@ -56,7 +56,7 @@ RegisterNUICallback('pmSpawnSim', function(data, cb)
     cb('ok')
 end)
 
---- What a number holds, for its page: its contacts, messages and calls (server/devtools.lua, pmNumberDetail).
+--- What a number holds, for its page: its contacts, messages, calls and blocks (server/devtools.lua, pmNumberDetail).
 RegisterNUICallback('pmDetail', function(data, cb)
     CreateThread(function()
         local res = Callback('whip_core:pmNumberDetail', type(data) == 'table' and data.phoneNumber or nil)
