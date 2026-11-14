@@ -98,15 +98,19 @@ function numberField(t, k, value, o = {}) {
 
 /** A length of time, saved in seconds: a box a unit, its number and its letter ("8h", "42m", "5s"), typed, or picked
  *  from its list (its chevron: app.js dhms-pick, dropdown.js). writeField 'dhms' adds the boxes up. `fallback`: what an
- *  empty one runs at (shown greyed). `units: 'hms'`: no days box, its hours counting them all (a task's time). */
+ *  empty one runs at (shown greyed). `units: 'hms'`: no days box, its hours counting them all (a task's time). Kept to
+ *  a tenth of a second (a 0.4 s Slide To shown as 0 was saved as 0 once touched: WLVF's review); the seconds box takes
+ *  "0.4" and "59.5". */
 function timeField(t, k, value, o = {}) {
-    const total = typeof value === 'number' && value >= 0 ? Math.round(value) : null;
+    const total = typeof value === 'number' && value >= 0 ? Math.round(value * 10) / 10 : null;
     const shown = total === null ? (o.fallback || 0) : total;
+    const secs = +(shown % 60).toFixed(1);
     const parts = o.units === 'hms'
-        ? [['h', 'hours', Math.floor(shown / 3600)], ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', shown % 60]]
+        ? [['h', 'hours', Math.floor(shown / 3600)], ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', secs]]
         : [['d', 'days', Math.floor(shown / 86400)], ['h', 'hours', Math.floor(shown % 86400 / 3600)],
-            ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', shown % 60]];
-    const boxes = parts.map(([p, word, n]) => `<div class="dr-dhms-box"><input class="dr-dhms-in" type="text" inputmode="numeric" maxlength="3"`
+            ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', secs]];
+    const boxes = parts.map(([p, word, n]) => `<div class="dr-dhms-box"><input class="dr-dhms-in" type="text"`
+        + ` inputmode="${p === 's' ? 'decimal' : 'numeric'}" maxlength="${p === 's' ? 4 : 3}"`
         + ` value="${total === null ? '' : n}" placeholder="${n}" data-t="${e(t)}" data-k="${e(k)}" data-f="dhms" data-part="${p}"`
         + ` aria-label="${word}" spellcheck="false"><span class="dr-dhms-u">${p}</span>`
         + `<button class="dr-dhms-dd" type="button" data-act="dhms-pick" data-part="${p}" aria-label="Pick ${word}">`
@@ -2947,7 +2951,7 @@ export function writeField(ed, el) {
             if (!isNaN(n) && n > 0) total += n * unit[inp.dataset.part];
             if (inp.value !== '') any = true;
         }
-        v = any ? Math.round(total) : undefined;
+        v = any ? Math.round(total * 10) / 10 : undefined;   // (to a tenth of a second: timeField)
     } else if (f === 'select' || f === 'text') {
         // (A Mixed list's own line is never a value.)
         if (el.value === '__mixed') return false;
