@@ -1946,7 +1946,7 @@ shared_script '@whip_core/lib/satellite.lua'</code></pre>
 <tr><td><code>Whip.command(name, opts, fn)</code> (server)</td><td>A chat command behind a SecureEvent's checks: refused while the player is down (<code>whileDead = true</code> allows it), rate limited (three at once, then one a second; <code>rateLimit = false</code> for none), <code>ace = 'my.perm'</code>, and <code>dev = true</code> for the console and <code>whip.devtools</code> with developer mode on. <code>fn(source, args, raw)</code> runs in its own thread. Use it instead of <code>RegisterCommand</code> with your own checks.</td></tr>
 <tr><td><code>Whip.registry(name, opts)</code> · <code>Whip.caller()</code></td><td>A registry of your own with WHIP's <a href="#patterns-registering">registration rule</a>, for a resource others extend (phone apps, MDT plugins): <code>local Apps = Whip.registry('app', { label = 'app' })</code>, then in your export <code>return Apps:add(Whip.caller(), id, def)</code>. Read <code>Apps.entries</code>, <code>Apps:get(id)</code>, <code>Apps:keysOf(owner)</code>.</td></tr>
 <tr><td><code>Whip.registerWith(resource, fn)</code></td><td>Runs <code>fn</code> now if <code>resource</code> is running and each time it starts, so registering with another resource's registry survives its restart.</td></tr>
-<tr><td><code>Whip.requires('1.1')</code> · <code>Whip.has(name)</code></td><td>Version checks. Put <code>whip_requires '1.1'</code> in your fxmanifest and the setup report flags an older whip_core; <code>Whip.requires</code> does the same from code. <code>Whip.has('GetBalance')</code> checks for one export.</td></tr>
+<tr><td><code>Whip.requires('1.1')</code> · <code>Whip.has(name)</code></td><td>Version checks. Put <code>whip_requires '1.1'</code> in your fxmanifest and the setup report flags an older whip_core; <code>Whip.requires</code> does the same from code. <code>Whip.has('GetBalance')</code> checks for one export. <code>whip_updates 'you/myresource'</code> there tells server owners when your GitHub repository has a newer release (<a href="#update-checks">Update checks</a>).</td></tr>
 <tr><td><code>Whip.onCoreLost(fn)</code></td><td>Only for a resource <em>without</em> <code>dependency 'whip_core'</code>: runs when whip_core stops, to let go of anything that needed it. Every player has been logged out by then with no <code>whip_core:player:logout</code>, so drop per-player state too.</td></tr>
 <tr><td><code>Whip.voice(name, …)</code> · <code>Whip.voiceSystem()</code></td><td>Calls whichever voice system runs (<a href="#voice-api">Voice for other resources</a>).</td></tr>
 </table>
@@ -11508,7 +11508,7 @@ end</code></pre>
 end)</code></pre>
 </div></div>
 <h2 id="running-whip">Running WHIP</h2>
-<p class="lede">What happens behind the <a href="#quickstart">Quick Start</a>: the database, oxmysql, a player's first download, and Legacy versus Enhanced. When something goes wrong, the <strong>WHIP setup</strong> report in the server console says what to fix (<code>whipsetup</code> prints it again).</p>
+<p class="lede">What happens behind the <a href="#quickstart">Quick Start</a>: the database, oxmysql, a player's first download, Legacy versus Enhanced, and update checks. When something goes wrong, the <strong>WHIP setup</strong> report in the server console says what to fix (<code>whipsetup</code> prints it again).</p>
 
 <h3>The database</h3>
 <p>WHIP needs MariaDB 10.2.3+ or MySQL 8.0.16+: older versions ignore the rules that stop a bank balance going below zero. The setup report says when yours is too old.</p>
@@ -11532,6 +11532,24 @@ end)</code></pre>
 <p>A script can't reliably tell which one it's on, so an Enhanced server declares it:</p>
 <pre><code class="lang-cfg">setr whip_platform enhanced</code></pre>
 <p>The setup report warns when the server looks like the other platform. To see what your game was told, turn developer mode on in <code>/w</code> and type <code>whipplatform</code> in F8. Developers: <a href="#both-platforms">Writing for both platforms</a>.</p>
+<h3 id="update-checks">Update checks</h3>
+<p>Every 12 hours, whip_core asks GitHub whether WHIP's resources have a newer release, and any other resource that names its repository. A newer one shows in the server console, in the setup report, and to an admin turning developer mode on. <code>whipupdates</code> in the server console lists every resource it checks; <code>whipupdates check</code> asks again now.</p>
+<p>It sends one request per repository to <code>api.github.com</code>. GitHub sees your server's address and which repositories it asked about, and nothing else. To turn it off:</p>
+<pre><code class="lang-cfg">set whip_update_check false</code></pre>
+<p>Your own resource takes part with one line in its <code>fxmanifest.lua</code>, next to its <code>version</code>:</p>
+<pre><code class="lang-lua">version '1.0.0'
+whip_updates 'you/mycafe'   -- the GitHub repository whose latest release is compared with version</code></pre>
+
+<div class="export-card" id="getupdate" data-search="getupdate getupdates update version newer release github check whip_updates">
+<div class="export-header"><span class="export-name">GetUpdate(resource?) · GetUpdates()</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>A resource's update status, from the last check: your own when <code>resource</code> is left out, or <code>nil</code> when it names no repository. <code>GetUpdates</code> returns every resource that names one. Neither asks GitHub, so call them as often as you like.</p>
+  <div class="return-info"><strong>Returns: </strong><code>{ resource, repository, current, latest, url, newer, checkedAt, problem }|nil</code> · <code>table[]</code></div>
+<pre><code class="lang-lua">local update = exports.whip_core:GetUpdate()
+if update and update.newer then
+    print(('mycafe %s is out: %s'):format(update.latest, update.url))
+end</code></pre>
+</div></div>
 <h2 id="configuration">Configuration</h2>
 <p class="lede">whip_core's settings live in its <code>config.lua</code>, read by server and client. The ones an owner changes are also in <code>/whip</code> → <strong>Settings</strong> → <strong>Config</strong>; timings, reaches and fine tuning are <code>config.lua</code> only.</p>
 <p>Most settings apply at once for every player; those marked <em>Next restart</em> wait for whip_core's next start. Another resource can't read whip_core's <code>Config</code>: use the export for the value, such as <code>GetPockets()</code>.</p>
