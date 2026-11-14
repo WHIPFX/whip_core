@@ -1,5 +1,12 @@
 -- The emotes, walk styles and expressions players can pick (/e, /walk, /mood and the F3 menu).
 --
+-- LICENCE: THIS FILE IS UNDER THE GNU GENERAL PUBLIC LICENSE 3.0 (COPYING), not the LGPL like the rest of whip_core.
+-- Many of its emotes, their commands and their prop placements come from RPEmotes
+-- (github.com/TayMcKenzieNZ/rpemotes, GPL 3.0) by TayMcKenzieNZ, Mathu_lmn, MadsL and the RPEmotes community, which
+-- grew from DullPear's dpemotes (github.com/andristum/dpemotes). Any copy of this file, or anything made from it,
+-- keeps these credits and stays open source under the GPL. It names only the game's own animations and props: none
+-- of RPEmotes' custom ones.
+--
 -- Every name in here must exist in the game. Before changing this file, run the checker:
 --     lua whip_core/dev/emotecheck.lua <folder with DurtyFree's dumps>
 -- It lists anything that is misspelled or missing (see the top of that file for the dumps).
