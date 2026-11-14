@@ -4,8 +4,8 @@
 --
 -- Esc, P or a pad's Start open whip's pause menu, never GTA's: the whip logo and Resume / Map /
 -- Settings / Quit on the left, a map on the right. Map makes the map full screen (drag, zoom,
--- double-click for a waypoint, a legend). Settings opens GTA's own settings; Quit leaves the
--- server. The page is html/js/pause.js and pause-map.js.
+-- double-click for a waypoint, a legend). Settings is GTA's own settings in whip's look (client/game_settings.lua);
+-- Quit leaves the server. The page is html/js/pause.js and pause-map.js.
 --
 -- The map is whip's, the data is GTA's. The picture is a tile set (whip_media_map/map/whip). What is
 -- on it comes from the game, read here while the menu is open and sent to the page: where the
@@ -14,7 +14,8 @@
 -- is GTA's waypoint, so the radar's own GPS line follows it.
 --
 -- The keys are checked every frame, for everyone: GTA has no other way to keep its menu shut. One ControlBlocks hook holds 199 (P / Start) and 200 (Esc) off and reads them —
--- except while GTA's own frontend is up (the Settings it was asked for), whose keys are its own.
+-- except while GTA's own frontend is up (its key bindings, or its settings menu under whip's Settings page, which
+-- keeps the pad off it), whose keys are its own.
 
 --- Is whip's pause menu up? Read by the screens list (client/inventory.lua), like the others.
 PauseMenuOpen = false
@@ -273,7 +274,7 @@ end
 
 --- One frame: GTA's pause keys held off, and a press opens (or, from a pad, shuts) whip's menu.
 local function pauseKeys()
-    if IsPauseMenuActive() then return end   -- GTA's own frontend (Settings): its keys are its own
+    if IsPauseMenuActive() then return end   -- GTA's own frontend (key bindings, or under Settings): its keys are its own
     DisableControlAction(0, 199, true)       -- P, a pad's Start
     DisableControlAction(0, 200, true)       -- Esc
     local esc = IsDisabledControlJustPressed(0, 200)
@@ -298,11 +299,15 @@ RegisterNUICallback('pauseResume', function(_, cb)
     closeMenu()
 end)
 
---- GTA's own settings: the landing menu is the one that opens on them.
-RegisterNUICallback('pauseSettings', function(_, cb)
+--- Settings' Key Bindings tab: GTA's own key bindings screen, in place of the pause menu. GTA's settings menu, up under
+--- the Settings page, shuts with the pause menu (client/game_settings.lua); the screen opens once it has gone.
+RegisterNUICallback('pauseKeyBindings', function(_, cb)
     cb('ok')
     closeMenu()
-    ActivateFrontendMenu(GetHashKey('FE_MENU_VERSION_LANDING_MENU'), false, -1)
+    local deadline = GetGameTimer() + 1000
+    while IsPauseMenuActive() and GetGameTimer() < deadline do Wait(0) end
+    Wait(100)
+    ActivateFrontendMenu(GetHashKey('FE_MENU_VERSION_LANDING_KEYMAPPING_MENU'), false, -1)
 end)
 
 RegisterNUICallback('pauseLeave', function(_, cb)

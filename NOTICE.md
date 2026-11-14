@@ -29,7 +29,10 @@ License Agreement. whip's licence does not cover them:
 - the car makers' logos in whip_core/html/img/manufacturers;
 - the game's names and data in whip's lists (weapons, peds, tattoos, voice lines, props, blips);
 - the map files in whip_autos_shop, and the map packs shipped beside whip (whip_homes_mirrorpark,
-  whip_graphics).
+  whip_graphics);
+- GTA's settings page, `pause_menu_pages_settings.gfx` in whip_core's stream/scaleform and stream_enhanced/scaleform,
+  which is the game's own with whip's questions added, and its class, decompiled, in whip_core/dev/pause_settings
+  (whip's added functions in it are whip's code).
 
 whip is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive.
 

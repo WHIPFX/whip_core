@@ -389,6 +389,7 @@ client_scripts {
     'client/pad.lua',
     'client/idle_cam.lua',
     'client/pause.lua',         -- after controls.lua (ControlBlocks at file scope)
+    'client/game_settings.lua', -- the pause menu's Settings page: GTA's settings menu under it
     'client/cam_shots.lua',
     'client/camera.lua',
     'client/drive_cam.lua',     -- after camera.lua
