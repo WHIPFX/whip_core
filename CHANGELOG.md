@@ -4,6 +4,16 @@ What changed in each version, for anyone whose resource uses whip.
 
 Each version lists **Added**, **Changed** and **Removed**.
 
+## 1.1.0
+
+### Added
+
+- `Whip.declare` in lib/satellite.lua: one declaring call, `Whip.declare:RegisterItem(...)`, made once whip_core is
+  ready and again after every restart, with no `Whip.register` function around it. It takes the `Register…`,
+  `Ensure…`, `On…` and `Watch…` exports, `SecureEvent`, `SecureCallback`, `AddAction`, `AddItemOption`, `AddPoint`
+  and `AddWeapons`, refuses anything else, and prints whip_core's refusals. A resource that uses it needs
+  `whip_requires '1.1'`.
+
 ## 1.0.0 (beta, not yet released)
 
 The beta's clean-up before the release. Until 1.0 ships, names may still change; each change is listed here.

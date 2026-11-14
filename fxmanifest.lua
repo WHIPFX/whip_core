@@ -3,8 +3,8 @@ game 'gta5'
 
 name 'whip_core'
 author 'Whippy'
-description 'Custom FiveM framework — Beta 1.0.0 public release'
-version '1.0.0'   -- the start-up banner reads it
+description 'Custom FiveM framework — Beta 1.1.0 public release'
+version '1.1.0'   -- the start-up banner reads it
 
 -- First on both sides: while whip_core loads, GetInvokingResource() names no caller.
 shared_script 'shared/invoker.lua'

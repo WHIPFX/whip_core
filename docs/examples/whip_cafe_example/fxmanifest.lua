@@ -11,6 +11,7 @@ description 'The tutorial café: an item, a counter, a job (whip example)'
 version '1.0.0'
 
 dependency 'whip_core'
+whip_requires '1.1'   -- the whip that has Whip.declare
 
 shared_scripts {
     '@whip_core/lib/satellite.lua',   -- whip's helper: gives you Whip.declare

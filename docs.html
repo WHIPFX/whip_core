@@ -1439,6 +1439,7 @@ game 'gta5'
 lua54 'yes'
 
 dependency 'whip_core'
+whip_requires '1.1'   -- the WHIP that has Whip.declare
 
 shared_scripts {
     '@whip_core/lib/satellite.lua',   -- WHIP's helper: gives you Whip.declare
@@ -1446,7 +1447,7 @@ shared_scripts {
 }
 server_script 'server.lua'
 client_script 'client.lua'</code></pre>
-<p>Add <code>ensure mycafe</code> to <code>server.cfg</code>, below WHIP's lines. <code>dependency 'whip_core'</code> starts whip_core first, and restarts your resource whenever whip_core restarts.</p>
+<p>Add <code>ensure mycafe</code> to <code>server.cfg</code>, below WHIP's lines. <code>dependency 'whip_core'</code> starts whip_core first, and restarts your resource whenever whip_core restarts. <code>whip_requires</code> makes the setup report flag an older whip_core.</p>
 <div class="info-box tip"><strong>Set up autocomplete first.</strong> Copy <code>whip_core/types/luarc.template.json</code> into <code>mycafe</code> as <code>.luarc.json</code> and open the folder in VS Code with the <em>Lua</em> extension (sumneko). Every export then shows its parameters and return values, and typos are underlined.</div>
 
 <h3>2. Where the counter is</h3>
@@ -1945,7 +1946,7 @@ shared_script '@whip_core/lib/satellite.lua'</code></pre>
 <tr><td><code>Whip.command(name, opts, fn)</code> (server)</td><td>A chat command behind a SecureEvent's checks: refused while the player is down (<code>whileDead = true</code> allows it), rate limited (three at once, then one a second; <code>rateLimit = false</code> for none), <code>ace = 'my.perm'</code>, and <code>dev = true</code> for the console and <code>whip.devtools</code> with developer mode on. <code>fn(source, args, raw)</code> runs in its own thread. Use it instead of <code>RegisterCommand</code> with your own checks.</td></tr>
 <tr><td><code>Whip.registry(name, opts)</code> · <code>Whip.caller()</code></td><td>A registry of your own with WHIP's <a href="#patterns-registering">registration rule</a>, for a resource others extend (phone apps, MDT plugins): <code>local Apps = Whip.registry('app', { label = 'app' })</code>, then in your export <code>return Apps:add(Whip.caller(), id, def)</code>. Read <code>Apps.entries</code>, <code>Apps:get(id)</code>, <code>Apps:keysOf(owner)</code>.</td></tr>
 <tr><td><code>Whip.registerWith(resource, fn)</code></td><td>Runs <code>fn</code> now if <code>resource</code> is running and each time it starts, so registering with another resource's registry survives its restart.</td></tr>
-<tr><td><code>Whip.requires('1.0')</code> · <code>Whip.has(name)</code></td><td>Version checks. Put <code>whip_requires '1.0'</code> in your fxmanifest and the setup report flags an older whip_core; <code>Whip.requires</code> does the same from code. <code>Whip.has('GetBalance')</code> checks for one export.</td></tr>
+<tr><td><code>Whip.requires('1.1')</code> · <code>Whip.has(name)</code></td><td>Version checks. Put <code>whip_requires '1.1'</code> in your fxmanifest and the setup report flags an older whip_core; <code>Whip.requires</code> does the same from code. <code>Whip.has('GetBalance')</code> checks for one export.</td></tr>
 <tr><td><code>Whip.onCoreLost(fn)</code></td><td>Only for a resource <em>without</em> <code>dependency 'whip_core'</code>: runs when whip_core stops, to let go of anything that needed it. Every player has been logged out by then with no <code>whip_core:player:logout</code>, so drop per-player state too.</td></tr>
 <tr><td><code>Whip.voice(name, …)</code> · <code>Whip.voiceSystem()</code></td><td>Calls whichever voice system runs (<a href="#voice-api">Voice for other resources</a>).</td></tr>
 </table>
