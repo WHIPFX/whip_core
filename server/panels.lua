@@ -823,6 +823,8 @@ function Panels.resolveHost(source, session)
         if not slotData then return nil end
     end
 
+    -- (isHost(nil) is false, and the search above returned if it found none.)
+    ---@cast slotData -nil
     return panelHost(source, h.container, h.slot, slotData)
 end
 
@@ -1144,7 +1146,7 @@ function Panels.registerItem(itemKey, config, resource)
 
     -- The opener for THIS item. Registered into a per-action table below rather than straight
     -- onto the action, so a family of items can share one context action.
-    local function openThisItem(source, player, slotData, container, slot)
+    local function openThisItem(source, _, slotData, container, slot)
         if not slotData or slotData.item ~= itemKey then return end
 
         local host = panelHost(source, container, slot, slotData)
@@ -1240,18 +1242,16 @@ function Panels.registerItem(itemKey, config, resource)
             -- Close is a backstop, not the moment contents are saved: every change is already folded
             -- into the host (Panels.persistToHost). It still runs for a server-side mutation that
             -- bypassed both hooks; an unchanged panel folds to nothing.
-            session.onClose = function(src, panelItems)
+            session.onClose = function(src)
                 -- The live session for this panel if one is still registered, else the captured one.
                 local live = Panels.sessionFor(src, panelConfig.id) or session
                 -- A host that changed outside the panel wins: re-read it, so the fold below writes
                 -- back the host's own contents rather than the panel's old copy of them.
                 Panels.refreshFromHost(src, live)
-                local ok, reason = Panels.persistToHost(src, live)
-                if not ok and reason == 'host item is gone' then
-                    -- The host was consumed, destroyed, or moved out of reach. Nothing is lost:
-                    -- contents travel folded into the host's metadata, so they went where it went.
-                    -- An ordinary outcome, not logged.
-                end
+                -- Refused with 'host item is gone' when the host was consumed, destroyed, or moved out of
+                -- reach. Nothing is lost: contents travel folded into the host's metadata, so they went
+                -- where it went. An ordinary outcome, not logged.
+                Panels.persistToHost(src, live)
             end
         end
     end
@@ -1306,7 +1306,7 @@ SecureEvent('whip_core:server:closePanelSession', {
     burst     = 3,
     -- Default '' so an absent id validates rather than being rejected as an empty string.
     params    = { {'panelId', 'string', 80, ''} },
-}, function(source, player, panelId)
+}, function(source, _, panelId)
     -- The client told us it closed the panel(s). No UI message back — it already knows.
     -- '' is the close-everything form; anything else names one panel.
     Panels.closeFor(source, (panelId ~= '' and panelId or nil), false)

@@ -164,7 +164,8 @@ local NO_LIMIT = DirectorFields.TIMES_OUT
 ---                or its own) on the run's band with its clock, answering the goal (goal() above)
 ---   untimed      no Time limit (Survive keeps a clock of its own); markLabel: its Mark field's words
 local function goalCard(def)
-    local own, untimed = def.run, def.untimed == true
+    -- The card's own run(ctx, up, words): def.run becomes the wrapper below.
+    local own, untimed = def.run --[[@as fun(ctx: table, up: function, words: any): ...]], def.untimed == true
     def.category, def.latent = 'goals', true
     def.labels = def.labels or {}
     local props = { { key = 'text', kind = 'text', label = 'Objective (on screen)', default = def.objective, maxLength = 120 } }
@@ -578,14 +579,14 @@ goalCard({
         -- The mark follows them; three looks in a row with none of them up is lost (not made yet is not).
         local goneFor = 0
         local function look()
-            local ids, up = npcsOf(ctx, npcW), nil
+            local ids, alive = npcsOf(ctx, npcW), nil
             for _, id in ipairs(ids) do
                 local i = Npcs.get(id)
-                if i and i.alive then up = i break end
+                if i and i.alive then alive = i break end
             end
-            if up then
+            if alive then
                 goneFor = 0
-                if mark and up.coords then g.mark('npc', vec(up.coords), { label = name, route = true }) end
+                if mark and alive.coords then g.mark('npc', vec(alive.coords), { label = name, route = true }) end
                 return nil
             end
             if #ids == 0 then return nil end
@@ -627,17 +628,17 @@ goalCard({
         if at and ctx:prop('mark') ~= false then g.mark('area', at, { label = 'Stay here', radius = radius }) end
         local outFor = 0
         ctx:poll(1000, function()
-            local up, inside, n = 0, 0, 0
+            local standing, inside, n = 0, 0, 0
             for _, s in ipairs(ctx:players()) do
                 n = n + 1
                 local me = Players[s]
                 if me and not me.isDead then
-                    up = up + 1
+                    standing = standing + 1
                     local p = playerPos(s)
                     if at and p and within(p, at, radius) then inside = inside + 1 end
                 end
             end
-            if n > 0 and up == 0 then
+            if n > 0 and standing == 0 then
                 Director.event(run, ctx.node.id, 'all went down')
                 return 'failed'
             end

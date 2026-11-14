@@ -51,7 +51,7 @@ local function tokenize(src)
         if c:match('%s') then
             i = i + 1
         elseif c:match('%d') or (c == '.' and src:sub(i + 1, i + 1):match('%d')) then
-            local s, e = src:find('^%d*%.?%d*', i)
+            local _, e = src:find('^%d*%.?%d*', i)
             local j = e + 1
             local ex = src:match('^[eE][%+%-]?%d+', j)
             if ex then j = j + #ex end

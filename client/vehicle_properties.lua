@@ -18,7 +18,7 @@
 -- likes. See server/vehicles.lua's mergeClientProperties for what the server does with a report.
 
 --- Read everything about how a vehicle currently looks.
----@param vehicle number entity handle
+---@param vehicle number|nil entity handle
 ---@return table props
 function GetVehicleProperties(vehicle)
     if not vehicle or vehicle == 0 then return {} end
@@ -162,7 +162,7 @@ end
 --- Switch a car's extras, keeping its wear (above). `extras` is { [n or "n"] = true (on) | false (off) }, n 1-14
 --- (1 / 0 are taken too: a BOOL native's answer); one the model does not have, or already as asked, is left alone.
 --- Answers how many were switched.
----@param veh number
+---@param veh number|nil
 ---@param extras table
 ---@return integer
 local function setExtras(veh, extras)
@@ -180,7 +180,7 @@ local function setExtras(veh, extras)
     end
     if #switch == 0 then return 0 end
     local wear = readWear(veh)
-    for _, s in ipairs(switch) do SetVehicleExtra(veh, s[1], s[2] and 0 or 1) end   -- 0 is on, 1 is off
+    for _, s in ipairs(switch) do SetVehicleExtra(veh, s[1], not s[2]) end   -- disable: false is on
     putWearBack(veh, wear)
     return #switch
 end
@@ -298,6 +298,8 @@ exports('GetVehicleProperties', function(vehicle)
     return GetVehicleProperties(Vehicles.refEntity(vehicle))
 end)
 
+local _saidEntityHint = {}   -- [resource] = true once told (SetVehicleProperties, below)
+
 --- Apply an appearance to a vehicle, here and now.
 ---
 --- LOCAL AND UNSAVED, BUT NOT UNSEEN. Vehicle mods are part of GTA's networked vehicle state, so
@@ -317,7 +319,6 @@ end)
 ---
 --- A bare number is a vehicleId. QBCore's and ox_lib's SetVehicleProperties take the entity there, so a number that
 --- names no car here but is an entity is refused with that hint, said once per resource in F8.
-local _saidEntityHint = {}
 exports('SetVehicleProperties', function(vehicle, props)
     if type(props) ~= 'table' then return false, 'props is a table, as GetVehicleProperties answers' end
     local veh = Vehicles.refEntity(vehicle)

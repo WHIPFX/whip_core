@@ -215,10 +215,13 @@ local reg = Registry.new('propSet', {
 ---@param owner string   Registry.caller()
 ---@param id string|number
 ---@param spec table     { props, audience?, tag? }: see the header
+---@return boolean ok
+---@return string|nil why
 function PropSets.show(owner, id, spec, ready)
     local wire, why = readSpec(spec, owner)
     if not wire then return false, why end
     wire.ready = ready == true or nil
+    ---@type string|table
     local aud = 'everyone'
     if spec.audience ~= nil then
         local a, awhy = Audience.read(spec.audience, true)
@@ -233,7 +236,7 @@ function PropSets.show(owner, id, spec, ready)
     local rec = { owner = owner, id = id, audience = aud, wire = wire, wireId = nextWire, sentTo = {},
                   motions = {}, mAcked = {}, mSent = {}, mLast = {} }
     local ok, rwhy = reg:add(owner, id, rec, spec.tag ~= nil and { tag = spec.tag } or nil)
-    if not ok then return false, rwhy end
+    if not ok then return false, rwhy --[[@as string]] end
     return true
 end
 
@@ -249,7 +252,7 @@ function PropSets.hide(owner, id)
 end
 
 --- Make one prop of a set move (MOVING, above), or stop it where it got to, or put it back still.
----@param index number   the prop's place in the set's list (1, 2, ...)
+---@param index number|nil   the prop's place in the set's list (1, 2, ...)
 ---@param motion table|false  { steps (DirectorTasks.compile's, a prop's), startAt = server ms, after = 'stop'|'loop',
 ---                              stopAt = server ms (held where it was then) } | false (still, as placed)
 ---@return boolean ok
@@ -268,8 +271,8 @@ function PropSets.move(owner, id, index, motion)
         for i, s in ipairs(motion.steps) do
             steps[i] = { t = s.t, p = s.p, ms = s.ms or 0 }
         end
-        m = { steps = steps, at = math.floor(tonumber(motion.startAt)), loop = motion.after == 'loop' or nil,
-              stop = tonumber(motion.stopAt) and math.floor(tonumber(motion.stopAt)) or nil }
+        m = { steps = steps, at = math.floor(tonumber(motion.startAt) --[[@as number]]), loop = motion.after == 'loop' or nil,
+              stop = tonumber(motion.stopAt) and math.floor(tonumber(motion.stopAt) --[[@as number]]) or nil }
     end
     rec.motions[index] = m
     rec.mver = (rec.mver or 0) + 1
@@ -302,7 +305,7 @@ end)
 SecureEvent('whip_core:server:propMotions', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'wireId', 'id'}, {'ver', 'int', 0, 1000000} },
-}, function(source, player, wireId, ver)
+}, function(source, _, wireId, ver)
     local rec = live[wireId]
     if not rec or not rec.sentTo[source] then return end
     if ver == rec.mver then rec.mAcked[source] = ver end

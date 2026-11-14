@@ -4,18 +4,18 @@
 local ROOT = arg[1] or (((arg[0] or ''):match('^(.*)[/\\]') or '.') .. '/../../../')
 local CORE = ROOT .. 'whip_core/'
 local realPrint = print
-function GetCurrentResourceName() return 'whip_core' end
-function GetInvokingResource() return nil end
-function GetResourceState() return 'started' end
-function GetGameTimer() return 0 end
-function exports() end
-function AddEventHandler() end
-function RegisterNetEvent() end
-function CreateThread(fn) fn() end
-function SetTimeout() end
-Citizen = { CreateThreadNow = function(fn) fn() end }
-function print() end
-json = { decode = nil }
+rawset(_G, 'GetCurrentResourceName', function() return 'whip_core' end)
+rawset(_G, 'GetInvokingResource', function() return nil end)
+rawset(_G, 'GetResourceState', function() return 'started' end)
+rawset(_G, 'GetGameTimer', function() return 0 end)
+rawset(_G, 'exports', function() end)
+rawset(_G, 'AddEventHandler', function() end)
+rawset(_G, 'RegisterNetEvent', function() end)
+rawset(_G, 'CreateThread', function(fn) fn() end)
+rawset(_G, 'SetTimeout', function() end)
+rawset(_G, 'Citizen', { CreateThreadNow = function(fn) fn() end })
+rawset(_G, 'print', function() end)
+rawset(_G, 'json', { decode = nil })
 for _, g in ipairs({ 'Config', 'Npcs', 'Vehicles', 'Stores', 'Inventory', 'Money', 'Bubbles', 'Conversations', 'RuntimePoints',
                      'Zones', 'PropSets', 'Doors', 'GroundItems', 'Jobs', 'Permissions', 'Character', 'PlayerFlags', 'EmoteList',
                      'DirectorLore', 'DirectorBand', 'DirectorTakes', 'Actors', 'Audience', 'SecureEvent', 'SecureCallback',
@@ -23,11 +23,11 @@ for _, g in ipairs({ 'Config', 'Npcs', 'Vehicles', 'Stores', 'Inventory', 'Money
     _G[g] = _G[g] or {}
 end
 dofile(CORE .. 'shared/registry.lua')
-function IsDuplicityVersion() return true end
+rawset(_G, 'IsDuplicityVersion', function() return true end)
 dofile(CORE .. 'shared/director/kit.lua')
 dofile(CORE .. 'shared/director/steps.lua')
 dofile(CORE .. 'shared/director/things.lua')
-Director = {}
+rawset(_G, 'Director', {})
 dofile(CORE .. 'server/director/fields.lua')
 dofile(CORE .. 'server/director/effects.lua')
 dofile(CORE .. 'server/director/nodes.lua')
@@ -47,17 +47,18 @@ local function ok(c, name, extra)
 end
 
 -- What the haggle says to the player: the last spec it sent.
+---@type table
 local said = nil
-function Director.playerOf() return 7 end
-function Director.handleOf() return { netId = 5, npcId = 9 } end
-DirectorTalk = {
-    speak = function(ctx, src, npcW, h, spec) said = spec end,
-    converse = function(ctx, src, useId, spec) said = spec return 1 end,
+rawset(Director, 'playerOf', function() return 7 end)
+rawset(Director, 'handleOf', function() return { netId = 5, npcId = 9 } end)
+rawset(_G, 'DirectorTalk', {
+    speak = function(_, _, _, _, spec) said = spec end,
+    converse = function(_, _, _, spec) said = spec return 1 end,
     noAnswerAfter = function() end,
     leave = function() end,
-}
-function Director.event() end
-DirectorNodes.shownName = function() return 'Irwin' end
+})
+rawset(Director, 'event', function() end)
+rawset(DirectorNodes, 'shownName', function() return 'Irwin' end)
 local paid = nil
 
 -- A Pay card stand-in: what its amount reads (CTX:prop, the haggled price standing in).

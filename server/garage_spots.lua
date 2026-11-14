@@ -173,8 +173,11 @@ end
 --- Takes a point, trusted: whoever calls it with one a player sent leashes it to that player first
 --- (whip_core:gmWizardSave, Config.GarageWizardReach), so "anywhere on the map from anywhere else on it"
 --- is still impossible — the same shape placeItem uses for the same reason.
----@param spotId number
----@param x number @param y number @param z number @param heading number
+---@param spotId number|nil
+---@param x number|nil
+---@param y number|nil
+---@param z number|nil
+---@param heading number|nil
 ---@return table|nil spot, string|nil err
 function GarageSpots.update(spotId, x, y, z, heading)
     spotId = tonumber(spotId)

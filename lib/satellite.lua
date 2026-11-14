@@ -112,13 +112,16 @@ if GetResourceMetadata(SELF, 'whip_error_tap', 0) ~= 'no' then
         return make(fn)
     end
     local nativeThread, nativeNow, nativeTimeout = Citizen.CreateThread, Citizen.CreateThreadNow, Citizen.SetTimeout
+    ---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (this section's top says why)
     Citizen.CreateThread = function(fn) return nativeThread(threadGuard(fn)) end
+    ---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (this section's top says why)
     Citizen.CreateThreadNow = function(fn, name)
         local list = costAsked
         if list ~= nil and type(fn) == 'function' then fn = countAsked(list, fn, name) end
         -- Named by the runtime (an event handler, a call into this resource): that name is what shows
         return nativeNow(name ~= nil and guard(fn) or threadGuard(fn), name)
     end
+    ---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (this section's top says why)
     Citizen.SetTimeout = function(ms, fn) return nativeTimeout(ms, threadGuard(fn)) end
     CreateThread, SetTimeout = Citizen.CreateThread, Citizen.SetTimeout
     -- The runtime catches these itself: kept, then raised again, so FiveM reports them as before.
@@ -328,7 +331,6 @@ end
 ---
 --- Called late — from a thread, after the announcement already went by — `fn` runs straight
 --- away as well, instead of waiting for a whip_core restart that may never come.
----@param fn function
 ---
 --- Called from inside a registered function (a helper that registers, used inside your own
 --- Whip.register), it runs once and is not remembered: the outer function registers it again every
@@ -601,10 +603,10 @@ if not IsDuplicityVersion() then
     ---@param serverId number
     ---@return number|nil
     function Whip.playerIndex(serverId)
-        serverId = tonumber(serverId)
-        if not serverId then return nil end
-        local idx = GetPlayerFromServerId(serverId)
-        if not idx or idx < 0 or GetPlayerServerId(idx) ~= serverId then return nil end
+        local id = tonumber(serverId)
+        if not id then return nil end
+        local idx = GetPlayerFromServerId(id)
+        if not idx or idx < 0 or GetPlayerServerId(idx) ~= id then return nil end
         return idx
     end
 end
@@ -717,7 +719,7 @@ end
 --- Put `value` at `path` in `root` and run the onConfigChanged hooks that cover it.
 local function configApply(root, path, value)
     local parent, key = configParent(root, path)
-    if not parent then
+    if not parent or key == nil then
         print(('[%s] settings: %s is not a place in Config'):format(SELF, path))
         return
     end
@@ -754,7 +756,7 @@ function Whip.configPage(def)
     local keys = {}
     for gi, g in ipairs(type(groups) == 'table' and groups or {}) do
         local list = {}
-        for i, e in ipairs(type(g) == 'table' and type(g.settings) == 'table' and g.settings or {}) do
+        for _, e in ipairs(type(g) == 'table' and type(g.settings) == 'table' and g.settings or {}) do
             local entry = {}
             for k, v in pairs(type(e) == 'table' and e or {}) do entry[k] = v end
             local why = nil
@@ -1895,6 +1897,7 @@ if not IsDuplicityVersion() then
 
     -- EVERY LOOP: what one pass makes, filed under the function its thread started with. lib/cost.lua's twin (its
     -- "EVERY LOOP" block says how): kept the same in both.
+    ---@type table|nil, function|nil, function|nil
     local loops, nativeWait, nativeThread = nil, nil, nil
     local SELF_ROW = '(/whipcost itself: naming the loops)'
     local wokeAt = setmetatable({}, { __mode = 'k' })
@@ -1944,6 +1947,7 @@ if not IsDuplicityVersion() then
                 file(list, name, kb - from, kb)
             end
         end
+        ---@cast nativeWait -nil   -- this is Wait only while countLoops holds the real one there
         nativeWait(ms)
         if co and loops then wokeAt[co] = collectgarbage('count') end
     end
@@ -1961,6 +1965,7 @@ if not IsDuplicityVersion() then
         return ...
     end
     local function countedThread(fn)
+        ---@cast nativeThread -nil   -- this is CreateThread only while countLoops holds the real one there
         if type(fn) ~= 'function' or not loops then return nativeThread(fn) end
         return nativeThread(function(...)
             local co = coroutine.running()

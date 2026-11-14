@@ -34,6 +34,8 @@ local function keepTake(id, samples)
         for k in pairs(takes) do
             if (takeUsed[k] or 0) < at then oldest, at = k, takeUsed[k] or 0 end
         end
+        -- (More than TAKES_KEPT kept: one was found.)
+        ---@cast oldest -nil
         takes[oldest], takeUsed[oldest], asked[oldest] = nil, nil, nil
         n = n - 1
     end

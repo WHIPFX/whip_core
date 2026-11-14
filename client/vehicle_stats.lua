@@ -287,7 +287,7 @@ local function onStoredBlock(entity, value, knownId)
 end
 
 --- The stored block: presence, and every value that changes at human pace.
-AddStateBagChangeHandler(VEHICLE_STATS_KEY, nil, function(bagName, _key, value)
+AddStateBagChangeHandler(VEHICLE_STATS_KEY, nil, function(bagName, _, value)
     if type(value) ~= 'table' then return end
     if not anyoneListening() then return end
 
@@ -308,7 +308,7 @@ end)
 
 --- The live block: the current value of anything registered `live`. Separate because it fires several times a second;
 --- it does not touch presence (updateHolders with only this block would retire every non-live stat).
-AddStateBagChangeHandler(VEHICLE_LIVE_KEY, nil, function(bagName, _key, value)
+AddStateBagChangeHandler(VEHICLE_LIVE_KEY, nil, function(bagName, _, value)
     if not anyoneListening() then return end
 
     local entity = GetEntityFromStateBagName(bagName)
@@ -547,41 +547,7 @@ end)
 
 -- ---- Watcher registration ----
 
---- Run code while a vehicle in scope carries a stat, without writing a presence cache.
----
----   onGained / onLost   facts about the world: fire for every vehicle in scope, ignoring driverOnly.
----   onStart / onStop    lifecycle of whileHeld for an entity; follow driverOnly. They cover getting out, losing the
----                       stat, the car despawning and the stat being pulled by someone else.
----
---- To modify a vehicle and put it back, use onStart/onStop. They do not run when whip_core or the watcher's own
---- resource stops: put it back in Whip.onCoreLost and onResourceStop too.
---- whileHeld defaults to every holder in scope; `driverOnly = true` narrows it to the car this player drives.
----
----     exports.whip_core:WatchVehicleStat('boost', {
----         onStart    = function(entity, value) captureHandling(entity) end,
----         whileHeld  = function(entity, value, dt) simulate(entity, value, dt) end,
----         onStop     = function(entity) restoreHandling() end,
----         interval   = 50,
----         driverOnly = true,
----     })
----
---- whileHeld may return a number: this client's own reading of the stat on that car, shown by the vehicle capsule
---- instead of the replicated value (without a callback per repaint). Return nothing to show the replicated value.
----
---- Several stats in one call: pass a list of names and each callback gets the stat's name second:
----
----     exports.whip_core:WatchVehicleStat({ 'part1', 'part2', 'part3' }, {
----         onStart = function(entity, name, value) ... end,
----         onStop  = function(entity, name) ... end,
----         driverOnly = true,
----     })
----
---- The id that comes back covers the whole list: UnwatchVehicleStat and SetVehicleStatWatchInterval act on every stat.
---- A list's whileHeld runs once per stat (ten stats at 100ms is a hundred crossings a second); for one job per car,
---- use onStart/onStop and a loop of your own.
----@param name string|string[]
----@param data table { onGained?, onLost?, onStart?, onStop?, whileHeld?, interval?, driverOnly?, id? }
----@return string|false watcherId, string|nil why
+--- One stat's watcher, for WatchVehicleStat (below). Answers its id.
 local function watchOne(name, data, resource, id)
     -- Keyed by who registered it, so re-registering replaces. `data.id` lets one resource hold several on one stat
     -- (default: the stat name).
@@ -659,6 +625,41 @@ end
 local unwatchOne
 
 -- A refusal answers false, why, as its data twin WatchVehicleData does.
+--- Run code while a vehicle in scope carries a stat, without writing a presence cache.
+---
+---   onGained / onLost   facts about the world: fire for every vehicle in scope, ignoring driverOnly.
+---   onStart / onStop    lifecycle of whileHeld for an entity; follow driverOnly. They cover getting out, losing the
+---                       stat, the car despawning and the stat being pulled by someone else.
+---
+--- To modify a vehicle and put it back, use onStart/onStop. They do not run when whip_core or the watcher's own
+--- resource stops: put it back in Whip.onCoreLost and onResourceStop too.
+--- whileHeld defaults to every holder in scope; `driverOnly = true` narrows it to the car this player drives.
+---
+---     exports.whip_core:WatchVehicleStat('boost', {
+---         onStart    = function(entity, value) captureHandling(entity) end,
+---         whileHeld  = function(entity, value, dt) simulate(entity, value, dt) end,
+---         onStop     = function(entity) restoreHandling() end,
+---         interval   = 50,
+---         driverOnly = true,
+---     })
+---
+--- whileHeld may return a number: this client's own reading of the stat on that car, shown by the vehicle capsule
+--- instead of the replicated value (without a callback per repaint). Return nothing to show the replicated value.
+---
+--- Several stats in one call: pass a list of names and each callback gets the stat's name second:
+---
+---     exports.whip_core:WatchVehicleStat({ 'part1', 'part2', 'part3' }, {
+---         onStart = function(entity, name, value) ... end,
+---         onStop  = function(entity, name) ... end,
+---         driverOnly = true,
+---     })
+---
+--- The id that comes back covers the whole list: UnwatchVehicleStat and SetVehicleStatWatchInterval act on every stat.
+--- A list's whileHeld runs once per stat (ten stats at 100ms is a hundred crossings a second); for one job per car,
+--- use onStart/onStop and a loop of your own.
+---@param name string|string[]
+---@param data table { onGained?, onLost?, onStart?, onStop?, whileHeld?, interval?, driverOnly?, id? }
+---@return string|false watcherId, string|nil why
 exports('WatchVehicleStat', function(name, data)
     if type(data) ~= 'table' then return false, 'data must be a table of callbacks' end
 
@@ -1229,7 +1230,7 @@ end
 --- Add one delta to the accumulator, for a vehicle already resolved (shared by both consume exports).
 ---@param vehicleId number
 ---@param name string
----@param delta number
+---@param delta number|nil
 ---@param now number  one clock reading, shared across a batch
 ---@return boolean
 local function accumulateConsume(vehicleId, name, delta, now)
@@ -1324,7 +1325,7 @@ end
 --- refuses it unless the vehicle already carries the stat.
 ---@param vehicle number|WhipVehicleRef  a vehicleId, or a reference: `{ entity = veh }` for a handle
 ---@param name string
----@param value number  what the stat is worth now
+---@param value number|nil  what the stat is worth now
 ---@return boolean
 exports('ReportVehicleStat', function(vehicle, name, value)
     if type(name) ~= 'string' then return false end

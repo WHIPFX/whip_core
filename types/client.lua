@@ -1,3 +1,4 @@
+---@meta
 -- ============================================
 -- whip_core — Client Export Annotations
 -- LuaLS type definitions for all client-side
@@ -425,7 +426,7 @@ function whip_core:PermitNativeWeapon(weapon, on) end
 ---
 ---     AddEventHandler('whip_core:ui:stateChanged', function(e) ... e.open ... end)
 ---
----@param e { open: boolean } True when a screen or dialog (whip's, or a satellite's via SetUIOpen) is now up
+--- e.open: true when a screen or dialog (whip's, or a satellite's via SetUIOpen) is now up (WhipEvtUiState)
 
 --- Declare that this resource's own NUI is open or closed. whip then treats your
 --- screen exactly like one of its own: the HUD hides, prompts stop, nothing opens
@@ -1862,7 +1863,7 @@ function whip_core:GetAllVehicleData(vehicle) end
 --- too, and `{ now = true }` also calls it once straight away for every car in range carrying the
 --- key. The options may go third, in place of `id`.
 ---@param key string Data key to watch
----@param callback fun(vehicleId: number, value: any, old: any, entity: number)|fun(change: WhipVehicleChange)
+---@param callback fun(change: WhipVehicleChange)|fun(vehicleId: number, value: any, old: any, entity: number) The first with `{ table = true }` (the one to prefer), else the second
 ---@param id string|WhipVehicleListenOpts|nil Defaults to the key
 ---@param opts WhipVehicleListenOpts|nil
 ---@return boolean registered
@@ -1917,7 +1918,7 @@ function whip_core:PadComboUsed() end
 --- has the keys (IsGameInputFree), unless `menus = true`. One owner per id; it goes when your resource
 --- stops, so call it from Whip.register.
 ---@param id string  a word: letters, digits, _ (up to 32)
----@param def { label: string, command?: string, onPress?: function, onRelease?: function, where?: 'car'|'foot', menus?: boolean, slot?: 'dpad_up'|'dpad_down'|'dpad_left'|'dpad_right'|'l3'|'veh_a'|'lb_a'|'lb_b'|'lb_x'|'lb_y'|'lb_dpad_up'|'lb_dpad_down'|'lb_dpad_left'|'lb_dpad_right', ready?: boolean }
+---@param def { label: string, command?: string, onPress?: function, onRelease?: function, where?: 'car'|'foot', menus?: boolean, slot?: 'dpad_up'|'dpad_down'|'dpad_left'|'dpad_right'|'l3'|'veh_a'|'foot_b'|'lb_a'|'lb_b'|'lb_x'|'lb_y'|'lb_dpad_up'|'lb_dpad_down'|'lb_dpad_left'|'lb_dpad_right', ready?: boolean }
 ---@return boolean ok
 ---@return string|nil why
 function whip_core:RegisterPadAction(id, def) end

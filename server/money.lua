@@ -89,7 +89,7 @@ end
 ---
 --- An amount of 0 takes nothing and still answers a receipt, so a free thing needs no special case.
 ---@param source number
----@param amount number
+---@param amount number|nil
 ---@param opts table|nil
 ---@param owner string  the resource charging (the export passes the caller)
 ---@param why string|nil  the activity-log reason (the export's Log.reasonFrom); defaults to opts.reason
@@ -204,6 +204,7 @@ function Money.charge(source, amount, opts, owner, why, saveWith)
             ok, err = Bank.Withdraw(accountId, amount, player.charId, reason, withStores and { with = withStores } or nil)
         end
         if not ok then
+            ---@cast err string|nil
             if wasAuto then
                 return false, ('Not enough cash (have $%d, need $%d), and the bank said: %s'):format(haveCash, amount, tostring(err))
             end
@@ -308,6 +309,7 @@ end
 ---@param amount integer
 ---@return boolean ok
 ---@return string|nil err
+---@return number|nil undelivered  how much of it did not arrive
 local function payBack(rec, amount)
     local reasonText = 'Refund: ' .. rec.reason
 
@@ -374,7 +376,7 @@ function Money.refund(receipt, amount, owner)
     -- rawget: a receipt handed back by a satellite is a plain copy, but never trust a table's shape.
     local id = tonumber(type(receipt) == 'table' and rawget(receipt, 'id') or receipt)
     local rec = id and Money._receipts[id]
-    if rec and not rec.held and expired(rec) then
+    if id and rec and not rec.held and expired(rec) then
         Money._receipts[id] = nil
         rec = nil
     end
@@ -439,7 +441,7 @@ end
 function Money.handOn(receipt, owner, amount)
     local id = tonumber(type(receipt) == 'table' and rawget(receipt, 'id') or receipt)
     local rec = id and Money._receipts[id]
-    if not rec or rec.owner ~= owner or owner ~= GetCurrentResourceName() then return nil end
+    if not id or not rec or rec.owner ~= owner or owner ~= GetCurrentResourceName() then return nil end
     if not rec.held and expired(rec) then Money._receipts[id] = nil return nil end
     local left = rec.amount - rec.refunded
     amount = math.min(math.tointeger(tonumber(amount)) or left, left)
@@ -463,7 +465,7 @@ end
 --- Cash that does not fit their pockets lands at their feet (giveOrDrop), never in nowhere. A
 --- character who is not online can only be paid into the bank. 0 pays nothing and answers true.
 ---@param who number|table
----@param amount number
+---@param amount number|nil
 ---@param opts table|nil
 ---@param owner string  the resource paying (the export passes the caller)
 ---@param why string|nil  the activity-log reason (the export's Log.reasonFrom); defaults to opts.reason
@@ -475,7 +477,9 @@ function Money.pay(who, amount, opts, owner, why)
     if not amount then return false, AMOUNT_ERR end
 
     local charId, src = WhoIs(who)
-    if not charId then return false, src or 'No such player' end
+    if not charId then return false, src --[[@as string|nil]] or 'No such player' end
+    -- (With a charId, WhoIs answers their source or nil, not a why.)
+    ---@cast src number|nil
     local player = src and Players[src] or nil
     if player and player.charId ~= charId then player = nil end
 
@@ -506,7 +510,7 @@ function Money.pay(who, amount, opts, owner, why)
             if ok then placement = 'inventory' end
         end
         if not ok then
-            ok, err, placement = Inventory.giveOrDrop(src, player, currency, amount, nil, { reason = why })
+            ok, err, placement = Inventory.giveOrDrop(src --[[@as number]], player, currency, amount, nil, { reason = why })
             if not ok then return false, err or 'Could not pay them' end
         end
         return true, { method = 'cash', amount = amount, currency = currency, placement = placement }

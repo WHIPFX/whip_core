@@ -229,7 +229,7 @@ function VehicleHandling.setLayer(vehicle, name, spec, owner)
         order = finite(spec.order) and spec.order or 0,
         set = set, add = add, scale = scale,
     })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end
 
@@ -343,7 +343,7 @@ function VehicleHandling.setPower(vehicle, name, multiplier, owner)
     end
 
     local ok, why = powerReg:add(owner, name, { owner = owner, name = name, entity = entity, mult = multiplier })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end
 

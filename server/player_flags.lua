@@ -127,9 +127,13 @@ end
 -- Exports
 -- ============================================
 
+---@return number|nil src
+---@return string|nil why
 local function sourceOf(who)
     local charId, src = WhoIs(who)
-    if not charId then return nil, src end
+    if not charId then return nil, src --[[@as string|nil]] end
+    -- (With a charId, WhoIs answers their source or nil, not a why.)
+    ---@cast src number|nil
     if not src then return nil, 'they are not online: flags are read and set while the character is on' end
     return src
 end

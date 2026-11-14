@@ -49,7 +49,7 @@ end
 
 --- A property as a choice: inside, at its visit point, facing in from its nearest front door. nil when it has no
 --- inside to stand in (a unit not resolved yet), or its pack is not running.
----@param rec table  the live record (Properties.get)
+---@param rec table|nil  the live record (Properties.get)
 local function propertyChoice(rec)
     if not rec or rec.active == false then return nil end
     local w = rec.world
@@ -103,7 +103,7 @@ end
 
 --- Where a choice puts this character now, read again live. nil for 'last' (their own position stands).
 ---@param charId number
----@param spawnId string
+---@param spawnId string|nil
 ---@return vector4|nil at, string|nil why  why: the choice is no longer theirs to make
 function SpawnChoices.resolve(charId, spawnId)
     if spawnId == nil or spawnId == '' or spawnId == 'last' then return nil end

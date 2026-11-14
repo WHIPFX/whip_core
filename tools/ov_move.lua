@@ -20,7 +20,26 @@
 
 OvMove = {}
 
+---@class OvMoveState
+---@field target table
+---@field entity integer
+---@field kind string
+---@field tilt boolean
+---@field onExit function|nil
+---@field looking boolean
+---@field pad boolean|nil
+---@field hidden boolean|nil
+---@field kScale number[]|nil
+---@field lastCam number[]|nil
+---@field calAt integer
+---@field sent number[]|nil
+---@field want number[]|nil
+---@field sentAt integer
+
+---@type OvMoveState|nil
 local mv = nil   -- the move on: { target, entity, kind, tilt, onExit, looking, pad, k, kScale, sent, want, sentAt }
+-- What reads it below runs only while a move is on (the ways in check it)
+---@cast mv -nil
 
 local SEND_MS = 100        -- a player's ped, to the server, at most this often
 local PAD_SPEED = 3.0      -- metres a second at a full push

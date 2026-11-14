@@ -74,7 +74,7 @@ local function alerted(run, worldId, npcId, v)
             for _, id in ipairs(npcsOf(run, wid)) do
                 local info = Npcs.get(id)
                 local c = info and info.coords
-                if c and info.conditions and info.conditions.reacts == true then
+                if info and c and info.conditions and info.conditions.reacts == true then
                     local dx, dy, dz = c.x - at.x, c.y - at.y, c.z - at.z
                     if dx * dx + dy * dy + dz * dz <= r2 then add(id) end
                 end

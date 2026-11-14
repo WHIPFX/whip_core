@@ -262,7 +262,7 @@ local function playersOwn(ctx, id)
     local def = Vehicles.getDef(id)
     local src = def and ctx:source(ctx:player())
     local p = src and Players[src]
-    return p ~= nil and p.charId ~= nil and def.ownerCharId == p.charId, src, p
+    return def ~= nil and p ~= nil and p.charId ~= nil and def.ownerCharId == p.charId, src, p
 end
 
 define({
@@ -292,7 +292,7 @@ define({
     run = function(ctx)
         local id = ctx:need('car')
         local own, _, p = playersOwn(ctx, id)
-        if not own then return 'refused', { why = 'not this pulse\'s player\'s car' } end
+        if not own or not p then return 'refused', { why = 'not this pulse\'s player\'s car' } end
         local g = ctx:prop('garage')
         if g == '' then g = nil end
         -- Store does not ask whether they may use a garage named (a home's): asked here, as Take Car
@@ -318,8 +318,8 @@ define({
     run = function(ctx)
         local id = ctx:need('car')
         local own, _, p = playersOwn(ctx, id)
-        if not own then return 'refused', { why = 'not this pulse\'s player\'s car' } end
-        local def = Vehicles.getDef(id)
+        if not own or not p then return 'refused', { why = 'not this pulse\'s player\'s car' } end
+        local def = Vehicles.getDef(id) --[[@as table]]   -- playersOwn has just found it
         local g = def.garage
         -- Retrieve does not ask whether they may use the garage (a home's): asked here.
         if g and g ~= '' and not Garages.canUse(g, p.charId) then return 'refused', { why = 'they may not use that garage' } end

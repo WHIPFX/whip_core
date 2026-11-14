@@ -10,7 +10,7 @@ local WIN = package.config:sub(1, 1) == '\\'
 local function list(dir, pattern)
     local cmd = WIN and ('dir /b "%s" 2>nul'):format(dir:gsub('/', '\\')) or ('ls "%s" 2>/dev/null'):format(dir)
     local out = {}
-    local p = io.popen(cmd)
+    local p = assert(io.popen(cmd))
     for name in p:lines() do if name:match(pattern) then out[#out + 1] = name end end
     p:close()
     table.sort(out)
@@ -23,7 +23,7 @@ local function run(env, args)
     table.sort(set)
     local cmd = (WIN and ('cd /d "%s" && '):format(here:gsub('/', '\\')) or ('cd "%s" && '):format(here))
         .. table.concat(set) .. 'lua54 ' .. args .. ' 2>&1'
-    local p = io.popen(cmd)
+    local p = assert(io.popen(cmd))
     local text = p:read('a')
     p:close()
     return text
@@ -56,9 +56,9 @@ end
 add('lint.lua', run({}, 'lint.lua'), '(lint: %d+ problems)')
 
 local now = table.concat(lines, '\n') .. '\n'
-local f = io.open(here .. '/golden_last.txt', 'wb') f:write(now) f:close()
+local f = assert(io.open(here .. '/golden_last.txt', 'wb')) f:write(now) f:close()
 if accept then
-    f = io.open(here .. '/golden_baseline.txt', 'wb') f:write(now) f:close()
+    f = assert(io.open(here .. '/golden_baseline.txt', 'wb')) f:write(now) f:close()
     print('baseline written')
     return
 end

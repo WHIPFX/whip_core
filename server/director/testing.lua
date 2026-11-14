@@ -108,7 +108,7 @@ function OPS.say(t, nodeId, option, amount)
     if amount ~= nil and not finite(tonumber(amount)) then return false, 'amount is a number' end
     local convId = run.convs and run.convs[t.src] or nil
     R.emit('conversation.choice', { runId = run.id, nodeId = nodeId, convId = convId, source = t.src, option = option,
-                                    amount = amount ~= nil and math.floor(tonumber(amount)) or nil }, run)
+                                    amount = amount ~= nil and math.floor(tonumber(amount) --[[@as number]]) or nil }, run)
     return true
 end
 

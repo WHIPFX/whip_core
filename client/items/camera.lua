@@ -24,7 +24,7 @@ local HOLD  = { dict = 'amb@world_human_paparazzi@male@base', clip = 'base' }
 local LOWER = { dict = 'amb@world_human_paparazzi@male@exit', clip = 'exit' }
 local RAISE_MS     = 1000   -- from the clip starting to the viewfinder
 local LOWER_MAX_MS = 1500   -- the lowering clip, at most, before the camera leaves the hand
-local PROP = `prop_pap_camera_01`   -- server/items/camera.lua's
+local PROP = (`prop_pap_camera_01`) --[[@as integer]]   -- server/items/camera.lua's
 
 -- The eyes: the head bone, as the ped stands when it comes up, a little up and in front of it.
 local HEAD_BONE   = 31086

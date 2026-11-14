@@ -90,7 +90,8 @@ exports('HoldRespawn', function(source, key, label)
     if not player.isDead then return false, 'they are not dead' end
     local id = ('%d:%s'):format(source, tostring(key or 'hold'))
     local text = (type(label) == 'string' and label ~= '') and label:gsub('[\r\n\t]', ' '):sub(1, 80) or 'Help is on the way'
-    return respawnHoldReg:add(owner, id, { id = id, source = source, label = text })
+    local ok, why = respawnHoldReg:add(owner, id, { id = id, source = source, label = text })
+    return ok, why --[[@as string|nil]]
 end)
 
 --- Let go of your hold `key` on this player (no key: every hold of yours on them). true when one went.
@@ -240,12 +241,12 @@ end
 ---@return boolean ok
 ---@return string|nil why  'Player not loaded', 'not down'
 exports('RevivePlayer', function(source, reason)
-    source = tonumber(source)
-    local player = source and Players[source]
-    if not player then return false, 'Player not loaded' end
+    local src = tonumber(source)
+    local player = src and Players[src]
+    if not src or not player then return false, 'Player not loaded' end
     if not player.isDead then return false, 'not down' end
-    MarkPlayerAlive(source, player, 'revive:' .. tostring(reason or GetInvokingResource() or 'script'))
-    TriggerClientEvent('whip_core:client:revive', source)
+    MarkPlayerAlive(src, player, 'revive:' .. tostring(reason or GetInvokingResource() or 'script'))
+    TriggerClientEvent('whip_core:client:revive', src)
     return true
 end)
 
@@ -309,7 +310,7 @@ SecureEvent('whip_core:server:interactionUsed', {
         {'kind', 'enum', { 'interact', 'radial' }},
         {'label', 'string', 60},
     },
-}, function(source, player, kind, label)
+}, function(_, player, kind, label)
     Log.paced(player.charId, 'interaction', { detail = label .. ' · ' .. kind })
 end)
 
@@ -318,7 +319,7 @@ local asServerId = AsServerId
 
 --- Where is this target player? For the `near` schemas below: the framework's own guard, with
 --- Event Monitor logging and no early-return to slip past.
-local function targetPosition(src, player, targetServerId)
+local function targetPosition(_, _, targetServerId)
     local id = asServerId(targetServerId)
     if not id then return nil end
     local ped = GetPlayerPed(id)
@@ -460,7 +461,7 @@ end
 SecureEvent('whip_core:server:escortPlayer', {
     rateLimit = 1000,
     params = { {'targetServerId', 'any'} },
-}, function(source, player, targetServerId)
+}, function(source, _, targetServerId)
     -- Tell the client to drop its optimistic state, and ANSWER the refusal: `return fail(..)` is
     -- `false, reason`, which whip shows the player and records.
     local function fail(reason)
@@ -504,7 +505,7 @@ SecureEvent('whip_core:server:releaseEscort', {
     whileDead = true,   -- dying lets go of whoever you were escorting
     rateLimit = 500,
     burst     = 3,      -- a refused release leaves the other player attached
-}, function(source, player)
+}, function(source)
     ReleaseEscortState(source)
 end)
 
@@ -513,7 +514,7 @@ SecureEvent('whip_core:server:seatInVehicle', {
     -- The player and the car are addresses ('id' rejects); seatIndex is a clamped small range,
     -- which is fine.
     params = { {'targetServerId', 'id'}, {'vehicleNetId', 'id', 1, 999999}, {'seatIndex', 'int', -1, 10} },
-}, function(source, player, targetServerId, vehicleNetId, seatIndex)
+}, function(source, _, targetServerId, vehicleNetId, seatIndex)
     if targetServerId == source then return end
 
     -- Must be escorting this target. Ledger, not bag, as above.
@@ -547,7 +548,7 @@ SecureEvent('whip_core:server:pullFromVehicle', {
     rateLimit = 1000,
     params = { {'targetServerId', 'id'} },
     near = { at = targetPosition, range = 5.0, message = false },
-}, function(source, player, targetServerId)
+}, function(source, _, targetServerId)
     if targetServerId == source then return end
 
     local target = Players[targetServerId]
@@ -897,7 +898,7 @@ end
 SecureCallback('whip_core:appearance:saveOutfit', {
     rateLimit = 1000, burst = 3,
     params = { { 'name', 'string', OUTFIT_NAME_MAX, '' }, { 'outfit', 'any' } },
-}, function(source, player, typed, outfit)
+}, function(_, player, typed, outfit)
     local clean, why = sanitizeOutfit(outfit)
     if not clean then return false, 'That outfit could not be saved (' .. why .. ')' end
     local list, limit = outfitsOf(player), outfitLimit()
@@ -924,7 +925,7 @@ end)
 SecureCallback('whip_core:appearance:updateOutfit', {
     rateLimit = 1000, burst = 3,
     params = { { 'id', 'id' }, { 'outfit', 'any' } },
-}, function(source, player, id, outfit)
+}, function(_, player, id, outfit)
     local clean, why = sanitizeOutfit(outfit)
     if not clean then return false, 'That outfit could not be saved (' .. why .. ')' end
     local list = outfitsOf(player)
@@ -938,7 +939,7 @@ end)
 SecureCallback('whip_core:appearance:renameOutfit', {
     rateLimit = 500, burst = 3,
     params = { { 'id', 'id' }, { 'name', 'string', OUTFIT_NAME_MAX, '' } },
-}, function(source, player, id, typed)
+}, function(_, player, id, typed)
     local list = outfitsOf(player)
     local at = outfitAt(list, id)
     if not at then return false, 'That outfit is not saved any more' end
@@ -951,7 +952,7 @@ end)
 SecureCallback('whip_core:appearance:deleteOutfit', {
     rateLimit = 500, burst = 3,
     params = { { 'id', 'id' } },
-}, function(source, player, id)
+}, function(_, player, id)
     local list = outfitsOf(player)
     local at = outfitAt(list, id)
     if not at then return list end   -- already gone: the list as it is
@@ -970,7 +971,7 @@ end)
 --- check: purchases are held to the shop's own range anyway (Shops.inRange).
 ---@param source number
 ---@param player table  the live player
----@param shopId number
+---@param shopId number|nil
 ---@return boolean ok
 ---@return string|nil reason
 function Shops.openFor(source, player, shopId)
@@ -979,6 +980,7 @@ function Shops.openFor(source, player, shopId)
         TriggerClientEvent('whip_core:client:openShop', source, nil)
         return false, 'Shop not found'
     end
+    ---@cast shopId number   -- a shop was found by it
 
     -- Already has a shop open
     if Shops.openShopOf(source) then
@@ -1036,7 +1038,7 @@ SecureEvent('whip_core:server:shopPurchase', {
         {'accountId', 'id', 0},   -- 0 = no account chosen (cash payment)
         {'expectedTotal', 'int', -1, 2000000000, -1},   -- -1 = not given
     },
-}, function(source, player, paymentMethod, accountId, expectedTotal)
+}, function(source, _, paymentMethod, accountId, expectedTotal)
     -- Refusals are `return false, 'why'`: shown and recorded. The shop screen still hears
     -- the result on its own event, since it redraws from it.
     if not Shops.openShopOf(source) then
@@ -1075,7 +1077,7 @@ SecureEvent('whip_core:server:shopSetPrice', {
     },
     -- Standing at the shop, like every other deliberate press.
     near = {
-        at = function(src, player, shopId)
+        at = function(_, _, shopId)
             local def = Shops.getDef(shopId)
             if def then return def.x, def.y, def.z end
         end,
@@ -1168,7 +1170,7 @@ SecureEvent('whip_core:server:openShopStock', {
     },
     -- Same guard as shopSetPrice above: this opens the stock CONTAINER.
     near = {
-        at = function(src, player, shopId)
+        at = function(_, _, shopId)
             local def = Shops.getDef(shopId)
             if def then return def.x, def.y, def.z end
         end,
@@ -1186,7 +1188,7 @@ end)
 
 SecureEvent('whip_core:server:uitGetAccess', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     TriggerClientEvent('whip_core:client:uitAccessGranted', source)
 end)
 
@@ -1204,7 +1206,7 @@ SecureEvent('whip_core:server:openPlayerInventory', {
     params = {
         {'targetCharId', 'id'},   -- an address: rejected, never clamped
     },
-}, function(source, player, targetCharId)
+}, function(source, _, targetCharId)
     -- Its `false, 'why'` is this event's answer: shown to the admin and recorded. `admin`: the one
     -- session that may destroy the target's items.
     return OpenPlayerInventory(source, targetCharId, nil, true)
@@ -1221,7 +1223,7 @@ SecureEvent('whip_core:server:closePlayerInventory', {
     burst     = 3,
 }, function(source, player)
     local ok, session = ClosePlayerInventorySession(source, player, false)
-    if ok then
+    if ok and session then
         print(('[whip_core] %s [%d] closed player inventory session (target charId: %d)'):format(
             player.fullName, source, session.targetCharId
         ))

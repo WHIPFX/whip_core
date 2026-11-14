@@ -140,8 +140,8 @@ local function wear(ped, netId, e, owned)
     end
     if not got.look then return end   -- still asking, or none for now
     worn[netId] = { ped = ped, v = e.v, owned = owned }
-    local look = got.look
-    CreateThread(function() ApplyAppearance(ped, look) end)   -- (waits out the face's bake)
+    local appearance = got.look
+    CreateThread(function() ApplyAppearance(ped, appearance) end)   -- (waits out the face's bake)
 end
 
 local function dress()

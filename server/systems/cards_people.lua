@@ -158,7 +158,7 @@ define({
                            { key = 'down', type = 'bool', label = 'Down' } } },
     value = function(ctx)
         local src, p = playerOf(ctx, ctx:need('player'))
-        if not p then return { found = false, name = '', cash = 0, health = 0, armour = 0, down = false } end
+        if not src or not p then return { found = false, name = '', cash = 0, health = 0, armour = 0, down = false } end
         return { found = true, name = p.fullName or '', character = p.charId, cash = p:getCash() or 0,
                  health = Stats.get(src, 'health') or 0, armour = Stats.get(src, 'armour') or 0, down = p.isDead == true }
     end,

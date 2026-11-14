@@ -27,8 +27,46 @@
 
 PropertyScale = {}
 
+---@class PropertyScaleRegister
+---@field active boolean
+---@field read boolean           an interior was read here
+---@field why? string            why not
+---@field templates table[]      whip's templates for it, their units in order
+---@field place? table
+---@field hash? number
+---@field yawOnly? boolean
+
+---@class PropertyScaleStamp
+---@field form table             { building, namePattern, labelPattern, floor?, start }
+---@field byHash table<number, table>   an interior's hash: its first (oldest) template
+---@field here? table            the copy the camera is in: { place, tpl?, count }
+---@field made number
+---@field busy boolean
+---@field nextRead number
+---@field last? table            the last registration's answer
+---@field pendingStep? number    how far the numbers move on once it is answered
+
+---@class PropertyScaleTour
+---@field ids number[]
+---@field index number
+---@field current? string        the property being checked, by name
+---@field state? string          'loading' | 'checking'
+---@field ok number
+---@field attention number
+---@field skipped number
+---@field lastProblem? string
+---@field paused boolean
+---@field skip boolean
+---@field stopped boolean
+---@field modeLive boolean       its mode is still up (an Esc ends it first)
+---@field start table            { x, y, z }: where the tour started, and ends
+---@field heading number
+
+---@type PropertyScaleRegister|nil
 local reg = nil       -- Register here: what the page shows
+---@type PropertyScaleStamp|nil
 local stamp = nil     -- Stamp mode, while it runs
+---@type PropertyScaleTour|nil
 local tour = nil      -- Verify, while it runs
 
 --- Forward-declared: the registration answer (in "Register here") redraws the Stamp HUD, which is
@@ -170,6 +208,7 @@ end)
 RegisterNUICallback('prRead', function(_, cb)
     readHere()
     PropertyScale.pushRegister()
+    ---@cast reg -nil
     cb({ ok = reg.read, why = reg.why })
 end)
 
@@ -235,7 +274,7 @@ local function registeredHere(place)
 end
 
 function stampRows()
-    local s = stamp
+    local s = stamp --[[@as PropertyScaleStamp]]
     local here = s.here
     local rows = {}
     if not here then
@@ -281,7 +320,8 @@ local function startStamp(form)
     if next(byHash) == nil then return false, 'No interior has a template yet — set one up first' end
 
     form.start = math.floor(tonumber(form.start) or 1)
-    form.floor = tonumber(form.floor) and math.floor(tonumber(form.floor)) or nil
+    local floor = tonumber(form.floor)
+    form.floor = floor and math.floor(floor) or nil
     stamp = { form = form, byHash = byHash, here = nil, made = 0, busy = false, nextRead = 0 }
 
     local started = PropertyEditor.start({
@@ -404,6 +444,7 @@ end)
 local VERIFY_LOAD_MS = 8000
 
 local function verifyOne(info)
+    ---@cast tour -nil
     local ped = PlayerPedId()
     local v = info.visit or info.anchor or info.place
     RequestCollisionAtCoord(v.x, v.y, v.z)
@@ -472,7 +513,7 @@ local function verifyOne(info)
 end
 
 local function tourRows()
-    local t = tour
+    local t = tour --[[@as PropertyScaleTour]]
     local rows = {
         { label = 'OK', value = t.ok, tone = t.ok > 0 and 'ok' or nil },
         { label = 'Needs attention', value = t.attention, tone = t.attention > 0 and 'err' or nil },
@@ -484,7 +525,7 @@ local function tourRows()
 end
 
 local function runTour()
-    local t = tour
+    local t = tour --[[@as PropertyScaleTour]]
     for i, id in ipairs(t.ids) do
         if t.stopped then break end
         while t.paused and not t.stopped do Wait(100) end
@@ -501,6 +542,7 @@ local function runTour()
             if problems == nil then
                 t.skipped = t.skipped + 1
             else
+                ---@cast extra -nil
                 TriggerServerEvent('whip_core:server:propertyAdminVerified', id,
                     { problems = problems, rooms = extra.rooms, fingerprint = extra.fingerprint })
                 if #problems == 0 then

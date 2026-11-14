@@ -109,6 +109,7 @@ local function shoot(f, obj, hash)
         if not DoesEntityExist(obj) then return false, 'the gun went' end
         local m, d = DirectorWeapons.barrel(obj)
         local t = targetOf(f.at) or (m + d * RANGE)
+        ---@diagnostic disable-next-line: redundant-parameter -- p14, NativeDB's 15th: not in the natives' docs
         ShootSingleBulletBetweenCoordsIgnoreEntity(m.x, m.y, m.z, t.x, t.y, t.z, dmg, true, hash, 0, true, false, -1.0, obj, false)
         if n < shots then Wait(gap) end
     end

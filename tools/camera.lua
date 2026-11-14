@@ -62,6 +62,7 @@ CameraCreatorActive = false
 
 local function copy(t) return json.decode(json.encode(t)) end
 
+---@return table
 local function emptySeq() return { keys = {}, length = 0, ease = 'linear' } end
 
 -- Where the anchor (Plays round) last stood, kept with the draft: when its subject is not there (the car
@@ -1392,9 +1393,9 @@ local gameKeysMade = false
 local gameStarted = 0     -- when the timeline started rolling (which camera it is on, for Page Up / Down)
 local editorPose = nil    -- where the editor's camera was, for coming back
 
-local function sendGame(say, kind)
+local function sendGame(text, kind)
     SendNUIMessage({ action = 'camEdGame', mode = S.game, live = S.liveCam, name = S.savedAs, cameras = keyCount(),
-                     cleanAll = S.cleanAll, say = say, kind = kind })
+                     cleanAll = S.cleanAll, say = text, kind = kind })
 end
 
 --- A clean screen while a shot rolls, and the whole time you play if this PC chose so.

@@ -386,7 +386,7 @@ local function myServerId() return GetPlayerServerId(PlayerId()) end
 
 local function faceOn(ped, cmd)
     local m = cmd and moodByCmd[cmd]
-    if m then SetFacialIdleAnimOverride(ped, m.anim, nil) else ClearFacialIdleAnimOverride(ped) end
+    if m then SetFacialIdleAnimOverride(ped, m.anim, (nil) --[[@as string]]) else ClearFacialIdleAnimOverride(ped) end
 end
 
 local function refreshMoods()

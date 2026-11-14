@@ -71,7 +71,7 @@ define({
         local id = ctx:need('car')
         ctx:call(function()
             local _, s2, p = playerIn(ctx)
-            if not s2 or s2 ~= src then return 'refused' end
+            if not p or s2 ~= src then return 'refused' end
             local ok, why = Vehicles.giveKey(src, p, id)
             if not ok then ctx:log('no key given: %s', tostring(why)) return 'refused' end
             return 'given'
@@ -80,8 +80,8 @@ define({
         return nil
     end,
     dryRun = function(ctx)
-        local _, src, p = playerIn(ctx)
-        if not src then return 'refused' end
+        local _, _, p = playerIn(ctx)
+        if not p then return 'refused' end
         tested(ctx, '%s given a key to car %s', tostring(p.fullName), tostring(ctx:need('car')))
         return 'given'
     end,
@@ -99,16 +99,16 @@ define({
         local id = ctx:need('car')
         ctx:call(function()
             local _, s2, p = playerIn(ctx)
-            if not s2 or s2 ~= src then return 'noKey' end
+            if not p or s2 ~= src then return 'noKey' end
             return Vehicles.removeKey(src, p, id) and 'taken' or 'noKey'
         end)
         ctx:after(CALL_TIMEOUT_S * 1000, 'timeout')
         return nil
     end,
     dryRun = function(ctx)
-        local _, src, p = playerIn(ctx)
+        local _, _, p = playerIn(ctx)
         local id = ctx:need('car')
-        if not src or not Vehicles.playerHasKey(p, id) then return 'noKey' end
+        if not p or not Vehicles.playerHasKey(p, id) then return 'noKey' end
         tested(ctx, 'every key to car %s taken from %s', tostring(id), tostring(p.fullName))
         return 'taken'
     end,
@@ -247,8 +247,8 @@ local function homeKey(cardType, title, desc, grant)
         values = { inputs = { { key = 'player', type = 'player', label = 'Player' }, { key = 'property', type = 'number', label = 'Property' } },
                    outputs = { { key = 'why', type = 'text', label = 'Why not' } } },
         run = function(ctx)
-            local _, src, p = playerIn(ctx)
-            if not src then return 'refused', { why = 'not here' } end
+            local _, _, p = playerIn(ctx)
+            if not p then return 'refused', { why = 'not here' } end
             local id, charId = math.floor(ctx:need('property')), p.charId
             ctx:call(function()
                 local ok, why
@@ -260,8 +260,8 @@ local function homeKey(cardType, title, desc, grant)
             return nil
         end,
         dryRun = function(ctx)
-            local _, src, p = playerIn(ctx)
-            if not src then return 'refused', { why = 'not here' } end
+            local _, _, p = playerIn(ctx)
+            if not p then return 'refused', { why = 'not here' } end
             local id = math.floor(ctx:need('property'))
             if not Properties.get(id) then return 'refused', { why = 'Unknown property' } end
             tested(ctx, '%s %s a key to property %d', tostring(p.fullName), grant and 'given' or 'had taken back', id)
@@ -303,8 +303,8 @@ local function jobChange(cardType, title, desc, needsRole, act, words)
         run = function(ctx)
             local job, jwhy = jobOf(ctx)
             if not job then return 'refused', { why = jwhy } end
-            local _, src, p = playerIn(ctx)
-            if not src then return 'refused', { why = 'not here' } end
+            local _, _, p = playerIn(ctx)
+            if not p then return 'refused', { why = 'not here' } end
             local role
             if needsRole ~= nil then
                 local ref = ctx:prop('role')
@@ -326,8 +326,8 @@ local function jobChange(cardType, title, desc, needsRole, act, words)
         dryRun = function(ctx)
             local job, jwhy = jobOf(ctx)
             if not job then return 'refused', { why = jwhy } end
-            local _, src, p = playerIn(ctx)
-            if not src then return 'refused', { why = 'not here' } end
+            local _, _, p = playerIn(ctx)
+            if not p then return 'refused', { why = 'not here' } end
             tested(ctx, '%s %s at %s', tostring(p.fullName), words, tostring(job.name or job.key))
             return 'done'
         end,
@@ -364,8 +364,8 @@ local function statChange(cardType, title, desc, add)
             return 'out'
         end,
         dryRun = function(ctx)
-            local _, src, p = playerIn(ctx)
-            if not src then return 'refused' end
+            local _, _, p = playerIn(ctx)
+            if not p then return 'refused' end
             tested(ctx, '%s\'s %s %s %s', tostring(p.fullName), tostring(ctx:prop('stat')), add and 'changed by' or 'set to', tostring(ctx:need('value')))
             return 'out'
         end,
@@ -464,7 +464,7 @@ define({
     run = function(ctx)
         local viewer = ctx:source(ctx:player())
         local _, src, p = playerIn(ctx)
-        if not viewer or not src then return 'refused' end
+        if not viewer or not p then return 'refused' end
         if viewer == src then ctx:log('nobody searches themselves') return 'refused' end
         local ok, why = OpenPlayerInventory(viewer, p.charId, SEARCH_RANGE)
         if not ok then ctx:log('search: %s', tostring(why)) return 'refused' end
@@ -473,7 +473,7 @@ define({
     dryRun = function(ctx)
         local viewer = ctx:source(ctx:player())
         local _, src, p = playerIn(ctx)
-        if not viewer or not src or viewer == src then return 'refused' end
+        if not viewer or not p or viewer == src then return 'refused' end
         tested(ctx, '%s\'s pockets opened to the searcher', tostring(p.fullName))
         return 'out'
     end,

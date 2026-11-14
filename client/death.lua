@@ -125,7 +125,7 @@ local function layDown(gen, at)
     -- lockdown (frozen, invincible), which nothing else's exit can cancel.
     PedHold.set('deathHide', { hidden = true })
 
-    NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, heading, true, false)
+    NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, heading, 1, false)
     Wait(100)
     ped = PlayerPedId()
     PedHold.reapply()   -- the resurrect can hand back a new ped, which starts with none of the holds
@@ -183,7 +183,7 @@ local function bringBackDeadPed()
     local ped = PlayerPedId()
     if not IsEntityDead(ped) then return end
     local c = GetEntityCoords(ped)
-    NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), true, false)
+    NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), 1, false)
     PedHold.reapply()
 end
 
@@ -337,7 +337,7 @@ local function ExitDeathState()
         local seat = veh ~= 0 and seatOf(veh, ped) or nil
         local c = GetEntityCoords(ped)
         reviving = true
-        NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), true, false)
+        NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), 1, false)
         Wait(100)
         reviving = false
         -- A logout meanwhile ended the death itself.
@@ -419,7 +419,7 @@ local function DoRespawn()
     -- Dead in a seat: brought back where they sit first, so the clear below takes a living ped out of it.
     if IsPedInAnyVehicle(ped, false) and IsEntityDead(ped) then
         local c = GetEntityCoords(ped)
-        NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), true, false)
+        NetworkResurrectLocalPlayer(c.x, c.y, c.z, GetEntityHeading(ped), 1, false)
         Wait(100)
         ped = PlayerPedId()
         PedHold.reapply()
@@ -447,7 +447,7 @@ local function DoRespawn()
     SetEntityHeading(ped, loc.w)
 
     -- Revive
-    NetworkResurrectLocalPlayer(loc.x, loc.y, loc.z, loc.w, true, false)
+    NetworkResurrectLocalPlayer(loc.x, loc.y, loc.z, loc.w, 1, false)
     Wait(100)
     ped = PlayerPedId()
     PedHold.reapply()   -- a new ped starts with none of the holds (an /w Invisible admin stays hidden)

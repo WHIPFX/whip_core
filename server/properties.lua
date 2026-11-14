@@ -1402,7 +1402,7 @@ end
 function Properties.resolveConflict(templateId, unitKey, mode)
     local t = Properties.getTemplate(templateId)
     local u = t and t.units[unitKey]
-    if not u then return false, 'Unknown unit' end
+    if not t or not u then return false, 'Unknown unit' end
     local overlay = u.overlay
     local conflicts = overlay and overlay._conflicts
     if not conflicts then return true end
@@ -1460,7 +1460,7 @@ function Properties.setPart(propertyId, part, value, scope)
     if scope == 'unit' then
         local t = Properties.getTemplate(rec.templateId)
         local u = t and t.units[rec.unitKey]
-        if not u then return false, 'Its unit is missing from its template' end
+        if not t or not u then return false, 'Its unit is missing from its template' end
         if rec.overrides and rec.overrides[part] ~= nil then
             local o = copy(rec.overrides)
             o[part] = nil
@@ -1632,10 +1632,10 @@ local function setOwnerNow(propertyId, charId, byCharId, src, ownerAtCall)
     -- error in it must not read as a failed hand-over (a purchase would refund). Each step in its own
     -- pcall, said in the console; the answer is true.
     local function tail(what, fn, ...)
-        local ran, err = pcall(fn, ...)
+        local ran, failure = pcall(fn, ...)
         if not ran then
             print(('[whip_core:properties] property %d changed hands, but %s failed: %s')
-                :format(rec.propertyId, what, tostring(err)))
+                :format(rec.propertyId, what, tostring(failure)))
         end
     end
     tail('the resync', Properties.resync, rec.propertyId)
@@ -2082,6 +2082,8 @@ SecureCallback('whip_core:property:purchase', {
     local rec = Properties.get(propertyId)
     local price, why = forSale(rec)
     if not price then return deny(why) end
+    -- (forSale answers no price for no property.)
+    ---@cast rec -nil
     if not atSign(source, rec) then return deny('Stand at the sign to buy it') end
     if method == 'bank' and accountId == 0 then return deny('Pick an account to pay from') end
     if buying[propertyId] then return deny('Someone is buying this property right now') end

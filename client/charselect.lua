@@ -385,6 +385,7 @@ local function buildScene()
     for n = 1, _places do
         local shot, si = shotFor(n)
         if shot then
+            ---@cast si -nil
             if not stops[si] then
                 stops[si] = { shot = shot, places = {} }
                 order[#order + 1] = si
@@ -425,6 +426,7 @@ function CharSelect.SelectSlot(n, opening)
     if n < 1 or n > _places then return end
     local slot, shotIndex = shotFor(n)
     if not slot then return end
+    ---@cast shotIndex -nil
 
     _switching = true
 
@@ -707,6 +709,7 @@ function CharSelect.Enter(opts)
         Wait(250)
     end
 
+    ---@type integer|nil
     local index = math.tointeger(tonumber(opts.slot)) or 1
     if opts.charId ~= nil then
         index = nil

@@ -20,6 +20,7 @@ local _outGun, _outMelee = 1.0, 1.0
 --- instead of believing it is still in place.
 function ResetDamageModifiers()
     SetPlayerWeaponDamageModifier(PlayerId(), 1.0)
+    ---@diagnostic disable-next-line: redundant-parameter -- p2: one of the game's parameters the natives' typing leaves out
     SetPlayerMeleeWeaponDamageModifier(PlayerId(), 1.0, true)
     _outGun, _outMelee = 1.0, 1.0
 end
@@ -545,7 +546,6 @@ AddEventHandler('gameEventTriggered', function(eventName, args)
     if args[1] ~= myPed then return end
 
     local attacker   = args[2]
-    local isFatal    = args[4] == 1
     local weaponHash = args[7]
 
     -- ---- Damage Source Tracking (for debug overlay / death log) ----
@@ -626,6 +626,7 @@ local function applyOutgoing(gun, melee)
         _outGun = gun
     end
     if melee ~= _outMelee then
+        ---@diagnostic disable-next-line: redundant-parameter -- p2: one of the game's parameters the natives' typing leaves out
         SetPlayerMeleeWeaponDamageModifier(PlayerId(), melee, true)
         _outMelee = melee
     end
@@ -643,7 +644,7 @@ CreateThread(function()
 
         local cost = WhipCost.start()
         local pid, ped = PlayerId(), PlayerPedId()
-        local _, weapon = GetCurrentPedWeapon(ped)
+        local _, weapon = GetCurrentPedWeapon(ped, false)
         local melee = weapon == unarmedHash or weapon == 0 or GetWeapontypeGroup(weapon) == meleeGroup
 
         -- Who this player is going for: free aim (mouse) and lock-on (a controller, assisted aim, a

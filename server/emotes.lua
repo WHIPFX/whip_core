@@ -30,7 +30,7 @@ SecureEvent('whip_core:server:emoteProps', {
     rateLimit = 100,
     burst     = 10,
     params    = { {'cmd', 'key', 40} },
-}, function(source, player, cmd)
+}, function(source, _, cmd)
     local props = propsOf[cmd]
     if not props then return end   -- an emote with nothing to hold: nothing to do
     HeldProps.give(source, props, 'emote')
@@ -57,7 +57,7 @@ SecureEvent('whip_core:server:setWalk', {
     rateLimit = 500,
     burst     = 3,
     params    = { {'walk', 'enum', WALKS} },
-}, function(source, player, walk)
+}, function(_, player, walk)
     local ok, why = player:setMetadata('walk', walk ~= 'c' and walk or nil)
     if not ok then return false, why end
 end)

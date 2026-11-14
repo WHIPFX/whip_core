@@ -27,6 +27,17 @@
 
 OvPanel = {}
 
+---@class OvPanelState
+---@field entity integer
+---@field info table
+---@field target table
+---@field desc table
+---@field note string|nil
+---@field opts table|nil
+---@field options table|nil
+---@field rewire table|nil
+
+---@type OvPanelState|nil
 local panel = nil       -- the open one: { entity, info, target, desc, options }
 local opening = false
 local openGen = 0       -- each open's own number: a close while it is still opening moves it on, and it never opens
@@ -73,7 +84,7 @@ local function stackPile(t, d) return aPile(t, d) and d.pile.stack == true end
 -- Effects go on any prop the server can name (not another script's object only this game has).
 local function fxThing(t) return t.kind == 'object' and t.ref ~= nil end
 local function anything() return true end
-local function lockedCar(t, d) return d.locked == true end
+local function lockedCar(_, d) return d.locked == true end
 
 -- What only a full admin may do (the server answers `admin`): what lasts past a restart, and the admin's own tools. A
 -- Dungeon Master (director.live) sees them greyed. The server refuses them as well (server/object_viewer.lua PERMANENT;
@@ -87,6 +98,20 @@ local ADMIN_ONLY = {
 
 -- how: 'act' (the server does it), 'toggle' (the server flips it: `hold` names its state), 'page' (a page of its
 -- own first: `page` names it, the page's button sends `act`), 'local' (done here: LOCAL below).
+---@class OvOption
+---@field key string
+---@field group string
+---@field how 'act'|'toggle'|'page'|'local'
+---@field when fun(t: table, d: table): boolean
+---@field label string
+---@field hint string
+---@field page string|nil
+---@field hold string|nil
+---@field danger boolean|nil
+---@field adminWhen (fun(t: table, d: table): boolean)|nil
+---@field lockedWhy string|nil
+
+---@type OvOption[]
 local OPTIONS = {
     { key = 'copy', group = 'info', how = 'local', when = anything, label = 'Copy details',
       hint = 'The model\'s name, its hash and where it stands, to the clipboard.' },
@@ -508,6 +533,7 @@ local function huntSpots(ped, n)
 end
 
 local function send()
+    ---@cast panel -nil   (refresh and open call it only with the panel there)
     local t, d = panel.target, panel.desc
     local options, groups = listFor(t, d, panel.opts and panel.opts.extras)
     panel.options = {}
@@ -637,6 +663,7 @@ local function stepAside()
     Focus.release('ovPanel')
     SendNUIMessage({ action = 'ovPanelClose' })
     local p = panel
+    ---@cast p -nil   (an option runs only from the open panel)
     return function()
         if panel ~= p then return end
         away = false
@@ -831,9 +858,11 @@ local RESHOWS = { ['live.solid'] = true, ['live.propModel'] = true }   -- (a Dun
 --- answer, which holds every press after it (the switches that "only worked once": a missing `hold`, 28 Oct).
 local function press(data, cb)
     local p = panel
+    ---@type string|nil
     local key = type(data) == 'table' and data.key or nil
     local o = p and p.options and p.options[key]
     if not p or away or not o then cb({ ok = false, text = 'That is not here any more' }) return end
+    ---@cast key string   (the options are kept under their string keys)
     if o.locked then cb({ ok = false, text = o.lockedWhy or 'Only an admin can do that: it lasts past a restart' }) return end
     local arg = type(data.arg) == 'table' and data.arg or {}
 
@@ -870,7 +899,7 @@ local function press(data, cb)
     if MODEL_KEYS[key] then
         local m = type(arg.model) == 'string' and arg.model:lower():match('^%s*([%w_]+)%s*$') or nil
         local hash = m and GetHashKey(m)
-        if not m or #m > 64 or not IsModelInCdimage(hash) then
+        if not m or not hash or #m > 64 or not IsModelInCdimage(hash) then
             cb({ ok = false, text = 'That is not a model this game has: check the spelling' })
             return
         end

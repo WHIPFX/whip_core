@@ -246,7 +246,7 @@ SecureEvent('whip_core:server:heldPropAttached', {
     burst     = 10,
     whileDead = true,
     params    = { {'netId', 'id', 1, 65535} },
-}, function(source, player, netId)
+}, function(source, _, netId)
     local ent = NetworkGetEntityFromNetworkId(netId)
     local rec = ent and byEnt[ent]
     if rec and NetworkGetEntityOwner(ent) == source then
@@ -261,7 +261,7 @@ SecureEvent('whip_core:server:heldPropsDrop', {
     rateLimit = false,
     whileDead = true,   -- dying ends an emote; its props must still go
     params    = { {'tag', 'enum', { 'emote', 'bar', 'give' }} },
-}, function(source, player, tag)
+}, function(source, _, tag)
     HeldProps.drop(source, tag)
 end)
 
@@ -276,7 +276,7 @@ SecureEvent('whip_core:server:barProp', {
         {'offset', 'list', {'v', 'number', -2.0, 2.0}, 3},
         {'rot',    'list', {'v', 'number', -360.0, 360.0}, 3},
     },
-}, function(source, player, model, bone, offset, rot)
+}, function(source, _, model, bone, offset, rot)
     if not allowed[hashOf(model:lower())] then return false, 'That prop cannot be held' end
     HeldProps.give(source, { { model = model, bone = bone, offset = offset, rot = rot } }, 'bar')
 end)
@@ -306,7 +306,7 @@ end
 exports('HoldProps', function(source, props, tag)
     local src = tonumber(source)
     local ped = src and GetPlayerPed(src)
-    if not ped or ped == 0 then return false, 'no such player' end
+    if not src or not ped or ped == 0 then return false, 'no such player' end
     if type(props) ~= 'table' or #props == 0 then return false, 'props is a list of { model, bone, offset, rot }' end
     return HeldProps.give(src, props, (ownTag(tag)))
 end)
@@ -342,7 +342,7 @@ AddEventHandler('onResourceStop', function(res)
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
         local tag = src and HeldProps.tagOf(src)
-        if tag and tag:sub(1, #prefix) == prefix then HeldProps.drop(src, tag) end
+        if src and tag and tag:sub(1, #prefix) == prefix then HeldProps.drop(src, tag) end
     end
 end)
 
@@ -373,7 +373,7 @@ local MAX_HOLD_OFFSET = 1.0   -- metres from the bone: further out is a mistake
 --- this tool's.
 SecureCallback('whip_core:heldHolds:mine', {
     ace = 'whip.devtools', rateLimit = 500, burst = 4,
-}, function(source, player)
+}, function(source)
     local set = held[source]
     if not set or type(set.tag) ~= 'string' or not set.tag:find(':', 1, true) then
         return false, 'Hold a resource\'s prop first (a pump\'s nozzle)'
@@ -394,7 +394,7 @@ SecureCallback('whip_core:heldHolds:save', {
         { 'oz', 'number', -MAX_HOLD_OFFSET, MAX_HOLD_OFFSET },
         { 'rx', 'number', -360.0, 360.0 }, { 'ry', 'number', -360.0, 360.0 }, { 'rz', 'number', -360.0, 360.0 },
     },
-}, function(source, player, tag, ox, oy, oz, rx, ry, rz)
+}, function(source, _, tag, ox, oy, oz, rx, ry, rz)
     if not Settings.mayEdit(source) then return false, 'Only a permanent admin can change how props are held' end
     local mine = held[source]
     if not mine or mine.tag ~= tag or not tag:find(':', 1, true) then return false, 'You are not holding it any more' end

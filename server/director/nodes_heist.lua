@@ -90,7 +90,7 @@ define({
         end
         ctx:onEnd(function()
             Director.followCrew(run, crewKey, nil)
-            if pointId then RuntimePoints.remove(CORE, pointId) pointId = nil end
+            if pointId then RuntimePoints.remove(CORE, pointId) pointId = false end
         end)
         local seconds = tonumber(ctx:prop('seconds'))
         if seconds then ctx:after(seconds * 1000, 'timeout') end
@@ -297,7 +297,7 @@ define({
         end
         ctx:onEnd(function()
             Director.followCrew(run, crewKey, nil)
-            if pointId then RuntimePoints.remove(CORE, pointId) pointId = nil end
+            if pointId then RuntimePoints.remove(CORE, pointId) pointId = false end
         end)
         local seconds = tonumber(ctx:prop('seconds'))
         if seconds then ctx:after(seconds * 1000, 'timeout') end

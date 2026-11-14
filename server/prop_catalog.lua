@@ -54,11 +54,12 @@ local function hasImage(row)
     return v == 1 or v == true
 end
 
+local categorySet = nil   -- [key] = true, from Config.PropCategories (worked out again when it changes)
+
 --- Is this a category anybody declared? An unknown one would produce a shelf in the furnisher that
 --- no tab leads to, which is worse than a refusal.
 ---@param key string
 ---@return boolean
-local categorySet = nil   -- [key] = true, from Config.PropCategories (worked out again when it changes)
 local function isCategory(key)
     if not categorySet then
         categorySet = {}
@@ -481,7 +482,7 @@ SecureEvent('whip_core:server:propAdd', {
         {'category', 'string', 32, 'misc'},
         {'name',     'string', 64, ''},
     },
-}, function(source, player, model, category, name)
+}, function(source, _, model, category, name)
     model = model:lower()
     if model == '' or tonumber(model) or model:match('^%-?%d+$') then
         return false, 'That is not a usable model name'
@@ -514,7 +515,7 @@ SecureEvent('whip_core:server:propRemove', {
     ace       = 'whip.devtools',
     rateLimit = 250,
     params    = { {'model', 'key', 80} },
-}, function(source, player, model)
+}, function(source, _, model)
     model = model:lower()
     local row = PropCatalog._rows[model]
     if not row or row.status == 'unavailable' then
@@ -584,7 +585,7 @@ SecureEvent('whip_core:server:propCatalogMissing', {
     ace       = 'whip.devtools',
     rateLimit = 5000,
     params    = { {'models', 'list', {'model', 'key', 80}, 500} },
-}, function(source, player, models)
+}, function(_, _, models)
     binModels(models, 'are missing from this game version')
 end)
 
@@ -595,7 +596,7 @@ SecureEvent('whip_core:server:propCatalogBroken', {
     rateLimit = 500,
     burst     = 4,
     params    = { {'models', 'list', {'model', 'key', 80}, 200} },
-}, function(source, player, models)
+}, function(_, _, models)
     binModels(models, 'would not spawn on this game version (/propcheck)')
 end)
 

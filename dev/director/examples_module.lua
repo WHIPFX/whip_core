@@ -21,12 +21,12 @@ end
 
 -- (The game's makers, faked as the other modules fake them: an NPC or a car made is a number, at where it was asked.)
 local made = 0
-Npcs.spawn = function(_, def) made = made + 1 return made, 5000 + made end
-Npcs.get = function(id) return { id = id, coords = { x = 0.0, y = 0.0, z = 0.0 }, alive = true } end
-Vehicles.spawnTempFor = function() made = made + 1 return made end
-Vehicles.getEntity = function(id) return 900 + id end
-Vehicles.getDef = function(id) return { plate = 'P' .. id } end
-Vehicles.spotBlocked = function() return nil end
+rawset(Npcs, 'spawn', function() made = made + 1 return made, 5000 + made end)
+rawset(Npcs, 'get', function(id) return { id = id, coords = { x = 0.0, y = 0.0, z = 0.0 }, alive = true } end)
+rawset(Vehicles, 'spawnTempFor', function() made = made + 1 return made end)
+rawset(Vehicles, 'getEntity', function(id) return 900 + id end)
+rawset(Vehicles, 'getDef', function(id) return { plate = 'P' .. id } end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
 
 -- (The items the examples hand out and hold, as the server's own item list has them.)
 for _, item in ipairs({ 'package', 'cash', 'drill', 'gold_bar', 'lockpick', 'phone' }) do
@@ -69,6 +69,7 @@ for _, root in ipairs(ROOTS) do
             local doc = placed(read(root.dir .. name .. '.json'))
             local res, why = exports.whip_core:TestDirectorScenario(doc, { player = 1, wait = false })
             assertType(res, 'table', 'started (' .. tostring(why) .. ')')
+            ---@cast res table
             for _ = 1, 40 do HarnessTick(50) end
             local now = exports.whip_core:GetDirectorTestResult(res.runId) or res
             assertNotEqual(now.outcome, 'faulted', 'faulted: ' .. tostring(now.reason))

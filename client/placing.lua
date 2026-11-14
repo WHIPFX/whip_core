@@ -235,7 +235,7 @@ local function modeLoop()
                     local nF = -surfaceNormal.x * sinH + surfaceNormal.y * cosH
                     local nR =  surfaceNormal.x * cosH + surfaceNormal.y * sinH
                     if nR > 1.0 then nR = 1.0 elseif nR < -1.0 then nR = -1.0 end
-                    placeRx = -math.deg(math.atan2(nF, surfaceNormal.z))
+                    placeRx = -math.deg(math.atan(nF, surfaceNormal.z))
                     placeRy = math.deg(math.asin(nR))
 
                     SetEntityCoordsNoOffset(ghostProp, placeHitX, placeHitY, placeHitZ, false, false, false)

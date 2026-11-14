@@ -40,7 +40,29 @@ FurnishBuilder = {}
 ---                  the mouse; opts.quiet: no notice when it fails; opts.turn: { x, y, z }), answering whether it is
 ---   addRow(row)    a row made where it says ({ model, x, y, z, rx, ry, rz, extra }), the selection left alone
 ---   pushState()    the page's state;  changed()  the set changed (unsaved, the list and the state sent)
+---@class FurnishEditor
+---@field kinds table<string, table>
+---@field kindOf fun(it: table): string
+---@field session fun(): table|nil
+---@field items fun(): table[]
+---@field unloadable fun(): table
+---@field selected fun(): integer|nil
+---@field select fun(i: integer|nil)
+---@field isSelected fun(i: integer): boolean
+---@field padOn fun(): boolean
+---@field aim fun(nx: number, ny: number): vector3, number, number, number
+---@field isHit fun(hit: any): boolean
+---@field dimsOf fun(model: any): table|nil
+---@field placeNew fun(model: string, extra?: table, opts?: table): boolean
+---@field addRow fun(row: table): boolean
+---@field pushState fun()
+---@field changed fun()
+---@field swapModel fun(it: table, model: string)
+
+-- Both set by FurnishBuilder.attach as the furnisher loads, before anything here is called.
+---@type FurnishEditor
 local ed = nil
+---@type table<string, table>
 local KINDS = nil   -- ed.kinds
 
 --- The world builder's things are of a KIND (its `extra.kind`): what the room makes for it, and how it
@@ -565,7 +587,8 @@ local function drawAim(it)
     if not DirectorWeapons then return end
     local m, at, hit = DirectorWeapons.aimHit(it.obj)
     DrawLine(m.x, m.y, m.z, at.x, at.y, at.z, 255, 40, 40, 230)
-    if hit then DrawMarker(28, at.x, at.y, at.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.12, 0.12, 255, 40, 40, 200, false, false, 2, false, nil, nil, false) end
+    if hit then DrawMarker(28, at.x, at.y, at.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.12, 0.12, 255, 40, 40, 200, false, false, 2, false,
+        (nil) --[[@as string]], (nil) --[[@as string]], false) end
 end
 
 --- A selected guard's cone on the ground (its page's Sees players), as its settings are now: client/vision.lua
@@ -1079,6 +1102,7 @@ end
 
 local GHOST_ALPHA = 120
 local GHOST_HOLD_MS, GHOST_DONE_MS = 4000, 1500   -- gone this long after the slider last moved / was let go
+---@type { ent: integer, id: any, untilAt: integer? }|nil
 local ghost = nil                                 -- { ent, id, untilAt }
 
 local function ghostGone()
@@ -1104,6 +1128,7 @@ function FurnishBuilder.turnGhost(id, heading, done)
         SetEntityAlpha(ent, GHOST_ALPHA, false)
         ghost = { ent = ent, id = id }
     end
+    ---@cast ghost -nil   -- (made just now when there was none)
     local r = GetEntityRotation(obj, 2)
     SetEntityRotation(ghost.ent, r.x, r.y, heading, 2, false)
     ghost.untilAt = GetGameTimer() + (done and GHOST_DONE_MS or GHOST_HOLD_MS)
@@ -1136,7 +1161,7 @@ function FurnishBuilder.stop()
 end
 
 --- The furnisher hands over the editor as it loads (see `ed` at the top), and this file's kinds join its.
----@param editor table
+---@param editor FurnishEditor
 function FurnishBuilder.attach(editor)
     ed, KINDS = editor, editor.kinds
     for name, K in pairs(BUILDER_KINDS) do KINDS[name] = K end

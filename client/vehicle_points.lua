@@ -369,7 +369,7 @@ end
 -- Where, now
 -- ============================================
 
-local atan2 = math.atan2 or math.atan
+local atan2 = math.atan
 
 --- The vehicle's own axes and origin: GetEntityMatrix's four answers (forward, right, up, position: forward first, as
 --- client/doors.lua reads it), or the ones the caller read this frame (`c`: client/vehicle_prompts.lua reads a car once
@@ -420,6 +420,7 @@ end
 ---@return number|nil x, number y, number z, number heading, table spot, string side
 function VehiclePoints.where(veh, action, c, me)
     local plan = VehiclePoints.plan(veh, action, c and c.model)
+    ---@diagnostic disable-next-line: missing-return-value -- nil alone: nowhere (the rest come only with x)
     if not plan then return nil end
     local fwd, right, up, pos = VehiclePoints.axes(veh, c)
     me = me or GetEntityCoords(PlayerPedId())
@@ -434,6 +435,7 @@ function VehiclePoints.where(veh, action, c, me)
         local d = dx * dx + dy * dy + dz * dz
         if d < bestD then best, bestD = s, d end
     end
+    ---@cast best -nil   -- a plan has a spot at least (VehiclePoints.plan)
     local side = best.face or best.side or ((plx < 0) and 'left' or 'right')
     local at = skinOf(veh, best, side)
     local x, y, z = VehiclePoints.toWorld(fwd, right, up, pos, at.x, at.y, at.z)
@@ -527,6 +529,6 @@ exports('SetVehiclePointRules', function(action, rules)
     local owner = Registry.caller()
     if type(action) ~= 'string' or action == '' then return false, 'name the point' end
     local ok, why = pointReg:add(owner, action, rules)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end)

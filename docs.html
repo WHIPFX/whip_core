@@ -1395,7 +1395,7 @@ Whip.<span class="fn">register</span>(<span class="kw">function</span>()
     <span class="fn">exports.whip_core</span>:<span class="fn">SecureEvent</span>(<span class="str">'mycafe:buy'</span>, {
         rateLimit = <span class="num">1000</span>,   <span class="cm">-- one purchase a second per player</span>
         near = { at = Config.Counter, range = <span class="num">3.0</span>, message = <span class="str">'Walk up to the counter'</span> },
-    }, <span class="kw">function</span>(source, player)
+    }, <span class="kw">function</span>(source)
         <span class="kw">local</span> receipt, err = <span class="fn">exports.whip_core</span>:<span class="fn">ChargePlayer</span>(source, Config.Price, { reason = <span class="str">'Coffee'</span> })
         <span class="kw">if</span> <span class="kw">not</span> receipt <span class="kw">then</span>
             <span class="kw">return</span> <span class="kw">false</span>, err   <span class="cm">-- could not pay: whip shows them why</span>
@@ -1518,12 +1518,12 @@ Whip.<span class="fn">register</span>(<span class="kw">function</span>()
             <span class="kw">return false</span>, <span class="str">'Clock on first'</span>
         <span class="kw">end</span>
 
-        <span class="kw">local</span> done, why = <span class="fn">exports.whip_core</span>:<span class="fn">Progress</span>(source, {
+        <span class="kw">local</span> done, reason = <span class="fn">exports.whip_core</span>:<span class="fn">Progress</span>(source, {
             label    = <span class="str">'Brewing...'</span>,
             duration = <span class="num">6000</span>,
             near     = { coords = Config.Counter, range = <span class="num">3.0</span> },   <span class="cm">-- still at the counter when it ends</span>
         })
-        <span class="kw">if not</span> done <span class="kw">then return false</span>, why <span class="kw">end</span>
+        <span class="kw">if not</span> done <span class="kw">then return false</span>, reason <span class="kw">end</span>
 
         <span class="cm">-- Six seconds went by: still the same character? (they may have logged out)</span>
         <span class="kw">if not</span> <span class="fn">exports.whip_core</span>:<span class="fn">IsSessionCurrent</span>(source, player.session) <span class="kw">then return end</span>

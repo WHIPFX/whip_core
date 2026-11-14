@@ -621,6 +621,7 @@ function Arrival.play(run, uncoverMs, opts)
     ControlBlocks.hold('arrival', { all = true })
     CleanScreen.hold('arrival')
 
+    ---@type integer|nil
     local cam = s.cam and CreateCam('DEFAULT_ANIMATED_CAMERA', true) or nil
     run.cam = cam   -- (for Arrival.run's clean-up, should anything below throw)
     run.prop = makeProp(s.prop)
@@ -782,6 +783,7 @@ function Arrival.play(run, uncoverMs, opts)
             local camRot = GetCamRot(cam, 2)
             SetGameplayCamRelativeHeading((camRot.z - GetEntityHeading(ped) + 540.0) % 360.0 - 180.0)
             SetGameplayCamRelativePitch(camRot.x, 1.0)
+            ---@diagnostic disable-next-line: redundant-parameter -- renderingOptions, NativeDB's 4th: not in the natives' docs
             StopRenderingScriptCamsUsingCatchUp(false, 0.0, 3, 0)
         end
         DestroyCam(cam, false)
@@ -911,15 +913,15 @@ function Arrival.fromMap(place, since)
         Wait(0); Wait(0)
         if loggedOut() then return end
         hold.ready()
-        local by, went = GetGameTimer() + hold.maxMs, false
-        while GetGameTimer() < by do
+        local holdBy, went = GetGameTimer() + hold.maxMs, false
+        while GetGameTimer() < holdBy do
             if loggedOut() then return end
             if hold.go() then went = true; break end
             Wait(0)
         end
         if not went then hold.lost() end
-        local since = hold.start()
-        if since then CharSelect.WaitMapGone(since, MAP_GONE_MS) end
+        local mapSince = hold.start()
+        if mapSince then CharSelect.WaitMapGone(mapSince, MAP_GONE_MS) end
         CleanScreen.release('arrival')
         ControlBlocks.release('arrival')
         PedHold.release('arrival')

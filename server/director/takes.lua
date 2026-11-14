@@ -421,7 +421,7 @@ end)
 SecureEvent('whip_core:server:takeWant', {
     whileDead = true, rateLimit = 500, burst = 6,
     params = { { 'ids', 'list', { 'id', 'id' }, WANT_MAX } },
-}, function(source, player, ids)
+}, function(source, _, ids)
     local l = line[source] or { has = {} }
     line[source] = l
     local mine, before, now, builder = sending[source], sent[source], GetGameTimer(), nil
@@ -444,7 +444,7 @@ end)
 SecureEvent('whip_core:server:takeGot', {
     whileDead = true, rateLimit = 50, burst = 20,
     params = { { 'id', 'id' } },
-}, function(source, player, id)
+}, function(source, _, id)
     local mine = sending[source]
     if mine and mine[id] then mine[id] = nil end
 end)

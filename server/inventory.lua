@@ -93,6 +93,7 @@ function Inventory.load(charId)
         print(('[whip_core:inv] ERROR loading inventory for charId %d: %s'):format(charId, tostring(rows)))
         return nil
     end
+    ---@cast rows -string
 
     local inv = {
         player    = {},
@@ -728,7 +729,7 @@ end
 ---@return table|nil
 function Inventory.runMetaGen(gen, item, ctx)
     if gen == nil then return nil end
-    local ok, result = pcall(gen, item, ctx or { reason = 'given' })
+    local ok, result = pcall(gen --[[@as function]], item, ctx or { reason = 'given' })   -- (or a callable table)
     if ok and type(result) == 'table' then return result end
     return nil
 end
@@ -736,7 +737,7 @@ end
 ---@param cache table
 ---@param container string
 ---@param item string  Config.Items key
----@param amount number
+---@param amount? number  default 1
 ---@param metadata table|nil
 ---@param ctx table|nil  who it is for, handed to the item's generator (Inventory.metaContext)
 ---@return boolean, string|nil
@@ -897,7 +898,7 @@ function Inventory.onlyStamped(match) return { only = match } end
 ---@param cache table
 ---@param container string
 ---@param item string
----@param amount number
+---@param amount? number  default 1
 ---@param only table|nil  Inventory.onlyStamped(match): take only the stacks carrying it (nil: any)
 ---@param taken table|nil  when given, each stack taken is added to it as { amount, metadata } — the items
 ---                        themselves, for a caller that passes them on (a payment into a stock room)
@@ -967,6 +968,7 @@ end
 ---@param item string
 ---@param only table|nil  count only the stacks carrying it (see removeItem)
 ---@return number
+---@diagnostic disable-next-line: duplicate-set-field -- the client's Inventory is a different table
 function Inventory.getItemCount(cache, container, item, only)
     local slots = cache[container]
     if not slots then return 0 end
@@ -1021,7 +1023,7 @@ end
 --- Remove item across every player container in order (checks total first)
 ---@param cache table
 ---@param item string
----@param amount number
+---@param amount? number  default 1
 ---@param only table|nil  take only the stacks carrying it (see removeItem)
 ---@param taken table|nil  collects the stacks taken, as removeItem's
 ---@return boolean success
@@ -1237,7 +1239,7 @@ end
 --- an EMPTY instance (an empty wallet). Pass the instance's metadata whenever you have it.
 ---@param cache table
 ---@param item string
----@param amount number
+---@param amount? number  default 1
 ---@param metadata table|nil  the instance's metadata, if this is about a specific one
 ---@return boolean canFit
 ---@return number availableCapacity
@@ -1274,7 +1276,7 @@ end
 --- did not go in is the caller's to put back.
 ---@param cache table
 ---@param item string
----@param amount number
+---@param amount? number  default 1
 ---@param metadata table|nil
 ---@param ctx table|nil  who it is for (Inventory.metaContext)
 ---@return number added
@@ -1707,7 +1709,7 @@ function Inventory.RegisterAccessorySlot(def, owner)
     end
 
     local ok, why = _accessorySlots:add(owner, def.slot, copySlotDef(def), def.tag ~= nil and { tag = def.tag } or nil)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -1721,7 +1723,7 @@ function Inventory.RegisterIgnitionKey(itemName, owner)
         return false, 'itemName (string) is required'
     end
     local ok, why = _ignitionKeys:add(owner or GetCurrentResourceName(), itemName, true)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -1827,7 +1829,7 @@ function Inventory.registerTaggedUseHandler(key, handler, tag)
     if type(key) ~= 'string' or key == '' then return false, 'a use handler needs a string key' end
     if handler == nil then return false, ('use handler "%s": no handler given'):format(key) end
     local ok, why = _uses:add(GetCurrentResourceName(), key, handler, { tag = tag })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -1870,6 +1872,7 @@ end
 ---@param how table|nil
 ---@return boolean ran  false when there is no handler, or it threw
 ---@return string|nil err
+---@return string|nil refused  the handler's refusal, or the database's, for the player
 function Inventory.runContextAction(action, source, player, slotData, container, slot, how)
     return Inventory.runContextActionAt(action, source, player, slotData, Inventory.pocketAddr(source, container, slot), how)
 end
@@ -1880,6 +1883,7 @@ end
 ---@param how table|nil
 ---@return boolean ran
 ---@return string|nil err
+---@return string|nil refused  the handler's refusal, or the database's, for the player
 function Inventory.runContextActionAt(action, source, player, slotData, addr, how)
     local locked = DbHealth.refusal()   -- items are locked while the database is down (db_health.lua)
     if locked then return false, locked, locked end
@@ -1941,6 +1945,7 @@ end
 ---@param container string
 ---@param slot number
 ---@return boolean, string|nil
+---@return boolean|nil logged  the handler logged the use itself
 function Inventory.useItem(source, player, container, slot)
     local cache = player.inventory
     if not cache then
@@ -2188,8 +2193,8 @@ function Inventory.give(source, item, amount, metadata, opts)
         if not okData then return false, ('metadata cannot be saved: %s'):format(what) end
     end
     local ok, err, placement = Inventory.giveOrDrop(source, Players[source], item, amount, metadata, give)
-    if not ok then return false, err end
-    return placement
+    if not ok then return false, err --[[@as string|nil]] end
+    return placement --[[@as string]]   -- (ok: 'inventory' or 'ground')
 end
 exports('AddItem', Inventory.give)
 
@@ -2679,7 +2684,7 @@ function Inventory.registerItem(key, definition, invoker, opts)
         if invoker == GetCurrentResourceName() then
             print(('[whip_core:inv] RegisterItem("%s") by %s refused: %s'):format(key, invoker, tostring(why)))
         end
-        return false, why
+        return false, why --[[@as string]]
     end
     return true
 end
@@ -2733,7 +2738,7 @@ local _addedOptions = Registry.new('ItemOption', {
 --- action is refused, and so is the same item and action added by another resource.
 ---@param itemKey string
 ---@param option table
----@return boolean ok, string|nil err
+---@return boolean ok, string|number|nil err  (the stored key when added)
 exports('AddItemOption', function(itemKey, option)
     local owner = Registry.caller()   -- first, before anything can yield
     if type(itemKey) ~= 'string' or itemKey == '' then return false, 'AddItemOption needs an item key' end
@@ -3167,6 +3172,7 @@ function OpenPlayerInventory(source, targetCharId, range, admin)
     local targetSource
     local targetName
     local isOnline = false
+    ---@type number|nil
     local retiredGone = 0   -- retired items taken out as an offline copy loaded (Inventory.load)
 
     -- A character whose live cache is mid-build is neither online nor safely offline: the
@@ -3249,6 +3255,8 @@ function OpenPlayerInventory(source, targetCharId, range, admin)
     _playerInvSessions[source] = session
     if session.range then watchPlayerInventorySession(source, session) end
     -- Now that this copy is the one kept: the retired items it lost on loading are written with the next flush.
+    -- (Each branch above returned if it had none.)
+    ---@cast targetCache -nil
     if (retiredGone or 0) > 0 then Stores.markDirty(Stores.rawInventory(targetCache, targetCharId, 'player')) end
 
     -- Build and send payload
@@ -3318,6 +3326,7 @@ end
 exports('OpenPlayerInventory', function(source, target, opts)
     local targetCharId, why = WhoIs(target)
     if not targetCharId then return false, why end
+    ---@type number|nil
     local range = PLAYER_INV_DEFAULT_RANGE
     if type(opts) == 'table' and opts.range ~= nil then
         if opts.range == false then
@@ -3341,7 +3350,7 @@ end)
 
 --- Is somebody (an admin, a robber) looking through this CHARACTER's inventory right now? (Not
 --- whether the player has their own inventory screen up.)
----@param charId number
+---@param charId number|nil
 ---@return boolean
 exports('IsCharacterBeingInspected', function(charId)
     charId = tonumber(charId)

@@ -85,7 +85,7 @@ local function _release(id)
 end
 
 --- Would this component open on top of somebody else's screen (declared with SetUIOpen)? Its owner may.
----@param owner string
+---@param owner string|nil
 ---@return boolean
 local function _screenInTheWay(owner)
     return ExternalUIOpenForOthers ~= nil and ExternalUIOpenForOthers(owner) or false
@@ -352,8 +352,8 @@ end)
 
 --- Show a notification toast.
 --- @param text string — message text
---- @param type string — 'success', 'error', 'info', 'warning' (default: 'info')
---- @param duration number — ms to show (default: 3000)
+--- @param type? string — 'success', 'error', 'info', 'warning' (default: 'info')
+--- @param duration? number — ms to show (default: 3000)
 function UI.Notify(text, type, duration)
     SendNUIMessage({
         action   = 'uiNotify',
@@ -392,7 +392,7 @@ end
 ---   item          what the bar is done with: an item's key, or a slot's data { item, metadata }. The disc shows its
 ---                 picture instead of filling; an item with no picture shows the icon
 --- @param label string|table — text above the bar, or every option in one table
---- @param duration number — ms to fill
+--- @param duration? number — ms to fill (default 3000)
 --- @param opts table|nil — { canCancel, anim, prop, disable, cancelOnDeath, cancelOnExit, notWhile, icon, item }
 --- @param owner string|nil — the resource asking (the export fills it in)
 --- @return boolean completed

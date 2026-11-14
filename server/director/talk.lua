@@ -51,7 +51,7 @@ function DirectorTalk.converse(ctx, src, useId, spec)
         end,
         onEnd = function(s, endWhy)
             local c = convs[convId]
-            convs[convId] = nil
+            convs[convId --[[@as number]]] = nil   -- (start has answered by the time it ends)
             if run.convs and run.convs[s] == convId then run.convs[s] = nil end
             if c then R.emit('conversation.ended', { runId = c.runId, nodeId = c.nodeId, convId = convId, source = s, why = endWhy }) end
         end,
@@ -114,7 +114,7 @@ end
 ---@param again boolean|nil  they talked and walked off: its mark is the talk sign alone ('resume'), not "!" ('new')
 function DirectorTalk.speak(ctx, src, npcW, h, spec, talkLabel, again)
     local function now()
-        local s = type(spec) == 'function' and spec() or spec
+        local s = (type(spec) == 'function' and spec() or spec) --[[@as table]]
         s.npcId, s.netId = h.npcId, h.netId
         return s
     end
@@ -236,6 +236,7 @@ function DirectorTalk.noAnswerAfter(ctx, h, seconds)
     local netId = type(h) == 'table' and h.netId or nil
     if not (netId and Bubbles) then return end
     if type(half) == 'string' and half ~= '' then
+        ---@type integer|nil
         local at = GetGameTimer() + math.floor(seconds * 500)
         ctx:poll(1000, function()
             if at and GetGameTimer() >= at then

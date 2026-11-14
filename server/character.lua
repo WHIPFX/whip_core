@@ -199,6 +199,7 @@ end
 ---@param dateOfBirth string  Format: YYYY-MM-DD
 ---@param gender string
 ---@return number|nil charId
+---@return string|nil why
 function Character.create(userId, firstName, lastName, dateOfBirth, gender)
     -- Check character limit. Read in a pcall: the read's await throws on a database error, and the create screen
     -- must get an answer.
@@ -313,10 +314,11 @@ end
 ---@param by string|nil  who renamed them, for the activity log
 ---@return boolean ok, string fullNameOrWhy, string|nil oldName
 function Character.rename(charId, firstName, lastName, by)
-    charId = tonumber(charId)
-    if not charId then return false, 'No such character' end
+    local id = tonumber(charId)
+    if not id then return false, 'No such character' end
+    charId = id
     local first, last, why = Character.cleanNames(firstName, lastName)
-    if not first then return false, why end
+    if not first or not last then return false, why --[[@as string]] end
 
     local okRead, rows = pcall(MySQL.query.await,
         'SELECT `firstName`, `lastName` FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL LIMIT 1', { charId })
@@ -406,8 +408,9 @@ end
 ---@return boolean gone
 ---@return string|nil why
 exports('IsCharacterDeleted', function(charId)
-    charId = Sanitize.id(charId)
-    if not charId then return false, 'a character is named by its charId' end
+    local id = Sanitize.id(charId)
+    if not id then return false, 'a character is named by its charId' end
+    charId = id
     if PlayersByCharId and PlayersByCharId[charId] then return false end   -- playing right now
     local ok, row = pcall(MySQL.single.await,
         'SELECT `deleted` FROM `characters` WHERE `charId` = ? LIMIT 1', { charId })

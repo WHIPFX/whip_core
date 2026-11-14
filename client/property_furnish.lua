@@ -32,6 +32,7 @@ local SPACE_SLACK = 0.3
 ---   page         the page's options, with the world builder's extras (client/furnish_builder.lua)
 ---   camera       { pos, rot, fov }: where the camera starts; nil: at the player
 ---   onSpawn      fn(item, entity): one of its peds made; onAction fn(id): its button
+---@type table|nil
 local session = nil
 
 --- May a thing stand here, in the open session?
@@ -477,6 +478,7 @@ local function firstItemHit(from, to, onTop, skip)
         local tops = i ~= skip and (not onTop or (not items[i].mark and kindOf(items[i]) == 'prop'))
         local t, n = nil, nil
         if tops then t, n = segmentHitsItem(items[i], from, to) end
+        ---@cast n vector3   -- answered with t: there whenever t is
         if t and t < bestT and (not onTop or n.z > 0.7) then best, bestT = i, t end
     end
     return best, best and bestT or nil
@@ -604,7 +606,7 @@ local function pushState()
     if set then
         rows = {}
         for _, it in ipairs(set) do
-            local i = rowOf(it)
+            local i = rowOf(it) --[[@as integer]]   -- pickedNow answers only rows still in `items`
             rows[#rows + 1] = i
             selectedRows[i] = true
         end
@@ -1001,6 +1003,7 @@ beginSession = function(rows)
     startModeLoop()
     -- The wheel as noclip has it (plain zooms, Shift+wheel the fly speed), heard only while the right button is
     -- held; released, it scrolls the catalog. A session with its own camera starts there.
+    ---@cast session -nil   -- set by the caller just before (enterFurnish, Furnisher.open)
     local cam = session.camera
     FreeCam.start({
         scroll     = 'fov',
@@ -1350,7 +1353,8 @@ end
 ---@param force boolean|nil  the world builder's Remove, confirmed
 ---@param index number|nil   which one the confirmation was for
 local function deleteSelected(force, index)
-    local it = selected and items[selected]
+    if not selected then return end
+    local it = items[selected]
     if not it then return end
     if index ~= nil and index ~= selected then return end
     -- Several: asked first, always (FurnishBuilder.confirmRemoveMany), then all of them go.
@@ -1543,6 +1547,7 @@ local function padFrame()
     local holds = it ~= nil and not it.door
     FreeCam.setPad(true, not holds)
     if not holds then padTrigWas = false return end
+    ---@cast it -nil   -- holds says it is there
 
     local t = WhipPadTrigger('rt') - WhipPadTrigger('lt')
     local dt = GetFrameTime()
@@ -1601,6 +1606,7 @@ local function padPress(nav)
             carrying = nil
             blocked = false
             if from then
+                ---@cast it -nil   -- `from` is set only on a carry of the selection (buttonX); padFrame drops a stale one
                 -- Back where it was picked up.
                 it.x, it.y, it.z, it.rx, it.ry, it.rz = from[1], from[2], from[3], from[4], from[5], from[6]
                 applySelected()
@@ -1694,7 +1700,7 @@ local function chevron(it)
         and not FurnishBuilder.hasPrompt(it) then
         DrawMarker(2, it.x, it.y, it.z + 1.0, 0.0, 0.0, 0.0, 180.0, 0.0, 0.0,
                    0.18, 0.18, 0.18, 255, 255, 255, 220,
-                   false, false, 2, false, nil, nil, false)
+                   false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
     end
 end
 
@@ -2184,6 +2190,7 @@ function Furnisher.open(spec)
                 end
                 return
             end
+            ---@cast session -nil   -- save is called only on the open session (save, above)
             session.finish(payload)
         end,
         -- Done: everything handed back (spec.onDone), and it closes. Save is this unless spec.onSave exists;

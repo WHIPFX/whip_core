@@ -88,7 +88,7 @@ end
 ---@param from table  { store, slot }
 ---@param detail table  { item, amount, source }
 ---@return string|nil why
-function CashMarks.checkMove(from, to, detail)
+function CashMarks.checkMove(from, _, detail)
     if Config.BlockOwnCharacterTransfers == false then return nil end
     if not detail or detail.item ~= CASH then return nil end
     local key = markKey(from.store)
@@ -243,7 +243,7 @@ local function flush(wait)
                 dirty[key .. '|' .. tostring(charId)] = d
             end
         else
-            pcall(MySQL.query, sql, params)
+            pcall(MySQL.query --[[@as function]], sql, params)
         end
     end
 end

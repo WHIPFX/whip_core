@@ -96,8 +96,6 @@ local _vehicleStats = Registry.new('VehicleStat', {
     end,
 })
 
---- Register a vehicle stat.
----@param name string
 --- A stat's `display`: how its value reads to a person, checked and put in one shape for every screen that shows it
 --- (html/js/stat-display.js reads it):
 ---
@@ -162,6 +160,8 @@ local function normDisplay(d)
     return out
 end
 
+--- Register a vehicle stat.
+---@param name string
 ---@param config table  { default, min, max, persist, decay, decayInterval, hud, display }
 ---@param owner string|nil  resource name; defaults to the caller
 ---@return boolean ok
@@ -324,7 +324,7 @@ function VehicleStats.register(name, config, owner)
     -- The same registration again changes nothing and announces nothing (whip_core:onReady fires
     -- on every resource start). A foreign re-registration is refused, with the owner's name.
     local ok, why = _vehicleStats:add(owner, name, entry)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -646,9 +646,10 @@ end
 --- For anything installable (a nitrous bottle, a tow hook): "present" is the key existing in the
 --- stored block, so removing it is not the same as setting zero. Afterwards `get` and `getAll`
 --- report the registered default.
----@param vehicleId number
+---@param vehicleId number|string|nil
 ---@param name string
----@return boolean
+---@return boolean ok
+---@return string|nil err
 function VehicleStats.clear(vehicleId, name)
     vehicleId = tonumber(vehicleId)
     if not vehicleId then return false, 'Invalid vehicleId' end
@@ -694,7 +695,7 @@ end
 --- Write a stat: clamp it, store it, persist it, replicate it, announce it.
 ---@param vehicleId number
 ---@param name string
----@param value number
+---@param value number|string|nil
 ---@param changeSource string|nil  for the event payload, e.g. 'refuel:pump'
 ---@return boolean ok
 ---@return string|nil err  why not
@@ -798,14 +799,14 @@ end
 --- Vehicles whose replication is currently held: [vehicleId] = nesting depth.
 VehicleStats._replicateHeld = {}
 
+--- Which keys a held batch still owes a write to. See VehicleStats.batched.
+VehicleStats._replicatePending = {}
+
 --- Put a vehicle's stats on the entity, where every client in range can read them.
 ---
 --- Only what the car actually has (the STORED block, not getAll's every default): every fuel tick
 --- re-sends the block, so it stays small. Every reader resolves a missing key to the registered default.
 ---@param vehicleId number
---- Which keys a held batch still owes a write to. See VehicleStats.batched.
-VehicleStats._replicatePending = {}
-
 function VehicleStats.replicate(vehicleId)
     if VehicleStats._replicateHeld[vehicleId] then
         local pending = VehicleStats._replicatePending[vehicleId]
@@ -822,8 +823,8 @@ function VehicleStats.replicate(vehicleId)
 
     -- Empty replicates as absent, matching the Sentinel truth below: a mismatch strikes the
     -- entity's owner (see VehicleData.replicate), and three strikes is a kick.
-    local block = VehicleStats.getStored(vehicleId)
-    if next(block) == nil then block = nil end
+    local stored = VehicleStats.getStored(vehicleId)
+    local block = next(stored) ~= nil and stored or nil
 
     Sentinel.setEntityKey(entity, VEHICLE_STATS_KEY, block)   -- whip's own write
     ProfilerExitScope()
@@ -1091,7 +1092,7 @@ Every('vehicle stat decay tick', function() return math.max(250, (Config.Vehicle
         -- the world, so nothing about it should be draining.
         local def = Vehicles.getDef(vehicleId)
         local entity = (def and def.state == 'out') and Vehicles.getEntity(vehicleId) or nil
-        if entity then
+        if def and entity then
             for name, config in pairs(VehicleStats._registry) do
                 -- A presence stat decays only on a car that HAS it: add() on an absent stat would
                 -- write default+delta, fitting the part.
@@ -1287,7 +1288,7 @@ SecureEvent('whip_core:server:reportStatBurn', {
         -- A map of stat name -> running total: `any` (a variable key set), validated in full below.
         { 'totals', 'any' },
     },
-}, function(source, player, vehicleId, totals)
+}, function(source, _, vehicleId, totals)
     if type(totals) ~= 'table' then return end
     if not Vehicles.getDef(vehicleId) then return end
 
@@ -1330,13 +1331,13 @@ VehicleStats._liveCursors = {}
 ---
 --- The defence is the clock, as for consumption: no value further above the last accepted one than
 --- maxRate could carry it since. A client sending 100 every frame gets the honest ramp.
----@param source number
+---@param _ number  the reporting player
 ---@param vehicleId number
 ---@param name string
 ---@param value number
 ---@param now number
 ---@param occ table  the batch's occupancy memo — see mayReport
-local function applyLiveReport(source, vehicleId, name, value, now, occ)
+local function applyLiveReport(_, vehicleId, name, value, now, occ)
     local config = VehicleStats._registry[name]
     if not (config and config.live) then return end   -- not a live stat; nothing to do
 
@@ -1392,7 +1393,7 @@ SecureEvent('whip_core:server:reportStatLive', {
         -- A map of stat name -> current value: `any`, validated in full below.
         { 'values', 'any' },
     },
-}, function(source, player, vehicleId, values)
+}, function(source, _, vehicleId, values)
     if type(values) ~= 'table' then return end
     if not Vehicles.getDef(vehicleId) then return end
 
@@ -1444,7 +1445,7 @@ SecureEvent('whip_core:server:setVehicleEngine', {
         { 'vehicleId', 'id' },
         { 'on', 'bool' },
     },
-}, function(source, player, vehicleId, on)
+}, function(source, _, vehicleId, on)
     local def = Vehicles.getDef(vehicleId)
     if not def then return end
 
@@ -1567,7 +1568,7 @@ exports('HoldVehicleEngine', function(vehicleId, key, reason)
         id = id, vehicleId = vehicleId,
         reason = (type(reason) == 'string' and reason ~= '') and reason:sub(1, 80) or 'The engine will not start',
     })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     if (VehicleStats.get(vehicleId, 'engine') or 0) > 0 then VehicleStats.set(vehicleId, 'engine', 0, 'held') end
     return true
 end)
@@ -1618,7 +1619,7 @@ SecureEvent('whip_core:server:vehStatDebugWatch', {
     whileDead = true,
     requirePlayer = false,
     params    = { { 'vehicleId', 'id', 0 } },   -- 0 = stop watching
-}, function(source, player, vehicleId)
+}, function(source, _, vehicleId)
     if vehicleId > 0 and not DevTools.isAllowed(source) then return false, 'ACE denied: whip.devtools' end
     VehicleStats._debugWatch[source] = (vehicleId > 0) and vehicleId or nil
 end)
@@ -1704,7 +1705,7 @@ end)
 --- applying a tune, resetting a car. One stat at a time needs nothing.
 ---
 --- It takes the values, not a callback: a table crosses the resource boundary once.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param values table  [statName] = value
 ---@param changeSource string|nil
 ---@return number|false written  how many actually took; FALSE when none did
@@ -1914,7 +1915,7 @@ end)
 --- The question GetVehicleStat can't answer (it resolves an absent stat to its default, so a turbo
 --- idling at 1 reads as fitted on every car). The mirror of the client export of the same name.
 --- Reads the cache directly, not through getStored.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param name string
 ---@return boolean
 exports('HasVehicleStat', function(vehicleId, name)

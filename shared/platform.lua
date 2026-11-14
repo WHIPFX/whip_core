@@ -42,10 +42,10 @@ else
     ---@param serverId number
     ---@return number|nil
     function GamePlatform.playerIndex(serverId)
-        serverId = tonumber(serverId)
-        if not serverId then return nil end
-        local idx = GetPlayerFromServerId(serverId)
-        if not idx or idx < 0 or GetPlayerServerId(idx) ~= serverId then return nil end
+        local id = tonumber(serverId)
+        if not id then return nil end
+        local idx = GetPlayerFromServerId(id)
+        if not idx or idx < 0 or GetPlayerServerId(idx) ~= id then return nil end
         return idx
     end
 

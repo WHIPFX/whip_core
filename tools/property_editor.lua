@@ -514,7 +514,7 @@ function PropertyEditor.placePropertyPost(p, scope, uses)
     if not p then return false end
     local s = type(p.sign) == 'table' and p.sign.x and p.sign or nil
     local post = s and PropertyMath.signPost(s.post)
-    local postHeading = post and select(4, PropertyMath.promptToPost(post, s.x, s.y, s.z, s.heading or 0.0)) or nil
+    local postHeading = s and post and select(4, PropertyMath.promptToPost(post, s.x, s.y, s.z, s.heading or 0.0)) or nil
     return PropertyEditor.placeSignPost({
         name = p.name or ('Property #' .. tostring(p.id)),
         forText = (scope == 'unit' and (uses or 1) > 1) and ('all %d properties on this unit'):format(uses)

@@ -117,7 +117,7 @@ local AT_HELP = 'at says where the point is: { coords = vector3(...) }, { netId 
 local function readRide(at, out, bones)
     if at.offset ~= nil then
         local ox, oy, oz = readXYZ(at.offset)
-        if not ox or math.abs(ox) > 10 or math.abs(oy) > 10 or math.abs(oz) > 10 then
+        if not (ox and oy and oz) or math.abs(ox) > 10 or math.abs(oy) > 10 or math.abs(oz) > 10 then
             return false, 'at.offset is a vector3 within 10 m of what it is on'
         end
         out.offset = { x = ox, y = oy, z = oz }
@@ -601,7 +601,7 @@ end
 ---@param owner string  Registry.caller(), read before anything else
 ---@param def table
 ---@return number|false
----@return string|nil
+---@return string|false|nil
 ---@return string[]|nil warnings
 function RuntimePoints.add(owner, def)
     local warn = {}
@@ -613,7 +613,7 @@ function RuntimePoints.add(owner, def)
     local id = RUNTIME_BASE + nextN
     f.pointId, f.owner, f.tag, f.input, f.sentTo = id, owner, tag, def, {}
     local ok, err = reg:add(owner, id, f, tag ~= nil and { tag = tag } or nil)
-    if not ok then return false, err, warnings end
+    if not ok then return false, err --[[@as string]], warnings end
     points[id] = f
     announce(f)
     -- `false`, not nil, in the middle: across an export a nil cuts off every answer after it (the
@@ -625,7 +625,7 @@ end
 --- require, audience, reach, seeFrom, focusMode, enabled, onUse); everything else stays. The third
 --- answer is the warnings, as RuntimePoints.add's.
 ---@return boolean ok
----@return string|nil why
+---@return string|false|nil why
 ---@return string[]|nil warnings
 function RuntimePoints.update(owner, pointId, patch)
     local id = Sanitize.id(pointId)
@@ -656,7 +656,7 @@ end
 function RuntimePoints.remove(owner, pointId)
     local id = Sanitize.id(pointId)
     local rec = id and points[id]
-    if not rec or rec.owner ~= owner then return false, 'no such point of yours' end
+    if not id or not rec or rec.owner ~= owner then return false, 'no such point of yours' end
     return reg:remove(owner, id)
 end
 
@@ -785,7 +785,7 @@ SecureEvent('whip_core:server:useRuntimePoint', {
     -- The option's path: up to MAX_DEPTH ids of 40, with a / between.
     params    = { {'pointId', 'id'}, {'optionId', 'string', 40 * MAX_DEPTH + MAX_DEPTH - 1, ''} },
     near      = {
-        at = function(src, player, pointId)
+        at = function(_, _, pointId)
             local rec = points[pointId]
             if rec then return position(rec) end
         end,
@@ -800,13 +800,14 @@ SecureEvent('whip_core:server:useRuntimePoint', {
     if not rec.enabled then return false, 'That is not available' end
     if not Audience.has(rec.audience, source) then return false, 'That is not for you' end
     local x, y, z = position(rec)
-    if not x then return false, 'That is not available' end
+    if not (x and y and z) then return false, 'That is not available' end
     local reach = (rec.reach or Config.InteractActiveRange or 2.0) + 2.0
     if not IsPlayerNear(source, x, y, z, reach) then return false, 'Too far away' end
 
     -- The whole way down: a menu the player could not have opened (its own require) opens nothing.
     local opt, chain = optionAt(rec.options, optionId)
     if not opt then return false, 'That is not available' end
+    ---@cast chain -nil   -- optionAt answers an option and its chain together
 
     -- `alive` from the nearest that says (the option, the menus above it, the point): the client's
     -- rule for one option and its action, in client/actions.lua, carried down a menu.
@@ -819,13 +820,13 @@ SecureEvent('whip_core:server:useRuntimePoint', {
     if alive ~= false and player.isDead then return false, 'Not while downed' end
     local ok, why = Requirements.met(source, player, aliveSettled(rec.requires))
     if not ok then return false, why end
-    local path = {}
+    local ids = {}
     for _, o in ipairs(chain) do
         ok, why = Requirements.met(source, player, aliveSettled(o.requires))
         if not ok then return false, why end
-        path[#path + 1] = o.id
+        ids[#ids + 1] = o.id
     end
-    path = table.concat(path, '/')
+    local path = table.concat(ids, '/')
 
     useSeq = useSeq + 1
     local netId = rec.netId or (rec.vehicleId and vehicleNetId(rec.vehicleId)) or nil

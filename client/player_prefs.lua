@@ -325,7 +325,7 @@ end
 
 --- Every row, by group, in the page's order.
 local function pageState(extra)
-    local groups, byName = {}, {}
+    local byName = {}
     local function groupOf(name)
         local g = byName[name]
         if not g then

@@ -215,9 +215,9 @@ local function hudHex(hud, fresh)
     local h = not fresh and hexCache[hud]
     if h then return h end
     local r, g, b = GetHudColour(hud)
-    h = ('#%02x%02x%02x'):format(r or 255, g or 255, b or 255)
-    if not fresh then hexCache[hud] = h end
-    return h
+    local hex = ('#%02x%02x%02x'):format(r or 255, g or 255, b or 255)
+    if not fresh then hexCache[hud] = hex end
+    return hex
 end
 
 --- A number JSON can carry: GTA answers NaN or an infinity for a blip it cannot place, and FiveM then drops the WHOLE
@@ -262,8 +262,8 @@ end
 ---@param alive function
 ---@param list table  this loop's list, refilled in place
 ---@return boolean|nil changed
----@return table movers
----@return table moverAt  [blip] = { x, y }, the movers only
+---@return table|nil movers
+---@return table|nil moverAt  [blip] = { x, y }, the movers only
 local function scanBlips(alive, list)
     local moving, at = {}, {}
     local n, changed = 0, false
@@ -440,7 +440,7 @@ local function dataLoop(alive)
     while alive() do
         local changed, moving, at = scanBlips(alive, list)
         if changed == nil then return end
-        movers, moverAt = moving, at
+        movers, moverAt = moving --[[@as table]], at --[[@as table]]   -- they come with changed
 
         local cost = WhipCost.start()
         local route = readRoute(0) or readRoute(1)

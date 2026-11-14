@@ -189,7 +189,7 @@ SecureEvent('whip_core:server:vehicleWaypoint', {
         {'y',   'number', -20000, 20000},
         {'set', 'bool'},   -- false: cleared
     },
-}, function(source, player, x, y, set)
+}, function(source, _, x, y, set)
     local veh = GetVehiclePedIsIn(GetPlayerPed(source), false)
     if not veh or veh == 0 then return end
     for _, id in ipairs(GetPlayers()) do

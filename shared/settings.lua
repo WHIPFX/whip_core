@@ -163,7 +163,7 @@ local function step(t, p)
 end
 
 ---@param path string
----@return table|nil parent, string key
+---@return table|nil parent, string|integer key
 local function parentOf(path)
     local t = Config
     local parts = {}
@@ -220,7 +220,7 @@ end
 --- still reads the new numbers. A value that is not a table (or replaces one that is not) is
 --- simply assigned.
 ---@param parent table
----@param key string
+---@param key string|integer
 ---@param value any
 local function putInPlace(parent, key, value)
     local old = parent[key]
@@ -867,16 +867,15 @@ local function badEntry(e, where, depth)
     return nil
 end
 
---- After a page is declared. server/settings.lua fills this in (what was saved for the page goes
---- out to every player); on a player's game there is nothing more to do.
----@param owner string
----@param opts table|nil  { quiet = true }: Settings.register's
-function Settings.pageRegistered(owner, opts) end
+--- After a page is declared, with (owner, opts): Settings.register's. server/settings.lua fills this in (what was
+--- saved for the page goes out to every player); on a player's game there is nothing more to do.
+---@diagnostic disable-next-line: duplicate-set-field -- server/settings.lua's replaces it there
+function Settings.pageRegistered() end
 
 --- After a satellite's page goes with its resource. server/settings.lua fills this in (an admin
 --- looking at the page is told); on a player's game there is nothing more to do.
----@param owner string
-function Settings.pageDropped(owner) end
+---@diagnostic disable-next-line: duplicate-set-field -- server/settings.lua's replaces it there
+function Settings.pageDropped() end
 
 --- Declare `owner`'s page. Values saved before it existed are checked now: one refused is forgotten
 --- (the declared default stands) and said in the console.
@@ -1019,7 +1018,7 @@ end
 AddEventHandler('onResourceStop', function(res)
     if res == CORE or not pages[res] then return end
     pages[res], index[res], hooks[res] = nil, nil, nil
-    Settings.pageDropped(res)
+    Settings.pageDropped()
 end)
 
 -- Each settings page in GetRegistrations with the registries. In a thread: this file loads before

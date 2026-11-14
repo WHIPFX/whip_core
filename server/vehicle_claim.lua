@@ -24,7 +24,6 @@
 -- things, written off with the session car). After a claim, what pointed at the old car follows the
 -- new one: 'claimed' is announced, and runtime points and the Director's run handles listen.
 
-local CORE = GetCurrentResourceName()
 local STORAGES = { 'trunk', 'glovebox' }
 
 --- Who is driving a car: the player's server id, or nil.
@@ -100,7 +99,8 @@ end
 function Vehicles.claim(vehicleId, who, opts)
     opts = type(opts) == 'table' and opts or {}
     local charId, src = WhoIs(who)
-    if not charId then return false, src end
+    if not charId then return false, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'No such car' end
     if not def.session then return false, 'That car is someone\'s already' end
@@ -181,6 +181,7 @@ function Vehicles.claim(vehicleId, who, opts)
     local here = opts.here ~= false and entity ~= nil
     local at
     if here then
+        ---@cast entity -nil   -- `here` only with one
         local c = GetEntityCoords(entity)
         at = { x = c.x, y = c.y, z = c.z, heading = GetEntityHeading(entity) }
     end

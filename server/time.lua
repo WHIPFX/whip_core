@@ -362,7 +362,7 @@ local CORE = GetCurrentResourceName()
 ---
 --- A layer belongs to the resource that set it: it is cleared when that resource stops, and another
 --- running resource may not replace or clear it (whip_core may: its admin tools answer for the server).
----@param source number
+---@param source number|string|nil
 ---@param name string   unique per source, e.g. 'mission:heist'
 ---@param opts table|nil  { priority?, hour?, minute?, weather?, frozen?, blackout? }; nil clears
 ---@param owner string|nil  the setting resource (the exports fill it in)

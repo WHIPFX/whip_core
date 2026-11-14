@@ -555,8 +555,8 @@ end
 --- sibling } } of the kinds that name anything.
 function F.refsData()
     local out = {}
-    for name, d in pairs(KINDS) do
-        if d.names or d.refs or d.sibling then out[name] = { names = d.names, refs = d.refs, sibling = d.sibling } end
+    for kind, d in pairs(KINDS) do
+        if d.names or d.refs or d.sibling then out[kind] = { names = d.names, refs = d.refs, sibling = d.sibling } end
     end
     return out
 end

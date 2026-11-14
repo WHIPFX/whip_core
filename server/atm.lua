@@ -26,7 +26,7 @@
 --- refused; the deposit and withdraw callbacks below re-check on the server every time.
 SecureCallback('whip_core:atm:accounts', {
     rateLimit = 500,
-}, function(source, player)
+}, function(_, player)
     local accounts = Bank.GetCharacterAccounts(player.charId) or {}
     local out = {}
 

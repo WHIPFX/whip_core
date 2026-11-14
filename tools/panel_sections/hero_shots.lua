@@ -23,6 +23,18 @@
 local CHARACTER = 'hero'   -- the character's id among the builder's things
 local MAX_PROPS = 60       -- as the setting allows (shared/config_schema.lua, maxProps)
 
+---@class HeroShotEdit
+---@field section string
+---@field index integer
+---@field shot table
+---@field camera table
+---@field held table
+---@field ped integer|nil
+---@field turn integer|nil
+---@field posedTurn integer|nil
+---@field made boolean|nil
+
+---@type HeroShotEdit|nil
 local editing = nil   -- { section, index, shot, camera, held, ped } while a shot is open
 
 local function r2(n) return math.floor((tonumber(n) or 0.0) * 100 + 0.5) / 100 end
@@ -54,6 +66,7 @@ local function repose()
         UI.Notify('The character is not in the shot: Exit and edit it again to bring them back', 'error', 4000)
         return
     end
+    ---@cast e -nil   (the ped came from it)
     e.turn = (e.turn or 0) + 1
     local turn = e.turn
     dropHeld(e)
@@ -106,6 +119,7 @@ RegisterNUICallback('cfgHeroEdit', function(data, cb)
         WhipPanelResult('That shot has no place or camera to open at', 'err')
         return
     end
+    ---@cast shot table   (pos came from it)
     if not Furnisher or not Furnisher.open then return end
 
     editing = {

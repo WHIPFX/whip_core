@@ -91,7 +91,38 @@ local SAME_M, SAME_COS = 0.001, math.cos(math.rad(0.1))
 --   double, car, frame, item, probe, busy (saving, swapping or changing pose), asking (the item the page is asking
 --   about), leave (Esc while busy: out once it is done), quiet (no keys until then), fromPanel (opened from /whip:
 --   the panel comes back after), heldTag + bone (a resource's held prop, not an item: its set's tag, its bone) }
+---@class HandEditSession
+---@field key string
+---@field label string
+---@field model integer
+---@field poses table[]
+---@field pose integer
+---@field hand string
+---@field holds table<string, table>
+---@field saved table<string, table>
+---@field visited table<string, boolean>
+---@field walk boolean|nil
+---@field savedWalk boolean|nil
+---@field grab boolean|nil
+---@field savedGrab boolean|nil
+---@field double integer
+---@field car integer|nil
+---@field walking boolean|nil
+---@field frame integer
+---@field item integer
+---@field probe integer
+---@field busy boolean|nil
+---@field asking { key: string, name: string }|nil
+---@field leave boolean|nil
+---@field quiet integer|nil
+---@field fromPanel boolean|nil
+---@field heldTag string|nil
+---@field bone integer|nil
+
+---@type HandEditSession|nil
 local ed = nil
+-- What reads it below runs only while the editor is open (the way in checks it)
+---@cast ed -nil
 
 --- The bone the hand's hold is from: a held prop's own, else the pose's hand.
 local function boneNow() return ed.bone or HAND_BONES[ed.hand] end
@@ -364,9 +395,9 @@ end
 --- The item's model, its holds as saved ({ right, left }; the left takes the right's when it has none), its
 --- "Allow player walk animation", and whether it is picked up with both hands. Yields.
 ---@return number|nil hash
----@return table|string holds, or why not
----@return boolean walk
----@return boolean twoHands
+---@return table|string holds # or why not
+---@return boolean|nil walk
+---@return boolean|nil twoHands
 local function loadItem(key)
     local model = Inventory.itemPropModel(key)
     local hash = model and LoadModel(model, 3000)

@@ -794,6 +794,10 @@ function Npcs.spawn(owner, def, opts)
     end
     local x, y, z, h = readCoords(def.coords)
     if not x then return false, 'coords must be a vector3/vector4 or { x, y, z, heading }' end
+    -- (readCoords answers all four, or nil.)
+    ---@cast y number
+    ---@cast z number
+    ---@cast h number
     local behaviour = def.behaviour or 'stand'
     if not BEHAVIOURS[behaviour] then return false, "behaviour is 'stand' or 'guard'" end
     local conditions, cwhy = readConditions(def.conditions)
@@ -818,8 +822,9 @@ function Npcs.spawn(owner, def, opts)
     local tag = opts.tag
     local bucket = 0
     if opts.bucket ~= nil then
-        bucket = math.tointeger(tonumber(opts.bucket))
-        if not bucket or bucket < 0 or bucket > 0x7fffffff then return false, 'bucket is a routing bucket, a whole number 0 or more' end
+        local b = math.tointeger(tonumber(opts.bucket))
+        if not b or b < 0 or b > 0x7fffffff then return false, 'bucket is a routing bucket, a whole number 0 or more' end
+        bucket = b
     end
     local gx, gy, gz = readCoords(def.gateAt)
 
@@ -1190,7 +1195,7 @@ SecureCallback('whip_core:npcLook', {
     -- (A burst for a group made at once, each NPC asked for by itself.)
     whileDead = true, rateLimit = 250, burst = 24,
     params = { { 'npcId', 'id' } },
-}, function(source, player, npcId)
+}, function(_, _, npcId)
     local rec = recs[npcId]
     if not rec or not rec.look then return {} end
     return { look = rec.look, v = rec.id }
@@ -1205,7 +1210,7 @@ SecureEvent('whip_core:server:npcApplied', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'npcId', 'id'}, {'netId', 'id', 1, 65535}, {'ver', 'int', 0, 1000000} },
     ownerOf = 'netId',
-}, function(source, player, npcId, netId, ver)
+}, function(_, _, npcId, netId, ver)
     local rec = recs[npcId]
     if not rec or rec.netId ~= netId then return end
     if ver == rec.ver then
@@ -1219,7 +1224,7 @@ SecureEvent('whip_core:server:npcJob', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'npcId', 'id'}, {'netId', 'id', 1, 65535}, {'jobId', 'int', 0, 2000000000}, {'how', 'enum', { 'done', 'failed' }} },
     ownerOf = 'netId',
-}, function(source, player, npcId, netId, jobId, how)
+}, function(_, _, npcId, netId, jobId, how)
     local rec = recs[npcId]
     if not rec or rec.netId ~= netId then return end
     TaskSeq.report(rec, jobId, how)
@@ -1229,7 +1234,7 @@ SecureEvent('whip_core:server:npcDied', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'npcId', 'id'}, {'netId', 'id', 1, 65535} },
     ownerOf = 'netId',
-}, function(source, player, npcId, netId)
+}, function(_, _, npcId, netId)
     local rec = recs[npcId]
     if not rec or rec.netId ~= netId or not rec.alive then return end
     rec.deadReportAt = rec.deadReportAt or GetGameTimer()   -- the tick confirms it, with the killer

@@ -30,6 +30,7 @@ local previewState = nil
 local promptsBackAt = nil
 
 -- The typed number in progress, or nil: { id, buffer, max, onSubmit, onCancel, held }.
+---@type table|nil
 local inputState = nil
 
 -- Forward-declared: unregister() and setOptions() have to be able to kill a live input.
@@ -235,23 +236,6 @@ end
 
 -- Public registration API
 
---- Register a world interaction point.
----@param data table { id (optional string), x, y, z, label, icon?, heading?, follow?, focusMode?, visibleRange?, activeRange?, sizeRange?, scale?, onBlur?, group?, callback (function), condition? (function→bool) }
----@return string registeredId
----
---- `heading`: world renderer only. Omitted, the prompt faces the player like a billboard; given, it stands
---- as a sign, readable from the front and hidden from behind.
---- `follow`: a function returning `x, y, z, heading`, called each frame while visible, for a point that
---- moves (a door handle). nil keeps the last position. Optional further answers, in order:
---- `pull` (metres toward the camera, so the prompt does not sit inside its prop; 0 = none),
---- `wrap` (the box a sign stands on, see interact_world.lua foldQuad), `centre` (centre the words on
---- the point), `tilt` (degrees a sign leans back), `fit` ({ width, above, below }, the box the prompt
---- stays inside).
---- `pull` and `centre` can also be given at registration.
---- `focusMode`: 'aim' (default, what you look at wins) or 'near' (closest wins, wider cone; doors).
---- `visibleRange` and `activeRange` override Config for this point: how far its circle fades in, and how
---- close you must be for the key to work. Visible range is capped to what the grid searches
---- (clampVisibleRange below).
 ---@param id string
 ---@param vr number|nil
 ---@return number|nil
@@ -286,6 +270,24 @@ local function checkedStyle(id, style)
     return s
 end
 
+--- Register a world interaction point.
+---@param data table { id (optional string), x, y, z, label, icon?, heading?, follow?, focusMode?, visibleRange?, activeRange?, sizeRange?, scale?, onBlur?, group?, callback (function), condition? (function→bool) }
+---@return string|false registeredId  false when refused
+---@return string|nil reason
+---
+--- `heading`: world renderer only. Omitted, the prompt faces the player like a billboard; given, it stands
+--- as a sign, readable from the front and hidden from behind.
+--- `follow`: a function returning `x, y, z, heading`, called each frame while visible, for a point that
+--- moves (a door handle). nil keeps the last position. Optional further answers, in order:
+--- `pull` (metres toward the camera, so the prompt does not sit inside its prop; 0 = none),
+--- `wrap` (the box a sign stands on, see interact_world.lua foldQuad), `centre` (centre the words on
+--- the point), `tilt` (degrees a sign leans back), `fit` ({ width, above, below }, the box the prompt
+--- stays inside).
+--- `pull` and `centre` can also be given at registration.
+--- `focusMode`: 'aim' (default, what you look at wins) or 'near' (closest wins, wider cone; doors).
+--- `visibleRange` and `activeRange` override Config for this point: how far its circle fades in, and how
+--- close you must be for the key to work. Visible range is capped to what the grid searches
+--- (clampVisibleRange, above).
 function Interactions.register(data)
     if type(data) ~= 'table' then return false, 'a prompt is a table: { id, x, y, z, label, callback, ... }' end
     local id = data.id
@@ -691,7 +693,7 @@ end
 ---@param id string|nil
 ---@return string|nil
 function Interactions.inputText(id)
-    if not Interactions.inputActive(id) then return nil end
+    if not inputState or not Interactions.inputActive(id) then return nil end
     return inputState.buffer
 end
 
@@ -700,7 +702,7 @@ end
 ---@param text string|number
 ---@return boolean set
 function Interactions.setInputText(id, text)
-    if not Interactions.inputActive(id) then return false end
+    if not inputState or not Interactions.inputActive(id) then return false end
     inputState.buffer = tostring(text or ''):gsub('%D', ''):sub(1, inputState.max)
     return true
 end
@@ -756,6 +758,7 @@ end
 ---@param id string
 ---@return number|nil index
 ---@return string|nil optionId
+---@return number|nil count  how many are offered now
 function Interactions.getSelection(id)
     local data = registry[id]
     if not data then return nil end
@@ -789,7 +792,6 @@ local cos = math.cos
 local abs = math.abs
 local sqrt = math.sqrt
 local max = math.max
-local min = math.min
 local pi = math.pi
 
 --- Camera forward direction as a unit vector. Global so other client files aim by the same maths.
@@ -1400,7 +1402,7 @@ CreateThread(function()
                 local vRange = data.visibleRange or visibleRange
                 local aRange = data.activeRange or activeRange
 
-                local score, dist, dot
+                local score, dist
                 if held then
                     -- Held: in range is enough, however the camera turns.
                     local hx, hy, hz = data.x - px, data.y - py, data.z - pz
@@ -1413,7 +1415,7 @@ CreateThread(function()
                   if ox * ox + oy * oy + oz * oz > reach * reach then
                     score = -1
                   else
-                    score, dist, dot = InteractComputeScore(px, py, pz, cfx, cfy, cfz, data.x, data.y, data.z, vRange)
+                    score, dist = InteractComputeScore(px, py, pz, cfx, cfy, cfz, data.x, data.y, data.z, vRange)
 
                     -- `follow` runs only for what is on screen, so a prompt about to be turned away is
                     -- asked where it is now first, at most every REFOLLOW_MS.
@@ -1422,7 +1424,7 @@ CreateThread(function()
                         if now >= (data._refollowAt or 0) then
                             data._refollowAt = now + REFOLLOW_MS
                             applyFollow(data)
-                            score, dist, dot = InteractComputeScore(px, py, pz, cfx, cfy, cfz, data.x, data.y, data.z, vRange)
+                            score, dist = InteractComputeScore(px, py, pz, cfx, cfy, cfz, data.x, data.y, data.z, vRange)
                         end
                     end
                   end

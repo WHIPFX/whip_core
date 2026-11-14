@@ -225,7 +225,7 @@ end
 --- difficulty is then one of that game's levels, and its minMs and timeoutMs are the defaults. A player
 --- the game cannot start for (whip_phone's: no phone) is told why, and the answer is false, 'not
 --- started', with nothing shown (`opts.quiet`: not told). 'unavailable': their game has no such game.
----@param source number
+---@param source number|string|nil
 ---@param difficulty string|table|nil  'easy' | 'medium' | 'hard' (default 'medium') — as the client export
 ---@param opts table|nil    { timeoutMs?: number, minMs?: number, tag?: string, game?: string, quiet?: boolean }
 ---@param owner string|nil  the resource asking (Registry.caller() in the export); default whip_core

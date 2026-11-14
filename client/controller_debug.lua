@@ -281,6 +281,7 @@ local function StartOverlayThread()
             -- "THE GAME SAW IT", one line per button, in F8 — the half the bindings' own lines
             -- cannot give: a press the game saw and no binding answered is a binding that did not fire.
             if saw then
+                ---@cast sawOrder -nil   -- (made with saw)
                 for i = 1, #sawOrder do
                     print(('[whip_core:pad] game saw %s  (%s)'):format(sawOrder[i], saw[sawOrder[i]]))
                 end

@@ -104,9 +104,9 @@ local function sameMatch(a, b)
 end
 
 --- Start timing an action for a player. Starting the same action again restarts its clock.
----@param source number
+---@param source number|string|nil
 ---@param name string        unique within the calling resource
----@param durationMs number  the progress bar's length, the same number the client uses
+---@param durationMs number|string|nil  the progress bar's length, the same number the client uses
 ---@param match table|nil    plain values the finish must repeat exactly
 ---@param owner string|nil   the resource the action belongs to (the exports fill this in)
 ---@return boolean started
@@ -147,7 +147,7 @@ end
 --- The answer is what the start was given: the match table, always a table, so it is truthy. That is
 --- how a finish learns WHICH item the use started from without the client naming it: pass no match,
 --- get the start's back.
----@param source number
+---@param source number|string|nil
 ---@param name string
 ---@param match table|nil  omit to take the start's values as they are
 ---@param owner string|nil
@@ -305,7 +305,7 @@ end
 --- `notWhile` = { 'swimming', 'underwater', 'falling' }: the player's game does not start the bar in any of them
 --- ('refused'), and ends it as one begins ('cancelled'), saying why on the capsule either way. The server cannot see the
 --- body, so this is their game's check (shared/body_state.lua).
----@param source number
+---@param source number|string|nil
 ---@param opts table  { label, duration, canCancel, anim, prop, disable, cancelOnDeath, cancelOnExit, notWhile, icon, item, near, tag } — the client Progress's options, plus `near` and `tag`
 ---@param owner string|nil  the resource asking
 ---@return boolean completed
@@ -313,7 +313,7 @@ end
 function TimedAction.progress(source, opts, owner)
     source = tonumber(source)
     local who = source and Players[source]
-    if not who then return false, 'Player not loaded' end
+    if not source or not who then return false, 'Player not loaded' end
     -- Not for a session on its way out: logout ends every bar before it drains, and a new one asked
     -- for inside the drain would outlive the character.
     if who.closing then return false, 'player left' end

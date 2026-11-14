@@ -125,7 +125,7 @@ end
 
 --- Does this player have `name`? Full admins (whip.devtools) have every permission that allows it;
 --- anyone else needs a grant on their account. A server id that is not a player has none.
----@param src number
+---@param src number|nil
 ---@param name string
 ---@return boolean
 function Permissions.has(src, name)
@@ -191,7 +191,7 @@ local function changed(userId, name, granted)
 end
 
 --- Give an account a permission. Answers true, or false and why.
----@param userId number
+---@param userId number|nil
 ---@param name string
 ---@param by number|string|nil  who gave it (a server id, a resource name, or nil: the server)
 function Permissions.grant(userId, name, by)

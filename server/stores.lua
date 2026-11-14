@@ -23,7 +23,6 @@ local TX_STALL_MS = 30000
 ---@param queries table[]  array of {query=string, values=table}
 ---@return boolean committed
 ---@return string|nil err
----@param queries table[]
 ---@param faultMode string|nil  which injected fault applies; nil means 'transaction'
 function Stores.runTransaction(queries, faultMode)
     if not queries or #queries == 0 then
@@ -310,7 +309,7 @@ local function defineStoreKind(kindId, kindDef)
 
     local isNew = Stores._kinds[kindId] == nil
     local added, why = _storeKinds:add(resource, kindId, shielded)
-    if not added then return false, why end
+    if not added then return false, why --[[@as string]] end
 
     if isNew then
         print(('[whip_core:stores] %s defined store kind "%s"%s')
@@ -717,8 +716,9 @@ function Stores.move(fromStore, fromSlot, toStore, toSlot)
 
         local returningWeight = 0
         if toData then
-            returningWeight = itemWeight(toData.item, toData.amount, toData.metadata)
-            if returningWeight == nil then return false, 'Unknown item weight' end
+            local w = itemWeight(toData.item, toData.amount, toData.metadata)
+            if w == nil then return false, 'Unknown item weight' end
+            returningWeight = w
         end
 
         -- Not asked when the source is a bag carried in the destination: both are already on it.
@@ -912,7 +912,7 @@ end
 --- Put an item into a specific slot, creating it.
 --- Merges onto a matching stack when metadata is equivalent, otherwise requires an empty slot.
 ---@param store table
----@param slot number
+---@param slot number|string|nil
 ---@param itemKey string
 ---@param amount number
 ---@param metadata table|nil
@@ -1010,7 +1010,7 @@ end
 
 --- Remove a quantity from a slot, destroying it.
 ---@param store table
----@param slot number
+---@param slot number|string|nil
 ---@param amount number|nil  nil removes the whole stack
 ---@return boolean ok
 ---@return string|nil err
@@ -1051,16 +1051,16 @@ Stores.defineKind('player', {
         return { player = player, cache = player.inventory, container = key.container }
     end,
 
-    instanceId = function(key, h)
+    instanceId = function(_, h)
         return ('player:%d:%s'):format(h.player.charId, h.container)
     end,
 
     -- The whole character is one row-set (pruned together), so one container's flush can't delete another's rows.
-    unitKey = function(key, h)
+    unitKey = function(_, h)
         return 'player:' .. h.player.charId
     end,
 
-    label = function(key, h)
+    label = function(_, h)
         return ('%s[%s]'):format(h.player.fullName or 'player', tostring(h.container))
     end,
 
@@ -1079,15 +1079,15 @@ Stores.defineKind('player', {
     end,
 
     -- The accessory strip's per-slot rule, on every path (beforeMove below only sees the drag path).
-    allowsAt = function(h, slot, itemKey, metadata)
+    allowsAt = function(h, slot, itemKey)
         if h.container ~= 'accessory' then return true end
         local def = Inventory.AccessorySlots[slot]
         if not def then
             return false, 'No such accessory slot'
         end
         if def.accepts and itemKey ~= def.accepts then
-            local itemDef = Config.Items[def.accepts]
-            return false, ('Only %s can go there'):format(itemDef and itemDef.name or def.label)
+            local acceptedDef = Config.Items[def.accepts]
+            return false, ('Only %s can go there'):format(acceptedDef and acceptedDef.name or def.label)
         end
         return true
     end,
@@ -1109,8 +1109,8 @@ Stores.defineKind('player', {
             return false, 'No such accessory slot'
         end
         if def.accepts and ctx.item ~= def.accepts then
-            local itemDef = Config.Items[def.accepts]
-            return false, ('Only %s can go there'):format(itemDef and itemDef.name or def.label)
+            local acceptedDef = Config.Items[def.accepts]
+            return false, ('Only %s can go there'):format(acceptedDef and acceptedDef.name or def.label)
         end
         return true
     end,
@@ -1156,14 +1156,14 @@ Stores.defineKind('rawInventory', {
         return { cache = key.cache, container = key.container, charId = key.charId }
     end,
 
-    instanceId = function(key, h) return ('raw:%d:%s'):format(h.charId, h.container) end,
+    instanceId = function(_, h) return ('raw:%d:%s'):format(h.charId, h.container) end,
     -- The player's own unit for their live cache, so an admin edit and the player's flush can't commit side by side.
-    unitKey    = function(key, h)
+    unitKey    = function(_, h)
         local live = PlayersByCharId and PlayersByCharId[h.charId]
         if live and live.inventory == h.cache then return 'player:' .. tostring(h.charId) end
         return 'raw:' .. tostring(h.charId)
     end,
-    label      = function(key, h) return ('char%d[%s]'):format(h.charId, h.container) end,
+    label      = function(_, h) return ('char%d[%s]'):format(h.charId, h.container) end,
 
     slots     = function(h) return Config.ContainerSlots[h.container] end,
     maxWeight = function(h) return Config.MaxWeight[h.container] or 9999 end,
@@ -1286,7 +1286,7 @@ Stores.defineKind('vehicle', {
 
     instanceId = function(key) return ('vehicle:%s:%s'):format(tostring(key.vehicleId), tostring(key.storageType)) end,
     unitKey    = function(key) return ('vehicle:%s:%s'):format(tostring(key.vehicleId), tostring(key.storageType)) end,
-    label      = function(key, h) return ('%s %s'):format(h.def.plate or 'vehicle', tostring(h.storageType)) end,
+    label      = function(_, h) return ('%s %s'):format(h.def.plate or 'vehicle', tostring(h.storageType)) end,
 
     slots     = function(h) return Vehicles.getStorageConfig(h.vehicleId, h.storageType).slots end,
     maxWeight = function(h) return Vehicles.getStorageConfig(h.vehicleId, h.storageType).maxWeight end,
@@ -1375,10 +1375,10 @@ Stores.defineKind('panel', {
         return { source = key.src, session = session }
     end,
 
-    instanceId = function(source, h) return 'panel:' .. tostring(h.session.id) end,
+    instanceId = function(_, h) return 'panel:' .. tostring(h.session.id) end,
     -- Ephemeral: never enqueued for persistence, so the unit key is only ever a label.
-    unitKey    = function(source, h) return 'panel:' .. tostring(h.session.id) end,
-    label      = function(source, h) return tostring(h.session.config.label or h.session.id) end,
+    unitKey    = function(_, h) return 'panel:' .. tostring(h.session.id) end,
+    label      = function(_, h) return tostring(h.session.config.label or h.session.id) end,
 
     slots     = function(h) return h.session.config.slots or 10 end,
     maxWeight = function(h) return h.session.config.maxWeight or math.huge end,
@@ -1555,7 +1555,7 @@ function Stores.selfContainment(from, to, detail)
             moving = from.store.kind.get(from.store.handle, from.slot)
         end
         local meta = moving and moving.metadata
-        if meta and meta.uid == host.uid and (host.itemKey == nil or moving.item == host.itemKey) then
+        if moving and meta and meta.uid == host.uid and (host.itemKey == nil or moving.item == host.itemKey) then
             return 'that cannot hold itself'
         end
         return nil
@@ -1582,8 +1582,8 @@ Stores.defineKind('basket', {
         return { source = source, session = session }
     end,
 
-    instanceId = function(source, h) return 'basket:' .. tostring(h.source) end,
-    unitKey    = function(source, h) return 'basket:' .. tostring(h.source) end,
+    instanceId = function(_, h) return 'basket:' .. tostring(h.source) end,
+    unitKey    = function(_, h) return 'basket:' .. tostring(h.source) end,
     label      = function() return 'Basket' end,
 
     slots     = function(h) return h.session.slots or 10 end,
@@ -1632,9 +1632,9 @@ Stores.defineKind('shop', {
         return { shopId = shopId, def = def, keys = keys }
     end,
 
-    instanceId = function(shopId, h) return 'shop:' .. tostring(h.shopId) end,
-    unitKey    = function(shopId, h) return 'shop:' .. tostring(h.shopId) end,
-    label      = function(shopId, h) return tostring(h.def.name or ('Shop ' .. tostring(h.shopId))) end,
+    instanceId = function(_, h) return 'shop:' .. tostring(h.shopId) end,
+    unitKey    = function(_, h) return 'shop:' .. tostring(h.shopId) end,
+    label      = function(_, h) return tostring(h.def.name or ('Shop ' .. tostring(h.shopId))) end,
 
     slots     = function(h) return #h.keys end,
     maxWeight = function() return math.huge end,
@@ -1664,7 +1664,7 @@ Stores.defineKind('shop', {
     synthetic = true,
 
     --- Nothing goes into an infinite shop (`set` would destroy it); selling back is its own transaction.
-    beforeMove = function(h, ctx)
+    beforeMove = function(_, ctx)
         if ctx.direction == 'in' then
             return false, 'This shop does not buy items'
         end
@@ -1771,6 +1771,7 @@ function Stores.moveByAddress(fromAddr, toAddr, opts, askedBy)
                     for _, store in ipairs({ from, to }) do
                         local owner = store.kind.id == 'player' and store.handle and store.handle.player
                         local charId = owner and owner.charId or false
+                        ---@cast charId any   -- false (no owner) is a key here too
                         if not logged[charId] then
                             logged[charId] = true
                             -- The live slot, so a first row mints the uid onto the real item.
@@ -2069,7 +2070,7 @@ end
 ---@param token table|nil  what Stores.freeze answered
 function Stores.unfreeze(token)
     local holds = token and Stores._frozen[token.unit]
-    if not holds then return end
+    if not (token and holds) then return end
     holds[token] = nil
     if next(holds) == nil then Stores._frozen[token.unit] = nil end
 end
@@ -2079,7 +2080,7 @@ end
 ---@return boolean
 function Stores.isFrozen(unit)
     local holds = unit ~= nil and Stores._frozen[unit]
-    if not holds then return false end
+    if not (unit and holds) then return false end
     local now, live = GetGameTimer(), false
     for token, lapses in pairs(holds) do
         if now < lapses then live = true else holds[token] = nil end
@@ -2145,7 +2146,7 @@ function Stores.commitMove(from, to, opts)
             and toBefore.amount < def.maxStack
         if not merges then
             occupant = toBefore
-        elseif detail.amount and fromNow.amount + toBefore.amount > def.maxStack then
+        elseif def and detail.amount and fromNow.amount + toBefore.amount > def.maxStack then
             -- A merge moves what fits, and the hooks and log are told that.
             detail.amount = math.min(detail.amount, def.maxStack - toBefore.amount)
         end
@@ -2467,7 +2468,6 @@ end
 ---@param stores table[]  the stores that were mutated
 ---@return boolean ok
 ---@return string|nil err
----@param stores table[]
 ---@param faultMode string|nil  passed through to runTransaction
 ---@param extra table[]|nil  queries that are not a unit's (a bank write), sent last in the same transaction
 function Stores.commit(stores, faultMode, extra)
@@ -2956,7 +2956,7 @@ end
 Stores.isDeferred = isDeferred
 
 --- Record that a store has changes not yet on disk. O(1), no I/O: what a mutation path calls instead of saving.
----@param store table
+---@param store table|nil
 function Stores.markDirty(store)
     if not store or not store.kind.persist then return end
     tieToActions(store)
@@ -3125,7 +3125,7 @@ function Stores.writeTogether(stores)
 end
 
 --- Route one store's save according to its kind's declared durability.
----@param store table
+---@param store table|nil
 ---@return boolean ok
 ---@return string|nil err
 function Stores.save(store)
@@ -3438,25 +3438,25 @@ function Stores.flushAll(opts)
     for _, batch in ipairs(batches) do
         -- Re-expanded now: a move during the failed commit's yield may have linked a new member.
         local stores = expandToGroups(batch.stores)
-        local units = {}
-        for i, s in ipairs(stores) do units[i] = s.unit end
+        local batchUnits = {}
+        for i, s in ipairs(stores) do batchUnits[i] = s.unit end
 
         -- A pulled-in unit may have a commit in flight: skip, and the next pass gathers the group.
-        if not claimInflight(units) then
+        if not claimInflight(batchUnits) then
             goto nextBatch
         end
 
         -- About to be written, so out of _dirty.
-        for _, u in ipairs(units) do Stores._dirty[u] = nil end
+        for _, u in ipairs(batchUnits) do Stores._dirty[u] = nil end
 
         local groupOk, groupErr = safeCommit(stores, faultMode)
-        releaseInflight(units)
+        releaseInflight(batchUnits)
 
         if groupOk then
-            releaseCommitted(units)
+            releaseCommitted(batchUnits)
         else
             failed = failed + 1
-            for i, unit in ipairs(units) do
+            for i, unit in ipairs(batchUnits) do
                 -- quarantine re-marks the unit dirty itself, with its backoff.
                 quarantine(unit, stores[i], groupErr)
             end
@@ -3575,6 +3575,7 @@ end
 ---@param store table
 ---@return table|nil queries  nil when a member could not be built
 ---@return string[] units     every unit of the group
+---@return table[] carried    the held payments that ride with it, marked in flight (only when it is whole)
 local function groupQueries(store)
     local queries, units, whole = {}, {}, true
     for _, s in ipairs(expandToGroups({ store })) do
@@ -3631,7 +3632,7 @@ function Stores.dispatchOwed()
                 done[u] = true
                 count = count + 1
             end
-            if queries and #queries > 0 then pcall(MySQL.transaction, queries) end
+            if queries and #queries > 0 then pcall(MySQL.transaction --[[@as function]], queries) end
         end
     end
     return count
@@ -3646,7 +3647,7 @@ function Stores.dispatchGroup(store)
     if not queries then return false end
     if #queries == 0 then return true end
     if #carried == 0 then
-        pcall(MySQL.transaction, queries)
+        pcall(MySQL.transaction --[[@as function]], queries)
         return true
     end
     -- A held payment rides it and whip_core is still running: wait in a thread of its own (an
@@ -3755,12 +3756,6 @@ for _, c in ipairs(PlayerContainers) do CLIENT_KINDS[c] = true end
 for name in pairs(CLIENT_KINDS) do Stores.ReservedKindNames[name] = true end
 for name in pairs(Stores._kinds) do Stores.ReservedKindNames[name] = true end
 
---- Resolve a client-supplied address into an authorized store.
----@param src number
----@param addr table  { kind, id?, sub?, slot }
----@return table|nil store
----@return number|nil slot
----@return string|nil err
 local EMPTY_VIEWERS = {}
 
 -- Viewers: who currently has a store open. Several players can; being a viewer is not access (decided once at
@@ -4461,7 +4456,7 @@ end)
 ---   readOnly      your own kind: they can look, and every move is refused
 --- A player's pockets open with OpenPlayerInventory, a panel with OpenPanel; a vehicle's glovebox and ignition open
 --- from its seat. If the player already has a screen open, the open is declined. Answers `true` or `false, reason`.
----@param source number
+---@param source number|string|nil
 ---@param addr table  { kind, id, sub }
 ---@param opts table|nil
 ---@return boolean ok
@@ -4469,7 +4464,7 @@ end)
 exports('OpenStore', function(source, addr, opts)
     source = tonumber(source)
     local player = source and Players[source]
-    if not player or not player.inventory then return false, 'Player not loaded' end
+    if not source or not player or not player.inventory then return false, 'Player not loaded' end
     if type(addr) ~= 'table' then return false, 'OpenStore takes an address: { kind, id, sub }' end
     opts = type(opts) == 'table' and opts or {}
     local kind = addr.kind
@@ -4534,7 +4529,7 @@ end)
 
 --- Take a store off a player's screen: once closed they can move nothing in it. Other viewers are untouched.
 --- Answers `true`, or `false, reason` ('That is not open'). A panel closes with ClosePanel.
----@param source number
+---@param source number|string|nil
 ---@param addr table  { kind, id, sub }
 ---@return boolean ok
 ---@return string|nil err
@@ -4709,7 +4704,7 @@ end)
 --- (a gun's serial) gets fresh metadata per slot when you pass none.
 --- For a reward into a player's pockets AddItem is still the call: when full it drops at their feet.
 ---@param addr table
----@param item string
+---@param item string|nil  anything but a known item key is refused, with the reason
 ---@param amount number|nil
 ---@param metadata table|nil
 ---@param opts string|table|nil  a reason for the activity log, or { reason = '...' }
@@ -4826,6 +4821,7 @@ function Stores.takeAt(addr, amount, opts, askedBy)
         end
         local ok, takeErr, stack = Stores.take(store, slot, amount)
         if not ok then return false, takeErr end
+        ---@cast stack -nil   -- a take that went through answers what it took
         removed, slots = stack, { slot }
     else
         local item = o.item
@@ -4949,7 +4945,7 @@ local heldReg = Registry.new('heldItem', {
 })
 
 --- Put an item in a player's hand (addr, one of their pocket slots), or take it out of it (nil).
----@param source number
+---@param source number|string|nil
 ---@param addr table|nil  { kind = 'player', id = source, sub = 'player'|'accessory', slot = n }
 ---@param owner string    the resource saying so
 ---@return boolean ok
@@ -4972,7 +4968,7 @@ function Stores.setHeld(source, addr, owner)
     if not d or not d.item then return false, 'That slot is empty' end
     local ok, why = heldReg:add(owner, source, { sub = addr.sub or 'player', slot = slot, item = d.item,
         serial = type(d.metadata) == 'table' and d.metadata.serial or nil })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -5008,7 +5004,7 @@ end)
 -- At logout (and a drop) the hand is empty, whoever said otherwise. A stopped resource's records: the registry.
 Character.onLife('logout', function(e)
     local src = e and e.source
-    if src and Stores._held[src] ~= nil then heldReg:remove(heldReg:ownerOf(src), src) end
+    if src and Stores._held[src] ~= nil then heldReg:remove(heldReg:ownerOf(src) --[[@as string]], src) end
 end)
 
 --- Change the metadata of the item at an address (any store).

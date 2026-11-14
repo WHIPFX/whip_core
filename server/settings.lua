@@ -269,6 +269,7 @@ end
 --- file sends its own), no panel is told, and one file write covers the burst.
 ---@param owner string
 ---@param opts table|nil  { quiet = true }
+---@diagnostic disable-next-line: duplicate-set-field -- replaces shared/settings.lua's empty default
 function Settings.pageRegistered(owner, opts)
     for path, row in pairs(rows[owner] or {}) do
         local entry = Settings.entry(owner, path)
@@ -306,8 +307,8 @@ function Settings.pageRegistered(owner, opts)
 end
 
 --- A satellite stopped and its page went (shared/settings.lua): an admin looking at it is told.
----@param owner string
-function Settings.pageDropped(owner)
+---@diagnostic disable-next-line: duplicate-set-field -- replaces shared/settings.lua's empty default
+function Settings.pageDropped()
     TriggerClientEvent('whip_core:client:settingsSaved', -1)
 end
 
@@ -338,9 +339,6 @@ end
 
 --- A value from the panel, in the setting's own form. The panel speaks JSON: a vector arrives as
 --- { x, y, z }. Plain values pass through for Settings.check to judge.
----@param entry table
----@param value any
----@return any
 local fromWire
 
 --- A record's position fields from the wire's { x, y, z } into vectors (records and map rows).
@@ -354,6 +352,9 @@ local function recordFromWire(fields, rec)
     return rec
 end
 
+---@param entry table
+---@param value any
+---@return any
 function fromWire(entry, value)
     if type(value) == 'table' and (entry.type == 'vec3' or entry.type == 'vec4') then
         local x, y, z, w = tonumber(value.x), tonumber(value.y), tonumber(value.z), tonumber(value.w)
@@ -534,7 +535,7 @@ local function when(t)
     t = tonumber(t)
     if not t then return nil end
     if t > 1e11 then t = math.floor(t / 1000) end
-    return os.date('%d %b %Y %H:%M', t)
+    return os.date('%d %b %Y %H:%M', t) --[[@as string]]
 end
 
 -- What the panel needs of an entry to draw and check it, at every level (a list's item, a
@@ -660,7 +661,7 @@ SecureCallback('whip_core:settings:apply', {
             { 'reset', 'bool', false },
         }, 200 },
     },
-}, function(source, player, changes)
+}, function(source, _, changes)
     return Settings.change(source, changes)
 end)
 

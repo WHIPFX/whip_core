@@ -140,7 +140,7 @@ RegisterNetEvent('whip_core:client:shopsSync', function(shops)
                 end
             end
             -- Also handle key-value format
-            for id, data in pairs(shops) do
+            for _, data in pairs(shops) do
                 if data and data.shopId and not shopDefs[data.shopId] then
                     shopDefs[data.shopId] = data
                 end
@@ -153,7 +153,7 @@ RegisterNetEvent('whip_core:client:shopsSync', function(shops)
         if DoesBlipExist(blip) then RemoveBlip(blip) end
     end
     shopBlips = {}
-    for shopId, data in pairs(shopDefs) do
+    for _, data in pairs(shopDefs) do
         CreateShopBlip(data)
     end
     refreshPropShops()

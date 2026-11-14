@@ -173,16 +173,16 @@ local function assignSlots(now)
 
     for i = 1, count do
         local m = list[i]
-        local s = m._slot
-        if s then
-            local sl = slots[s]
+        local slot = m._slot
+        if slot then
+            local sl = slots[slot]
             local ring = m.kind == 'prompt'
             -- (A thing's disc wears its kind's glyph; a prompt's, its own icon or key.)
             local glyph = m.glyph or KIND_GLYPH[m.kind]
             if sl.name ~= m.name or sl.detail ~= m.detail or sl.glyph ~= glyph or sl.pic ~= m.pic or sl.ring ~= ring then
                 sl.name, sl.detail, sl.glyph, sl.pic, sl.ring = m.name, m.detail, glyph, m.pic, ring
                 sl.readyAt = now + SETTLE_MS
-                page:send({ slot = s - 1, name = m.name or '', detail = m.detail or '',
+                page:send({ slot = slot - 1, name = m.name or '', detail = m.detail or '',
                     glyph = glyph, pic = m.pic, ring = ring })
             end
         end

@@ -212,9 +212,10 @@ end
 ---@return boolean answered
 ---@return any value_or_why
 function Ask.run(source, spec, opts, owner)
-    source = tonumber(source)
-    local who = source and Players[source]
-    if not who or who.closing then return false, 'Player not loaded' end
+    local id = tonumber(source)
+    local who = id and Players[id]
+    if not id or not who or who.closing then return false, 'Player not loaded' end
+    source = id
     if who.isDead then return false, 'dead' end
     if opts ~= nil and type(opts) ~= 'table' then return false, 'opts must be a table' end
     opts = opts or {}
@@ -305,7 +306,7 @@ exports('AnswerAsk', function(source, token, yes)
     local caller = Registry.caller()
     source, token = tonumber(source), tonumber(token)
     local entry = token and _pending[token]
-    if not entry or entry.done or entry.source ~= source then return false, 'That question is gone' end
+    if not token or not entry or entry.done or entry.source ~= source then return false, 'That question is gone' end
     if entry.viaOwner ~= caller then return false, 'That question was not asked through you' end
     local player = Players[source]
     if entry.session ~= nil and (not player or player.session ~= entry.session) then

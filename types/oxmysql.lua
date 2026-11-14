@@ -1,0 +1,89 @@
+---@meta
+-- ============================================
+-- whip_core — oxmysql's MySQL, as whip uses it
+-- ============================================
+--
+-- '@oxmysql/lib/MySQL.lua' (fxmanifest.lua's server_scripts) makes the MySQL global at run time, and it carries no
+-- annotations of its own; without these the editor took MySQL's shape from dev/director/harness.lua's stand-in, whose
+-- functions take no arguments. Only the calls whip makes are here. The .await forms wait, so call them from a thread
+-- or a handler, and a failed query raises an error instead of answering nil.
+
+---@alias WhipSqlParams table|nil Positional (`?`) values in order, or named (`@name`, `:name`) values by name
+
+---@class WhipMySQLMethod
+---@overload fun(query: string|integer, params?: WhipSqlParams|fun(result: any), cb?: fun(result: any))
+local Method = {}
+
+---@class WhipMySQLQuery: WhipMySQLMethod
+local Query = {}
+--- Every row, or for an INSERT/UPDATE/DELETE the driver's result (affectedRows, insertId).
+---@async
+---@param query string|integer
+---@param params? WhipSqlParams
+---@return table
+function Query.await(query, params) end
+
+---@class WhipMySQLScalar: WhipMySQLMethod
+local Scalar = {}
+--- The first column of the first row, or nil when there is no row.
+---@async
+---@param query string|integer
+---@param params? WhipSqlParams
+---@return any
+function Scalar.await(query, params) end
+
+---@class WhipMySQLSingle: WhipMySQLMethod
+local Single = {}
+--- The first row, or nil when there is none.
+---@async
+---@param query string|integer
+---@param params? WhipSqlParams
+---@return table|nil
+function Single.await(query, params) end
+
+---@class WhipMySQLInsert: WhipMySQLMethod
+local Insert = {}
+--- The new row's id (insertId).
+---@async
+---@param query string|integer
+---@param params? WhipSqlParams
+---@return integer
+function Insert.await(query, params) end
+
+---@class WhipMySQLUpdate: WhipMySQLMethod
+local Update = {}
+--- How many rows changed (affectedRows).
+---@async
+---@param query string|integer
+---@param params? WhipSqlParams
+---@return integer
+function Update.await(query, params) end
+
+---@class WhipMySQLTransaction: WhipMySQLMethod
+local Transaction = {}
+--- Runs every query or none: true when they all ran.
+---@async
+---@param queries table A list of queries ({ query = sql, values = params } or { sql, params }), or a map of sql to params
+---@param params? WhipSqlParams Shared values for every query
+---@return boolean
+function Transaction.await(queries, params) end
+
+---@class WhipMySQLReady
+---@overload fun(cb: fun())
+local Ready = {}
+--- Wait until oxmysql has connected.
+---@async
+---@return true
+function Ready.await() end
+
+---@class WhipMySQL
+---@field query WhipMySQLQuery
+---@field scalar WhipMySQLScalar
+---@field single WhipMySQLSingle
+---@field insert WhipMySQLInsert
+---@field update WhipMySQLUpdate
+---@field prepare WhipMySQLQuery
+---@field rawExecute WhipMySQLQuery
+---@field transaction WhipMySQLTransaction
+---@field ready WhipMySQLReady
+MySQL = {}

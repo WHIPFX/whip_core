@@ -39,6 +39,7 @@ end
 -- A line has no price of its own: a shop prices per ITEM, so a line costs what the shop asks for
 -- that item NOW. The screen shows it, the till charges it, and the till refuses if it changed after
 -- the player last saw the total (Shops.purchase's expectedTotal).
+---@diagnostic disable-next-line: lowercase-global -- a global on purpose (see above): stores.lua reads it
 _basketSessions = {}   -- [source] = { items = { [slot] = { item, amount, metadata } }, slots = n, checkout = bool }
 
 --- How many lines a basket has: Config.ShopBasketSlots, held to 1-50 (the basket's events address
@@ -624,7 +625,10 @@ end
 ---@return string|nil why
 function Shops.addToBasket(source, itemKey, want)
     local session, def, shelf, basket = basketAction(source)
-    if not session then return false, def end
+    if not session then return false, def --[[@as string]] end
+    ---@cast def table   -- with a session come the shop, its shelf and the basket
+    ---@cast shelf -nil
+    ---@cast basket -nil
     if not Shops.itemPrice(def, itemKey) then return false, 'That is not for sale' end
 
     local touched = {}
@@ -656,7 +660,10 @@ end
 ---@return string|nil why  for a change made only in part
 function Shops.setLine(source, basketSlot, quantity)
     local session, def, shelf, basket = basketAction(source)
-    if not session then return false, def end
+    if not session then return false, def --[[@as string]] end
+    ---@cast def table   -- with a session come the shop, its shelf and the basket
+    ---@cast shelf -nil
+    ---@cast basket -nil
     local entry = session.items[basketSlot]
     if not entry then return false, 'That is not in your basket' end
 
@@ -712,7 +719,10 @@ end
 ---@return string|nil why       why not, or why not all of it
 function Shops.setItemTotal(source, itemKey, want, from)
     local session, def, shelf, basket = basketAction(source)
-    if not session then return false, def end
+    if not session then return false, def --[[@as string]] end
+    ---@cast def table   -- with a session come the shop, its shelf and the basket
+    ---@cast shelf -nil
+    ---@cast basket -nil
     local before = basketCount(session, itemKey)
     local touched, why = {}, nil
 
@@ -779,7 +789,7 @@ SecureEvent('whip_core:server:basketAdd', {
     -- A click per unit is ordinary shopping: the default limit (100 ms, burst 10) stops a held key,
     -- not a shopper.
     params = { {'item', 'key', 50}, {'amount', 'amount', 999} },
-}, function(source, player, itemKey, amount)
+}, function(source, _, itemKey, amount)
     local added, why = Shops.addToBasket(source, itemKey, amount)
     if not added then return false, why end
     if why then NotifyPlayer(source, why, 'warning', 3000) end
@@ -797,7 +807,7 @@ SecureCallback('whip_core:basketSetItem', {
     rateLimit = 30,
     burst     = 20,
     params    = { {'item', 'key', 50}, {'quantity', 'int', 0, 999}, {'from', 'any'} },
-}, function(source, player, itemKey, quantity, from)
+}, function(source, _, itemKey, quantity, from)
     local lines, seen = {}, {}
     local list = type(from) == 'table' and from or {}
     for i = 1, math.min(#list, 50) do
@@ -931,10 +941,10 @@ SecureEvent('whip_core:server:shopSetLayout', {
     burst     = 3,
     -- layoutRev: the shelf's revision when Edit Shelf opened (-1: not said, no check)
     params = { {'categories', 'any'}, {'layout', 'any'}, {'layoutRev', 'int', -1, 2147483647, -1} },
-}, function(source, player, categories, layout, layoutRev)
+}, function(source, _, categories, layout, layoutRev)
     local shopId = Shops.openShopOf(source)
     local def = shopId and Shops.getDef(shopId)
-    if not def then return false, 'No shop open' end
+    if not shopId or not def then return false, 'No shop open' end
     if not Shops.inRange(source) then return false, 'Too far from shop' end
     if not Shops.canArrange(source, def) then return false, 'You cannot arrange this shop' end
     if type(categories) ~= 'table' or type(layout) ~= 'table' then return false, 'Nothing to save' end
@@ -951,7 +961,7 @@ SecureEvent('whip_core:server:basketSetQuantity', {
     -- The line is an address ('id' rejects line 60 rather than clamping it onto line 50 — a
     -- different line); the quantity is a count, and clamping a count is fine.
     params = { {'basketSlot', 'id', 1, 50}, {'quantity', 'int', 0, 999} },
-}, function(source, player, basketSlot, quantity)
+}, function(source, _, basketSlot, quantity)
     local ok, why = Shops.setLine(source, basketSlot, quantity)
     if not ok then return false, why end
     if why then NotifyPlayer(source, why, 'warning', 3000) end
@@ -1450,7 +1460,8 @@ function Shops.update(shopId, data)
 end
 
 ---@param shopId number
----@return boolean
+---@return boolean ok
+---@return string|nil err
 local function deleteNow(shopId)
     local def = Shops.cache[shopId]
     if not def then return false end
@@ -1499,7 +1510,7 @@ end
 -- Accessors
 -- ============================================
 
----@param shopId number
+---@param shopId number|nil
 ---@return table|nil
 function Shops.getDef(shopId)
     return Shops.cache[shopId]
@@ -1707,7 +1718,7 @@ function Shops.ensureShop(key, data, caller)
     if by and by ~= caller and Registry.alive(by) then
         return false, ('shop "%s" is declared by %s'):format(key, by)
     end
-    if by == caller and Registry.deepEquals(ens.decl, d) then return existing end
+    if by == caller and type(ens) == 'table' and Registry.deepEquals(ens.decl, d) then return existing end
 
     -- Built in the shop's turn, from its settings as they are then.
     local ok, err = Shops.update(existing.shopId, function(cur)
@@ -1776,9 +1787,9 @@ function Shops.loadPrices(containerId)
 end
 
 --- Price an item on a stocked shop's shelf, or take it off sale (forSale false keeps the price).
----@param containerId number  the shop's stock container
+---@param containerId number|string|nil  the shop's stock container
 ---@param itemKey string
----@param price number
+---@param price number|string|nil
 ---@param forSale boolean
 ---@param slot number|nil  for the priceChanged event, when the price was set from a shelf slot
 ---@return boolean ok, string|nil err
@@ -1787,7 +1798,7 @@ function Shops.setItemPrice(containerId, itemKey, price, forSale, slot)
     -- non-number, NaN, an unknown container). A negative price is floored to 0 below.
     containerId = tonumber(containerId)
     local container = containerId and Containers.getDef(containerId)
-    if not container then return false, 'Unknown container' end
+    if not containerId or not container then return false, 'Unknown container' end
 
     if type(itemKey) ~= 'string' or not Config.Items[itemKey] then return false, 'Unknown item' end
 
@@ -1847,8 +1858,8 @@ end
 ---
 --- Never listed without a price: Mark For Sale on an item never priced is refused ("Set a price
 --- first"). A deliberate $0 is a Set Price.
----@param containerId number
----@param slot number
+---@param containerId number|string|nil
+---@param slot number|string|nil
 ---@param price number|nil
 ---@param forSale boolean|nil
 ---@param expectItem string|nil
@@ -1856,7 +1867,7 @@ end
 function Shops.setSlotPrice(containerId, slot, price, forSale, expectItem)
     containerId = tonumber(containerId)
     local container = containerId and Containers.getDef(containerId)
-    if not container then return false, 'Unknown container' end
+    if not containerId or not container then return false, 'Unknown container' end
 
     slot = tonumber(slot)
     if not slot or slot ~= math.floor(slot) or slot < 1 or slot > (container.slots or 0) then
@@ -2117,6 +2128,8 @@ end
 ---@param expectedTotal number|nil  the total on the player's screen; -1 or nil when not given
 ---@return boolean success
 ---@return string|nil error
+---@return table|nil receipt  the purchase, as whip_core:shop:purchased carries it
+---@return string|nil kind  'carry' when it will not all fit (Shops.purchase's kind)
 local function purchaseInner(source, paymentMethod, accountId, expectedTotal)
     local player = Players[source]
     if not player or not player.inventory then
@@ -2516,7 +2529,7 @@ exports('DeleteShop', function(shopId)
     if not def then return false, 'Shop not found' end
     local theirs = shopOfAnother(def, caller)
     if theirs then return false, theirs end
-    return Shops.delete(tonumber(shopId))
+    return Shops.delete(tonumber(shopId) --[[@as number]])
 end)
 exports('UpdateShop', function(shopId, data)
     local caller = Registry.caller()
@@ -2525,7 +2538,7 @@ exports('UpdateShop', function(shopId, data)
     if type(data) ~= 'table' then return false, 'UpdateShop needs a data table' end
     local theirs = shopOfAnother(def, caller)
     if theirs then return false, theirs end
-    return Shops.update(tonumber(shopId), data)
+    return Shops.update(tonumber(shopId) --[[@as number]], data)
 end)
 
 --- A stocked shop's stock container, from either way an export names it: the containerId, or
@@ -2634,7 +2647,7 @@ exports('SetShopLayout', function(shopId, data)
     if type(data) ~= 'table' then return false, 'SetShopLayout needs { categories, layout }' end
     local theirs = shopOfAnother(def, Registry.caller())
     if theirs then return false, theirs end
-    return Shops.setLayout(tonumber(shopId), data.categories, data.layout)
+    return Shops.setLayout(tonumber(shopId) --[[@as number]], data.categories, data.layout)
 end)
 
 --- `{ [itemKey] = { price, forSale } }`, per item.

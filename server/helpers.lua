@@ -124,7 +124,9 @@ function EpochSeconds(v)
     if type(v) == 'string' then
         local y, mo, d, h, mi, s = v:match('^(%d+)%-(%d+)%-(%d+)[ T](%d+):(%d+):(%d+)')
         if y then
-            return os.time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d),
+            -- (digits, by the pattern: tonumber always answers)
+            return os.time({ year = tonumber(y) --[[@as integer]], month = tonumber(mo) --[[@as integer]],
+                             day = tonumber(d) --[[@as integer]],
                              hour = tonumber(h), min = tonumber(mi), sec = tonumber(s) })
         end
     end
@@ -227,8 +229,8 @@ function SafeSavePlayer(player, label, teardown)
             -- The cache itself is still right here, so save it directly rather than skipping
             -- the save, and drop the queue entry ONLY if that landed (a failed one stays owed, and
             -- linked to the other half of its move).
-            local pcallOk, saveOk2, saveErr2 = pcall(Inventory.save, player.charId, player.inventory)
-            if pcallOk then
+            local saveRan, saveOk2, saveErr2 = pcall(Inventory.save, player.charId, player.inventory)
+            if saveRan then
                 invOk, invErr = saveOk2, saveErr2
             else
                 invOk, invErr = false, saveOk2
@@ -293,12 +295,15 @@ function MayKnowName(viewer, target)
     local viewerChar, viewerSrc = WhoIs(viewer)
     local targetChar, targetSrc = WhoIs(target)
     if not viewerChar or not viewerSrc or not targetChar then return false, 'Player not loaded' end
+    -- (With a charId, WhoIs answers their source or nil, not a why.)
+    ---@cast viewerSrc number
+    ---@cast targetSrc number|nil
     if viewerChar == targetChar then return true end
     local rule = Config.ShowPlayerNames
     if rule == 'never' then return false, 'Names are hidden on this server' end
     if rule == 'always' then return true end
     local who = targetSrc and Players[targetSrc]
-    if not who or who._inCreator or GetPlayerRoutingBucket(targetSrc) ~= GetPlayerRoutingBucket(viewerSrc) then
+    if not targetSrc or not who or who._inCreator or GetPlayerRoutingBucket(targetSrc) ~= GetPlayerRoutingBucket(viewerSrc) then
         return false, 'Too far away'
     end
     local ped = GetPlayerPed(targetSrc)

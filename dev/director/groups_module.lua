@@ -6,35 +6,35 @@
 local R = DirectorRuntime
 
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
-local npcs, nextNpc, byLabel = {}, 0, {}
-Npcs.spawn = function(_, def)
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
+local npcs, nextNpc = {}, 0
+rawset(Npcs, 'spawn', function()
     nextNpc = nextNpc + 1
     npcs[nextNpc] = { npcId = nextNpc, netId = 5000 + nextNpc, alive = true, coords = { x = 0.0, y = 0.0, z = 0.0 } }
     return nextNpc, 5000 + nextNpc
-end
-Npcs.get = function(id) return npcs[id] end
+end)
+rawset(Npcs, 'get', function(id) return npcs[id] end)
 local patches = {}
-Npcs.setState = function(_, id, patch) patches[#patches + 1] = { id = id, patch = patch } return true end
+rawset(Npcs, 'setState', function(_, id, patch) patches[#patches + 1] = { id = id, patch = patch } return true end)
 local blips = {}
-Blips.show = function(_, _, id) blips[#blips + 1] = id return true end
-Blips.remove = function() end
+rawset(Blips, 'show', function(_, _, id) blips[#blips + 1] = id return true end)
+rawset(Blips, 'remove', function() end)
 local removed = {}
 local realRemoveMade = DirectorNodes.removeMade
-DirectorNodes.removeMade = function(ctx, wid, h) removed[#removed + 1] = wid return realRemoveMade(ctx, wid, h) end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(DirectorNodes, 'removeMade', function(ctx, wid, h) removed[#removed + 1] = wid return realRemoveMade(ctx, wid, h) end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local at = function(x) return { x = x, y = 0.0, z = 0.0, heading = 0.0 } end
 local function npc(id, x, group) return { id = id, kind = 'npc', layer = 'run', label = id, def = { model = 's_m_m_security_01', coords = at(x), group = group } } end
@@ -112,7 +112,7 @@ RegisterTestModule({
         end },
         { name = 'an older card (one thing) is brought up to a list', fn = function()
             local d = DirectorDoc.load(doc({ n('k', 'npc.allKilled', { npc = 'g1' }, 1), n('e', 'vehicle.entered', { car = 'car1' }, 1),
-                                            n('i', 'item.picked', { item = 'spot' }, 1), n('f', 'fail.npcDies', { npc = 'g3' }, 1) }))
+                                            n('i', 'item.picked', { item = 'spot' }, 1), n('f', 'fail.npcDies', { npc = 'g3' }, 1) })) --[[@as table]]
             assertEqual(type(d.nodes[1].props.npc), 'table', 'All Killed: a list')
             assertEqual(d.nodes[1].props.npc[1], 'g1', 'its NPC kept')
             assertEqual(d.nodes[1].v, 2, 'its version')
@@ -171,7 +171,7 @@ RegisterTestModule({
                             { 'map.blipRemove', 'at' }, { 'tasks.stop', 'what' }, { 'npc.hostile', 'npc' } }
             local nodes = {}
             for i, c in ipairs(cards) do nodes[i] = n('c' .. i, c[1], { [c[2]] = 'x' .. i }, 1) end
-            local d = DirectorDoc.load(doc(nodes))
+            local d = DirectorDoc.load(doc(nodes)) --[[@as table]]
             for i, c in ipairs(cards) do
                 local v = d.nodes[i].props[c[2]]
                 assertTrue(type(v) == 'table' and v[1] == 'x' .. i, c[1] .. ': its one thing, in a list')
@@ -217,6 +217,7 @@ RegisterTestModule({
             local run = start('gr_car', n('k', 'vehicle.entered', { car = { 'car1', 'car2' } }))
             local h2 = Director.handleOf(run, 'car2')
             assertNotNil(h2 and h2.vehicleId, 'car2 made')
+            ---@cast h2 -nil
             R.emit('vehicle.entered', { source = 1, vehicleId = 99, seat = -1 })
             tick(2)
             assertEqual(run.status, 'running', 'another car: not it')

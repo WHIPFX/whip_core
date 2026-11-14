@@ -199,6 +199,8 @@ end)
 local doorInteractCooldown = 0
 -- doorPrompts ([doorId] = { idA, idB }) is declared above the proximity thread, which reads it.
 
+local _derivedOffsets = {}   -- [model] = { x, y, z }; a model's dimensions never change
+
 --- The handle's offset inside the door's own model, worked out from the model itself.
 ---
 --- Derived, not tabulated: for a hinged door the origin sits at the hinge, so the free edge is
@@ -207,8 +209,6 @@ local doorInteractCooldown = 0
 --- Config.DoorPromptOffsets keys a hand-measured {x, y, z} off the model hash for those.
 ---@param model number
 ---@return number x, number y, number z
-local _derivedOffsets = {}   -- [model] = { x, y, z }; a model's dimensions never change
-
 local function handleOffset(model)
     local override = (Config.DoorPromptOffsets or {})[model]
     if override then return override.x, override.y, override.z end

@@ -360,7 +360,7 @@ SecureCallback('whip_core:pmGetAllUsers', {
     -- would look like the server has no users.
     rateLimit = 250,
     burst     = 5,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.pmgr[source] = true
     return pmGetAllUsers()
 end)
@@ -375,7 +375,7 @@ SecureCallback('whip_core:pmGetUserDetail', {
     rateLimit = 100,
     burst     = 5,
     params    = { {'userId', 'id'}, {'session', 'int', 0, 65535, 0} },
-}, function(source, player, userId, session)
+}, function(source, _, userId, session)
     pmShowing[source] = { userId = userId, session = session }
     return pmGetUserDetail(userId, source, session)
 end)
@@ -389,7 +389,7 @@ SecureCallback('whip_core:alPlayer', {
     -- userId is an address ('id'). beforeId stays 'any': it is an optional paging cursor, absent
     -- for the first page, and anything unreadable simply means "from the newest".
     params    = { {'userId', 'id'}, {'beforeId', 'any'} },
-}, function(source, player, userId, beforeId)
+}, function(_, _, userId, beforeId)
     local rows = MySQL.query.await(
         'SELECT `charId` FROM `characters` WHERE `userId` = ?', { userId }) or {}
     local charIds = {}
@@ -404,7 +404,7 @@ SecureCallback('whip_core:alItem', {
     rateLimit = 200,
     burst     = 5,
     params    = { {'uid', 'string', 24}, {'beforeId', 'any'} },
-}, function(source, player, uid, beforeId)
+}, function(_, _, uid, beforeId)
     return Log.itemRows(uid, tonumber(beforeId) or 0, 50)
 end)
 
@@ -423,11 +423,11 @@ SecureCallback('whip_core:wpCharSearch', {
     rateLimit = 150,
     burst     = 5,
     params    = { {'q', 'string', 60} },
-}, function(source, player, q)
+}, function(_, _, q)
     local needle = q:lower()
     local results, seen = {}, {}
 
-    for src, p in pairs(Players) do
+    for _, p in pairs(Players) do
         if p.charId and p.fullName and (p.fullName:lower():find(needle, 1, true) or tostring(p.charId) == q) then
             results[#results + 1] = { charId = p.charId, name = p.fullName, online = true }
             seen[p.charId] = true
@@ -467,7 +467,7 @@ end)
 SecureEvent('whip_core:server:plmClosed', {
     requirePlayer = false, whileDead = true,
     rateLimit = 500, burst = 3,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.pmgr[source] = nil
     pmShowing[source] = nil
 end)
@@ -483,7 +483,7 @@ SecureEvent('whip_core:server:requestThemeSwap', {
     ace = 'whip.devtools',
     rateLimit = 500,
     params = { {'resource', 'string', 64, ''} },
-}, function(source, player, resource)
+}, function(source, _, resource)
     if resource == '' then resource = Themes.getActive() or Config.Theme end
     if resource == 'none' then resource = nil end
     TriggerClientEvent('whip_core:client:applyTheme', source, resource)
@@ -507,6 +507,7 @@ SecureEvent('whip_core:server:pmKick', {
     local userId = (loaded or PendingPlayers[targetSource] or {}).userId
     local name = loaded and loaded.fullName or GetPlayerName(targetSource)
     -- Auto-add note. A note that did not save does not stop the kick; the admin is told.
+    ---@type boolean, string|integer
     local noted, noteId = false, 'no account yet (still connecting)'
     if userId then
         noted, noteId = pcall(MySQL.insert.await,
@@ -614,7 +615,7 @@ SecureEvent('whip_core:server:pmPermission', {
     rateLimit = 500,
     ace = 'whip.devtools',
     params = { {'userId', 'id'}, {'name', 'string', 64}, {'on', 'bool'} },
-}, function(source, player, userId, name, on)
+}, function(source, _, userId, name, on)
     if not Permissions.get(name) then return false, 'No permission called ' .. tostring(name) end
     if not Permissions.mayGrant(source, name) then return false, 'You may not hand that one out' end
     local ok, why
@@ -670,7 +671,7 @@ SecureEvent('whip_core:server:pmDeleteNote', {
     rateLimit = 1000,
     ace = 'whip.devtools',
     params = { {'noteId', 'id'}, {'userId', 'id', 0} },
-}, function(source, player, noteId, userId)
+}, function(source, _, noteId, userId)
     local ok, err = pcall(MySQL.query.await, 'DELETE FROM `admin_notes` WHERE `noteId` = ?', { noteId })
     if not ok then
         print(('[whip_core:admin] deleting note #%d failed: %s'):format(noteId, tostring(err)))
@@ -704,7 +705,7 @@ SecureEvent('whip_core:server:pmTeleportTo', {
     rateLimit = 1000,
     ace = 'whip.devtools',
     params = { {'targetSource', 'id'} },  -- reject-don't-clamp: see pmKick
-}, function(source, player, targetSource)
+}, function(source, _, targetSource)
     local tgtPed = GetPlayerPed(targetSource)
     if not Players[targetSource] or not tgtPed or tgtPed == 0 then
         NotifyPlayer(source, 'They are not in the world', 'error')
@@ -719,7 +720,7 @@ SecureEvent('whip_core:server:pmBringPlayer', {
     rateLimit = 1000,
     ace = 'whip.devtools',
     params = { {'targetSource', 'id'} },  -- reject-don't-clamp: see pmKick
-}, function(source, player, targetSource)
+}, function(source, _, targetSource)
     local srcPed = GetPlayerPed(source)
     if not srcPed or srcPed == 0 then return end
     if not Players[targetSource] then
@@ -760,6 +761,7 @@ SecureEvent('whip_core:server:pmShot', {
             print(('[whip_core:admin] a picture of player %d failed: %s'):format(targetSource, tostring(data)))
             data, why = false, 'the picture failed'
         end
+        ---@type table|false
         local pos = false
         if data then
             local target = Players[targetSource]
@@ -939,7 +941,7 @@ DevTools.setRefresh('gm', gmBroadcast)
 
 SecureEvent('whip_core:server:gmGetAllGarages', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     DevTools.viewers.gm[source] = true
     TriggerClientEvent('whip_core:client:gmAllGarages', source,
         Garages.snapshotAll(), Garages.getVehicleCounts())
@@ -947,14 +949,14 @@ end)
 
 SecureEvent('whip_core:server:gmClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.gm[source] = nil
 end)
 
 SecureEvent('whip_core:server:gmCreateGarage', {
     ace = 'whip.devtools',
     params = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(source, _, data)
     if type(data) ~= 'table' then return end
     local key = Sanitize.key(data.key, 60)
     if not key then
@@ -999,7 +1001,7 @@ SecureCallback('whip_core:gmWizardCreate', {
     ace       = 'whip.devtools',
     rateLimit = 2000,
     params    = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(source, _, data)
     if type(data) ~= 'table' then return { ok = false, why = 'Nothing to create' } end
     local key = Sanitize.key(data.key, 60)
     if not key then return { ok = false, why = 'Give it a name: its key is made from it' } end
@@ -1146,11 +1148,11 @@ SecureCallback('whip_core:gmWizardSave', {
     ace       = 'whip.devtools',
     rateLimit = 2000,
     params    = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(source, _, data)
     if type(data) ~= 'table' then return { ok = false, why = 'Nothing to save' } end
     local key = Sanitize.key(data.key, 60)
     local g = key and Garages.get(key)
-    if not g then return { ok = false, why = 'No such garage' } end
+    if not key or not g then return { ok = false, why = 'No such garage' } end
     if Garages.isPrivate(key) then
         return { ok = false, why = "A private garage is its property's: change it in /whip → Properties" }
     end
@@ -1209,7 +1211,7 @@ SecureEvent('whip_core:server:gmUpdateGarage', {
         {'key', 'key', 60},
         {'data', 'any'},
     },
-}, function(source, player, key, data)
+}, function(source, _, key, data)
     if type(data) ~= 'table' then return end
 
     if data.name       ~= nil then data.name       = Sanitize.string(data.name, 100, key) end
@@ -1239,7 +1241,7 @@ end)
 SecureEvent('whip_core:server:gmDeleteGarage', {
     ace = 'whip.devtools',
     params = { {'key', 'key', 60}, {'moveTo', 'any'} },
-}, function(source, player, key, moveTo)
+}, function(source, _, key, moveTo)
     moveTo = type(moveTo) == 'string' and Sanitize.key(moveTo, 60) or nil
     local inside = Garages.getVehicleCounts()[key] or 0
     if inside > 0 and not moveTo then
@@ -1261,7 +1263,7 @@ SecureEvent('whip_core:server:gmMoveVehicle', {
         {'vehicleId', 'id'},
         {'toGarageKey', 'key', 60},
     },
-}, function(source, player, vehicleId, toGarageKey)
+}, function(source, _, vehicleId, toGarageKey)
 
     local veh = Vehicles.context(vehicleId)
     if not veh then
@@ -1288,7 +1290,7 @@ SecureEvent('whip_core:server:gmGetGarageVehicles', {
     -- 'string', not 'key': a read, and a property's private garage is keyed 'property:<id>', which
     -- the key sanitizer (letters, numbers, _ and -) would refuse. The lookup below is the check.
     params = { {'garageKey', 'string', 60} },
-}, function(source, player, garageKey)
+}, function(source, _, garageKey)
     if not Garages.get(garageKey) then return end
 
     local vehicles = Garages.getGarageVehicles(garageKey)
@@ -1365,7 +1367,7 @@ DevTools.setRefresh('gim', gimBroadcast)
 
 SecureEvent('whip_core:server:gimGetAll', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     DevTools.viewers.gim[source] = true
     TriggerClientEvent('whip_core:client:gimAllItems', source, {
         items      = GroundItems.getAllArray(),
@@ -1377,7 +1379,7 @@ end)
 
 SecureEvent('whip_core:server:gimClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.gim[source] = nil
 end)
 
@@ -1493,14 +1495,14 @@ DevTools.setRefresh('ib', ibBroadcast)
 
 SecureEvent('whip_core:server:ibGetAll', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     DevTools.viewers.ib[source] = true
     TriggerClientEvent('whip_core:client:ibAllItems', source, ibBuildItemList())
 end)
 
 SecureEvent('whip_core:server:ibClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.ib[source] = nil
 end)
 
@@ -1544,7 +1546,7 @@ end)
 --- What the page needs once: every item (its filter and its pictures) and the groups' names.
 SecureCallback('whip_core:alSetup', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function()
     local items = {}
     for key, def in pairs(ibBuildItemList()) do items[key] = { name = def.name, img = def.img, resource = def.resource } end
     local groups = {}
@@ -1559,7 +1561,7 @@ SecureCallback('whip_core:alFeed', {
     rateLimit = 150,
     burst     = 10,
     params    = { {'filter', 'any'} },
-}, function(source, player, filter)
+}, function(_, _, filter)
     return Log.feedRows(filter)
 end)
 
@@ -1570,7 +1572,7 @@ SecureCallback('whip_core:alItemActivity', {
     rateLimit = 300,
     burst     = 6,
     params    = { {'since', 'any'} },
-}, function(source, player, since)
+}, function(_, _, since)
     local rows = Log.itemActivity(since)
     if not rows then return { ok = false, why = 'The log could not be read for that long: try a shorter one' } end
     return { ok = true, items = rows }
@@ -1582,7 +1584,7 @@ SecureCallback('whip_core:alItemInfo', {
     rateLimit = 200,
     burst     = 5,
     params    = { {'uid', 'string', 24} },
-}, function(source, player, uid)
+}, function(_, _, uid)
     return Log.itemInfo(uid) or { count = 0 }
 end)
 
@@ -1627,7 +1629,7 @@ SecureCallback('whip_core:alEconomy', {
     rateLimit = 500,
     burst     = 4,
     params    = { {'since', 'any'}, {'itemKey', 'any'}, {'bucket', 'any'} },
-}, function(source, player, since, itemKey, bucket)
+}, function(_, _, since, itemKey, bucket)
     local res = Log.economy(since, itemKey, bucket)
     if res.ok then res.census = itemCensus(res.itemKey) end
     return res
@@ -1720,7 +1722,7 @@ end
 --- Open: get all data
 SecureEvent('whip_core:server:pmGetAll', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     DevTools.viewers.pm[source] = true
     TriggerClientEvent('whip_core:client:pmAllData', source, {
         entries = pmGetAllData(),
@@ -1730,7 +1732,7 @@ end)
 --- Close
 SecureEvent('whip_core:server:pmClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.pm[source] = nil
 end)
 
@@ -1750,7 +1752,7 @@ SecureEvent('whip_core:server:pmEditNumber', {
         {'phoneNumber', 'string', 10},
         {'newNumber', 'string', 10},
     },
-}, function(source, player, oldNumber, newNumber)
+}, function(source, _, oldNumber, newNumber)
     oldNumber = tostring(oldNumber or ''):gsub('[^%d]', '')
     newNumber = tostring(newNumber or ''):gsub('[^%d]', '')
     if #newNumber ~= 10 then
@@ -1817,7 +1819,7 @@ end)
 SecureEvent('whip_core:server:pmDeleteNumber', {
     ace = 'whip.devtools',
     params = { {'phoneNumber', 'string', 10} },
-}, function(source, player, number)
+}, function(source, _, number)
     number = tostring(number or ''):gsub('[^%d]', '')
 
     local existingRow = phoneRow(number)
@@ -1857,7 +1859,7 @@ end)
 SecureEvent('whip_core:server:pmAssignNumber', {
     ace = 'whip.devtools',
     params = { {'charId', 'id'} },
-}, function(source, player, charId)
+}, function(source, _, charId)
     -- A character that is there (not deleted): the insert's foreign key threw on one that is not, unanswered
     if not MySQL.scalar.await('SELECT charId FROM characters WHERE charId = ? AND deleted IS NULL', { charId }) then
         return false, ('There is no character #%d'):format(charId)
@@ -1944,7 +1946,7 @@ SecureCallback('whip_core:pmNumberDetail', {
     ace       = 'whip.devtools',
     rateLimit = 250,
     params    = { {'phoneNumber', 'string', 10} },
-}, function(source, player, number)
+}, function(_, _, number)
     number = tostring(number or ''):gsub('[^%d]', '')
     if #number ~= 10 then return { ok = false } end
     local function count(sql, args)
@@ -2021,7 +2023,7 @@ SecureCallback('whip_core:pmPhoneDossier', {
     rateLimit = 400,
     burst     = 3,
     params    = { {'phoneNumber', 'string', 10}, {'tzOffset', 'int', -900, 900, 0} },
-}, function(source, player, number, tzOffset)
+}, function(_, _, number, tzOffset)
     number = tostring(number or ''):gsub('[^%d]', '')
     if #number ~= 10 then return { ok = false, why = 'That is not a phone number' } end
     if not phoneRow(number, true) then return { ok = false, why = 'That number is not on this server' } end
@@ -2030,7 +2032,7 @@ SecureCallback('whip_core:pmPhoneDossier', {
 
     local ok, res = pcall(function()
         local q = MySQL.query.await
-        local row = phoneRow(number, true)
+        local row = phoneRow(number, true) --[[@as table]]   -- asked above; one gone since fails the pcall
 
         local contacts = {}
         for _, c in ipairs(q([[SELECT contactId, contactName, contactNumber, UNIX_TIMESTAMP(createdAt) AS t
@@ -2189,11 +2191,12 @@ SecureCallback('whip_core:pmPhoneThread', {
     rateLimit = 150,
     burst     = 6,
     params    = { {'phoneNumber', 'string', 10}, {'otherNumber', 'string', 10}, {'beforeId', 'any'} },
-}, function(source, player, number, other, beforeId)
+}, function(_, _, number, other, beforeId)
     number = tostring(number or ''):gsub('[^%d]', '')
     other = tostring(other or ''):gsub('[^%d]', '')
     if #number ~= 10 or #other ~= 10 then return { ok = false, why = 'That is not a phone number' } end
     local before = math.floor(tonumber(beforeId) or 0)
+    ---@type (string|integer)[]
     local args = { number, number, other, other, number }
     local sql = [[SELECT messageId, (senderNumber = ?) AS mine, content, UNIX_TIMESTAMP(createdAt) AS t,
             UNIX_TIMESTAMP(readAt) AS r
@@ -2266,7 +2269,7 @@ end
 
 local function jmGetBankAccounts()
     local result = {}
-    for jobId, job in pairs(Jobs.cache) do
+    for jobId in pairs(Jobs.cache) do
         local accounts = Bank.GetAccountsByJob(jobId)
         if #accounts > 0 then
             result[tostring(jobId)] = {}
@@ -2330,7 +2333,7 @@ DevTools.setRefresh('jm', jmBroadcast)
 --- Open Job Manager — register viewer + send initial data
 SecureEvent('whip_core:server:jmGetAll', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     DevTools.viewers.jm[source] = true
     TriggerClientEvent('whip_core:client:jmAllJobs', source, jmBuildPayload())
 end)
@@ -2338,7 +2341,7 @@ end)
 --- Close Job Manager — unregister viewer
 SecureEvent('whip_core:server:jmClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.jm[source] = nil
 end)
 
@@ -2385,7 +2388,7 @@ SecureEvent('whip_core:server:jmUpdateJob', {
         {'jobId', 'id'},
         {'data', 'any'},
     },
-}, function(source, player, jobId, data)
+}, function(source, _, jobId, data)
     if type(data) ~= 'table' then return end
 
     local updateData = {}
@@ -2418,7 +2421,7 @@ end)
 SecureEvent('whip_core:server:jmDeleteJob', {
     ace = 'whip.devtools',
     params = { {'jobId', 'id'} },
-}, function(source, player, jobId)
+}, function(source, _, jobId)
 
     local ok, why = Jobs.delete(jobId)
     if not ok then
@@ -2432,7 +2435,7 @@ end)
 SecureEvent('whip_core:server:jmCreateRole', {
     ace = 'whip.devtools',
     params = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(source, _, data)
     if type(data) ~= 'table' then return end
 
     -- Sanitize.id, not int: int clamps 0 up to 1, and a missing job id would become job #1.
@@ -2461,7 +2464,7 @@ SecureEvent('whip_core:server:jmUpdateRole', {
         {'roleId', 'id'},
         {'data', 'any'},
     },
-}, function(source, player, roleId, data)
+}, function(source, _, roleId, data)
     if type(data) ~= 'table' then return end
 
     local updateData = {}
@@ -2490,7 +2493,7 @@ end)
 SecureEvent('whip_core:server:jmDeleteRole', {
     ace = 'whip.devtools',
     params = { {'roleId', 'id'} },
-}, function(source, player, roleId)
+}, function(source, _, roleId)
 
     local ok, err = Jobs.deleteRole(roleId)
     if not ok then
@@ -2533,7 +2536,7 @@ SecureEvent('whip_core:server:jmFire', {
         {'jobId', 'id'},
         {'charId', 'id'},
     },
-}, function(source, player, jobId, charId)
+}, function(source, _, jobId, charId)
 
     -- Admin path, no actor arg. Bank revocation, the player's job list and this panel are all
     -- updated inside Jobs.fire.
@@ -2554,7 +2557,7 @@ SecureEvent('whip_core:server:jmSetRole', {
         {'charId', 'id'},
         {'roleId', 'id'},
     },
-}, function(source, player, jobId, charId, roleId)
+}, function(source, _, jobId, charId, roleId)
 
     -- Admin path, no actor arg. Bank access, the player's job list and this panel are all updated
     -- inside Jobs.setRole.
@@ -2630,7 +2633,7 @@ end
 SecureCallback('whip_core:jmWizardCreate', {
     ace    = 'whip.devtools',
     params = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(_, player, data)
     if type(data) ~= 'table' then return { ok = false, why = 'Nothing to make a job from' } end
     local name = Sanitize.string(data.name, 100, '')
     if name == '' then return { ok = false, why = 'Give the job a name' } end
@@ -2670,7 +2673,7 @@ end)
 SecureCallback('whip_core:jmWizardSave', {
     ace    = 'whip.devtools',
     params = { {'jobId', 'id'}, {'data', 'any'} },
-}, function(source, player, jobId, data)
+}, function(_, player, jobId, data)
     if not Jobs.cache[jobId] then return { ok = false, why = 'No such job' } end
     if type(data) ~= 'table' then return { ok = false, why = 'Nothing to change' } end
     local problems = {}
@@ -2692,6 +2695,7 @@ SecureCallback('whip_core:jmWizardSave', {
         n = n + 1
         if n > JM_MAX_PEOPLE then break end
         local id = Sanitize.id(charId)
+        ---@type boolean, string|nil
         local ok, why = false, 'no such person'
         if id then ok, why = Jobs.fire(jobId, id) end
         if not ok then problems[#problems + 1] = ('#%s was not let go: %s'):format(tostring(charId), why or 'refused') end
@@ -2701,8 +2705,8 @@ SecureCallback('whip_core:jmWizardSave', {
     if data.name ~= nil or data.ownerCharId ~= nil then
         local upd = {}
         if data.name ~= nil then
-            local n = Sanitize.string(data.name, 100, '')
-            if n ~= '' then upd.name = n end
+            local name = Sanitize.string(data.name, 100, '')
+            if name ~= '' then upd.name = name end
         end
         if data.ownerCharId ~= nil then upd.ownerCharId = Sanitize.id(data.ownerCharId) or false end
         local ok, why = Jobs.update(jobId, upd)
@@ -2763,6 +2767,7 @@ SecureCallback('whip_core:jmWizardSave', {
         if n > JM_MAX_PEOPLE then break end
         local id = type(m) == 'table' and Sanitize.id(m.charId)
         local role = id and Jobs.resolveRole(jobId, m.rank)
+        ---@type boolean, string|nil
         local ok, why = false, 'no such rank'
         if role then ok, why = Jobs.setRole(jobId, id, role.roleId) end
         if not ok then problems[#problems + 1] = ('#%s did not change rank: %s'):format(tostring(id or '?'), why or 'refused') end
@@ -2814,7 +2819,7 @@ end
 SecureEvent('whip_core:server:smGetAll', {
     ace = 'whip.devtools',
     requirePlayer = false,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.sm[source] = true
     -- The keys config.lua's Config.Shops starts shops with: a shop's page says where its key came from.
     local configShops = {}
@@ -2831,7 +2836,7 @@ end)
 --- Close Shop Manager
 SecureEvent('whip_core:server:smClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.sm[source] = nil
 end)
 
@@ -2937,7 +2942,7 @@ end)
 SecureCallback('whip_core:smWizardCreate', {
     ace    = 'whip.devtools',
     params = { {'data', 'any'} },
-}, function(source, player, data)
+}, function(_, player, data)
     local def, why, unpriced = smCreate(player, data)
     if not def then return { ok = false, why = why } end
     smBroadcast()
@@ -2997,7 +3002,7 @@ SecureEvent('whip_core:server:smUpdateShop', {
         {'shopId', 'id'},
         {'data', 'any'},
     },
-}, function(source, player, shopId, data)
+}, function(source, _, shopId, data)
     if type(data) ~= 'table' then return end
     local ok, why = smUpdate(shopId, data)
     if not ok then return false, why end
@@ -3009,7 +3014,7 @@ end)
 SecureCallback('whip_core:smWizardUpdate', {
     ace    = 'whip.devtools',
     params = { {'shopId', 'id'}, {'data', 'any'} },
-}, function(source, player, shopId, data)
+}, function(_, _, shopId, data)
     local ok, why, unpriced = smUpdate(shopId, data)
     if not ok then return { ok = false, why = why } end
     smBroadcast()
@@ -3021,7 +3026,7 @@ end)
 SecureCallback('whip_core:smStockPrices', {
     ace    = 'whip.devtools',
     params = { {'containerId', 'id'} },
-}, function(source, player, containerId)
+}, function(_, _, containerId)
     if not Containers.getDef(containerId) then return { ok = false, why = ('No container #%d'):format(containerId) } end
     Shops.loadPrices(containerId)
     local cache = Shops.priceCache[containerId]
@@ -3039,7 +3044,7 @@ SecureEvent('whip_core:server:smDeleteShop', {
     params = {
         {'shopId', 'id'},
     },
-}, function(source, player, shopId)
+}, function(source, _, shopId)
     -- Its reason, not always "not found": "being changed — try again", a database error
     local ok, why = Shops.delete(shopId)
     if not ok then return false, why or 'Shop not found' end
@@ -3071,7 +3076,7 @@ SecureEvent('whip_core:server:twSetTime', {
         {'hour', 'int', 0, 23},
         {'minute', 'int', 0, 59},
     },
-}, function(source, player, hour, minute)
+}, function(source, _, hour, minute)
     TimeWeather.setTime(hour, minute)
     ShowSuccess(source, ('Time set to %02d:%02d'):format(hour, minute))
     twBroadcast()
@@ -3083,7 +3088,7 @@ SecureEvent('whip_core:server:twSetWeather', {
     params = {
         {'weather', 'enum', Config.WeatherTypes},
     },
-}, function(source, player, weather)
+}, function(source, _, weather)
     TimeWeather.setWeather(weather)
     ShowSuccess(source, 'Weather set to ' .. weather)
     twBroadcast()
@@ -3093,7 +3098,7 @@ end)
 SecureEvent('whip_core:server:twSetFrozen', {
     ace = 'whip.devtools',
     params = { {'frozen', 'bool'} },
-}, function(source, player, frozen)
+}, function(source, _, frozen)
     TimeWeather.setFrozen(frozen)
     ShowSuccess(source, frozen and 'Time frozen' or 'Time unfrozen')
     twBroadcast()
@@ -3103,7 +3108,7 @@ end)
 SecureEvent('whip_core:server:twSetBlackout', {
     ace = 'whip.devtools',
     params = { {'blackout', 'bool'} },
-}, function(source, player, blackout)
+}, function(source, _, blackout)
     TimeWeather.setBlackout(blackout)
     ShowSuccess(source, blackout and 'Blackout enabled' or 'Blackout disabled')
     twBroadcast()
@@ -3113,7 +3118,7 @@ end)
 SecureEvent('whip_core:server:twSetTimeScale', {
     ace = 'whip.devtools',
     params = { {'scale', 'number', 0, 10} },
-}, function(source, player, scale)
+}, function(source, _, scale)
     TimeWeather.setTimeScale(scale)
     ShowSuccess(source, ('Time scale set to %.1f'):format(scale))
     twBroadcast()
@@ -3123,7 +3128,7 @@ end)
 SecureEvent('whip_core:server:twGetAll', {
     ace = 'whip.devtools',
     requirePlayer = false,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.tw[source] = true
     local data = TimeWeather.getSyncData()
     data.weatherTypes = TimeWeather.getWeatherTypes()
@@ -3133,7 +3138,7 @@ end)
 --- Close Time Manager
 SecureEvent('whip_core:server:twClosed', {   -- no ACE: see plmClosed
     requirePlayer = false, whileDead = true,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.tw[source] = nil
 end)
 

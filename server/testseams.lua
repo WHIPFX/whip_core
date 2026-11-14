@@ -367,7 +367,7 @@ end)
 
 --- Open a shop for a player, as a shop point's E does once its own checks have passed (Shops.openFor). For
 --- whip_test's shop screen tests. Answers true, or false and why.
----@param source number
+---@param source number|string|nil
 ---@param shopId number
 ---@return boolean ok
 ---@return string|nil why
@@ -375,7 +375,7 @@ exports('__TestOpenShop', function(source, shopId)
     if not seamsEnabled() then return false, 'test seams are off' end
     source = tonumber(source)
     local player = source and Players[source]
-    if not player then return false, 'not loaded' end
+    if not source or not player then return false, 'not loaded' end
     return Shops.openFor(source, player, tonumber(shopId))
 end)
 
@@ -579,9 +579,8 @@ end)
 --- Persistence is write-behind for most kinds, so this is NOT a no-op: it drains the dirty
 --- set through Stores.flushAll and reports whether anything is still owed afterwards. A
 --- false return means quarantined or backing off, not merely slow.
----@param source number|nil
 ---@return boolean
-exports('__TestFlushPersistence', function(source)
+exports('__TestFlushPersistence', function()
     if not seamsEnabled() then return false end
 
     -- Every write-behind path, in order — character positions and rows (PlayerRows), vehicle stats and
@@ -659,7 +658,7 @@ exports('__TestFailNextQuery', function(pattern)
     _rawFault = { pattern = pattern, expires = GetGameTimer() + FAULT_TTL_MS }
     _rawOriginals = {}
     for _, method in ipairs(RAW_METHODS) do
-        local real = MySQL[method].await
+        local real = MySQL[method].await --[[@as fun(query: string, params: table|nil): any]]   -- query, update and insert alike
         _rawOriginals[method] = real
         MySQL[method].await = function(query, params)
             local f = _rawFault
@@ -803,6 +802,8 @@ exports('__TestRateLimitBypass', function(on)
     return false
 end)
 
+local _announced = {}   -- [src] = true for a phantom whose loaded was announced
+
 --- Create or clear phantom players.
 ---
 --- A phantom is an entry in `Players` (and `Stats._cache`) with no character behind it. Every
@@ -822,7 +823,6 @@ end)
 ---@param n number  how many to create; 0 clears them
 ---@param announce boolean|nil
 ---@return number active
-local _announced = {}   -- [src] = true for a phantom whose loaded was announced
 exports('__TestPhantoms', function(n, announce)
     n = math.max(0, math.min(tonumber(n) or 0, 1024))
     -- The ones announced hear their logout first, whatever comes next.
@@ -921,7 +921,7 @@ end)
 
 --- Delete a vehicle whip created, row and all, so a load test doesn't leave its cars in `vehicles`.
 --- Through Vehicles.delete, so the cache, storage and write-behind queue are released together.
----@param vehicleId number
+---@param vehicleId number|string|nil
 ---@return boolean
 exports('__TestDeleteVehicle', function(vehicleId)
     if not seamsEnabled() then return false end
@@ -995,7 +995,7 @@ end)
 --- For SpawnTempVehicle's `keyInIgnition` test. There is no public read of the ignition —
 --- a satellite asks about keys through a player (HasVehicleKey) — and the ignition of a temp car
 --- lives only in memory, so there is no row for a test to read either.
----@param vehicleId number
+---@param vehicleId number|string|nil
 ---@return boolean|nil  nil with the seams off
 exports('__TestKeyInIgnition', function(vehicleId)
     if not seamsEnabled() then return nil end
@@ -1010,7 +1010,7 @@ end)
 --- The release runs from Character.onLife hooks the delete path calls (the public event is news only),
 --- so a test needs this to reach them. It refuses a character that is not deleted, so it cannot strip
 --- a live one.
----@param charId number
+---@param charId number|string|nil
 ---@return boolean ran
 ---@return string|nil why
 exports('__TestRunCharacterDeleted', function(charId)

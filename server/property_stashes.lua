@@ -186,6 +186,8 @@ function PropertyStashes.make(job, rec, objects, clean)
     for i, id in pairs(job.keep) do clean[i].containerId = id end
     for _, i in ipairs(job.create) do
         local spec, o = PropertyStashes.spec(clean[i].model), objects[i]
+        -- (prepare put only stash models in job.create.)
+        ---@cast spec -nil
         local def, why = Containers.create({
             name = spec.label, type = 'stash', slots = spec.slots, maxWeight = spec.weight,
             x = tonumber(o.x), y = tonumber(o.y), z = tonumber(o.z), heading = (tonumber(o.rz) or 0.0) % 360.0,

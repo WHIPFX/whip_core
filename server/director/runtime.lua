@@ -141,6 +141,9 @@ local function deepCopy(v, depth)
 end
 
 --- Run card code so that a WAIT inside it is caught instead of stalling whoever called it.
+---@return boolean ok
+---@return any res   what the card answered, or the error
+---@return any data
 local function runGuarded(fn, ...)
     local co = coroutine.create(fn)
     local ok, a, b = coroutine.resume(co, ...)
@@ -844,13 +847,6 @@ function R.seedIds(n)
     if n > nextRunId then nextRunId = n end
 end
 
---- Start a run of a compiled graph.
----@param graph table   DirectorGraph.compile's result
----@param opts table    { scenarioId, rev, tag?, test, players = { src, ... }, starter, trigger, vars,
----                       places? = { [worldId] = coords } (this run's own: CTX:place),
----                       onTrace? = fn(step, run): told of every step from the first }
----@return table|false run
----@return string|nil why
 --- Has the scenario a Scenario Run Started By Player card (a lead-in before its job)? Asked once a graph.
 local function hasBegin(graph)
     if graph.hasBegin == nil then
@@ -863,6 +859,13 @@ local function hasBegin(graph)
 end
 R.hasBegin = hasBegin
 
+--- Start a run of a compiled graph.
+---@param graph table   DirectorGraph.compile's result
+---@param opts table    { scenarioId, rev, tag?, test, players = { src, ... }, starter, trigger, vars,
+---                       places? = { [worldId] = coords } (this run's own: CTX:place),
+---                       onTrace? = fn(step, run): told of every step from the first }
+---@return table|false run
+---@return string|nil why
 function R.start(graph, opts)
     opts = opts or {}
     local test = opts.test == true

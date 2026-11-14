@@ -126,7 +126,7 @@ local function expand(entry)
     if not entry:find('*', 1, true) then return { entry } end
     local dir = entry:match('^(.*)/[^/]*$') or '.'
     local out = {}
-    local pipe = io.popen('dir /b /on "' .. ROOT .. '\\' .. dir:gsub('/', '\\') .. '\\*.lua" 2>nul')
+    local pipe = assert(io.popen('dir /b /on "' .. ROOT .. '\\' .. dir:gsub('/', '\\') .. '\\*.lua" 2>nul'))
     for name in pipe:lines() do out[#out + 1] = dir .. '/' .. name end
     pipe:close()
     return out
@@ -161,9 +161,9 @@ local KEEPS_A = {
     EXTRAARG = true,
 }
 
----@return table defs   set of global names this file assigns
----@return table priv   list of { global, field, how = 'reads'|'writes' }
----@return table fields { defs = { [global] = { [field] = true } }, reads = { {global, field} },
+---@return table|nil defs   set of global names this file assigns (all three nil: the file could not be read)
+---@return table|nil priv   list of { global, field, how = 'reads'|'writes' }
+---@return table|nil fields { defs = { [global] = { [field] = true } }, reads = { {global, field} },
 ---                       opaque = { [global] = true }, dynamic = { [global] = true } } — see FIELD
 local function scan(relPath)
     local src = readAll(ROOT .. '\\' .. relPath:gsub('/', '\\'))
@@ -171,7 +171,7 @@ local function scan(relPath)
     writeAll(TMP, (src:gsub('`', 'Q')))
     -- The whole command in one more pair of quotes: cmd.exe strips the outer pair when a command
     -- starts with a quoted path, which otherwise breaks both paths and lists nothing.
-    local pipe = io.popen('""' .. LUAC .. '" -l -l -p "' .. TMP .. '" 2>&1"')
+    local pipe = assert(io.popen('""' .. LUAC .. '" -l -l -p "' .. TMP .. '" 2>&1"'))
     local defs, priv, privSeen = {}, {}, {}
     local fields = { defs = {}, reads = {}, opaque = {}, dynamic = {} }
     local readSeen = {}
@@ -308,7 +308,7 @@ local function measure()
         local definedIn, scans = {}, {}
         for _, f in ipairs(files) do
             local defs, priv, fields = scan(f)
-            if defs then
+            if defs and priv and fields then
                 scans[#scans + 1] = { file = f, priv = priv, fields = fields }
                 for name in pairs(defs) do
                     definedIn[name] = definedIn[name] or {}

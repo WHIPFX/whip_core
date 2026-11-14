@@ -45,7 +45,7 @@ local HELMET_FLAG      = 35
 local WEAPON_LOCK_FLAG = 48
 local function pedSettings(ped)
     SetPedConfigFlag(ped, HELMET_FLAG, Config.BikeAutoHelmet == true)
-    if not (isGiveModeActive ~= nil and isGiveModeActive()) then SetPedConfigFlag(ped, WEAPON_LOCK_FLAG, true) end
+    if not (Inventory.isGiveModeActive and Inventory.isGiveModeActive()) then SetPedConfigFlag(ped, WEAPON_LOCK_FLAG, true) end
     SetCanAttackFriendly(ped, true, true)
     SetPlayerHealthRechargeMultiplier(PlayerId(), 0.0)
     SetPlayerHealthRechargeLimit(PlayerId(), 0.0)
@@ -149,7 +149,7 @@ exports('HoldPlayerPed', function(id, flags)
     local h = {}
     for i = 1, #FLAGS do h[FLAGS[i]] = flags[FLAGS[i]] == true end
     local ok, why = satHolds:add(owner, id, h)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end)
 

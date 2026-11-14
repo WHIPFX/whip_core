@@ -1,3 +1,4 @@
+---@meta
 -- ============================================
 -- whip_core — LuaLS Type Annotations
 -- ============================================
@@ -13,6 +14,9 @@
 --   events.lua           — Every event whip fires, with its payload type (and old name)
 --   director.lua         — The Director API's shapes (DirectorRunView, DirectorScenarioView, its events)
 --   satellite.lua        — The Whip.* helper from '@whip_core/lib/satellite.lua'
+--   oxmysql.lua          — oxmysql's MySQL global, as whip calls it
+--   runtime.lua          — Corrections to the FiveM runtime's own annotations (multi-value exports, natives
+--                          that take a player as a number, ClearTimeout)
 --   luarc.template.json  — The .luarc.json you copy into your own resource (step 2)
 --
 -- COVERAGE: these stubs cover the full export surface, client and

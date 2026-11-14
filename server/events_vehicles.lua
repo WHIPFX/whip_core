@@ -89,7 +89,7 @@ end
 --- prompts are hidden from everybody else, but a hidden prompt is a courtesy and this is the rule.
 ---@return boolean ok
 ---@return string|nil why
-local function mayUseGarage(source, player, garageKey)
+local function mayUseGarage(_, player, garageKey)
     if Garages.canUse(garageKey, player and player.charId) then return true end
     return false, 'That garage is private'
 end
@@ -250,7 +250,7 @@ SecureEvent('whip_core:server:appearanceApplied', {
     params = {
         {'vehicleIds', 'any'},   -- a list of ids, or one id; checked one by one below
     },
-}, function(source, player, vehicleIds)
+}, function(source, _, vehicleIds)
     if type(vehicleIds) ~= 'table' then vehicleIds = { vehicleIds } end
 
     for i = 1, math.min(#vehicleIds, DRESSED_BATCH_MAX) do
@@ -423,7 +423,7 @@ SecureEvent('whip_core:server:vehicleSeat', {
         {'seat',      'int', -1, 15},
         {'entered',   'bool'},
     },
-}, function(source, player, vehicleId, seat, entered)
+}, function(source, _, vehicleId, seat, entered)
     local def = Vehicles.getDef(vehicleId)
 
     if entered then
@@ -508,7 +508,7 @@ function Vehicles.wakeSeatFor(player)
     -- The same car: a street car's id lasts one server run, and the next run gives it to another car.
     local vehicleId = tonumber(note.vehicleId)
     local def = vehicleId and Vehicles.getDef(vehicleId)
-    if not def or def.plate ~= note.plate or def.model ~= note.model then return nil end
+    if not vehicleId or not def or def.plate ~= note.plate or def.model ~= note.model then return nil end
     local entity = Vehicles.getEntity(vehicleId)
     if not entity or GetEntityRoutingBucket(entity) ~= GetPlayerRoutingBucket(player.source) then return nil end
 
@@ -867,7 +867,7 @@ SecureEvent('whip_core:server:registerSessionVehicle', {
     -- is asked first, and answered the way checkIgnition answers it.
     local knownId = Vehicles.getEntityVehicleId(entity)
     local knownDef = knownId and Vehicles.getDef(knownId)
-    if knownDef then
+    if knownId and knownDef then
         -- The netId rides along so the client can tell a reply about THIS car from a late one about
         -- the car it sat in before.
         TriggerClientEvent('whip_core:client:sessionVehicleRegistered', source, knownId, netId)
@@ -899,7 +899,7 @@ SecureEvent('whip_core:server:registerSessionVehicle', {
     -- the entity whip actually tracks for it — a car that merely carries the same plate text is not it.
     local ownedId = Vehicles.getByPlate(plate)
     local ownedDef = ownedId and Vehicles.getDef(ownedId)
-    if ownedDef and not ownedDef.session and not Vehicles.isPlayerDriving(source, ownedId) then
+    if ownedId and ownedDef and not ownedDef.session and not Vehicles.isPlayerDriving(source, ownedId) then
         RecordEventRejection('whip_core:server:registerSessionVehicle', source,
             'plate belongs to an owned vehicle the reporter is not driving')
         return
@@ -951,7 +951,7 @@ SecureCallback('whip_core:resolveVehicle', {
         {'netId', 'id'},
         {'vehType', 'string', 30, 'automobile'},
     },
-}, function(source, player, plate, model, netId, vehType)
+}, function(source, _, plate, model, netId, vehType)
     -- Gate first, from the car itself: the caller must be standing at the car, and the plate is the
     -- one the car carries. Each refusal answers `false, why`.
     local entity = reportedVehicleEntity(source, netId)
@@ -1014,7 +1014,7 @@ SecureEvent('whip_core:server:saveMyPosition', {
     whileDead = true,   -- only marks where you are for the next save
     -- The client sends no faster than this (client/vehicles.lua saveMyPosition: one inside the gap waits for it).
     rateLimit = 5000,
-}, function(source, player)
+}, function(source)
     PlayerRows.markPosition(source)
 end)
 
@@ -1083,7 +1083,7 @@ SecureEvent('whip_core:server:toggleVehicleDoor', {
         -- "shut" is idempotent where a toggle would race.
         {'want', 'enum', {'toggle', 'open', 'shut'}, 'toggle'},
     },
-}, function(source, player, netId, doorIndex, want)
+}, function(source, _, netId, doorIndex, want)
     local entity = reportedVehicleEntity(source, netId)
     if not entity then return end
 
@@ -1190,7 +1190,7 @@ SecureEvent('whip_core:server:reassertVehicleLock', {
     rateLimit = 250,
     burst     = 3,   -- two cars spawned side by side can both be caught in one laggy moment
     params    = { {'vehicleId', 'id'} },
-}, function(source, player, vehicleId)
+}, function(_, _, vehicleId)
     local def = Vehicles.getDef(vehicleId)
     if not def or (def.session and not def.temp) then return end
     local entity = Vehicles.getEntity(vehicleId)
@@ -1265,6 +1265,7 @@ local function sendStoragePayload(source, player, def, vehicleId, storageType)
 
     -- If opening glovebox and player is the driver, also include ignition data
     local showIgnition = false
+    ---@type table|false
     local ignitionSlot = false  -- false = empty, table = has key
     if storageType == 'glovebox' then
         local ped = GetPlayerPed(source)
@@ -1469,7 +1470,7 @@ SecureEvent('whip_core:server:closeVehicleStorage', {
         {'vehicleId', 'id'},
         {'storageType', 'enum', {'trunk', 'glovebox', 'key'}, 'trunk'},
     },
-}, function(source, player, vehicleId, storageType)
+}, function(source, _, vehicleId, storageType)
     -- Only a viewer may close (a close forces a save and an unload sweep).
     if not Stores.isViewer(source, ('vehicle:%s:%s'):format(tostring(vehicleId), storageType)) then
         RecordEventRejection('whip_core:server:closeVehicleStorage', source,
@@ -1497,7 +1498,7 @@ SecureEvent('whip_core:server:checkIgnition', {
     rateLimit = 500,
     burst     = 3,
     params = { {'vehicleId', 'id', 0} },   -- 0 = no whip id (an unregistered car)
-}, function(source, player, vehicleId)
+}, function(source, _, vehicleId)
     if not vehicleId or vehicleId == 0 then
         -- No vehicleId (NPC not yet registered) — no key restriction
         TriggerClientEvent('whip_core:client:ignitionState', source, 0, true)
@@ -1697,7 +1698,7 @@ SecureEvent('whip_core:server:vehicleModels', {
     whileDead = true,
     rateLimit = 60000,
     params = { { 'models', 'list', { 'model', 'key', 60 }, 6000 } },
-}, function(source, player, models)
+}, function(source, _, models)
     local who = GetPlayerIdentifierByType(source, 'license') or ('source:' .. tostring(source))
     if modelsReported[who] then return end
     modelsReported[who] = true

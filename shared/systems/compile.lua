@@ -70,11 +70,6 @@ local function fieldProblem(f, v, vars)
     return nil
 end
 
---- Check and compile a System document for one lane ('server' or 'client').
----@param doc table
----@param lane string|nil
----@return table|nil graph
----@return table problems   { { severity = 'error' | 'warning', node, pin, message } }
 -- ============================================
 -- Claims
 -- ============================================
@@ -109,7 +104,7 @@ local function claimProblems(doc, problems)
         local to = type(l) == 'table' and l.to
         local from = type(l) == 'table' and l.from
         local t = type(to) == 'table' and P[to.node]
-        if t and type(from) == 'table' and P[from.node] then
+        if t and type(to) == 'table' and type(from) == 'table' and P[from.node] then
             for _, p in ipairs(t.vin) do
                 if p.key == to.pin then into[to.node] = into[to.node] or {}; into[to.node][to.pin] = from end
             end
@@ -152,6 +147,11 @@ local function claimProblems(doc, problems)
     end
 end
 
+--- Check and compile a System document for one lane ('server' or 'client').
+---@param doc table
+---@param lane string|nil
+---@return table|nil graph
+---@return table problems   { { severity = 'error' | 'warning', node, pin, message } }
 function G.compile(doc, lane)
     lane = lane or 'server'
     local problems = {}

@@ -3,32 +3,31 @@
 -- picked); and a card saved as "a car or a prop" read as a director entity. Against the real Director under the dev
 -- harness. Run from whip_core/dev/director:
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua npcattacks_module.lua
-local R = DirectorRuntime
 
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 local npcs, nextNpc = {}, 0
-Npcs.spawn = function(_, def)
+rawset(Npcs, 'spawn', function()
     nextNpc = nextNpc + 1
     npcs[nextNpc] = { npcId = nextNpc, netId = 5000 + nextNpc, alive = true, coords = { x = 0.0, y = 0.0, z = 0.0 } }
     return nextNpc, 5000 + nextNpc
-end
-Npcs.get = function(id) return npcs[id] end
+end)
+rawset(Npcs, 'get', function(id) return npcs[id] end)
 local patches = {}
-Npcs.setState = function(_, id, patch) patches[#patches + 1] = { id = id, patch = patch } return true end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(Npcs, 'setState', function(_, id, patch) patches[#patches + 1] = { id = id, patch = patch } return true end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local at = function(x) return { x = x, y = 0.0, z = 0.0, heading = 0.0 } end
 local function npc(id, x) return { id = id, kind = 'npc', layer = 'run', label = id, def = { model = 's_m_m_security_01', coords = at(x) } } end
@@ -38,7 +37,7 @@ local WORLD = {
     { id = 'spot1', kind = 'spot', layer = 'run', label = 'spot1', def = { coords = at(20) } },
     { id = 'route1', kind = 'route', layer = 'run', label = 'route1', def = { points = { at(0), at(5) } } },
 }
-local function doc(nodes, links, v)
+local function doc(nodes, links)
     return { format = 2, name = 'Attacks', description = '', vars = {}, comments = {}, world = WORLD, nodes = nodes, links = links,
              settings = { start = { mode = 'admin' }, maxConcurrentRuns = 1, teamSize = 4, maxRunSec = 900 } }
 end
@@ -93,7 +92,7 @@ RegisterTestModule({
         { name = 'another NPC that is dead: nobody is told to attack', fn = function()
             cars, nextCar, npcs, nextNpc, patches = {}, 0, {}, 0, {}
             local realGet = Npcs.get
-            Npcs.get = function(id) local r = npcs[id] if r and r.netId == 5002 then r.alive = false end return r end
+            rawset(Npcs, 'get', function(id) local r = npcs[id] if r and r.netId == 5002 then r.alive = false end return r end)
             local p = attackRun('na_dead', 'victim')
             Npcs.get = realGet
             assertNil(p, 'nobody was told to attack')
@@ -132,7 +131,7 @@ RegisterTestModule({
             assertEqual(p.style, false, 'style false')
         end },
         { name = 'the card\'s fight fields are Shoot At\'s own, shown only while it attacks', fn = function()
-            local def = DirectorNodes.get('npc.hostile')
+            local def = DirectorNodes.get('npc.hostile') --[[@as table]]
             local byKey = {}
             for _, f in ipairs(def.props) do byKey[f.key] = f end
             for _, f in ipairs(DirectorSteps.SHOOTING) do
@@ -144,7 +143,7 @@ RegisterTestModule({
             end
         end },
         { name = 'saved as "a car or a prop" (version 1): read as a director entity', fn = function()
-            local d = DirectorDoc.load(doc({ n('h', 'npc.hostile', { npc = 'guard', target = 'a car or a prop', thing = 'car1' }, 1) }, {}))
+            local d = DirectorDoc.load(doc({ n('h', 'npc.hostile', { npc = 'guard', target = 'a car or a prop', thing = 'car1' }, 1) }, {})) --[[@as table]]
             assertEqual(d.nodes[1].props.target, 'a director entity', 'its target')
             assertEqual(d.nodes[1].v, DirectorNodes.get('npc.hostile').v, 'its version: the card\'s now')
             assertEqual(d.nodes[1].props.thing, 'car1', 'its thing kept')

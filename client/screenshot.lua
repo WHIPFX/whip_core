@@ -60,7 +60,7 @@ RegisterNUICallback('screenshotTaken', function(d, cb)
     cb({ ok = true })
     local id = type(d) == 'table' and tonumber(d.id) or nil
     local p = id and _waiting[id]
-    if not p then return end   -- nobody waits for it any more (given up on): not kept
+    if not (id and p) then return end   -- nobody waits for it any more (given up on): not kept
     _waiting[id] = nil
     p:resolve({ ok = d.ok == true, data = type(d.data) == 'string' and d.data or nil, why = d.why })
 end)

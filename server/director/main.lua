@@ -681,7 +681,7 @@ function Director.coolingDown(sc, run)
     for s in pairs(run.players) do
         local p = (not only or s == run.starter) and Players[s]
         local ends = p and p.charId and tonumber(t[tostring(p.charId)])
-        if ends and ends > now then
+        if p and ends and ends > now then
             out = out or {}
             out[#out + 1] = { src = s, mins = math.ceil((ends - now) / 60), name = p.fullName }
         end
@@ -1013,7 +1013,7 @@ end
 --- Why a scenario would not switch on, in words for the console: Check's errors (each with its card and
 --- variant), or the reason it gave. A switch-on refused by the server itself says it here, never only "its
 --- check failed".
----@param res table|string  Director.activate's second answer
+---@param res any  Director.activate's second answer, or any other reason (said as text)
 ---@return string
 function Director.whyNotOn(res)
     if type(res) ~= 'table' then return tostring(res) end
@@ -1097,7 +1097,7 @@ end
 
 --- Activate a scenario document: checked, compiled, its standing layer made, its start point up.
 ---@param id string
----@param doc table
+---@param raw table
 ---@param opts table|nil  { dbId, rev }: a scenario from the store (its runs go in its history);
 ---                       { by = source }: who switched it on (for scripts: scenario:switchedOn)
 ---@return boolean ok
@@ -1129,7 +1129,7 @@ function Director.activate(id, raw, opts)
     end
 
     local built, sc, bwhy, bworld = pcall(Director.build, id, doc, { dbId = opts.dbId, rev = opts.rev, prefix = 'standing' })
-    if not built then sc, bwhy = nil, 'it could not be built: ' .. tostring(sc) end
+    if not built then sc, bwhy = false, 'it could not be built: ' .. tostring(sc) end
     if not sc then
         lost(bwhy)
         return false, Director.buildProblem(doc, bwhy, bworld)
@@ -1190,13 +1190,13 @@ function Director.activate(id, raw, opts)
         if itemStarts[key] == nil and Inventory.handlerOwner('use', key) ~= nil then
             return fail(('"%s" already does something when used (%s)'):format(tostring(key), tostring(Inventory.handlerOwner('use', key))))
         end
-        local ok, why = Inventory.registerTaggedUseHandler(key, function(source)
+        local registered, why = Inventory.registerTaggedUseHandler(key, function(source)
             local run, rwhy = startFor(sc, source, { source = source, item = key })
             if not run then return false, rwhy end
             if start.consume == true then return nil end   -- used up
             return false                                    -- kept
         end, sc.tag)
-        if not ok then return fail(why) end
+        if not registered then return fail(why) end
         itemStarts[key] = id
         sc.item = key
     elseif mode == 'area' or mode == 'timer' then
@@ -1281,7 +1281,7 @@ function Director.switchByScript(key, on, why, by)
     --- The revision a person switched on allows scripts (read: WAITS).
     local function revisionAllows()
         local doc, dwhy = DirectorStore.revision(key, row.activeRev)
-        if not doc then return nil, dwhy end
+        if not doc then return nil, dwhy --[[@as string]] end
         if not (type(doc.settings) == 'table' and doc.settings.scriptSwitch == true) then return nil, NOT_SCRIPTS end
         return doc
     end

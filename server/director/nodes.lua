@@ -162,7 +162,7 @@ function DirectorNodes.claimSpace(owner, ns)
         return false, ('"%s." is whip_core\'s: name yours after your resource'):format(ns)
     end
     local ok, why = Spaces:add(owner, ns, true)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -275,7 +275,7 @@ end
 function DirectorNodes.carAt(def, model)
     local c = type(def) == 'table' and def.coords or nil
     local at = DirectorKit.vec3(c)
-    if not at then return nil end
+    if not c or not at then return nil end
     local ground = tonumber(c.ground)
     local lift = type(def.lifts) == 'table' and type(model) == 'string' and tonumber(def.lifts[model]) or nil
     if ground and lift and DirectorKit.finite(ground) and DirectorKit.finite(lift) and lift >= 0 and lift < 20 then
@@ -426,7 +426,8 @@ function DirectorNodes.defineFor(owner, def)
     local ok, why = validate(def)
     if not ok then return false, why end
     def.owner = owner
-    return Cards:add(owner, def.type, def)
+    local added, addWhy = Cards:add(owner, def.type, def)
+    return added, addWhy --[[@as string|nil]]
 end
 
 --- Take one of `owner`'s card types away (never anyone else's).
@@ -644,8 +645,8 @@ function DirectorNodes.applyRenames(doc)
         for i, l in ipairs(doc.links) do
             local from = type(l) == 'table' and l.from or nil
             local r = type(from) == 'table' and moved[from.node] or nil
-            local pin = r and r.pins and type(from.pin) == 'string' and r.pins[from.pin] or nil
-            if pin then
+            local pin = r and type(from) == 'table' and r.pins and type(from.pin) == 'string' and r.pins[from.pin] or nil
+            if pin and type(from) == 'table' then
                 local cl = {}
                 for k, v in pairs(l) do cl[k] = v end
                 cl.from = { node = from.node, pin = pin }

@@ -94,7 +94,7 @@ SecureEvent('whip_core:server:systemsDoc', {
     rateLimit = 300,
     burst = 4,
     params = { { 'token', 'id' }, { 'doc', 'any' } },
-}, function(source, player, token, doc)
+}, function(source, _, token, doc)
     local clean, why = copyPlain(doc, 1, { 0 })
     if clean and (clean.format ~= 1 or clean.kind ~= 'system') then clean, why = nil, 'that is not a system document' end
     local mine = uploads[source]
@@ -164,6 +164,7 @@ end
 --- for a request that only ends what the sender owns (their own test), which a builder who has just
 --- lost access must still be able to end.
 local function cb(name, params, handler, rate, level)
+    ---@type string|nil
     local permission = SB
     if level == false then permission = nil elseif level ~= nil then permission = level end
     SecureCallback('whip_core:systems:' .. name, {
@@ -269,7 +270,7 @@ cb('watch', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, functi
     return { editors = editorsOf(key, source) }
 end)
 
-cb('history', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('history', { { 'key', 'key', 64 } }, function(_, _, key)
     local list, why = SystemStore.history(key, 30)
     if not list then return false, why end
     return { revisions = list }
@@ -303,7 +304,7 @@ local function exampleDoc(name)
 end
 
 cb('create', { { 'key', 'key', 64 }, { 'name', 'string', 80 }, { 'from', 'string', 80, '' } },
-function(source, player, key, name, from)
+function(source, _, key, name, from)
     local why = off()
     if why then return false, why end
     local doc, dwhy
@@ -330,7 +331,7 @@ function(source, player, key, name, from)
 end, 1000)
 
 cb('save', { { 'key', 'key', 64 }, { 'baseRev', 'int', 0, 1000000000 }, { 'token', 'id' }, { 'note', 'string', 200, '' } },
-function(source, player, key, baseRev, token, note)
+function(source, _, key, baseRev, token, note)
     local why = off()
     if why then return false, why end
     local doc, uwhy = takeUpload(source, token)
@@ -341,7 +342,7 @@ function(source, player, key, baseRev, token, note)
     return { rev = rev, problems = problems, pins = pins, powers = powers, approvedOk = powers == '' }
 end, 500)
 
-cb('check', { { 'token', 'id' } }, function(source, player, token)
+cb('check', { { 'token', 'id' } }, function(source, _, token)
     local doc, uwhy = takeUpload(source, token)
     if not doc then return false, uwhy end
     local ok, problems, pins, powers = checked(doc)
@@ -370,7 +371,7 @@ function(source, player, key, rev, seen)
     return { ok = true, approved = needed }
 end, 1000, SA)
 
-cb('activate', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, function(source, player, key, rev)
+cb('activate', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, function(source, _, key, rev)
     local why = off()
     if why then return false, why end
     local row = SystemStore.get(key)

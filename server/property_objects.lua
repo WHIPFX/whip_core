@@ -447,7 +447,7 @@ SecureEvent('whip_core:server:propertyFurnishClosed', {
     rateLimit = 250,
     burst     = 4,
     params    = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(source, _, propertyId)
     local l = _lock[propertyId]
     if l and l.source == source then unlock(propertyId) end
 end)
@@ -490,7 +490,7 @@ SecureCallback('whip_core:property:objects', {
     rateLimit = 100,
     burst     = 20,
     params    = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(source, _, propertyId)
     -- A refusal says why (false, why), never nil, which reads as "no answer, try again" (audit 20, WLD-3)
     local rec = Properties.get(propertyId)
     if not rec then return false, 'Unknown property' end

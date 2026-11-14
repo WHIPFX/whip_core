@@ -40,8 +40,6 @@ local LINES = {
 local BY_KEY, BY_LABEL, LABELS = {}, {}, {}
 for _, l in ipairs(LINES) do BY_KEY[l.key] = l; BY_LABEL[l.label] = l.key; LABELS[#LABELS + 1] = l.label end
 local REACTIONS = { 'bumped', 'hitByCar', 'aimedAt', 'gunfire', 'carStolen' }
-local IS_REACTION = {}
-for _, k in ipairs(REACTIONS) do IS_REACTION[k] = true end
 LoreVoice.LINES, LoreVoice.REACTIONS = LINES, REACTIONS
 
 local function say(fmt, ...) print(('[whip_core:director] lore voices: ' .. fmt):format(...)) end
@@ -496,7 +494,7 @@ function LoreVoice.tick()
     for _, s in ipairs(GetPlayers()) do
         local src = tonumber(s)
         local ped = src and GetPlayerPed(src)
-        if ped and ped ~= 0 then players[#players + 1] = { src = src, at = GetEntityCoords(ped), bucket = GetPlayerRoutingBucket(src) } end
+        if src and ped and ped ~= 0 then players[#players + 1] = { src = src, at = GetEntityCoords(ped), bucket = GetPlayerRoutingBucket(src) } end
     end
     for npcId, n in pairs(npcs) do
         local voice = linesOf(n.key)
@@ -617,11 +615,11 @@ end)
 SecureEvent('whip_core:server:loreReact', {
     rateLimit = 300, burst = 5,
     params = { { 'netId', 'id', 1, 4294967295 }, { 'kind', 'enum', REACTIONS } },
-}, function(source, player, netId, kind)
+}, function(source, _, netId, kind)
     if not cfg().enabled then return end
     local npcId = Npcs.by('netId', netId)
     local n = npcId and npcs[npcId]
-    if not n then return end
+    if not npcId or not n then return end
     local voice = linesOf(n.key)
     if not (voice and voice[kind]) then return end
     -- The reporter must be near it (a game reporting from across the map is not believed).
@@ -647,7 +645,7 @@ end)
 SecureCallback('whip_core:director:loreVoiceTest', {
     permission = 'director.build', whileDead = true, rateLimit = 1500, burst = 2,
     params = { { 'key', 'key', 64 }, { 'url', 'string', 255 } },
-}, function(source, player, key, url)
+}, function(source, _, key, url)
     url = trim(url)
     local bad = LoreVoice.audioProblem(url)
     if bad then return false, bad end
@@ -730,7 +728,7 @@ end
 SecureCallback('whip_core:director:loreTest', {
     permission = 'director.build', whileDead = true, rateLimit = 1000, burst = 3,
     params = { { 'key', 'key', 64 }, { 'mode', 'enum', { 'ask', 'on', 'off' } } },
-}, function(source, player, key, mode)
+}, function(source, _, key, mode)
     if mode == 'ask' then return testState(source) end
     if mode == 'off' then endTest(source) return testState(source) end
     local c = DirectorLore.get(key)
@@ -756,7 +754,7 @@ end)
 SecureCallback('whip_core:director:loreTestSay', {
     permission = 'director.build', whileDead = true, rateLimit = 400, burst = 4,
     params = { { 'url', 'string', 255 }, { 'text', 'string', MAX_TEXT, '' } },
-}, function(source, player, url, text)
+}, function(source, _, url, text)
     local t = tests[source]
     if not t or not npcs[t.npcId] then return false, 'Your test NPC has gone: Spawn to test again' end
     if not cfg().enabled then return false, 'lore voice lines are switched off (Config.LoreVoice.Enabled)' end

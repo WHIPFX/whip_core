@@ -57,7 +57,7 @@ Portraits.MAX_LEN = MAX_LEN
 SecureEvent('whip_core:server:portraitSave', {
     rateLimit = 10000,
     params = { {'image', 'string', MAX_LEN + 1} },   -- one over: a cut-off picture is refused, not kept
-}, function(source, player, image)
+}, function(_, player, image)
     local charId = player and player.charId
     if not charId then return false, 'No character' end
     if not isPicture(image) then return false, 'Not a portrait' end
@@ -81,7 +81,7 @@ SecureCallback('whip_core:portraits', {
     rateLimit = 200,
     burst = 10,
     params = { {'charIds', 'any'} },
-}, function(source, player, charIds)
+}, function(_, _, charIds)
     if type(charIds) ~= 'table' then return { ok = true, portraits = {} } end
     local ids, seen = {}, {}
     for _, v in ipairs(charIds) do
@@ -109,7 +109,7 @@ end)
 SecureCallback('whip_core:myPortrait', {
     rateLimit = 2000,
     burst = 3,
-}, function(source, player)
+}, function(_, player)
     local charId = player and player.charId
     if not charId then return { ok = true } end
     local ok, rows = pcall(MySQL.query.await,

@@ -471,9 +471,9 @@ function InteractPress.play(target, opts)
 
     -- The normal, facing the player whichever way round it was given.
     local N = nil
-    local n = opts.normal and vec(opts.normal)
-    if n then
-        local x, y, z = unit(n[1], n[2], n[3])
+    local given = opts.normal and vec(opts.normal)
+    if given then
+        local x, y, z = unit(given[1], given[2], given[3])
         if x ~= 0.0 or y ~= 0.0 or z ~= 0.0 then
             if x * (P.x - T.x) + y * (P.y - T.y) + z * (P.z - T.z) < 0 then x, y, z = -x, -y, -z end
             N = { x = x, y = y, z = z }
@@ -486,7 +486,7 @@ function InteractPress.play(target, opts)
     local h = GetEntityHeading(ped)
     local p
     if not cover and hands < 2 then
-        local s = set
+        local s = set --[[@as table]]   -- loaded: InteractPress.available() above
         -- The prompt in the ped's frame (the list's)
         local t = { toPed(P, h, T.x, T.y, T.z) }
         local n = N and { toPed(P, h, N.x, N.y, N.z, true) } or nil

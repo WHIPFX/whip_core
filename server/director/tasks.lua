@@ -68,7 +68,8 @@ for _, g in ipairs(GROUPS) do DirectorTasks.GROUP_KEYS[g.key] = true end
 function DirectorTasks.defineFor(owner, def)
     if TYPES[def.t] then return false, ('"%s" is whip_core\'s own task'):format(def.t) end
     def.owner, def.satellite = owner, true
-    return SatTypes:add(owner, def.t, def)
+    local ok, why = SatTypes:add(owner, def.t, def)
+    return ok, why --[[@as string|nil]]
 end
 
 --- Take one of `owner`'s task types away (never anyone else's).

@@ -677,7 +677,7 @@ RegisterNetEvent('whip_core:client:groundItemsSync', function(items)
     clientItemCells = {}
     if items then
         for id, data in pairs(items) do
-            local numId = tonumber(id)
+            local numId = tonumber(id) --[[@as number]]   -- the server's pile ids
             groundItemsData[numId] = data
             clientGridInsert(numId, data.x, data.y)
         end
@@ -729,7 +729,7 @@ RegisterNetEvent('whip_core:client:groundItemsBatchAdd', function(items, cells, 
     end
 
     for id, data in pairs(items) do
-        local numId = tonumber(id)
+        local numId = tonumber(id) --[[@as number]]   -- the server's pile ids
         local known = groundItemsData[numId]
         if not known then
             groundItemsData[numId] = data
@@ -943,7 +943,7 @@ end)
 
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then
-        for id, obj in pairs(groundItemProps) do
+        for _, obj in pairs(groundItemProps) do
             if DoesEntityExist(obj) then
                 DeleteEntity(obj)
             end

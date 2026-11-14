@@ -101,6 +101,7 @@ local memory = nil   -- while timing: { from = KB at the start, at = when, last,
 -- of one pass a run. What the counting itself makes (naming a loop, its row) is a row of its own, so it is not taken
 -- for this resource's.
 local loops = nil                                     -- while timing: [file:line] = { n, kb }
+---@type function|nil, function|nil
 local nativeWait, nativeThread = nil, nil
 local SELF_ROW = '(/whipcost itself: naming the loops)'
 local wokeAt = setmetatable({}, { __mode = 'k' })     -- [coroutine] = KB when it last woke
@@ -130,7 +131,7 @@ end
 
 --- One pass of `name`'s loop: `made` KB (read before anything here made its own), then what filing it made, on the
 --- counting's own row.
-local function file(list, name, made, kb)
+local function file(list, name, made, kbNow)
     local e = list[name]
     if not e then
         e = { n = 0, kb = 0.0 }
@@ -139,14 +140,14 @@ local function file(list, name, made, kb)
     e.n = e.n + 1
     if made > 0 then e.kb = e.kb + made end
     local own = list[SELF_ROW]
-    own.kb = own.kb + math.max(0, collectgarbage('count') - kb)
+    own.kb = own.kb + math.max(0, collectgarbage('count') - kbNow)
 end
 
-local function countedWait(ms)
+local function countedWait(waitMs)
     local co = coroutine.running()
     local list = loops
     if co and list then
-        local kb = collectgarbage('count')   -- first: the naming below is the counting's, not the pass's
+        local kbNow = collectgarbage('count')   -- first: the naming below is the counting's, not the pass's
         local from = wokeAt[co]
         if from then
             local name = loopOf[co]
@@ -154,10 +155,11 @@ local function countedWait(ms)
                 name = loopName()
                 loopOf[co] = name
             end
-            file(list, name, kb - from, kb)
+            file(list, name, kbNow - from, kbNow)
         end
     end
-    nativeWait(ms)
+    ---@cast nativeWait -nil   -- this is Wait only while countLoops holds the real one there
+    nativeWait(waitMs)
     if co and loops then wokeAt[co] = collectgarbage('count') end
 end
 
@@ -165,18 +167,19 @@ end
 local function threadEnded(co, fn, ...)
     local list, from = loops, wokeAt[co]
     if list and from then
-        local kb = collectgarbage('count')
+        local kbNow = collectgarbage('count')
         local name = loopOf[co]
         if not name then
             local info = debug.getinfo(fn, 'S')
             name = info.short_src .. ':' .. info.linedefined
         end
-        file(list, name, kb - from, kb)
+        file(list, name, kbNow - from, kbNow)
     end
     return ...
 end
 
 local function countedThread(fn)
+    ---@cast nativeThread -nil   -- this is CreateThread only while countLoops holds the real one there
     if type(fn) ~= 'function' or not loops then return nativeThread(fn) end
     return nativeThread(function(...)
         local co = coroutine.running()

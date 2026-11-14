@@ -295,7 +295,8 @@ local function ride(ped, w)
     end
     local car = onCarUnder(ped)
     if not car then return end
-    local h = { ped = ped, car = car, off = GetOffsetFromEntityGivenWorldCoords(car, GetEntityCoords(ped)),
+    local pc = GetEntityCoords(ped)
+    local h = { ped = ped, car = car, off = GetOffsetFromEntityGivenWorldCoords(car, pc.x, pc.y, pc.z),
                 rot = GetEntityHeading(ped) - GetEntityHeading(car) }
     FreezeEntityPosition(ped, false)
     hold(h)
@@ -566,15 +567,15 @@ end
 local function jobAnim(w, dict, clip, loop, ms)
     local netId, jobId = w.netId, not w.preview and w.brain.job.id or nil
     CreateThread(function()
-        local loaded = LoadAnimDict(dict, 3000)
+        local ready = LoadAnimDict(dict, 3000)
         local ped
         if w.preview then
             ped = w.ped
-            if not loaded or not w.still() or not DoesEntityExist(ped) then return end
+            if not ready or not w.still() or not DoesEntityExist(ped) then return end
         else
             ped = pedFor(netId)
             local now = watches[netId]
-            if not loaded or not mine(ped) or not now or not now.brain.job or now.brain.job.id ~= jobId then return end
+            if not ready or not mine(ped) or not now or not now.brain.job or now.brain.job.id ~= jobId then return end
         end
         TaskPlayAnim(ped, dict, clip, 4.0, -4.0, loop and -1 or ms, loop and 1 or 0, 0.0, false, false, false)
     end)
@@ -635,16 +636,16 @@ STEP.goTo = function(ped, _, s)
     local ahead = type(s.ahead) == 'table' and type(s.ahead.at) == 'table' and s.ahead or nil
     local on = onward[ped]
     onward[ped] = nil
-    local task, since
+    local taskId, since
     if on and on.pace == s.p.pace and math.abs(on.at.x - a.x) + math.abs(on.at.y - a.y) + math.abs(on.at.z - a.z) < 0.1
         and GetScriptTaskStatus(ped, on.task) ~= 7 then
-        task, since = on.task, on.since   -- (already on its way there: it set off as it walked through the last point)
+        taskId, since = on.task, on.since   -- (already on its way there: it set off as it walked through the last point)
     else
         -- (Walking on through it: its way at the end is the way on, so GTA has no turn to make there.)
-        task, since = walkTo(ped, s.p, ahead ~= nil, ahead and wayOn(a, ahead.at) or (a.heading or 0.0)), GetGameTimer()
+        taskId, since = walkTo(ped, s.p, ahead ~= nil, ahead and wayOn(a, ahead.at) or (a.heading or 0.0)), GetGameTimer()
     end
     -- Done there, or when its walk has ended as near as it could get (a point a little off the paths).
-    return { arrive = a, within = 1.2, task = task, since = since, ahead = ahead, pace = s.p.pace }
+    return { arrive = a, within = 1.2, task = taskId, since = since, ahead = ahead, pace = s.p.pace }
 end
 
 --- On through a Go To's point to the next one (jobDone, once there): set off for it now.
@@ -835,18 +836,18 @@ STEP.throw = function(ped, w, s)
     if not at then return end
     local hash = GetHashKey(THROWN[s.p.item] or 'WEAPON_GRENADE')
     local was = throwOf[ped]
-    local mine = { before = was and was.before or nil, given = was and was.given or {} }
-    throwOf[ped] = mine
+    local rec = { before = was and was.before or nil, given = was and was.given or {} }
+    throwOf[ped] = rec
     local still = stillFor(w)
     -- The run's tidy-up, by its last throw: its items put away, what it held before back in its hand.
     local function tidy()
         throwOf[ped] = nil
         if not DoesEntityExist(ped) then return end
         local held = GetSelectedPedWeapon(ped)
-        for h in pairs(mine.given) do RemoveWeaponFromPed(ped, h) end
-        if not (mine.given[held] or held == UNARMED or held == 0) then return end
-        local before = mine.before
-        if before and before ~= 0 and not mine.given[before] and HasPedGotWeapon(ped, before, false) then
+        for h in pairs(rec.given) do RemoveWeaponFromPed(ped, h) end
+        if not (rec.given[held] or held == UNARMED or held == 0) then return end
+        local before = rec.before
+        if before and before ~= 0 and not rec.given[before] and HasPedGotWeapon(ped, before, false) then
             SetCurrentPedWeapon(ped, before, true)
         else
             SetCurrentPedWeapon(ped, UNARMED, true)
@@ -856,18 +857,18 @@ STEP.throw = function(ped, w, s)
         -- Its asset held for the throw (counted: streaming.lua), given back once it is over
         LoadWeaponAsset(hash, 3000)
         SetTimeout(6000, function() ReleaseWeaponAsset(hash) end)
-        if throwOf[ped] ~= mine then return end   -- another throw came after: it throws and tidies up
+        if throwOf[ped] ~= rec then return end   -- another throw came after: it throws and tidies up
         -- (Asked again after the load: its job over, or the NPC another game's now, it throws nothing; what an earlier
         -- throw of the run gave is put away.)
         if not DoesEntityExist(ped) or not still() then tidy() return end
-        if mine.before == nil then mine.before = GetSelectedPedWeapon(ped) end
-        mine.given[hash] = true
+        if rec.before == nil then rec.before = GetSelectedPedWeapon(ped) end
+        rec.given[hash] = true
         GiveWeaponToPed(ped, hash, 1, false, true)
         SetCurrentPedWeapon(ped, hash, true)
         -- TASK_THROW_PROJECTILE: FiveM's wrapper declares fewer parameters than the game reads.
         Citizen.InvokeNative(0x7285951DBF6B5A51, ped, at.x + 0.0, at.y + 0.0, at.z + 0.0, 0, false)
         Wait(2500)
-        if throwOf[ped] ~= mine then return end   -- another throw came after: it tidies up
+        if throwOf[ped] ~= rec then return end   -- another throw came after: it tidies up
         tidy()
     end)
 end
@@ -891,7 +892,7 @@ STEP.emote = function(ped, w, s, left)
     else jobAnim(w, a.dict, a.clip, true, left) end
 end
 
-STEP.anim = function(ped, w, s, left)
+STEP.anim = function(_, w, s, left)
     jobAnim(w, s.p.dict, s.p.clip, s.p.loop ~= false, left)
 end
 
@@ -1058,7 +1059,7 @@ local function runJob(ped, w)
     local last = list[#list]
     -- Taken over part-way: what lasts first (its walk round under a Wait), then only the step that takes time.
     if resumed and job.keep and stepOf(job.keep.t) and (not last or last.t == 'wait') then
-        pcall(stepOf(job.keep.t), ped, w, job.keep, math.max(1000, (job.keep.ms or 10000)))
+        pcall(stepOf(job.keep.t) --[[@as function]], ped, w, job.keep, math.max(1000, (job.keep.ms or 10000)))
     end
     runSteps(ped, w, list, 1, since, resumed)
 end
@@ -1193,8 +1194,8 @@ local function applyBrain(ped, w)
     if not w.canMove and post and b.alive and not (w.gate and not w.ready) and not w.onCar and not b.job
         and w.snapped ~= postKey and not IsPedInAnyVehicle(ped, false) then
         w.snapped = postKey
-        local c = GetEntityCoords(ped)
-        if flatDistance(ped, post) > 0.15 or math.abs(c.z - post.z) > 0.3 then
+        local pos = GetEntityCoords(ped)
+        if flatDistance(ped, post) > 0.15 or math.abs(pos.z - post.z) > 0.3 then
             SetEntityCoordsNoOffset(ped, post.x, post.y, post.z, false, false, false)
         end
         if post.h and math.abs(((GetEntityHeading(ped) - post.h) + 180.0) % 360.0 - 180.0) > 5.0 then

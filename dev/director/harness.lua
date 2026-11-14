@@ -4,6 +4,8 @@
 --   CHECKONLY=1   every scenario a module would run is only put through Check (for the world modules)
 --   MEMCAP_MB=n   stop past n MB (1024 at most, the default): unknown names are stubs here, and a runaway must never
 --                 fill the server's memory
+-- A stand-in for one of whip_core's or the game's own names is set with rawset, not assigned: the editor's Lua language
+-- server would take an assignment for one more definition of the real thing.
 io.stdout:setvbuf("no")
 local here = (arg[0] or ''):match('^(.*)[/\\]') or '.'
 local CORE_ROOT, TEST_ROOT, FIRST_MODULE = arg[1], arg[2], 3
@@ -22,12 +24,12 @@ local function memGuard()
 end
 debug.sethook(memGuard, '', 20000)
 local rawCreate = coroutine.create
-coroutine.create = function(fn)
+rawset(coroutine, 'create', function(fn)
     return rawCreate(function(...)
         debug.sethook(memGuard, '', 20000)
         return fn(...)
     end)
-end
+end)
 
 -- ---- a catch-all world: anything unknown is a callable stub answering nil ----
 -- A number key is never made up (it answers nil): a loop over a stub's list ends at once instead of making
@@ -48,27 +50,27 @@ end })
 -- ---- the scheduler ----
 local now = 1000
 local threads = {}
-function GetGameTimer() return now end
-function CreateThread(fn) threads[#threads + 1] = { co = coroutine.create(fn), at = now } end
-function SetTimeout(ms, fn) threads[#threads + 1] = { co = coroutine.create(fn), at = now + (ms or 0) } end
-function Wait(ms)
+rawset(_G, 'GetGameTimer', function() return now end)
+rawset(_G, 'CreateThread', function(fn) threads[#threads + 1] = { co = coroutine.create(fn), at = now } end)
+rawset(_G, 'SetTimeout', function(ms, fn) threads[#threads + 1] = { co = coroutine.create(fn), at = now + (ms or 0) } end)
+rawset(_G, 'Wait', function(ms)
     local _, main = coroutine.running()
     if main then error('Wait outside a thread', 2) end
     coroutine.yield(ms or 0)
-end
-Citizen = { CreateThread = CreateThread, Wait = Wait, SetTimeout = SetTimeout,
-            CreateThreadNow = function(fn) CreateThread(fn) end }
+end)
+rawset(_G, 'Citizen', { CreateThread = CreateThread, Wait = Wait, SetTimeout = SetTimeout,
+            CreateThreadNow = function(fn) CreateThread(fn) end })
 -- FiveM's promises (state 0 waiting, 1 resolved, 2 rejected), and Citizen.Await on the fake scheduler.
-promise = {}
-promise.__index = promise
-function promise.new() return setmetatable({ state = 0 }, promise) end
-function promise:resolve(v) if self.state == 0 then self.state, self.value = 1, v end end
-function promise:reject(e) if self.state == 0 then self.state, self.value = 2, e end end
-function Citizen.Await(p)
+rawset(_G, 'promise', {})
+rawset(promise, '__index', promise)
+rawset(promise, 'new', function() return setmetatable({ state = 0 }, promise) end)
+rawset(promise, 'resolve', function(self, v) if self.state == 0 then self.state, self.value = 1, v end end)
+rawset(promise, 'reject', function(self, e) if self.state == 0 then self.state, self.value = 2, e end end)
+rawset(Citizen, 'Await', function(p)
     while p.state == 0 do Wait(0) end
     if p.state == 2 then error(p.value, 2) end
     return p.value
-end
+end)
 local function resumeDue()
     local i = 1
     while i <= #threads do
@@ -76,6 +78,7 @@ local function resumeDue()
         if t.at <= now then
             local ok, ms = coroutine.resume(t.co)
             if not ok then
+                ---@diagnostic disable-next-line: undefined-global -- a module's own hook, when it sets one
                 if HARNESS_ON_ERROR then HARNESS_ON_ERROR(t, ms) else print('THREAD ERROR: ' .. tostring(ms)) end
                 table.remove(threads, i)
             elseif coroutine.status(t.co) == 'dead' then
@@ -96,10 +99,10 @@ end
 function HarnessThreads() return #threads end
 
 -- ---- FiveM and whip bits the Director touches ----
-function GetCurrentResourceName() return 'whip_core' end
-function IsDuplicityVersion() return true end   -- (the server's side: shared files load their server half)
+rawset(_G, 'GetCurrentResourceName', function() return 'whip_core' end)
+rawset(_G, 'IsDuplicityVersion', function() return true end)   -- (the server's side: shared files load their server half)
 CALLER = 'whip_test'
-Registry = { new = function(_, o)
+rawset(_G, 'Registry', { new = function(_, o)
     local store = o.store or {}
     return {
         seed = function(_, k, v) store[k] = v end,
@@ -109,13 +112,13 @@ Registry = { new = function(_, o)
         get = function(_, k) return store[k] end,
     }
 end, caller = function() return CALLER end, releaseTag = function() end, releaseTagEverywhere = function() end,
-   alive = function() return true end }
+   alive = function() return true end })
 setmetatable(Registry, stubMeta)
-Portraits = { MAX_LEN = 65536 }
+rawset(_G, 'Portraits', { MAX_LEN = 65536 })
 local registered = {}
-exports = setmetatable({}, {
+rawset(_G, 'exports', setmetatable({}, {
     __call = function(_, name, fn) registered[name] = fn end,
-    __index = function(_, res)
+    __index = function(_, _)
         return setmetatable({}, { __index = function(_, name)
             return function(_, ...)
                 local fn = registered[name]
@@ -124,30 +127,30 @@ exports = setmetatable({}, {
             end
         end })
     end,
-})
+}))
 HARNESS_EXPORTS = registered
-function vector3(x, y, z) return { x = x, y = y, z = z } end
-function vector4(x, y, z, w) return { x = x, y = y, z = z, w = w } end
-Players = { [1] = { source = 1, charId = 7, fullName = 'Test Tester', userId = 3 } }
-function GetPlayerName(s) return Players[s] and 'Tester' or nil end
-function GetPlayers() return { '1' } end
-function GetPlayerPed(s) return Players[s] and 100 + s or 0 end
-function GetEntityCoords() return { x = 0.0, y = 0.0, z = 0.0 } end
-function GetEntityHeading() return 0.0 end
-function GetPlayerRoutingBucket() return 0 end
-function DoesEntityExist() return false end
+rawset(_G, 'vector3', function(x, y, z) return { x = x, y = y, z = z } end)
+rawset(_G, 'vector4', function(x, y, z, w) return { x = x, y = y, z = z, w = w } end)
+rawset(_G, 'Players', { [1] = { source = 1, charId = 7, fullName = 'Test Tester', userId = 3 } })
+rawset(_G, 'GetPlayerName', function(s) return Players[s] and 'Tester' or nil end)
+rawset(_G, 'GetPlayers', function() return { '1' } end)
+rawset(_G, 'GetPlayerPed', function(s) return Players[s] and 100 + s or 0 end)
+rawset(_G, 'GetEntityCoords', function() return { x = 0.0, y = 0.0, z = 0.0 } end)
+rawset(_G, 'GetEntityHeading', function() return 0.0 end)
+rawset(_G, 'GetPlayerRoutingBucket', function() return 0 end)
+rawset(_G, 'DoesEntityExist', function() return false end)
 NOTIFIED = {}
-function NotifyPlayer(s, text, kind) NOTIFIED[#NOTIFIED + 1] = { s = s, text = text, kind = kind } end
-function TriggerClientEvent() end
-function TriggerLatentClientEvent() end
-function TriggerEvent() end
-function AddEventHandler() end
-function RegisterNetEvent() end
-function RegisterCommand() end
+rawset(_G, 'NotifyPlayer', function(s, text, kind) NOTIFIED[#NOTIFIED + 1] = { s = s, text = text, kind = kind } end)
+rawset(_G, 'TriggerClientEvent', function() end)
+rawset(_G, 'TriggerLatentClientEvent', function() end)
+rawset(_G, 'TriggerEvent', function() end)
+rawset(_G, 'AddEventHandler', function() end)
+rawset(_G, 'RegisterNetEvent', function() end)
+rawset(_G, 'RegisterCommand', function() end)
 HARNESS_EVENTS = {}   -- [name] = its handler: a module plays a game answering
-function SecureEvent(name, _, fn) HARNESS_EVENTS[name] = fn end
-function SecureCallback() end
-function Every(_, ms, fn)
+rawset(_G, 'SecureEvent', function(name, _, fn) HARNESS_EVENTS[name] = fn end)
+rawset(_G, 'SecureCallback', function() end)
+rawset(_G, 'Every', function(_, ms, fn)
     CreateThread(function()
         Wait(ms)
         while true do
@@ -155,36 +158,36 @@ function Every(_, ms, fn)
             Wait((ok and tonumber(n)) or ms)
         end
     end)
-end
-function GetResourceKvpString() return nil end
-function SetResourceKvp() end
-function print(...) if HARNESS_QUIET then return end io.write(table.concat({ ... }, '\t'), '\n') end
-json = { encode = function() return '{}' end, decode = function() return nil end }
-Config = { Items = { food = { label = 'Food' }, water = { label = 'Water' } } }
-Permissions = { has = function() return true end }
+end)
+rawset(_G, 'GetResourceKvpString', function() return nil end)
+rawset(_G, 'SetResourceKvp', function() end)
+rawset(_G, 'print', function(...) if HARNESS_QUIET then return end io.write(table.concat({ ... }, '\t'), '\n') end)
+rawset(_G, 'json', { encode = function() return '{}' end, decode = function() return nil end })
+rawset(_G, 'Config', { Items = { food = { label = 'Food' }, water = { label = 'Water' } } })
+rawset(_G, 'Permissions', { has = function() return true end })
 -- Prop sets: nothing goes to any game here; a set is never up (wireOf).
-PropSets = setmetatable({ maxProps = function() return 256 end, wireOf = function() return nil end,
-                          show = function() return true end, ready = function() return true end }, stubMeta)
+rawset(_G, 'PropSets', setmetatable({ maxProps = function() return 256 end, wireOf = function() return nil end,
+                          show = function() return true end, ready = function() return true end }, stubMeta))
 -- NPCs: none made before the Director's files are read (lore_voice.lua looks at start); a module fakes the rest.
-Npcs = setmetatable({ list = function() return {} end }, stubMeta)
+rawset(_G, 'Npcs', setmetatable({ list = function() return {} end }, stubMeta))
 -- A fake pocket: counts by item ('cash' too), what a run stamped kept apart so its end can take it back.
 POCKET = { cash = 250 }
 STAMPED = {}
-Players[1].inventory = {}
-Inventory = {
-    give = function(s, item, n, md)
+rawset(Players[1], 'inventory', {})
+rawset(_G, 'Inventory', {
+    give = function(_, item, n, md)
         POCKET[item] = (POCKET[item] or 0) + n
         if type(md) == 'table' and md.director then STAMPED[item] = (STAMPED[item] or 0) + n end
         return 'player'
     end,
     getItemCountAcrossContainers = function(_, item) return POCKET[item] or 0 end,
-}
-CoreStop = setmetatable({ running = false }, stubMeta)
+})
+rawset(_G, 'CoreStop', setmetatable({ running = false }, stubMeta))
 HARNESS_TAKEBACK = function()
     for item, n in pairs(STAMPED) do POCKET[item] = (POCKET[item] or 0) - n end
     STAMPED = {}
 end
-PlayerFlags = { validName = function(n) return type(n) == 'string' and n:match('^[%a][%w_.:%-]*$') ~= nil end, get = function() return nil end }
+rawset(_G, 'PlayerFlags', { validName = function(n) return type(n) == 'string' and n:match('^[%a][%w_.:%-]*$') ~= nil end, get = function() return nil end })
 
 local files = { 'shared/emote_list.lua', 'shared/gta_weapons.lua', 'shared/gta_weapon_models.lua', 'shared/weapon_catalog.lua',
   'shared/skillcheck.lua', 'shared/take_track.lua', 'shared/director/kit.lua', 'shared/director/steps.lua', 'shared/director/things.lua',
@@ -219,20 +222,19 @@ CreateThread(function() while true do pcall(R.pass) Wait(50) end end)
 
 -- ---- whip_test's runner, as the modules see it ----
 local asserts = 0
-local SKIP = {}
 local function fail(label, msg) error({ assert = true, msg = (label and (label .. ': ') or '') .. msg }, 3) end
 local function show(v) if type(v) == 'string' then return ('%q'):format(v) end return tostring(v) end
-function assertEqual(a, e, l) asserts = asserts + 1 if a ~= e then fail(l, ('expected %s, got %s'):format(show(e), show(a))) end end
-function assertNotEqual(a, e, l) asserts = asserts + 1 if a == e then fail(l, ('expected not %s'):format(show(e))) end end
-function assertType(v, t, l) asserts = asserts + 1 if type(v) ~= t then fail(l, ('expected a %s, got %s'):format(t, type(v))) end end
-function assertNotNil(v, l) asserts = asserts + 1 if v == nil then fail(l, 'expected a value, got nil') end end
-function assertNil(v, l) asserts = asserts + 1 if v ~= nil then fail(l, 'expected nil, got ' .. show(v)) end end
-function assertTrue(v, l) asserts = asserts + 1 if not v then fail(l, 'expected true, got ' .. show(v)) end end
-function assertFalse(v, l) asserts = asserts + 1 if v then fail(l, 'expected false, got ' .. show(v)) end end
-function assertGt(v, t, l) asserts = asserts + 1 if not (v > t) then fail(l, ('expected more than %s, got %s'):format(show(t), show(v))) end end
-function assertGte(v, t, l) asserts = asserts + 1 if not (v >= t) then fail(l, ('expected at least %s, got %s'):format(show(t), show(v))) end end
-function skip(reason) error({ skip = true, msg = reason }, 2) end
-function waitFor(fn, ms)
+function _G.assertEqual(a, e, l) asserts = asserts + 1 if a ~= e then fail(l, ('expected %s, got %s'):format(show(e), show(a))) end end
+function _G.assertNotEqual(a, e, l) asserts = asserts + 1 if a == e then fail(l, ('expected not %s'):format(show(e))) end end
+function _G.assertType(v, t, l) asserts = asserts + 1 if type(v) ~= t then fail(l, ('expected a %s, got %s'):format(t, type(v))) end end
+function _G.assertNotNil(v, l) asserts = asserts + 1 if v == nil then fail(l, 'expected a value, got nil') end end
+function _G.assertNil(v, l) asserts = asserts + 1 if v ~= nil then fail(l, 'expected nil, got ' .. show(v)) end end
+function _G.assertTrue(v, l) asserts = asserts + 1 if not v then fail(l, 'expected true, got ' .. show(v)) end end
+function _G.assertFalse(v, l) asserts = asserts + 1 if v then fail(l, 'expected false, got ' .. show(v)) end end
+function _G.assertGt(v, t, l) asserts = asserts + 1 if not (v > t) then fail(l, ('expected more than %s, got %s'):format(show(t), show(v))) end end
+function _G.assertGte(v, t, l) asserts = asserts + 1 if not (v >= t) then fail(l, ('expected at least %s, got %s'):format(show(t), show(v))) end end
+function _G.skip(reason) error({ skip = true, msg = reason }, 2) end
+function _G.waitFor(fn, ms)
     local deadline = GetGameTimer() + (ms or 5000)
     while GetGameTimer() < deadline do
         local v = fn()
@@ -257,22 +259,25 @@ registered.GetInventory = function()
     return { player = slots }
 end
 registered.GetPlayerCash = function() return POCKET.cash or 0 end
-DirectorEffects.takeBack = function() HARNESS_TAKEBACK() return 0 end
+rawset(DirectorEffects, 'takeBack', function() HARNESS_TAKEBACK() return 0 end)
 
 dofile(TEST_ROOT .. '/server/director_kit.lua')
 -- CHECKONLY: every scenario a module would run is put through Check and its errors printed (the world is not here);
 -- the test then ends at once.
 if os.getenv('CHECKONLY') then
     HARNESS_OFFLINE = false
+    ---@diagnostic disable-next-line: undefined-global -- DK is whip_test's (director_kit.lua, read above)
     DK.toField = function() return DK.FIELD end
+    ---@diagnostic disable-next-line: undefined-global -- DK is whip_test's
     DK.goHome = function() end
+    ---@diagnostic disable-next-line: undefined-global -- DK is whip_test's
     DK.ask = function() return nil, false end
+    ---@diagnostic disable-next-line: undefined-global -- DK is whip_test's
     DK.teleport = function(_, at) return at end
     CHECKED = { docs = 0, bad = 0 }
-    local real = registered.TestDirectorScenario
-    registered.TestDirectorScenario = function(doc, opts)
+    registered.TestDirectorScenario = function(doc)
         CHECKED.docs = CHECKED.docs + 1
-        local ok, probs = registered.CheckDirectorScenario(doc)
+        local _, probs = registered.CheckDirectorScenario(doc)
         local errs = {}
         for _, p in ipairs(probs or {}) do
             if p.severity == 'error' and not p.live then errs[#errs + 1] = (p.node and (p.node .. ': ') or '') .. tostring(p.message) end
@@ -287,12 +292,12 @@ if os.getenv('CHECKONLY') then
     for _, name in ipairs({ 'assertEqual', 'assertNotEqual', 'assertType', 'assertNotNil', 'assertNil', 'assertTrue', 'assertFalse', 'assertGt', 'assertGte' }) do
         _G[name] = function() asserts = asserts + 1 end
     end
-    waitFor = function(fn) return fn() end
+    _G.waitFor = function(fn) return fn() end
     GetDirectorTestResult = nil
     registered.GetDirectorTestResult = function() return { runId = -1, status = 'checked', done = true, steps = {}, fired = {}, entered = {}, things = {}, made = {}, vars = {}, waiting = {} } end
     registered.SteerDirectorTest = function() return true end
     registered.AddItem = function() return 'player' end
-    MySQL = { insert = { await = function() return 4242 end }, query = { await = function() return {} end } }
+    rawset(_G, 'MySQL', { insert = { await = function() return 4242 end }, query = { await = function() return {} end } })
 end
 for i = FIRST_MODULE, #arg do dofile(arg[i]) end
 table.sort(modules, function(a, b) return (a.order or 99) < (b.order or 99) end)

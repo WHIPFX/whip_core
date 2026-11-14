@@ -155,7 +155,8 @@ end
 ---
 ---   templateIds   one id, or a list: every interior the MLO has, into one pack
 ---   opts          { placements = boolean, id = 'yourname.mlo' | nil, label = string | nil }
----@return table|nil result { id, text, fileName, templates, units, properties, warnings }, string|nil err
+---@return table|nil result  { id, text, fileName, templates, units, properties, warnings }
+---@return string|nil err
 function PropertyExport.build(templateIds, opts)
     opts = opts or {}
     if type(templateIds) ~= 'table' then templateIds = { templateIds } end
@@ -165,7 +166,7 @@ function PropertyExport.build(templateIds, opts)
         local t = Properties.getTemplate(id)
         if not t then return nil, ('There is no template #%s'):format(tostring(id)) end
         if (t.archetypeHash or 0) == 0 then
-            return nil, ('"%s" is an open-world property: it has no interior to ship with'):format(t.label or '#' .. id)
+            return nil, ('"%s" is an open-world property: it has no interior to ship with'):format(t.label or ('#' .. id))
         end
         if not seen[t.templateId] then
             seen[t.templateId] = true

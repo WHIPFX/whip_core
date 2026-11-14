@@ -361,7 +361,7 @@ RegisterNUICallback('radarDebugReset', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('radarDebugPrint', function(data, cb)
+RegisterNUICallback('radarDebugPrint', function(_, cb)
     print('[whip_core:radardebug] radarRects = {')
     for _, key in ipairs({ 'minimap', 'minimap_mask', 'minimap_blur' }) do
         local r = rects[key]

@@ -58,6 +58,7 @@ local function slotFor(look, w, l, icon)
         elseif s.used < oldestAt then oldest, oldestAt = k, s.used end
     end
     local k = free or oldest
+    ---@cast k -nil   -- (every slot is free or drawn: one of the two)
     slots[k] = { key = key, used = now }
     send(k, icon and { slot = k, look = 'icon', icon = icon } or { slot = k, look = look, w = w, l = l })
     return k

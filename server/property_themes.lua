@@ -169,6 +169,7 @@ end
 function PropertyThemes.infoOf(rec)
     local p, home = PropertyThemes.homeOf(rec)
     if not p then return nil end
+    ---@cast home -nil
     local current = math.tointeger(tonumber(rec.theme)) or 0
     if not p.byId[current] then current = p.themes[1].id end
     return { resource = p.resource, label = p.label, home = home.key, current = current, themes = themeList(p) }
@@ -202,10 +203,10 @@ local function push(resource)
     table.sort(ids)
     local map, n = {}, 0
     for _, id in ipairs(ids) do
-        local rec = Properties.get(id)
+        local rec = Properties.get(id) --[[@as table]]   -- (one of getAll's, just above)
         local hp, home = PropertyThemes.homeOf(rec)
         local t = math.tointeger(tonumber(rec.theme))
-        if hp == p and t and t ~= 0 and p.byId[t] and map[home.key] == nil then
+        if hp == p and home and t and t ~= 0 and p.byId[t] and map[home.key] == nil then
             map[home.key] = t
             n = n + 1
         end
@@ -273,6 +274,7 @@ function PropertyThemes.set(propertyId, themeId)
     if not rec then return false, 'Unknown property' end
     local p, home = PropertyThemes.homeOf(rec)
     if not p then return false, 'This property has no themes' end
+    ---@cast home -nil
     themeId = math.tointeger(tonumber(themeId))
     local theme = themeId and p.byId[themeId]
     if not theme then return false, 'That is not one of its themes' end
@@ -342,6 +344,7 @@ SecureEvent('whip_core:server:propertySetTheme', {
     TriggerClientEvent('whip_core:client:propertyThemeSet', source, propertyId, ok == true, themeId)
     -- Refused: `false, why` — whip shows them the why and the Event Monitor records it
     if not ok then return false, why or 'Could not change the theme' end
+    ---@cast rec -nil
     local p = PropertyThemes.homeOf(rec)
     local theme = p and p.byId[themeId]
     ShowSuccess(source, ('%s: %s'):format(rec.name, theme and theme.name or 'theme changed'))

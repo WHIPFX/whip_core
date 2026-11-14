@@ -59,7 +59,7 @@ SecureEvent('whip_core:server:directorDoc', {
     rateLimit = 500,
     burst = 4,
     params = { { 'token', 'id' }, { 'doc', 'any' } },
-}, function(source, player, token, doc)
+}, function(source, _, token, doc)
     local clean, why = copyPlain(doc, 1, { 0 })
     -- Read the one way (doc.lua): what the editor sent is a scenario of this Director's format, or why not.
     if clean then clean, why = DirectorDoc.load(clean) end
@@ -133,6 +133,7 @@ end
 --- for a request that only ends what the sender owns (their own test), which a builder who has just
 --- lost access must still be able to end.
 local function cb(name, params, handler, rate, level)
+    ---@type string|nil
     local permission = BUILD
     if level == false then permission = nil elseif level ~= nil then permission = level end
     SecureCallback('whip_core:director:' .. name, {
@@ -224,7 +225,7 @@ end)
 --- scenario's things as a step may name them { [id] = { kind, def } } (a route's points with them). Answers
 --- { plans = { { id, plan = { steps, after } | nil, problems } } }, an emote's animation looked up for each step.
 local PREVIEW_MAX = 8
-cb('previewPlans', { {'things', 'any'}, {'world', 'any'} }, function(source, player, things, world)
+cb('previewPlans', { {'things', 'any'}, {'world', 'any'} }, function(_, _, things, world)
     local W = {}
     for id, w in pairs(type(world) == 'table' and world or {}) do
         if type(id) == 'string' and #id <= 64 and type(w) == 'table' and type(w.kind) == 'string' and #w.kind <= 24 then
@@ -277,14 +278,14 @@ cb('loreSave', { { 'key', 'key', 64 }, { 'name', 'string', 80 }, { 'model', 'str
                  { 'frameX', 'number', 0, 100, 50 }, { 'frameY', 'number', 0, 100, 50 }, { 'frameZ', 'number', 1, 3, 1 },
                  -- the voice lines as JSON text, read and checked by DirectorLore.save (cleanVoice); empty leaves them
                  { 'voice', 'string', 48000, '' } },
-function(source, player, key, name, model, bankName, notes, picture, frameX, frameY, frameZ, voice)
+function(_, player, key, name, model, bankName, notes, picture, frameX, frameY, frameZ, voice)
     local c, why = DirectorLore.save(key, { name = name, model = model, bankName = bankName, notes = notes, picture = picture,
         pictureFrame = { x = frameX, y = frameY, z = frameZ }, voice = voice }, player and player.fullName or nil)
     if not c then return false, why end
     return { character = c }
 end, 500)
 
-cb('loreRetire', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('loreRetire', { { 'key', 'key', 64 } }, function(_, player, key)
     local ok, why = DirectorLore.retire(key, player and player.fullName or nil)
     if not ok then return false, why end
     return true
@@ -345,7 +346,7 @@ cb('watch', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, functi
     return { editors = editorsOf(key, source), lore = DirectorLore.list() }   -- (lore: as `open`'s)
 end)
 
-cb('history', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('history', { { 'key', 'key', 64 } }, function(_, _, key)
     if not DirectorStore.get(key) then return false, 'No scenario called ' .. key end
     return { revisions = DirectorStore.history(key, 30) }
 end)
@@ -469,7 +470,7 @@ end
 -- THE SCENARIOS PAGE'S MAP AND WHO MADE IT: where each of its things is in its newest revision, with what its mark's
 -- card says (placeOf: what it is, its settings, its task steps, who names it), and its maker's name and face (the
 -- character they play now, else the one they played last, as the Player Manager's list does), and whether they are on.
-cb('places', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('places', { { 'key', 'key', 64 } }, function(_, _, key)
     local doc, why = DirectorStore.revision(key)
     if not doc then return false, why end
     local places = {}
@@ -500,7 +501,7 @@ end, 300)
 
 -- A car's take as a line on the Scenarios page's map: where it drives, { x1, y1, x2, y2, ... } (DirectorTakes.path).
 -- Only a take one of the scenario's cars names (in its newest revision).
-cb('takePath', { { 'key', 'key', 64 }, { 'take', 'int', 1, 2147483647 } }, function(source, player, key, take)
+cb('takePath', { { 'key', 'key', 64 }, { 'take', 'int', 1, 2147483647 } }, function(_, _, key, take)
     local doc, why = DirectorStore.revision(key)
     if not doc then return false, why end
     local named = false
@@ -546,7 +547,7 @@ local function exampleDoc(name)
 end
 
 cb('create', { { 'key', 'key', 64 }, { 'name', 'string', 80 }, { 'from', 'string', 200, '' } },
-function(source, player, key, name, from)
+function(source, _, key, name, from)
     local why = off()
     if why then return false, why end
     local doc, dwhy
@@ -579,7 +580,7 @@ function(source, player, key, name, from)
 end, 1000)
 
 -- One of the examples New offers, only to look at (the tutorial shows them: nothing is stored).
-cb('example', { { 'name', 'key', 64 } }, function(source, player, name)
+cb('example', { { 'name', 'key', 64 } }, function(_, _, name)
     local known = false
     for _, e in ipairs(EXAMPLES) do if e == name then known = true end end
     if not known then return false, 'No example called ' .. name end
@@ -589,7 +590,7 @@ cb('example', { { 'name', 'key', 64 } }, function(source, player, name)
 end, 300)
 
 cb('save', { { 'key', 'key', 64 }, { 'baseRev', 'int', 0, 1000000000 }, { 'token', 'id' }, { 'note', 'string', 200, '' } },
-function(source, player, key, baseRev, token, note)
+function(source, _, key, baseRev, token, note)
     local why = off()
     if why then return false, why end
     local doc, uwhy = takeUpload(source, token)
@@ -606,7 +607,7 @@ function(source, player, key, baseRev, token, note)
     return { rev = rev, problems = problems }
 end, 500)
 
-cb('check', { { 'token', 'id' } }, function(source, player, token)
+cb('check', { { 'token', 'id' } }, function(source, _, token)
     local doc, uwhy = takeUpload(source, token)
     if not doc then return false, uwhy end
     local ok, problems = DirectorGraph.check(doc)
@@ -617,7 +618,7 @@ end, 300)
 -- Director.deactivate aborts every run of it). With players in a run, nothing changes until the page has
 -- asked: the answer is { ok = false, going = n }, and the page sends the request again with endRuns.
 cb('activate', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 }, { 'endRuns', 'bool', false } },
-function(source, player, key, rev, endRuns)
+function(source, _, key, rev, endRuns)
     local why = off()
     if why then return false, why end
     if Director.active[key] and not endRuns then
@@ -632,7 +633,7 @@ function(source, player, key, rev, endRuns)
     return { ok = true, problems = res }
 end, 1000)
 
-cb('deactivate', { { 'key', 'key', 64 }, { 'endRuns', 'bool', false } }, function(source, player, key, endRuns)
+cb('deactivate', { { 'key', 'key', 64 }, { 'endRuns', 'bool', false } }, function(source, _, key, endRuns)
     local sc = Director.active[key]
     if sc and not endRuns then
         local going = runsGoing(key)
@@ -655,7 +656,7 @@ cb('deactivate', { { 'key', 'key', 64 }, { 'endRuns', 'bool', false } }, functio
     return { ok = true }
 end, 1000)
 
-cb('delete', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('delete', { { 'key', 'key', 64 } }, function(source, _, key)
     local why = off()
     if why then return false, why end
     if not DirectorStore.get(key) then return false, 'No scenario called ' .. key end
@@ -671,7 +672,7 @@ cb('delete', { { 'key', 'key', 64 } }, function(source, player, key)
     return { ok = true }
 end, 1000, ADMIN)
 
-cb('startRun', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('startRun', { { 'key', 'key', 64 } }, function(source, _, key)
     local sc = Director.active[key]
     if not sc then return false, 'Switch it on first' end
     local run, why = Director.startRun(sc, source, { source = source })
@@ -679,7 +680,7 @@ cb('startRun', { { 'key', 'key', 64 } }, function(source, player, key)
     return { runId = run.id }
 end, 1000)
 
-cb('abort', { { 'runId', 'id' } }, function(source, player, runId)
+cb('abort', { { 'runId', 'id' } }, function(_, _, runId)
     if not Director.cutShort(runId, 'stopped by an admin') then return false, 'No such run' end   -- (no cooldown)
     return { ok = true }
 end, 500)
@@ -693,7 +694,7 @@ end, 500)
 --- (`value` their account's userId).
 cb('overview', { { 'days', 'int', 1, 90, 14 }, { 'scope', 'enum', { 'all', 'scenario', 'lore', 'maker' }, 'all' },
                  { 'value', 'string', 64, '' } },
-function(source, player, days, scope, value)
+function(_, _, days, scope, value)
     if not DirectorStore.ready then return false, off() or 'The Director is still starting' end
     local ids
     if scope == 'scenario' then
@@ -715,12 +716,12 @@ function(source, player, days, scope, value)
     return o
 end, 1000)
 
-cb('players', { { 'key', 'key', 64 } }, function(source, player, key)
+cb('players', { { 'key', 'key', 64 } }, function(_, _, key)
     if not DirectorStore.get(key) then return false, 'No scenario called ' .. key end
     return { players = DirectorStore.players(key, 100) }
 end, 300)
 
-cb('runs', { { 'key', 'key', 64 }, { 'before', 'int', 0, 2000000000, 0 } }, function(source, player, key, before)
+cb('runs', { { 'key', 'key', 64 }, { 'before', 'int', 0, 2000000000, 0 } }, function(_, _, key, before)
     if not DirectorStore.get(key) then return false, 'No scenario called ' .. key end
     return { runs = DirectorStore.runs(key, before, 50) }
 end, 300)
@@ -742,7 +743,7 @@ local function cardTitles(key)
 end
 
 cb('events', { { 'key', 'key', 64 }, { 'runId', 'int', 0, 2000000000, 0 }, { 'before', 'int', 0, 2000000000, 0 } },
-function(source, player, key, runId, before)
+function(_, _, key, runId, before)
     if not DirectorStore.get(key) then return false, 'No scenario called ' .. key end
     local list = DirectorStore.events(key, runId, before, 100)
     local titles = cardTitles(key)
@@ -751,7 +752,7 @@ function(source, player, key, runId, before)
 end, 300)
 
 --- An old revision back as the draft: a NEW revision with its document (nothing is ever rewritten).
-cb('restore', { { 'key', 'key', 64 }, { 'rev', 'int', 1, 1000000000 } }, function(source, player, key, rev)
+cb('restore', { { 'key', 'key', 64 }, { 'rev', 'int', 1, 1000000000 } }, function(source, _, key, rev)
     local why = off()
     if why then return false, why end
     local row = DirectorStore.get(key)
@@ -774,7 +775,7 @@ end, 1000)
 local LIVE = 'director.live'   -- (server/director/live.lua)
 local LEVELS = { build = BUILD, admin = ADMIN, live = LIVE }
 
-cb('access', {}, function(source)
+cb('access', {}, function()
     return { builders = Permissions.holders(BUILD), admins = Permissions.holders(ADMIN), live = Permissions.holders(LIVE),
              ready = Permissions.ready }
 end, 500, ADMIN)
@@ -789,7 +790,7 @@ local function accountOf(charId)
     return tonumber(rows[1].userId), ((rows[1].firstName or '') .. ' ' .. (rows[1].lastName or ''))
 end
 
-cb('grant', { { 'charId', 'id' }, { 'level', 'enum', { 'build', 'admin', 'live' } } }, function(source, player, charId, level)
+cb('grant', { { 'charId', 'id' }, { 'level', 'enum', { 'build', 'admin', 'live' } } }, function(source, _, charId, level)
     local name = LEVELS[level]
     if not Permissions.mayGrant(source, name) then return false, 'You may not give that' end
     local userId, who = accountOf(charId)
@@ -799,7 +800,7 @@ cb('grant', { { 'charId', 'id' }, { 'level', 'enum', { 'build', 'admin', 'live' 
     return { ok = true, name = who, userId = userId }
 end, 1000, ADMIN)
 
-cb('revoke', { { 'userId', 'id' }, { 'level', 'enum', { 'build', 'admin', 'live' } } }, function(source, player, userId, level)
+cb('revoke', { { 'userId', 'id' }, { 'level', 'enum', { 'build', 'admin', 'live' } } }, function(source, _, userId, level)
     local name = LEVELS[level]
     if not Permissions.mayGrant(source, name) then return false, 'You may not take that away' end
     local ok, why = Permissions.revoke(userId, name, source)
@@ -817,7 +818,7 @@ cb('packs', {}, function()
     return { packs = DirectorPacks.list(), trusted = DirectorPacks.trustedList and DirectorPacks.trustedList() or {} }
 end, 300)
 
-cb('accept', { { 'resource', 'string', 64 }, { 'file', 'string', 128 } }, function(source, player, res, file)
+cb('accept', { { 'resource', 'string', 64 }, { 'file', 'string', 128 } }, function(source, _, res, file)
     local why = off()
     if why then return false, why end
     if not validRes(res) then return false, 'That is not a resource' end
@@ -828,7 +829,7 @@ end, 1000, ADMIN)
 
 -- Trust a resource once: its new and changed scenarios are accepted by themselves
 -- when they pass Check (still read-only). Or stop trusting it.
-cb('trust', { { 'resource', 'string', 64 }, { 'on', 'bool' } }, function(source, player, res, on)
+cb('trust', { { 'resource', 'string', 64 }, { 'on', 'bool' } }, function(source, _, res, on)
     local why = off()
     if why then return false, why end
     if not validRes(res) then return false, 'That is not a resource' end
@@ -837,14 +838,14 @@ cb('trust', { { 'resource', 'string', 64 }, { 'on', 'bool' } }, function(source,
     return { ok = true }
 end, 1000, ADMIN)
 
-cb('refuse', { { 'resource', 'string', 64 }, { 'file', 'string', 128 } }, function(source, player, res, file)
+cb('refuse', { { 'resource', 'string', 64 }, { 'file', 'string', 128 } }, function(source, _, res, file)
     if not validRes(res) then return false, 'That is not a resource' end
     local ok, why = DirectorPacks.refuse(res, file, source)
     if not ok then return false, why end
     return { ok = true }
 end, 1000, ADMIN)
 
-cb('export', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, function(source, player, key, rev)
+cb('export', { { 'key', 'key', 64 }, { 'rev', 'int', 0, 1000000000, 0 } }, function(_, _, key, rev)
     local res, why = DirectorPacks.export(key, rev > 0 and rev or nil)
     if not res then return false, why end
     return res
@@ -971,7 +972,7 @@ end
 
 --- End what a test made: its run (which takes back what it handed out, as every run's end does:
 --- Director.runEnded), and its standing things.
-local function endTest(src, t, why)
+local function endTest(_, t, why)
     local run = t.run
     -- Ended on purpose (Reset, Stop): the test map is told by what asked, not as a run's own end.
     t.ending = true
@@ -1066,7 +1067,7 @@ local function npcDebugList(src, t)
             local info = not seen[id] and Npcs.get(id) or nil
             seen[id] = true
             local c = info and info.coords
-            if c and info.netId and #(vector3(c.x, c.y, c.z) - me) <= NPC_DEBUG_M then
+            if info and c and info.netId and #(vector3(c.x, c.y, c.z) - me) <= NPC_DEBUG_M then
                 local e = Npcs.explain(id, name)
                 if e then
                     refineNpcLine(e, run, wid, talks, src)
@@ -1115,7 +1116,7 @@ AddEventHandler('playerDropped', function() npcDebug[source] = nil end)
 --- Back to step `seq` (where the run reached `node`), on from its `pin`. What cards after it made goes from the world
 --- (Josh: the run can make it again); variables, what was handed out and the player stay. { ok, removed }.
 cb('testRewind', { { 'seq', 'int', 1, 1000000000, 1 }, { 'node', 'key', 64 }, { 'pin', 'string', 32, '' } },
-function(source, player, seq, node, pin)
+function(source, _, seq, node, pin)
     local t = tests[source]
     local run = t and t.run
     if not run then return false, 'No test is running' end
@@ -1134,7 +1135,7 @@ function(source, player, seq, node, pin)
     return { ok = true, removed = removed }
 end, 500)
 
-cb('test', { { 'key', 'key', 64 }, { 'token', 'id' }, { 'variant', 'string', 16, '' } }, function(source, player, key, token, variant)
+cb('test', { { 'key', 'key', 64 }, { 'token', 'id' }, { 'variant', 'string', 16, '' } }, function(source, _, key, token, variant)
     local why = off()
     if why then return false, why end
     local doc, uwhy = takeUpload(source, token)

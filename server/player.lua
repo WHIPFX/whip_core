@@ -2,26 +2,30 @@
 -- WhipPlayer — Server-side player metatable class
 -- ============================================
 
+-- The public fields and methods are declared in types/classes.lua; these are the ones whip_core keeps
+-- to itself.
 ---@class WhipPlayer
----@field source number
----@field userId number
----@field charId number
----@field firstName string
----@field lastName string
----@field fullName string
----@field dateOfBirth string
----@field gender string
----@field position vector4
----@field health number
----@field armour number
----@field isDead boolean
----@field metadata table
----@field license string
----@field steam string|nil
----@field discord string|nil
----@field fivem string|nil
----@field dirty boolean          true if player data has changed since last save
----@field inventoryDirty boolean true if inventory has changed since last save
+---@field session number                 this character load's number (IsSessionCurrent)
+---@field inventory WhipInventoryCache|nil the pockets; set before the player is in Players (a phantom has none)
+---@field accountNumber string|nil       the default bank account's number, cached at the load
+---@field phantom boolean|nil            a load-test stand-in (__TestPhantoms): nothing about it is saved
+---@field closing boolean|nil            logging out or dropped: the session's events are refused from here on
+---@field dropped boolean|nil            disconnected
+---@field _inCreator boolean|nil         in the character creator, until creatorDone
+---@field placed boolean                 the ped has arrived where the character was sent (getCoords)
+---@field loadedAt number                GetGameTimer() at the load (or the creator's end)
+---@field diedAt number|nil              GetGameTimer() at the death, while dead
+---@field lifeGen number|nil             counts revivals, so a death timer can tell its life from the next
+---@field _haveItemDefs boolean|nil      the client already has the item definitions
+---@field _inventoryLocked boolean|nil   an admin is viewing this inventory
+---@field _metadataDirty number|boolean|nil metadata changed since the last row write (the row's ticket)
+---@field _clampSaid table<string, boolean>|nil columns already said to be out of range
+---@field _rowBuildSaid boolean|nil      a row that could not be built was already said
+---@field _finalRow table|nil            the teardown's last row, owed until written (PlayerRows.freeze)
+---@field _finalPos table|nil            the teardown's last position, owed until written
+---@field watchPlacement fun(self: WhipPlayer)
+---@field handlerSheet fun(self: WhipPlayer): table
+---@field lightSheet fun(self: WhipPlayer): table
 
 WhipPlayer = {}
 WhipPlayer.__index = WhipPlayer
@@ -326,12 +330,13 @@ function PlayerRows.markDirty(source)
     PlayerRows._dirty[source] = PlayerRows._seq
 end
 
+PlayerRows._soon = {}   -- [source] = true
+
 --- This player's row needs writing, but not this second: a need or a custom stat (hunger and thirst each drop every
 --- ten seconds, which made the row a write every five for every player). Marked for real by the next position sweep
 --- (below, every PlayerPositionSaveInterval), so it goes out with the position. Health, armour and death still mark
 --- at once (markDirty); a logout, a restart and the final save mark everyone anyway.
 ---@param source number
-PlayerRows._soon = {}   -- [source] = true
 function PlayerRows.markSoon(source)
     if source then PlayerRows._soon[source] = true end
 end
@@ -641,10 +646,9 @@ end)
 --- Position always: the sweep only marks a player who has moved more than the epsilon since their last
 --- write, so someone who logs out after a short walk may have nothing pending, and where they logged
 --- out is exactly where they expect to be standing next time.
----@param teardown boolean|nil  the session's last write (disconnect, logout)
----@return boolean ok
----@param teardown boolean|nil  the last save of this character's session: its seat noted, its row frozen
+---@param teardown boolean|nil  the last save of this character's session (disconnect, logout): its seat noted, its row frozen
 ---@param seatNoted boolean|nil  a teardown save after the first (PlayerRows.saveIfChanged): the seat is not noted again
+---@return boolean ok
 function WhipPlayer:save(teardown, seatNoted)
     if self.phantom then return true end
     PlayerRows.markPosition(self.source)
@@ -1038,8 +1042,9 @@ local NOTIFY_KINDS = { 'info', 'success', 'warning', 'error' }
 --- handler's `return false, 'why'` is shown through it (server/secure.lua).
 function NotifyPlayer(source, text, kind, duration)
     if source ~= -1 then
-        source = Sanitize.id(source)
-        if not source or not GetPlayerName(source) then return false, 'They are not on the server' end
+        local id = Sanitize.id(source)
+        if not id or not GetPlayerName(id) then return false, 'They are not on the server' end
+        source = id
     end
     text = Sanitize.string(text, 300)
     if text == '' then return false, 'Nothing to say: the text is empty' end
@@ -1143,7 +1148,7 @@ SecureCallback('whip_core:playerName', {
     rateLimit = 100,
     burst     = 20,
     params    = { {'target', 'id'} },
-}, function(source, player, target)
+}, function(source, _, target)
     local who = Players[target]
     if not who or not who.fullName then return false, 'Player not loaded' end
     local ok, why = MayKnowName(source, target)

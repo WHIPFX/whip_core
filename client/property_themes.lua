@@ -20,7 +20,7 @@ local function close()
 end
 
 --- Open the picker on a property's looks (its sign's Theme). The server decides who may.
----@param propertyId number
+---@param propertyId number|nil
 function OpenPropertyThemes(propertyId)
     propertyId = tonumber(propertyId)
     if openId or not propertyId then return end

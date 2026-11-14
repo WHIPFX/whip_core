@@ -11,7 +11,8 @@
 Camera = {}
 
 -- Active camera state
-local _cam = nil
+---@type integer|nil
+local _cam = nil   -- set whenever _active is
 local _active = false
 local _currentFilter = 'none'
 -- The room the camera is in is kept right for the game while a sequence plays (client/viewport_room.lua):
@@ -174,6 +175,7 @@ end
 function Camera._playLoop(gen, canLook, canMove, exitKey)
     if canLook or canMove or exitKey then
         while _active and _gen == gen do
+            ---@cast _cam -nil
             if exitKey then
                 if IsDisabledControlJustPressed(0, 200) then
                     Camera.Stop()
@@ -321,6 +323,7 @@ end
 
 --- A picture onto the camera: its shake, its filter, the bars, and the room it is in.
 local function show(pose, fx, tMs, letterbox)
+    ---@cast _cam -nil
     local sp, sr, sy = 0.0, 0.0, 0.0
     if fx and fx.shake then sp, sr, sy = CamMath.shake(tMs / 1000.0, fx.shake.amount, fx.shake.freq) end
     SetCamCoord(_cam, pose.x, pose.y, pose.z)

@@ -128,6 +128,7 @@ function Containers.loadAll()
             local requirements = jsonColumn(row, 'requirements')
             if row.key then Containers._keyIndex[row.key] = row.containerId end
             -- '' on disk is no prop at all (a property's stash: the furniture is what you see).
+            ---@type string|false
             local prop = row.prop or Config.ContainerDefaultProp
             if prop == '' then prop = false end
 
@@ -208,7 +209,7 @@ local function containerRequirements(req)
     if property ~= nil then out.property = property end
     if next(out) == nil then return nil end
     -- Through JSON, so a declaration compares equal to what the row gives back (EnsureContainer).
-    return json.decode(json.encode(out))
+    return (json.decode(json.encode(out)))
 end
 
 -- The fields CreateContainer, EnsureContainer and UpdateContainer read: anything else is said in the console once.
@@ -282,7 +283,7 @@ local function destroyRuntime(def, why)
     for _, slotData in pairs(Containers.invCache[id] or {}) do
         if type(slotData) == 'table' and slotData.item then
             -- Against the admin who deleted it, when one did (as a stash's delete is).
-            Log.item(def.removedBy, 'lost', slotData, { detail = ('run container %s gone (%s)'):format(def.name or '#' .. id,
+            Log.item(def.removedBy, 'lost', slotData, { detail = ('run container %s gone (%s)'):format(def.name or ('#' .. id),
                 def.goneWhy or why or 'removed') })
         end
     end
@@ -367,7 +368,7 @@ local function createRuntime(data, owner, requirements)
     }
     -- FIRST, so a run that has ended (a closed tag) is refused before anything exists.
     local ok, why = runtimeReg:add(owner, id, def, data.tag ~= nil and { tag = data.tag } or nil)
-    if not ok then return nil, why end
+    if not ok then return nil, why --[[@as string]] end
     Containers.cache[id] = def
     Containers.invCache[id] = {}   -- known, and empty: there is nothing on disk to read
 
@@ -512,7 +513,8 @@ local function highestUsedSlot(containerId)
     end
     local highest = 0
     for slot, entry in pairs(Containers.invCache[containerId] or {}) do
-        if entry and tonumber(slot) and tonumber(slot) > highest then highest = tonumber(slot) end
+        local n = tonumber(slot)
+        if entry and n and n > highest then highest = n end
     end
     return highest, loadedHere
 end
@@ -936,16 +938,17 @@ function Containers.ensure(key, data, caller)
         return Containers.create(fields)
     end
 
+    ---@type table|nil
     local ens = type(existing.declared) == 'table' and existing.declared or nil
     local by = ens and ens.by or nil
     if by and by ~= caller and Registry.alive(by) then
         return nil, ('container "%s" is declared by %s'):format(key, by)
     end
-    if by == caller and Registry.deepEquals(ens.decl, d) then return existing end
+    if ens and by == caller and Registry.deepEquals(ens.decl, d) then return existing end
 
     local fields = { declared = declared }
     for k, v in pairs(d) do fields[k] = v end
-    local before = by and type(ens.decl) == 'table' and ens.decl or {}
+    local before = ens and by and type(ens.decl) == 'table' and ens.decl or {}
     if d.allowedItems == nil and before.allowedItems ~= nil then fields.allowedItems = {} end
     if d.requirements == nil and before.requirements ~= nil then fields.requirements = false end
 
@@ -1076,7 +1079,7 @@ function Containers.loadInventory(containerId)
     if Containers.invCache[containerId] then return true end
 
     local inv = {}
-    if rows then
+    if type(rows) == 'table' then
         for _, row in ipairs(rows) do
             -- type-checked: one hand-edited row must not make the stash unopenable
             local meta = Inventory.readMetadata(row.metadata,
@@ -1550,14 +1553,15 @@ end
 ---@return string|nil err
 exports('UpdateContainer', function(containerId, data)
     local caller = Registry.caller()   -- first, before anything can yield
-    containerId = Sanitize.id(containerId)
-    if not containerId then return false, 'a container id is a whole number' end
+    local id = Sanitize.id(containerId)
+    if not id then return false, 'a container id is a whole number' end
+    containerId = id
     if type(data) ~= 'table' then return false, 'data must be a table of the fields to change' end
     local theirs = notYours(containerId, caller)
     if theirs then return false, theirs end
-    local readWhy
-    data, readWhy = readContainerData(data, caller, ('container %d'):format(containerId))
-    if not data then return false, readWhy end
+    local read, readWhy = readContainerData(data, caller, ('container %d'):format(containerId))
+    if not read then return false, readWhy end
+    data = read
     local key = data.key
     if key ~= nil and key ~= false
         and (type(key) ~= 'string' or #key > 100 or not key:match(CONTAINER_KEY_PATTERN)) then
@@ -1600,8 +1604,9 @@ end)
 ---@return string|nil err
 exports('DeleteContainer', function(containerId)
     local caller = Registry.caller()   -- first, before anything can yield
-    containerId = Sanitize.id(containerId)
-    if not containerId then return false, 'a container id is a whole number' end
+    local id = Sanitize.id(containerId)
+    if not id then return false, 'a container id is a whole number' end
+    containerId = id
     local theirs = notYours(containerId, caller)
     if theirs then return false, theirs end
     local ok, err = Containers.delete(containerId)
@@ -1641,12 +1646,12 @@ end)
 ---@return string|nil why
 exports('EnsureContainer', function(key, data)
     local caller = Registry.caller()   -- first, before anything can yield
-    local readWhy
-    data, readWhy = readContainerData(data, caller, ('container "%s"'):format(tostring(key)))
-    if data == false then
+    local read, readWhy = readContainerData(data, caller, ('container "%s"'):format(tostring(key)))
+    if read == false then
         Registry.sayRefused(caller, readWhy)
         return false, readWhy
     end
+    data = read
     if not WaitForCoreReady() then return false, NOT_READY end
     local def, why = Containers.ensure(key, data, caller)
     if not def then

@@ -601,7 +601,7 @@ local function rotateEdge(g, t)
 end
 
 -- Lua 5.3 has no math.atan2; the runtimes differ.
-local atan2 = math.atan2 or math.atan
+local atan2 = math.atan
 
 --- Which way this panel is facing now, as a world heading. Read off the hinge and handle bones, so no
 --- open angle is assumed; the outward normal is that vector turned a quarter turn. Only for panels that
@@ -684,6 +684,7 @@ partPointOutside = function(part, veh, detached, g, c)
         return x, y, z
     end
     g = g or partGeometry(part, veh, c)
+    ---@diagnostic disable-next-line: missing-return-value -- nil alone: nowhere (the rest come only with x)
     if not g then return nil end
 
     -- The authored handle, read live every frame. Not for a torn-off door (the bone goes with the

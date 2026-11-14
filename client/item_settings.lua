@@ -76,6 +76,7 @@ end)
 ---@param item string
 ---@param key string
 ---@return any
+---@diagnostic disable-next-line: duplicate-set-field -- the server's ItemSettings is a different table
 function ItemSettings.get(item, key)
     local list = type(item) == 'string' and values[item]
     if not list or type(key) ~= 'string' then return nil end

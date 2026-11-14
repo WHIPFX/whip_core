@@ -470,6 +470,8 @@ function DirectorLive.setKey(src, t, spec)
     dropKey(t)
     local secure = spec.secure == true
     local def = Vehicles.getDef(vid)
+    -- (dropKey may wait: the car can have gone meanwhile)
+    if not def then return false, 'It is not there any more', DirectorLive.keyOf(t) end
     if (def.secure == true) ~= secure then
         local ok, why = Vehicles.setSecure(vid, secure)
         if not ok then return false, why, DirectorLive.keyOf(t) end
@@ -757,15 +759,15 @@ local function cb(name, params, handler, rate)
     }, handler)
 end
 
-cb('liveMake', { { 'spec', 'any' } }, function(source, player, spec)
+cb('liveMake', { { 'spec', 'any' } }, function(source, _, spec)
     return DirectorLive.make(source, spec)
 end, 250)
 
-cb('liveMove', { { 'id', 'id' }, { 'coords', 'any' }, { 'rot', 'any' } }, function(source, player, id, coords, rot)
+cb('liveMove', { { 'id', 'id' }, { 'coords', 'any' }, { 'rot', 'any' } }, function(source, _, id, coords, rot)
     return DirectorLive.move(source, id, coords, rot)
 end, 150)
 
-cb('liveRemove', { { 'id', 'id' } }, function(source, player, id)
+cb('liveRemove', { { 'id', 'id' } }, function(source, _, id)
     local ok, why = DirectorLive.remove(source, id)
     if not ok then return false, why end
     return { ok = true }
@@ -777,14 +779,14 @@ SecureEvent('whip_core:server:liveFired', {
     rateLimit = 300,
     burst = 5,
     params = { { 'id', 'id' }, { 'shots', 'int', 1, 20 } },
-}, function(source, player, id, shots)
+}, function(source, _, id, shots)
     local t = things[id]
     if not t or t.kind ~= 'prop' or not t.weapon then return end
     DirectorLive.log(source, ('fired a Fixed Weapon (%s, %d %s)'):format(t.weapon, shots, shots == 1 and 'shot' or 'shots'), t.coords)
 end)
 
 --- Everything I made (`all`: an admin's, everyone's). Answers how many went.
-cb('liveClear', { { 'all', 'bool' } }, function(source, player, all)
+cb('liveClear', { { 'all', 'bool' } }, function(source, _, all)
     if all and not DirectorLive.isAdmin(source) then return false, 'Only an admin can clear everyone\'s' end
     local p = Players[source]
     local ids = {}
@@ -808,7 +810,7 @@ cb('liveClear', { { 'all', 'bool' } }, function(source, player, all)
 end, 1000)
 
 --- One effect off, from the Dungeon Mode page (its maker's, or a full admin's).
-cb('liveFxOff', { { 'key', 'string', 160 } }, function(source, player, key)
+cb('liveFxOff', { { 'key', 'string', 160 } }, function(source, _, key)
     local e = effects[key]
     if not e then return false, 'It is off already' end
     if not mayChange(source, e) then return false, ('That %s is %s\'s'):format(e.kind, tostring(e.by)) end

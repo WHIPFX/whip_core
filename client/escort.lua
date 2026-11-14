@@ -197,7 +197,7 @@ end)
 
 -- Server rejected our escort attempt (revert optimistic state). The reason is whip's toast: the
 -- server's handler answers `false, reason`, which shows it (UI-1).
-RegisterNetEvent('whip_core:client:escortFailed', function(reason)
+RegisterNetEvent('whip_core:client:escortFailed', function()
     escortTarget = nil
 end)
 
@@ -230,7 +230,7 @@ end)
 -- Pulled out of a vehicle. Only OUT: the escort itself starts when the server has recorded it and
 -- says so (youAreEscorted). This used to mark us escorted here, before the server agreed, and a
 -- server that then changed its mind never told us — frozen until /logout (audit 3, H7).
-RegisterNetEvent('whip_core:client:pullFromVehicle', function(bySource)
+RegisterNetEvent('whip_core:client:pullFromVehicle', function()
     -- Dead in the seat: a dead ped takes no task, so death.lua lays them beside the door.
     if DeathPullFromSeat and DeathPullFromSeat() then return end
     local myPed = PlayerPedId()

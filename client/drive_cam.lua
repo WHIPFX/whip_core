@@ -39,6 +39,7 @@ local EXIT_MS, AGAIN_MS = 500, 600
 local SHAKE = { speed = 0.18, baseFreq = 7.0, speedFreq = 11.0, air = 0.15, land = 0.9, crash = 1.6,
                 decay = 2.6, maxImpulse = 2.6, max = 2.5, dv = 4.0, dvFull = 22.0, hp = 8.0, hpFull = 120.0 }
 
+---@type integer|nil
 local cam = nil
 local mem = {}
 local run = { subjects = {}, frame = 0 }
@@ -194,6 +195,7 @@ local function shakeFor(veh, s, dt)
 end
 
 local function frame(veh, dt)
+    ---@cast cam -nil   -- (only with the camera up: the loop below)
     run.subjects.veh = veh
     run.frame = run.frame + 1
     local s = CamShots.subject(run, 'veh')
@@ -231,6 +233,7 @@ CreateThread(function()
                 begin()
                 upFrames = 0
             end
+            ---@cast cam -nil   -- (begun)
             upFrames = upFrames + 1
             if upFrames > 3 and GetRenderingCam() == -1 then
                 -- Script cameras were turned off under it: start again from GTA's camera.

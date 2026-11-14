@@ -30,6 +30,7 @@ local ROUGH_RUNS = 100
 local CLOCK = '(reading the clock)'
 
 local running = false
+---@type table[]|nil
 local reports = nil
 
 -- ============================================
@@ -44,6 +45,7 @@ local reports = nil
 local asked = nil   -- while timing: [label] = { n, kb, ms }
 
 --- 'event whip_core:client:x', 'export IsKeyPressed', or where a callback whip_core handed out lives.
+---@return string|false
 local function askedLabel(name)
     if type(name) ~= 'string' then return '(unnamed)' end
     local event = name:match('^event (%S+)')
@@ -118,6 +120,7 @@ AddEventHandler('whip_core:cost:askedReported', function(r)
 end)
 
 local function report(frames, seconds)
+    ---@cast reports -nil   (run only while timing, before it is cleared)
     local p = function(...) print('[whip_core:cost] ' .. string.format(...)) end
     local base, kbBase = 0.0, 0.0
     for _, r in ipairs(reports) do
@@ -218,14 +221,14 @@ local function report(frames, seconds)
     local loopRows, loopKb = {}, {}
     for _, r in ipairs(reports) do
         if type(r.loops) == 'table' then
-            local sum = 0.0
+            local loopSum = 0.0
             for key, e in pairs(r.loops) do
                 local n, kbMade = tonumber(e.n) or 0, tonumber(e.kb) or 0
-                sum = sum + kbMade
+                loopSum = loopSum + kbMade
                 loopRows[#loopRows + 1] = { key = (r.resource == 'whip_core' and '' or (r.resource .. ': ')) .. key,
                     perSecond = n / seconds, kbSecond = kbMade / seconds, bytesPass = n > 0 and kbMade * 1024 / n or 0 }
             end
-            loopKb[r.resource] = sum / seconds
+            loopKb[r.resource] = loopSum / seconds
         end
     end
     table.sort(loopRows, function(a, b) return a.kbSecond > b.kbSecond end)
@@ -250,15 +253,15 @@ local function report(frames, seconds)
     for _, r in ipairs(reports) do
         if type(r.asked) == 'table' and satAsked then satAsked[r.resource] = r.asked end
     end
-    for resource, list in pairs(satAsked or {}) do
-        local sum = 0.0
-        for label, e in pairs(list) do
+    for resource, labels in pairs(satAsked or {}) do
+        local satSum = 0.0
+        for label, e in pairs(labels) do
             local n, kbMade = tonumber(e.n) or 0, tonumber(e.kb) or 0
-            sum = sum + kbMade
+            satSum = satSum + kbMade
             satRows[#satRows + 1] = { label = resource .. ': ' .. label, perSecond = n / seconds, kbSecond = kbMade / seconds,
                                       bytesRun = n > 0 and kbMade * 1024 / n or 0 }
         end
-        satKb[resource] = sum / seconds
+        satKb[resource] = satSum / seconds
     end
     table.sort(satRows, function(a, b) return a.perSecond > b.perSecond end)
     p('')
@@ -293,7 +296,8 @@ DevCommand('whipcost', function(_, args)
     -- /whipcost [seconds]. (Every loop is counted now: a `loops` word, as it used to be typed, changes nothing.)
     local seconds = nil
     for _, a in ipairs(args or {}) do
-        if tonumber(a) and not seconds then seconds = math.floor(tonumber(a)) end
+        local n = tonumber(a)
+        if n and not seconds then seconds = math.floor(n) end
     end
     seconds = math.max(MIN_SECONDS, math.min(MAX_SECONDS, seconds or DEFAULT_SECONDS))
     running, reports, satAsked = true, {}, {}

@@ -594,7 +594,7 @@ end)
 
 -- Player load/logout: health regen disable + HUD init
 
-RegisterNetEvent('whip_core:client:playerLoaded', function(data)
+RegisterNetEvent('whip_core:client:playerLoaded', function()
     -- Disable GTA's native health regen to 50 HP
     SetPlayerHealthRechargeMultiplier(PlayerId(), 0.0)
     SetPlayerHealthRechargeLimit(PlayerId(), 0.0)

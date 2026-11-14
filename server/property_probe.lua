@@ -18,7 +18,7 @@ SecureEvent('whip_core:server:propertyProbeSave', {
         {'label', 'string', 48},
         {'body',  'string', 2000000},
     },
-}, function(source, player, label, body)
+}, function(source, _, label, body)
     -- A file name, not a path: lowercase letters, digits, dash and underscore only.
     local safe = label:lower():gsub('[^%w%-_]', '_'):sub(1, 48)
     if safe == '' then safe = 'interior' end

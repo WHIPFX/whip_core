@@ -250,7 +250,7 @@ SecureCallback('whip_core:devtools:setMode', {
     whileDead = true,
     requirePlayer = false,
     params = { {'on', 'bool'} },
-}, function(source, player, on)
+}, function(source, _, on)
     local ok, err = DevTools.setMode(source, on, 'switch')
     if not ok then return false, err end
     return true
@@ -302,6 +302,6 @@ RegisterCommand('w', function() end, true)
 SecureCallback('whip_core:devtools:checkAccess', {
     ace = 'whip.devtools',
     requirePlayer = false,
-}, function(source, player)
+}, function()
     return true
 end)

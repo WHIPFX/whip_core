@@ -14,7 +14,7 @@
 local HERE = (arg[0]:match('^(.*)[/\\]') or '.')
 local CORE = HERE .. '/../..'
 
-function IsDuplicityVersion() return true end
+rawset(_G, 'IsDuplicityVersion', function() return true end)
 dofile(CORE .. '/shared/director/kit.lua')
 dofile(CORE .. '/shared/director/things.lua')
 dofile(CORE .. '/server/director/fields.lua')

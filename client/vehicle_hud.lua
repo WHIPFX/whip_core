@@ -249,6 +249,7 @@ local function BoatPropOut(veh, running, now)
         propBone = GetEntityBoneIndexByName(veh, 'prop_1')
         propStern = GetModelDimensions(GetEntityModel(veh))   -- its first answer: the box's minimum corner
     end
+    ---@cast propStern -nil   -- set above for this boat
     if running and math.abs(GetVehicleThrottleOffset(veh)) >= PROP_THROTTLE then
         local out = not yes(IsEntityInWater(veh))
         if not out then
@@ -327,7 +328,7 @@ local function pruneRevSet()
     for entity in pairs(_revSet) do
         if not DoesEntityExist(entity) then gone[#gone + 1] = entity end
     end
-    for _, entity in ipairs(gone) do revReg:remove(revReg:ownerOf(entity), entity) end
+    for _, entity in ipairs(gone) do revReg:remove(revReg:ownerOf(entity) --[[@as string]], entity) end   -- (held, so owned)
 end
 
 --- Where a vehicle's rev dial comes from, on this client.
@@ -374,7 +375,7 @@ exports('SetVehicleRevRange', function(vehicle, engine)
 
     pruneRevSet()
     local ok, why = revReg:add(owner, entity, entry)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end)
 
@@ -465,10 +466,10 @@ exports('SetVehicleDialGear', function(vehicle, gear)
     end
     if entity == 0 or not DoesEntityExist(entity) or GetEntityType(entity) ~= 2 then return false, 'no such vehicle' end
     for other in pairs(_gearSet) do
-        if not DoesEntityExist(other) then gearReg:remove(gearReg:ownerOf(other), other) end
+        if not DoesEntityExist(other) then gearReg:remove(gearReg:ownerOf(other) --[[@as string]], other) end   -- (held, so owned)
     end
     local ok, why = gearReg:add(owner, entity, gear)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     _speedKeep[entity] = nil   -- worked out afresh: the handle may be a deleted car's
     return true
 end)

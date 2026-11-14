@@ -59,7 +59,9 @@ local BANDS = { inner = 0.0012, white = 0.0034, outer = 0.0018 }
 local drawOrder = 1
 
 local skinNow = nil       -- the skin last applied
+---@type { colour: number[], rects: number[][], discs: number[][], dw: number, dh: number }[]|nil
 local layers = nil        -- the frame's three layers, worked out for this screen (buildLayers)
+---@type { dict: string, ring: string, x: number, y: number, w: number, h: number }|nil
 local sprite = nil        -- the baked frame: its dictionary, centre and size on this screen (buildLayers)
 local spriteReady, discReady = false, false   -- their dictionaries loaded, as last checked (buildLayers)
 local ringReady = false   -- the ring's dictionary loaded, as last checked (buildLayers)
@@ -77,6 +79,7 @@ local mapSwapped = false
 --- The frame's dictionaries: loaded yet? Asked for if not. Natives only, so it is asked on every pass, the ones that
 --- change nothing too: a dictionary still streaming is picked up as it arrives.
 local function checkReady()
+    ---@cast sprite -nil   -- called only from buildLayers, once sprite is set
     spriteReady = HasStreamedTextureDictLoaded(sprite.dict) and true or false
     if not spriteReady then RequestStreamedTextureDict(sprite.dict, false) end
     -- The ring only while the black behind the map is not solid: a player at full never loads it.
@@ -158,6 +161,8 @@ end
 local function drawFrame()
     -- Looked at once a second, by the clock rather than a count of frames, for a resolution or safe-zone change.
     if not layers or GetGameTimer() >= layersDue then buildLayers() end
+    ---@cast layers -nil   -- buildLayers has set both
+    ---@cast sprite -nil
 
     if not IsMinimapRendering() or IsBigmapActive() then return end
     if CleanScreen.on then return end   -- a recording (client/clean_screen.lua): the map is hidden, so its frame is

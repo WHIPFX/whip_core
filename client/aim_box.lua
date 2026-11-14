@@ -185,6 +185,12 @@ function AimBox.aim(kinds, flags, maxT, sticky, out)
         if onMap then return onBody(nil, hitPos, hitNormal, out) end
         return false
     end
+    -- (A hit: rayBox answers all of them.)
+    ---@cast r -nil
+    ---@cast f -nil
+    ---@cast u -nil
+    ---@cast p -nil
+    ---@cast b -nil
     local hx = p.x + r.x * l1 + f.x * l2 + u.x * l3
     local hy = p.y + r.y * l1 + f.y * l2 + u.y * l3
     local hz = p.z + r.z * l1 + f.z * l2 + u.z * l3

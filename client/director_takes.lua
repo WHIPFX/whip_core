@@ -47,6 +47,34 @@ local HUD_MS   = 100
 local OTHERS_MAX = 8
 local PARKED_MAX = 8
 
+---@class TakeRecording
+---@field key string
+---@field wid string
+---@field model string
+---@field label string
+---@field start table
+---@field veh integer
+---@field peds integer[]
+---@field others table[]
+---@field parked table[]
+---@field tow? string
+---@field back table
+---@field reopen? string
+---@field run? integer
+---@field phase? string
+---@field count? integer
+---@field buf? table
+---@field t0? integer
+---@field t? integer
+---@field why? string
+---@field hitched? string
+---@field towEvents? table[]
+---@field saves? { list: table[], byToken: table }
+---@field ask? integer
+---@field keys? table
+---@field hudAt? integer
+
+---@type TakeRecording|nil
 local R = nil        -- the recording: { phase, run, key, wid, model, label, start, veh, peds, others, parked, tow, hitched,
                      -- towEvents, buf, t0, t, ask, back, reopen, why, saves }; others = { { veh, peds, samples, at =
                      -- { x, y, z, heading }, label } }; parked = { { veh, wid, model, at, buf } }; saves = { [token] =
@@ -239,6 +267,7 @@ local function makeOthers(list)
             left = left - 1
         end)
     end
+    ---@type integer|nil
     local sayAt = GetGameTimer() + 500
     while left > 0 do
         if sayAt and GetGameTimer() >= sayAt then
@@ -254,6 +283,7 @@ local function makeOthers(list)
             local x, y, z, h = TakePlayer.start(o.samples)
             veh, peds = makeCopy(o.model, x, y, z, h, o.riders, true)
             if veh then
+                ---@cast peds integer[]   -- (a car made: its riders)
                 dress(veh, o.car, o.model, o.ext)
                 for _, p in ipairs(peds) do SetEntityInvincible(p, true) end
                 local other = { veh = veh, peds = peds, samples = o.samples, at = { x = x, y = y, z = z, heading = h },
@@ -323,6 +353,7 @@ local function makeParked(list)
         local c = type(p) == 'table' and type(p.coords) == 'table' and p.coords or nil
         local x, y, z = c and tonumber(c.x), c and tonumber(c.y), c and tonumber(c.z)
         if #out < PARKED_MAX and type(p.car) == 'string' and type(p.model) == 'string' and x and y and z then
+            ---@cast c table   -- (x, y and z were read off it)
             local veh = makeCopy(p.model, x, y, z, tonumber(c.heading) or 0.0, nil)
             if veh then
                 dress(veh, p.car, p.model, p.ext)
@@ -415,6 +446,7 @@ end
 --- The car's own trailer (its page's Tows) on its hitch, and the hitches kept from the start: one with it on is
 --- hitched at 0. Each parked one's frames from the start too.
 local function startTow()
+    ---@cast R -nil   -- (an attempt is starting)
     local veh = R.veh
     TakePlayer.hitch(veh, nil)
     for _, p in ipairs(R.parked) do
@@ -426,6 +458,7 @@ end
 
 --- The hitch as it is now (frame `t`): a parked one hitched or let go since the last frame is kept as a moment.
 local function noteTow(t)
+    ---@cast R -nil   -- (recording)
     local now = parkedWid(R.parked, TakePlayer.trailerOf(R.veh))
     if now == R.hitched then return end
     if R.hitched then R.towEvents[#R.towEvents + 1] = { t = t, w = R.hitched, on = false } end
@@ -435,6 +468,7 @@ end
 
 --- One attempt: back on the spot, count, record until saved, tried again or thrown away.
 local function attempt()
+    ---@cast R -nil   -- (newAttempt: a recording is up; current(run) says it still is)
     local run = R.run
     local veh = R.veh
     letGoOfAll(R)   -- (driven again while the last one's save was unanswered)
@@ -499,7 +533,10 @@ end
 --- again after a wait that ran out never makes a second copy, and its answer still counts when it comes late.
 --- Every take a Save sends: the car's, then each parked one's that was hitched (its own placed thing's take).
 --- { { wid (nil: the car's), buf, model } }, each buf finished; nil and why when there is nothing to save.
+---@return table[]|nil list
+---@return string|nil why
 local function toSave()
+    ---@cast R -nil   -- (save: a recording is up)
     local keys, n = TakeTrack.finish(R.buf)
     if n < 2 or (R.t or 0) < 500 then return nil, 'Nothing to save yet: drive a little first' end
     local list = { { buf = R.buf, keys = keys, model = R.model } }
@@ -521,7 +558,7 @@ local function save()
     if not list then
         local why
         list, why = toSave()
-        if not list then UI.Notify(why, 'warning') return end
+        if not list then UI.Notify(why --[[@as string]], 'warning') return end
     end
     R.saves = { list = list, byToken = {} }
     local bytes = 0
@@ -583,7 +620,7 @@ RegisterNetEvent('whip_core:client:takeSaved', function(token, id, ms, why)
         return
     end
     -- (This drive's answer, whichever Save it answers: held after a wait that ran out counts too.)
-    if not mine or (R.phase ~= 'saving' and R.phase ~= 'held') then return end
+    if not mine or not R or (R.phase ~= 'saving' and R.phase ~= 'held') then return end
     if not id then
         hold('not saved')
         UI.Notify(why or 'The driving event was not saved', 'error')
@@ -643,6 +680,7 @@ RegisterNUICallback('directorTakeRecord', function(d, cb)
             goBack(nil, reopen)
             return
         end
+        ---@cast peds integer[]   -- (a car made: its riders)
         dress(veh, d.car, d.model, d.ext, true)
         -- (Held here while their takes come: one this game has not got yet is a few seconds on a slow connection.)
         FreezeEntityPosition(veh, true)
@@ -826,6 +864,7 @@ RegisterNetEvent('whip_core:client:takeRide', function(token, netId, at, maxMs)
             TriggerServerEvent('whip_core:server:takeRideSeated', token, false)
             return
         end
+        ---@cast veh -nil   -- (seated: in it)
         r.veh = veh
         -- (Theirs before the take starts: its first frames play here, not on whoever had the car.)
         Vehicles.takeControl(veh, { attempts = 3, wait = 300 })

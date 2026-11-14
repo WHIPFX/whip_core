@@ -754,7 +754,7 @@ local function drawHoldRing(cx, cy, cz, rx, ry, rz, ux, uy, uz, half, corner, th
 end
 
 --- Which way is right, and which way is up, for this prompt. Nil when it should not be drawn: a fixed sign seen from behind.
----@return number|nil rx, number ry, number rz, number ux, number uy, number uz
+---@return number|nil rx, number|nil ry, number|nil rz, number|nil ux, number|nil uy, number|nil uz
 local function signOrientation(e, camX, camY, camZ)
     local h = math.rad(e.heading)
     local sinH, cosH = math.sin(h), math.cos(h)
@@ -789,15 +789,14 @@ local billboardBasis = WorldQuad.billboardBasis
 local wantRows = {}
 local function nearerFirst(a, b) return (a.dist or 0) < (b.dist or 0) end
 
---- Draw one frame; called every frame while anything is visible.
+--- Draw one frame; called every frame while anything is visible. The second and third (the state changes and the ids
+--- that left: interact_nui.lua's) are not needed here: this draws from `visible`.
 ---@param visible table        [id] = entry, everything in range this frame
----@param changed table|nil    state changes; a table (maybe empty) on a score frame, else nil
----@param removed table|nil    ids that left; same rule
----@param isScoreFrame boolean whether the caller scored this frame (use this, not the truthiness of the two above)
+---@param isScoreFrame boolean whether the caller scored this frame
 ---@param camPos vector3|nil  the camera's position, when read this frame
 ---@param cfx number|nil @param cfy number|nil @param cfz number|nil  the camera's forward, likewise
 ---@param passNow number|nil  GetGameTimer, as the caller read it this frame
-function R.frame(visible, changed, removed, isScoreFrame, camPos, cfx, cfy, cfz, passNow)
+function R.frame(visible, _, _, isScoreFrame, camPos, cfx, cfy, cfz, passNow)
     if not attached then return end
 
     updateBadgeSize()

@@ -482,7 +482,7 @@ end
 SecureCallback('whip_core:director:loreLook', {
     permission = 'director.build', whileDead = true, rateLimit = 2000, burst = 2,
     params = { { 'key', 'key', 64 }, { 'look', 'any' }, { 'image', 'string', (Portraits and Portraits.MAX_LEN or 65536) + 1, '' } },
-}, function(source, player, key, look, image)
+}, function(_, player, key, look, image)
     if look == 'none' then look = nil
     elseif type(look) ~= 'table' then return false, 'No look was sent' end
     local ok, why = DirectorLore.setLook(key, look, image, player and player.fullName or nil)
@@ -496,7 +496,7 @@ end)
 SecureCallback('whip_core:director:lorePortraits', {
     permission = 'director.build', whileDead = true, rateLimit = 300, burst = 6,
     params = { { 'keys', 'any' } },
-}, function(source, player, keys)
+}, function(_, _, keys)
     if type(keys) ~= 'table' then return { portraits = {} } end
     local list, seen = {}, {}
     for _, k in ipairs(keys) do
@@ -520,7 +520,7 @@ end)
 SecureCallback('whip_core:loreLook', {
     whileDead = true, rateLimit = 250, burst = 8,
     params = { { 'key', 'key', 64 } },
-}, function(source, player, key)
+}, function(_, _, key)
     local c, look = chars[key], looks[key]
     if not c or not look then return {} end
     return { look = look, v = c.lookV }
@@ -561,7 +561,7 @@ end
 function DirectorLore.pay(key, who, amount, message, madeNote)
     if not DirectorLore.isLive(key) then return false, 'No lore character called ' .. tostring(key) end
     local charId, src = WhoIs(who)
-    if not charId then return false, src or 'No such player' end
+    if not charId then return false, src --[[@as string|nil]] or 'No such player' end
     local to, readErr = Bank.GetDefaultAccount(charId)
     if not to then return false, readErr and 'The bank could not be reached' or 'They have no bank account' end
     local from, why = DirectorLore.account(key)
@@ -653,7 +653,7 @@ local function usesIn(doc, key)
                         if own == nil then own = DirectorLore.defaultOf(vd) or false end
                         v = own
                     end
-                    if v == key then add(tostring(def.title or n.type)) end
+                    if v == key then add(tostring(def and def.title or n.type)) end
                 end
             end
         end
@@ -741,7 +741,7 @@ end
 SecureCallback('whip_core:director:loreProps', {
     permission = 'director.build', whileDead = true, rateLimit = 500, burst = 3,
     params = { { 'key', 'key', 64 }, { 'hat', 'int', -1, 255, -1 }, { 'hatTexture', 'int', 0, 63, 0 } },
-}, function(source, player, key, hat, hatTexture)
+}, function(_, player, key, hat, hatTexture)
     local c = chars[key]
     if not c then return false, 'No lore character called ' .. tostring(key) end
     local list = {}
@@ -758,7 +758,7 @@ end)
 SecureCallback('whip_core:director:loreActivity', {
     permission = 'director.build', whileDead = true, rateLimit = 500, burst = 3,
     params = { { 'key', 'key', 64 } },
-}, function(source, player, key)
+}, function(_, _, key)
     local c = chars[key]
     if not c then return false, 'No lore character called ' .. tostring(key) end
     local scenarios, why = scenariosUsing(key)

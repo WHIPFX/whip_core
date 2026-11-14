@@ -53,12 +53,6 @@ local ProfilerExitScope  = ProfilerExitScope  or function() end
 -- Internal: Parameter Validation
 -- ============================================
 
---- Validate and sanitize a single parameter against its schema definition.
---- @param raw any          The raw value from the client
---- @param pDef table       Schema definition: {'name', 'type', ...}
---- @param src number|nil   Invoking player, for types whose validity depends on who is asking
---- @return any sanitized   The sanitized value (or nil on failure)
---- @return string|nil reason  Error reason if validation failed
 --- A number off the wire: a number, or a string that reads as one (JavaScript often sends numbers as
 --- strings). Anything else is nil here, so a declared default still answers for it.
 ---@return number|nil
@@ -84,6 +78,13 @@ local function isFuncRef(v)
     return type(mt) == 'table' and rawget(mt, '__call') ~= nil
 end
 
+--- Validate and sanitize a single parameter against its schema definition.
+--- @param raw any          The raw value from the client
+--- @param pDef table       Schema definition: {'name', 'type', ...}
+--- @param src number       Invoking player, for types whose validity depends on who is asking
+--- @return any sanitized   The sanitized value (or nil on failure)
+--- @return string|nil reason  Error reason if validation failed
+--- @return string|nil say  what the player is told, when the refusal is one they can meet honestly
 local function validateParam(raw, pDef, src)
     local name    = pDef[1]
     local pType   = pDef[2]
@@ -435,7 +436,7 @@ local _openByKey      = {}                                     -- ['name|src'] =
 local _openBySrc      = {}                                     -- [src] = handlers running for that player
 
 ---@param name string  the registry name: the event, or 'cb:<name>' for a callback
----@param src number
+---@param src number|nil
 local function invocationKey(name, src)
     return tostring(name) .. '|' .. tostring(src)
 end
@@ -671,6 +672,7 @@ end
 ---@return boolean ok, any ...  as pcall
 function Actions.call(owner, fn, ...)
     local recs = (owner and owner ~= GetCurrentResourceName()) and Actions.current() or {}
+    ---@cast owner string   -- recs is empty without one
     for _, r in ipairs(recs) do
         r.calling = r.calling or {}
         r.calling[owner] = (r.calling[owner] or 0) + 1
@@ -1076,7 +1078,7 @@ local function checkNear(schema, src, handPlayer, sanitized, nParams)
         if not x then return false, 'near.at is not a function, a position or \'vehicle\'', 'error' end
     end
 
-    if not x then
+    if not (x and y and z) then
         if near.allowUnknown then return true end
         return false, 'Too far away (near.at found no position)', 'rejected'
     end
@@ -1137,7 +1139,7 @@ local function claimName(name, kind, resource)
     local names = kind == 'callback' and _callbackNames or _eventNames
     local ok, why = names:add(resource, name, true)
     if ok then return true end
-    return false, why
+    return false, why --[[@as string]]
 end
 
 -- The param types validateParam knows. Kept next to the schema check below; a new type is added
@@ -1450,12 +1452,12 @@ function SecureEvent(eventName, schema, handler)
         local args = { ... }
         local t0   = GetGameTimer()
 
-        local schema        = reg.schema
-        local handler       = reg.handler
-        local requirePlayer = schema.requirePlayer ~= false
-        local rateLimit, rateBurst = effectiveRate(schema)
-        local ace           = schema.ace
-        local params        = schema.params or {}
+        local regSchema     = reg.schema
+        local regHandler    = reg.handler
+        local requirePlayer = regSchema.requirePlayer ~= false
+        local rateLimit, rateBurst = effectiveRate(regSchema)
+        local ace           = regSchema.ace
+        local params        = regSchema.params or {}
 
         reg.calls    = reg.calls + 1
         reg.lastCall = os.time()
@@ -1478,7 +1480,7 @@ function SecureEvent(eventName, schema, handler)
         end
 
         -- An in-game permission (server/permissions.lua)
-        local denied = permissionRefusal(schema, src)
+        local denied = permissionRefusal(regSchema, src)
         if denied then
             refuseEvent(reg, eventName, src, denied, args)
             return
@@ -1495,7 +1497,7 @@ function SecureEvent(eventName, schema, handler)
         end
 
         -- Dead players act on nothing unless the schema says otherwise (refusedWhileDead).
-        if refusedWhileDead(schema, player) then
+        if refusedWhileDead(regSchema, player) then
             refuseEvent(reg, eventName, src, 'Player is dead', args)
             return
         end
@@ -1523,30 +1525,30 @@ function SecureEvent(eventName, schema, handler)
         -- (gunny's shotFired).
         local handPlayer = player
         if reg.resource ~= GetCurrentResourceName() then
-            if player then handPlayer = schema.sheet == 'light' and player:lightSheet() or player:handlerSheet() end
+            if player then handPlayer = regSchema.sheet == 'light' and player:lightSheet() or player:handlerSheet() end
             sanitized = paramsForSatellite(params, sanitized)   -- 'addr' as an address
         end
 
-        if schema.near then
-            local nearOk, nearWhy, nearStatus = checkNear(schema, src, handPlayer, sanitized, #params)
+        if regSchema.near then
+            local nearOk, nearWhy, nearStatus = checkNear(regSchema, src, handPlayer, sanitized, #params)
             if not nearOk and nearStatus == 'error' then
                 print(('[whip_core:secure] ERROR in near for "%s": %s'):format(eventName, tostring(nearWhy)))
-                refuseEvent(reg, eventName, src, nearWhy, args, 'error')
+                refuseEvent(reg, eventName, src, nearWhy --[[@as string]], args, 'error')
                 return
             end
             if not nearOk then
-                refuseEvent(reg, eventName, src, nearWhy, args)
+                refuseEvent(reg, eventName, src, nearWhy --[[@as string]], args)
                 -- And tell them: a silent return looks like the server is down. `near.message =
                 -- false` stays silent, for anything fired on a tick rather than by a press.
-                if schema.near.message ~= false then
+                if regSchema.near.message ~= false then
                     ShowError(src,
-                        schema.near.message or 'Too far away')
+                        regSchema.near.message or 'Too far away')
                 end
                 return
             end
         end
 
-        if schema.ownerOf and not checkOwnerOf(schema, src, sanitized) then
+        if regSchema.ownerOf and not checkOwnerOf(regSchema, src, sanitized) then
             refuseEvent(reg, eventName, src, 'not the network owner of that entity', args)
             return
         end
@@ -1560,7 +1562,7 @@ function SecureEvent(eventName, schema, handler)
         noteVehicles(inv, params, sanitized)
 
         ProfilerEnterScope('whip:secureHandler')
-        local ok, packed = callTracked(inv, handler, src, handPlayer, table.unpack(sanitized, 1, #params))
+        local ok, packed = callTracked(inv, regHandler, src, handPlayer, table.unpack(sanitized, 1, #params))
         ProfilerExitScope()
 
         -- Index 2: slot 1 of callTracked's packed result is pcall's success flag.
@@ -1576,12 +1578,12 @@ function SecureEvent(eventName, schema, handler)
         -- refusal is recorded like whip's own. `return false` with no message refuses without a
         -- toast (still recorded).
         if ok and packed[2] == false then
-            local why = packed[3]
-            if type(why) ~= 'string' or why == '' then why = nil end   -- '' is no message, not a reason
-            if why and NotifyPlayer then NotifyPlayer(src, why, 'error') end
+            local message = packed[3]
+            if type(message) ~= 'string' or message == '' then message = nil end   -- '' is no message, not a reason
+            if message and NotifyPlayer then NotifyPlayer(src, message, 'error') end
             if not refused then
                 reg.rejects = reg.rejects + 1
-                logSecureEvent(eventName, src, 'rejected', why or 'refused by the handler', elapsed)
+                logSecureEvent(eventName, src, 'rejected', message or 'refused by the handler', elapsed)
                 refused = true
             end
         end

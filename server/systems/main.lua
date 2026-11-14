@@ -106,7 +106,7 @@ R.setPorts({
         table.sort(out, function(a, b) return a.source < b.source end)
         return out
     end,
-    remember = function(inst, scope, key, name, value)
+    remember = function(inst, _, key, name, value)
         local id = inst.meta and inst.meta.systemId
         if not id or inst.test then return end
         local ok, why = SystemStore.rememberValue(id, key, name, value)

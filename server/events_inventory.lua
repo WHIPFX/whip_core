@@ -505,7 +505,7 @@ SecureEvent('whip_core:server:inventoryClosed', {
     rateLimit = 500,
     -- Burst 3; see the note on openInventory above.
     burst     = 3,
-}, function(source, player)
+}, function(_, player)
     Log.paced(player.charId, 'inv_close')
 end)
 
@@ -668,7 +668,7 @@ SecureEvent('whip_core:server:storeContextAction', {
     end
 
     Log.item(player.charId, 'ctx_' .. action, slotData)
-    local _, _, refused = Inventory.runContextActionAt(action, source, player, slotData, Stores.addressOf(at.store, at.slot))
+    local _, _, refused = Inventory.runContextActionAt(action, source, player, slotData, Stores.addressOf(at.store, at.slot) --[[@as table]])
     if refused then return false, refused end
 end)
 
@@ -1127,7 +1127,7 @@ SecureEvent('whip_core:server:dropToGround', {
     end
 
     local took, takeErr, removed = Stores.take(fromStore, fromSlot, amount)
-    if not took then
+    if not took or not removed then
         refuseOp(EVENT, source, takeErr or 'Could not drop that', opId)
         return
     end
@@ -1215,7 +1215,7 @@ SecureEvent('whip_core:server:dropOneToGround', {
     end
 
     local took, takeErr, removed = Stores.take(fromStore, fromSlot, 1)
-    if not took then
+    if not took or not removed then
         refuseOp(EVENT, source, takeErr or 'Failed to drop item', opId)
         return
     end
@@ -1762,7 +1762,7 @@ end)
 SecureEvent('whip_core:server:throwStarted', {
     rateLimit = 200,
     params = { {'netId', 'id'} },
-}, function(source, player, netId)
+}, function(source, _, netId)
     local ped = GetPlayerPed(source)
     if not ped or ped == 0 then return end
     local c = GetEntityCoords(ped)
@@ -1827,7 +1827,7 @@ SecureEvent('whip_core:server:throwItemLanded', {
     end
 
     local took, takeErr, removed = Stores.take(fromStore, slot, amount)
-    if not took then
+    if not took or not removed then
         return false, takeErr or 'Could not throw that'
     end
     Stores.markDirty(fromStore)   -- owed before the ground INSERT yields (see dropToGround)
@@ -1945,7 +1945,7 @@ SecureEvent('whip_core:server:throwLaunched', {
     local fromStore = Stores.player(source, container)
     if not fromStore then return refuse('Could not reach your inventory') end
     local took, takeErr, removed = Stores.take(fromStore, slot, amount)
-    if not took then return refuse(takeErr or 'Could not throw that') end
+    if not took or not removed then return refuse(takeErr or 'Could not throw that') end
     Stores.markDirty(fromStore)
     Log.ensureUid(removed)
 
@@ -1982,7 +1982,7 @@ SecureEvent('whip_core:server:throwSettled', {
         {'ry', 'number', -180, 180, 0.0},
         {'posed', 'bool', false},
     },
-}, function(source, player, groundId, x, y, z, heading, rx, ry, posed)
+}, function(source, _, groundId, x, y, z, heading, rx, ry, posed)
     local EVENT = 'whip_core:server:throwSettled'
     local owner = GroundItems.flightOwner(groundId)
     local data = GroundItems.getById(groundId)
@@ -2067,7 +2067,7 @@ SecureEvent('whip_core:server:placeItem', {
     end
 
     local took, takeErr, removed = Stores.take(fromStore, slot, amount)
-    if not took then
+    if not took or not removed then
         return false, takeErr or 'Could not place that'
     end
     Stores.markDirty(fromStore)   -- owed before the ground INSERT yields (see dropToGround)
@@ -2106,6 +2106,7 @@ end)
 
 --- Override broadcastCreate: only send to players whose synced cells include the item's cell
 --- (PlayersNearPoint, server/player_lifecycle.lua).
+---@diagnostic disable-next-line: duplicate-set-field -- replaces ground.lua's default on purpose
 GroundItems.broadcastCreate = function(data)
     for _, src in ipairs(PlayersNearPoint(data.x, data.y)) do
         TriggerClientEvent('whip_core:client:groundItemCreated', src, data)
@@ -2114,6 +2115,7 @@ end
 
 --- Override broadcastUpdate the same way: a pile's amount changed (a split on the ground). Only the
 --- players who were sent the pile in the first place can be holding it.
+---@diagnostic disable-next-line: duplicate-set-field -- replaces ground.lua's default on purpose
 GroundItems.broadcastUpdate = function(data)
     for _, src in ipairs(PlayersNearPoint(data.x, data.y)) do
         TriggerClientEvent('whip_core:client:groundItemUpdated', src, data.id, data.amount)
@@ -2135,7 +2137,7 @@ Every('ground and door cell sync', function() return (Config.GroundSyncInterval 
             -- Nothing to do until the player changes cell: the same cell gives the same square of
             -- cells, exactly. lastCell starts empty at login, so the first pass always runs.
             local cell = coords and GroundItems.cellKey(coords.x, coords.y)
-            if cell and cell ~= syncData.lastCell then
+            if cell and coords and cell ~= syncData.lastCell then
                 syncData.lastCell = cell
                 local currentCells = GroundItems.getNearbyCellKeys(coords.x, coords.y, streamRange)
 

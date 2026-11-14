@@ -131,6 +131,22 @@ local function badTag(tag)
 end
 Registry.badTag = badTag
 
+---@class WhipRegistry
+---@field name string
+---@field label string
+---@field entries table
+---@field owners table
+---@field tags table
+---@field releaseOrder number
+---@field scoped boolean
+---@field shared boolean
+---@field prefixed boolean
+---@field reserved string|nil
+---@field sweep boolean
+---@field same (fun(old: any, new: any): boolean)|false|nil
+---@field validate function|nil
+---@field onAdd function|nil
+---@field onRemove function|nil
 local Reg = {}
 Reg.__index = Reg
 
@@ -160,7 +176,7 @@ Reg.__index = Reg
 ---                        start with its resource's name is warned about, once per resource (noteUnprefixed)
 ---@param name string  unique, shown by Registry.list
 ---@param opts table|nil
----@return table registry
+---@return WhipRegistry registry
 function Registry.new(name, opts)
     opts = opts or {}
     local reg = setmetatable({

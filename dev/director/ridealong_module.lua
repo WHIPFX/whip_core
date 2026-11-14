@@ -4,52 +4,52 @@
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua ridealong_module.lua
 
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at, opts)
+rawset(Vehicles, 'spawnTempFor', function(model, at, opts)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at, opts = opts }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function DoesEntityExist(e) return e ~= nil and e ~= 0 end
-function GetEntityCoords() return { x = 2.0, y = 0.0, z = 0.0 } end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
-Players[1] = Players[1] or { charId = 1 }
-Players[2] = Players[2] or { charId = 2 }
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'DoesEntityExist', function(e) return e ~= nil and e ~= 0 end)
+rawset(_G, 'GetEntityCoords', function() return { x = 2.0, y = 0.0, z = 0.0 } end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
+rawset(Players, 1, Players[1] or { charId = 1 })
+rawset(Players, 2, Players[2] or { charId = 2 })
 
 -- What this game was told, and each list a car is given.
 local told, lists, npcs, seats = {}, {}, {}, {}
-function TriggerClientEvent(name, src, ...)
+rawset(_G, 'TriggerClientEvent', function(name, src, ...)
     if name == 'whip_core:client:takeRide' or name == 'whip_core:client:takeRideOver' then
         told[#told + 1] = { name = name:match('[^:]+$'), src = src, args = { ... } }
     end
-end
-Actors.setTow = function() return 1 end
-Actors.runTasks = function(_, ent, plan, opts)
+end)
+rawset(Actors, 'setTow', function() return 1 end)
+rawset(Actors, 'runTasks', function(_, ent, plan, opts)
     local rec = { ent = ent, plan = plan, opts = opts }
     for _, s in ipairs(plan.steps) do
         if s.t == 'take' then rec.take = opts.resolve(s) end
     end
     lists[#lists + 1] = rec
     return #lists
-end
-Npcs.spawn = function(_, d)
+end)
+rawset(Npcs, 'spawn', function(_, d)
     npcs[#npcs + 1] = d
     return #npcs, 7000 + #npcs
-end
-Npcs.setState = function(_, id, state)
+end)
+rawset(Npcs, 'setState', function(_, id, state)
     if type(state.ride) == 'table' then seats[#seats + 1] = { id = id, seat = state.ride.seat } end
     return true
-end
+end)
 local TAKES = { [24] = { id = 24, lengthMs = 20000, start = { x = 2.0, y = 0.0, z = 0.0, heading = 0.0 } } }
-DirectorTakes.get = function(id) return TAKES[math.tointeger(tonumber(id))] end
-DirectorTakes.load = function(id) return TAKES[math.tointeger(tonumber(id))] end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(DirectorTakes, 'get', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+rawset(DirectorTakes, 'load', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local function reset() told, lists, npcs, seats, cars, nextCar = {}, {}, {}, {}, {}, 0 end
 
@@ -78,7 +78,7 @@ local function doc(props, riders, spawn)
 end
 local function start(key, d)
     local check = DirectorGraph.check
-    DirectorGraph.check = function() return true, {} end
+    rawset(DirectorGraph, 'check', function() return true, {} end)
     local okA, err = pcall(Director.activate, key, d, { rev = 1 })
     DirectorGraph.check = check
     if not okA then error(err) end
@@ -139,7 +139,7 @@ RegisterTestModule({
             start('ra_c', doc({ ride = true }, riders))
             assertEqual(#seats, 1, 'one NPC seated')
             assertTrue(seats[1] and seats[1].seat ~= -1, 'not at the wheel')
-            local def = DirectorNodes.get('vehicle.playTake')
+            local def = DirectorNodes.get('vehicle.playTake') --[[@as table]]
             local made = def.makes({ car = 'car3', ride = true }, doc({ ride = true }, riders))
             assertTrue(made.pas == true and made.drv == nil, 'Check knows it makes no driver')
             made = def.makes({ car = 'car3' }, doc({}, riders))

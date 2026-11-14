@@ -1325,7 +1325,7 @@ function Doors.hold(owner, data, opts)
     if opts.requirements ~= nil then
         local why
         req, why = normaliseRequirements(opts.requirements)
-        if req == false then return nil, why end
+        if req == false then return nil, why --[[@as string]] end
     end
     req = req or { charIds = {} }   -- nobody, until the holder says who
 
@@ -1387,7 +1387,7 @@ function Doors.hold(owner, data, opts)
 
     -- First, so a run that has ended is refused before anything exists.
     local ok, why = holdReg:add(owner, rec.doorId, rec, tag ~= nil and { tag = tag } or nil)
-    if not ok then return nil, why end
+    if not ok then return nil, why --[[@as string]] end
     if door then
         doorCache[door.doorId] = door
         cellInsert(door)
@@ -1582,7 +1582,7 @@ function Doors.ensureSet(list, manager, prune)
                 local partner = doorCache[door.linkedDoorId]
                 local pmb = partner and managerOf(partner)
                 local ours = pmb ~= nil and sameManager(pmb, manager)
-                local pdef = ours and seen[pmb.key] or nil
+                local pdef = ours and pmb and seen[pmb.key] or nil
                 local stale = (pdef ~= nil and pdef.link ~= def.key) or (pdef == nil and prune)
                 if ours and stale then
                     local ok, err = Doors.unlinkDoors(id, mgrFor(def.key))
@@ -1621,10 +1621,10 @@ end
 --- pass a full position). Doors.getByPosition DOES use z: "which door is exactly here".
 ---@param x number
 ---@param y number
----@param z number  accepted for call-site symmetry; not used
+---@param _ number  the z, accepted for call-site symmetry; not used
 ---@param range number
 ---@return table[]
-function Doors.getNearby(x, y, z, range)
+function Doors.getNearby(x, y, _, range)
     local result = {}
     local rangeSq = range * range
     for _, door in pairs(doorCache) do
@@ -1696,9 +1696,9 @@ function Doors.requirementsMet(source, player, req, noun)
     if not next(req) then return true, nil end
     -- The one shape (a row written before normaliseRequirements existed may not be in it). A shape
     -- that cannot be read keeps the door shut rather than throwing on every press.
-    local why
-    req, why = normaliseRequirements(req)
-    if req == false then return false, ('This %s is misconfigured: %s'):format(noun, tostring(why)) end
+    local clean, why = normaliseRequirements(req)
+    if clean == false then return false, ('This %s is misconfigured: %s'):format(noun, tostring(why)) end
+    req = clean
     -- Nothing left once read (a `lockpick = false` from an older save, an empty job list): open, as
     -- `{}` is.
     if req == nil or next(req) == nil then return true, nil end
@@ -1774,7 +1774,7 @@ SecureCallback('whip_core:getDoorAll', {
     -- The manager's own edit reads three times (before, 200 ms after, and on the doorUpdated it
     -- causes): four in a burst covers one edit.
     burst     = 4,
-}, function(source, player)
+}, function()
     return Doors.getAll()
 end)
 
@@ -1786,7 +1786,7 @@ SecureEvent('whip_core:server:doorToggle', {
     near = {
         -- Asked at each press, so a change in /whip → Settings reaches it.
         range = function() return (Config.DoorInteractRange or 3.0) + 2.0 end,
-        at = function(source, player, doorId)
+        at = function(_, _, doorId)
             local door = doorCache[doorId]
             if not door then return nil end
             return door.x, door.y, door.z
@@ -1857,9 +1857,9 @@ SecureEvent('whip_core:server:doorToggle', {
 
     -- Linked door, before the autolock below, so the timer captures the partner's number after it.
     if door.linkedDoorId then
-        local linked = doorCache[door.linkedDoorId]
-        if linked then
-            Doors.updateState(linked.doorId, door.locked, { cause = 'press', source = source })
+        local partner = doorCache[door.linkedDoorId]
+        if partner then
+            Doors.updateState(partner.doorId, door.locked, { cause = 'press', source = source })
         end
     end
 
@@ -1893,7 +1893,7 @@ SecureEvent('whip_core:server:doorLockpickAttempt', {
     end,
     near = {
         range = function() return (Config.DoorInteractRange or 3.0) + 2.0 end,
-        at = function(source, player, doorId)
+        at = function(_, _, doorId)
             local door = doorCache[doorId]
             if not door then return nil end
             return door.x, door.y, door.z
@@ -1985,7 +1985,7 @@ end)
 SecureCallback('whip_core:doorWizardJobs', {
     ace       = 'whip.devtools',
     rateLimit = 1000,
-}, function(source, player)
+}, function()
     local out = {}
     for _, j in ipairs(Jobs.getAll()) do
         if j.key then out[#out + 1] = { key = j.key, name = j.name or j.key } end
@@ -2068,7 +2068,7 @@ SecureEvent('whip_core:server:doorUpdate', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'doorId', 'id'}, {'updates', 'any'} },
-}, function(source, player, doorId, updates)
+}, function(source, _, doorId, updates)
     if type(updates) ~= 'table' then return end
     -- Doors.update announces itself (projected).
     local ok, err = Doors.update(doorId, updates)
@@ -2083,7 +2083,7 @@ SecureEvent('whip_core:server:doorDelete', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'doorId', 'id'} },
-}, function(source, player, doorId)
+}, function(source, _, doorId)
     local ok, err = Doors.delete(doorId)
     if ok then
         -- Doors.delete announces itself.
@@ -2102,7 +2102,7 @@ SecureEvent('whip_core:server:doorRelease', {
     rateLimit = 250,
     burst     = 5,   -- releasing a gone resource's doors is a run of clicks down the list
     params = { {'doorId', 'id'} },
-}, function(source, player, doorId)
+}, function(source, _, doorId)
     local door = doorCache[doorId]
     local mb = managerOf(door)
     if not mb then return end
@@ -2132,7 +2132,7 @@ SecureEvent('whip_core:server:doorLink', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'doorId1', 'id'}, {'doorId2', 'id'} },   -- addresses: rejected, never clamped to door #1
-}, function(source, player, doorId1, doorId2)
+}, function(source, _, doorId1, doorId2)
     local linked, linkErr = Doors.linkDoors(doorId1, doorId2)
     if not linked then
         ShowError(source, linkErr or 'Could not link those doors')
@@ -2150,7 +2150,7 @@ SecureEvent('whip_core:server:doorUnlink', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'doorId', 'id'} },
-}, function(source, player, doorId)
+}, function(source, _, doorId)
     local ok, errOrPartner = Doors.unlinkDoors(doorId)
     if not ok then return false, errOrPartner or 'Could not unlink that door' end
     -- As for a link: only an open Door Manager has anything to repaint.
@@ -2168,7 +2168,7 @@ SecureEvent('whip_core:server:doorSetLocked', {
     rateLimit = 100,
     burst     = 5,
     params = { {'doorId', 'id'}, {'locked', 'bool'} },
-}, function(source, player, doorId, locked)
+}, function(_, _, doorId, locked)
     local ok, err = Doors.setLocked(doorId, locked)
     if not ok then return false, err end
 end)
@@ -2179,7 +2179,7 @@ SecureEvent('whip_core:server:doorToggleLocked', {
     rateLimit = 100,
     burst     = 5,
     params = { {'doorId', 'id'} },
-}, function(source, player, doorId)
+}, function(_, _, doorId)
     local door = doorCache[doorId]
     if not door then return false, 'Door not found' end
     local ok, err = Doors.setLocked(doorId, not door.locked)

@@ -29,8 +29,8 @@ end
 
 --- Sanitize a string value: strip control chars, limit length.
 --- @param val any       Raw input
---- @param maxLen number Max allowed length
---- @param default string Fallback if invalid (default '')
+--- @param maxLen? number Max allowed length (none: no limit)
+--- @param default? string Fallback if invalid (default '')
 --- @return string
 function Sanitize.string(val, maxLen, default)
     default = default or ''
@@ -51,7 +51,7 @@ end
 
 --- Sanitize a key identifier: alphanumeric, underscore, hyphen only.
 --- @param val any       Raw input
---- @param maxLen number Max length (default 60)
+--- @param maxLen? number Max length (default 60)
 --- @return string|nil   nil if invalid
 function Sanitize.key(val, maxLen)
     maxLen = maxLen or 60
@@ -64,9 +64,9 @@ end
 
 --- Sanitize a number: reject NaN/inf, clamp to range.
 --- @param val any       Raw input
---- @param min number    Minimum allowed (default -1e12)
---- @param max number    Maximum allowed (default 1e12)
---- @param default number Fallback if invalid (default 0)
+--- @param min? number    Minimum allowed (default -1e12)
+--- @param max? number    Maximum allowed (default 1e12)
+--- @param default? number Fallback if invalid (default 0)
 --- @return number
 function Sanitize.number(val, min, max, default)
     default = default or 0
@@ -86,9 +86,9 @@ end
 
 --- Sanitize an integer: same as number but floored.
 --- @param val any       Raw input
---- @param min number    Minimum allowed
---- @param max number    Maximum allowed
---- @param default number Fallback if invalid (default 0)
+--- @param min? number    Minimum allowed (default -1e12)
+--- @param max? number    Maximum allowed (default 1e12)
+--- @param default? number Fallback if invalid (default 0)
 --- @return number
 function Sanitize.int(val, min, max, default)
     return math.floor(Sanitize.number(val, min, max, default))

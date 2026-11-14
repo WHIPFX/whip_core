@@ -31,7 +31,7 @@ local STILL_MS = 1.0   -- metres a second: a car slower than this is stopped
 local function num(v, lo, hi, fallback) return DirectorKit.num(v, fallback, lo, hi) end
 
 --- A spot's marker rules, ready to test against; nil when it has none (look 'none', not a spot, not placed).
----@param w table  the placed thing (ctx:place's copy, or the graph's)
+---@param w table|nil  the placed thing (ctx:place's copy, or the graph's)
 ---@return table|nil r  { id, look, x, y, z, heading, w, l, shown, activate, thing, still }
 function DirectorSpots.rules(w)
     if type(w) ~= 'table' or w.kind ~= 'spot' or type(w.def) ~= 'table' then return nil end

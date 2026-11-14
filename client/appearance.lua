@@ -826,7 +826,7 @@ local function undressedFor(ped)
     if not body then return nil end
     local out = { components = {} }
     for comp, item in pairs(UNDRESSED[body]) do
-        local id = tonumber(comp)
+        local id = tonumber(comp) --[[@as integer]]   -- (UNDRESSED's keys are all numbers)
         local d = -1
         if item[1] == 'base' then
             d = item[2]
@@ -1395,7 +1395,7 @@ RegisterNUICallback('saveAppearance', function(data, cb)
 end)
 
 -- Cancel creator
-RegisterNUICallback('cancelCreator', function(data, cb)
+RegisterNUICallback('cancelCreator', function(_, cb)
     if not CreatorLive() then cb({ ok = false }) return end
 
     -- Someone else's look: nothing handed back; the player's own look goes back on (FinishLook).

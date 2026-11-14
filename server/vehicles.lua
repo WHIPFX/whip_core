@@ -496,8 +496,8 @@ function Vehicles.loadAll()
             if def.state == 'out' and not def.session and def.locked then lockedOut[#lockedOut + 1] = vehicleId end
         end
         for _, vehicleId in ipairs(lockedOut) do
-            local ok, inside = pcall(Vehicles.hasKeyInIgnition, vehicleId)
-            if ok and inside then Vehicles.setLocked(vehicleId, false) end
+            local asked, inside = pcall(Vehicles.hasKeyInIgnition, vehicleId)
+            if asked and inside then Vehicles.setLocked(vehicleId, false) end
         end
 
         -- Snapshot the ids before the first yield: spawn yields, and new street cars add keys to
@@ -705,6 +705,7 @@ end
 ---@param vehicleId number
 ---@param kind 'trunk'|'glovebox'
 ---@return boolean
+---@diagnostic disable-next-line: duplicate-set-field -- the client's Vehicles is a different table
 function Vehicles.hasStorage(vehicleId, kind)
     local def = Vehicles._records[vehicleId]
     return Vehicles.modelStorage(def and def.model, kind).on
@@ -1134,7 +1135,7 @@ end
 
 --- Move a vehicle to a different character. Writes the one column.
 ---@param vehicleId number
----@param newCharId number
+---@param newCharId number|string|nil
 ---@return boolean ok
 ---@return string|nil err
 function Vehicles.transferOwner(vehicleId, newCharId)
@@ -1765,7 +1766,7 @@ local REPORTED_SCALARS = {
 --- Take a client's account of how a vehicle looks and keep only what a client can honestly say: dirt, nothing else
 --- (every other change is made by trusted code with SetVehicleAppearance). Built from the stored record, not the
 --- report, since saveProperties assigns rather than merges.
----@param vehicleId number
+---@param vehicleId number|nil
 ---@param props table
 ---@return table props, table|nil heldBack  what the report disagreed with the record about
 function Vehicles.mergeClientProperties(vehicleId, props)
@@ -1870,6 +1871,7 @@ function Vehicles.setLocked(vehicleId, locked, source)
     return true
 end
 
+---@diagnostic disable-next-line: duplicate-set-field -- the client's Vehicles is a different table
 function Vehicles.isLocked(vehicleId)
     local def = Vehicles._records[vehicleId]
     if not def then return true end
@@ -1879,10 +1881,6 @@ end
 -- ============================================
 -- Storage viewers: a boot or glovebox is SHARED, as a stash is (moves are atomic), never one player at a time
 -- ============================================
-
-local function storageKey(vehicleId, storageType)
-    return tostring(vehicleId) .. ':' .. storageType
-end
 
 --- Add this player to a compartment's viewer set (shared, as a stash: see Containers.tryOpen). Never refused, so it
 --- answers nothing (audit 20, VEH-7: its "true" fed a "Someone else is using this storage" that could not happen).
@@ -1992,6 +1990,7 @@ end
 ---@param vehicleId number
 ---@param storageType string  'trunk', 'glovebox', or 'key'
 ---@return table[]  Array of {query=string, values=table}
+---@return function confirm  run once the queries have committed: the next save writes only what changed since
 function Vehicles.buildSaveQueries(vehicleId, storageType)
     local noop = function() end
     local inv = Vehicles.invCache[vehicleId]
@@ -2337,8 +2336,8 @@ end
 ---@return table[]
 local function serverOccupants(entity)
     local out = {}
-    for _, src in ipairs(GetPlayers()) do
-        src = tonumber(src)
+    for _, id in ipairs(GetPlayers()) do
+        local src = tonumber(id)
         local ped = GetPlayerPed(src)
         if ped and ped ~= 0 and GetVehiclePedIsIn(ped, false) == entity then
             local player = Players and Players[src] or nil
@@ -2605,7 +2604,7 @@ function Vehicles.spotBlocked(x, y, z, opts)
     local bayHeading = tonumber(opts.heading)
     local bucket = tonumber(opts.bucket) or 0
 
-    for _, veh in ipairs(GetAllVehicles()) do
+    for _, veh in ipairs(GetAllVehicles() --[[@as integer[] ]]) do   -- the server native: a list
         if veh ~= opts.exceptEntity and DoesEntityExist(veh) and GetEntityRoutingBucket(veh) == bucket then
             local c = GetEntityCoords(veh)
             local inIt
@@ -2619,7 +2618,7 @@ function Vehicles.spotBlocked(x, y, z, opts)
     end
 
     for _, id in ipairs(GetPlayers()) do
-        local src = tonumber(id)
+        local src = tonumber(id) --[[@as integer]]   -- GetPlayers answers server ids as digits
         if src ~= opts.exceptSource and GetPlayerRoutingBucket(src) == bucket then
             local ped = GetPlayerPed(src)
             if ped and ped ~= 0 and #(GetEntityCoords(ped) - centre) < 2.5 then
@@ -2995,8 +2994,6 @@ function Vehicles.despawnToGarage(vehicleId)
     return true
 end
 
---- Strip whip's identity and every block it wrote, and stop forcing the car to persist.
----@param entity number
 --- Pin (or unpin) a street car on the client that owns it on the network. A street car stays GTA population and
 --- the owning client culls it, boot and all, once the player walks away. SetEntityAsMissionEntity is a client
 --- native, so the owner is asked. Undone when whip lets the car go (handBackToGta).
@@ -3011,6 +3008,8 @@ local function pinOnOwner(entity, pin)
 end
 Vehicles._pinOnOwner = pinOnOwner
 
+--- Strip whip's identity and every block it wrote, and stop forcing the car to persist.
+---@param entity number
 local function handBackToGta(entity)
     stripWhipKeys(entity)
     SetEntityOrphanMode(entity, 0)
@@ -3106,7 +3105,7 @@ function Vehicles.reconcileWorld()
         end
     end
 
-    for _, entity in ipairs(GetAllVehicles()) do
+    for _, entity in ipairs(GetAllVehicles() --[[@as integer[] ]]) do   -- the server native: a list
         -- readEntityStamp, not getEntityVehicleId: the index is empty at boot, so the stamp is the
         -- only memory of the previous run.
         local stampedId = Vehicles.readEntityStamp(entity)
@@ -3239,6 +3238,7 @@ local newSessionRecord
 ---@return number|nil vehicleId
 function Vehicles.getLiveByPlate(plate)
     local id = Vehicles.getByPlate(plate)
+    if not id then return nil end
     local def = id and Vehicles._records[id]
     if def and def.session and not Vehicles.getEntity(id) then return nil end
     return id
@@ -3271,7 +3271,7 @@ function Vehicles.registerSessionVehicle(plate, model, netId, vehType, engineOn,
     -- A street car whose car has gone is not found again by plate (plate text is client-set: renaming your car must
     -- not collect a culled car's boot). The record goes, contents logged as lost, and this is a new street car.
     local existDefNow = existingId and Vehicles._records[existingId]
-    if existDefNow and existDefNow.session and not Vehicles.getEntity(existingId) then
+    if existingId and existDefNow and existDefNow.session and not Vehicles.getEntity(existingId) then
         Vehicles.cleanupSessionVehicle(existingId, 'gone')
         existingId = nil
     end
@@ -3337,8 +3337,8 @@ function Vehicles.registerSessionVehicle(plate, model, netId, vehType, engineOn,
     -- `keyMinted` in the existing-plate branch above.
     if engineOn then
         Vehicles._records[sessionId].keyMinted = true
-        local keyModel = model or 'unknown'
-        if tonumber(keyModel) or keyModel:match('^%-?%d+$') then
+        local keyModel = model or 'unknown' ---@type string|nil
+        if keyModel and (tonumber(keyModel) or keyModel:match('^%-?%d+$')) then
             keyModel = nil
         end
         Vehicles.invCache[sessionId].key[1] = {
@@ -3662,7 +3662,7 @@ function Vehicles.ensureSessionVehicle(plate, clientModel)
 
     -- Not registered — find entity by plate and auto-register
     local normPlate = plate:upper():gsub('%s+', '')
-    local allVehicles = GetAllVehicles()
+    local allVehicles = GetAllVehicles() --[[@as integer[] ]]   -- the server native: a list
     for _, entity in ipairs(allVehicles) do
         local entPlate = GetVehicleNumberPlateText(entity)
         if entPlate and entPlate:upper():gsub('%s+', '') == normPlate then
@@ -3876,7 +3876,7 @@ end
 ---     v.stats.fuel, v.data.myThing, v.properties, v.storage
 --- Always a copy. Returns nil for a vehicle whip does not know. Occupants cost a scan of every player, so they are
 --- opt-in: `GetVehicle(id, { occupants = true })`.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param opts table|nil
 ---@return table|nil
 exports('GetVehicle', function(vehicleId, opts)
@@ -3912,7 +3912,7 @@ end)
 ---@return string|nil why  with {} when `who` names nobody
 exports('GetVehiclesOf', function(who)
     local charId, why = WhoIs(who)
-    if not charId then return {}, why end
+    if not charId then return {}, why --[[@as string]] end
 
     local out = {}
     for _, vehicleId in ipairs(Vehicles.ownedIds(charId)) do
@@ -3925,7 +3925,7 @@ end)
 
 --- Put a vehicle into the world. Idempotent: on a vehicle already out it moves it. Returns `false` rather than nil
 --- on failure (an export's return list stops at the first nil).
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param x number|vector3|vector4|nil  defaults to the vehicle's saved position; or a vector3 (then y is the
 ---                                     heading) or a vector4 (its w is)
 ---@param y number|nil
@@ -3956,7 +3956,7 @@ end)
 --- Take a vehicle out of the world and put it away in its garage, its record and storage kept
 --- (Vehicles.despawnToGarage). Storage is flushed first. SpawnVehicle brings it out again.
 --- `(ok, err)` like every other verb.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return boolean ok, string|nil err
 function Vehicles.despawnByRef(vehicleId)
     local refErr
@@ -3998,7 +3998,7 @@ end
 --- Put a vehicle away in a garage: out of the world, position cleared, state 'garaged'. Unlike DespawnVehicle it
 --- takes a garageKey and refuses a car that is not 'out' (DespawnVehicle files it in its own garage, works with
 --- somebody inside, removes a temporary car and hands a street car back to GTA). For an impound, or a test.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param garageKey string|nil  defaults to wherever it is already assigned, or the default garage;
 ---                             a key that names no garage is refused
 ---@return boolean ok, string|nil err
@@ -4013,7 +4013,7 @@ end)
 
 --- Take a vehicle out of a garage. Marks it 'out' and locked; it still has to be spawned (retrieving decides the car
 --- may come out, spawning decides where).
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param garageKey string|nil  defaults to the garage it is assigned to
 ---@return boolean ok, string|nil err
 exports('RetrieveVehicle', function(vehicleId, garageKey)
@@ -4034,8 +4034,8 @@ end)
 
 --- Is this player in the driver's seat of this vehicle? The cheap answer (three natives, no
 --- allocation, no scan) for a question asked many times a second.
----@param source number
----@param vehicleId number
+---@param source number|string|nil
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return boolean
 exports('IsPlayerDrivingVehicle', function(source, vehicleId)
     source = Sanitize.id(source)
@@ -4046,8 +4046,8 @@ end)
 
 --- Is this player anywhere inside this vehicle? Passengers included: the check for "may they open the glovebox"
 --- (IsPlayerDrivingVehicle is the one for "may they report fuel burn").
----@param source number
----@param vehicleId number
+---@param source number|string|nil
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return boolean
 exports('IsPlayerInVehicle', function(source, vehicleId)
     source = Sanitize.id(source)
@@ -4059,7 +4059,7 @@ end)
 --- Which whip car is this player sitting in? The server's view, never the client's word. `opts.driver = true` wants
 --- the driver's seat; without it any seat will do. Returns false (not nil) with the why.
 ---     local vehicleId, why = exports.whip_core:GetPlayerVehicle(source, { driver = true })
----@param source number
+---@param source number|string|nil
 ---@param opts table|nil  { driver?: boolean }
 ---@return number|false vehicleId, string|nil why  a sentence you can show the player
 exports('GetPlayerVehicle', function(source, opts)
@@ -4079,7 +4079,7 @@ end)
 
 --- Where is this vehicle? Three floats, in the shape `near.at` wants. Only a car in the world answers (a last
 --- recorded spot would let someone act on a car nobody can see); for where a car was last seen, GetVehicle(id).coords.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return number|nil x  nil when the car is not in the world
 ---@return number|nil y
 ---@return number|nil z
@@ -4354,6 +4354,8 @@ function Vehicles.spawnTempFor(model, coords, opts, owner)
     if opts.secure == true then Vehicles.setSecure(vehicleId, true, true) end
 
     if giveKey then
+        ---@cast forSource -nil   -- giveKey only with a loaded forSource (above)
+        ---@cast player -nil
         local keyOk, keyErr = Vehicles.giveKey(forSource, player, vehicleId)
         if not keyOk then
             Vehicles.cleanupSessionVehicle(vehicleId, 'failed')
@@ -4404,7 +4406,7 @@ end
 --- A `vehicle_key` carries `metadata.vehicleId` and is not tied to the owner, so the seller's key still works.
 --- `revokeOldKeys` removes keys from the previous owner's pockets when online; it can't reach a key offline, in a
 --- stash, a boot or on the ground. Returns `false` rather than nil on failure.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param newOwner number|table  the receiving player: a server id, or { charId = n } while they play
 ---@param opts table|nil  { giveKey = true, revokeOldKeys = true }
 ---@return boolean ok
@@ -4415,9 +4417,10 @@ exports('TransferVehicle', function(vehicleId, newOwner, opts)
     if not vehicleId then return false, refErr end
 
     local newCharId, newSource = WhoIs(newOwner)
-    if not newCharId then return false, newSource end
+    if not newCharId then return false, newSource --[[@as string]] end
     local buyer = newSource and Players[newSource]
     if not buyer then return false, 'The new owner must be online' end
+    ---@cast newSource number   -- online, so WhoIs gave their source
 
     opts = type(opts) == 'table' and opts or {}
 
@@ -4447,7 +4450,7 @@ end)
 
 --- Destroy a vehicle and everything in it, permanently: the row, trunk, glovebox, ignition contents, entity, queued
 --- writes and anybody's open view of its storage. A session vehicle is forgotten. Ungated like every satellite export.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return boolean ok
 ---@return string|nil err
 exports('DeleteVehicle', function(vehicleId)
@@ -4462,7 +4465,7 @@ exports('DeleteVehicle', function(vehicleId)
 end)
 
 --- Lock or unlock a vehicle. Persists, and applies to the entity if it is in the world.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param locked boolean
 ---@return boolean ok, string|nil err
 exports('SetVehicleLocked', function(vehicleId, locked)
@@ -4479,7 +4482,8 @@ end)
 ---@return number|nil source, table|string playerOrWhy
 local function keyHolder(who)
     local charId, src = WhoIs(who)
-    if not charId then return nil, src end
+    if not charId then return nil, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
     local player = src and Players[src]
     if not player then return nil, 'They are not online: a key goes into their pockets, so give it when they are' end
     return src, player
@@ -4488,6 +4492,7 @@ end
 exports('GiveVehicleKey', function(who, vehicleId)
     local source, player = keyHolder(who)
     if not source then return false, player end
+    ---@cast player table   -- with a source, keyHolder's second answer is the player
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
@@ -4556,6 +4561,7 @@ exports('AdoptVehicle', adoptVehicle)
 exports('RemoveVehicleKey', function(who, vehicleId)
     local source, player = keyHolder(who)
     if not source then return false, player end
+    ---@cast player table   -- with a source, keyHolder's second answer is the player
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
@@ -4609,7 +4615,7 @@ end
 --- `model` can't be written this way.
 ---     exports.whip_core:SetVehicleAppearance(vehicleId, { mods = { ['11'] = 3 }, color1 = 27 })
 --- `opts.data` / `opts.clearData` set and remove VehicleData keys in the same write as the look.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@param props table  appearance fields to apply over the current ones
 ---@param opts table|nil  { data = { [key] = value }, clearData = { key, ... } }
 ---@return boolean ok, string|nil err
@@ -4681,7 +4687,7 @@ end)
 
 --- Put a vehicle back to the appearance the server has stored: the undo for anything a client did locally (mods
 --- set with network control replicate to everyone, e.g. an abandoned shop preview).
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil
 ---@return boolean ok, string|nil err
 exports('RestoreVehicleAppearance', function(vehicleId)
     local refErr

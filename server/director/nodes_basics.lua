@@ -235,7 +235,7 @@ define({
     labels = { start = 'Start', stop = 'Stop', done = 'Time\'s up', stopped = 'Stopped' },
     latent = true,
     -- Nothing wired into Stop: it is never stopped.
-    unusedPin = function(props, pin, wiredIn) return pin == 'stopped' and not (wiredIn and wiredIn.stop) end,
+    unusedPin = function(_, pin, wiredIn) return pin == 'stopped' and not (wiredIn and wiredIn.stop) end,
     props = {
         { key = 'seconds', kind = 'duration', label = 'How long (seconds)', default = 300, min = 1, max = 86400 },
         { key = 'label', kind = 'text', label = 'Says', default = 'Time left', maxLength = 60 },

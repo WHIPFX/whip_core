@@ -51,7 +51,7 @@ end)
 SecureCallback('whip_core:appearance:clothingPictures', {
     requirePlayer = false,
     params = { { 'body', 'enum', { 'male', 'female' } } },
-}, function(source, player, body)
+}, function(_, _, body)
     local mine = pictures and pictures[body]
     if type(mine) ~= 'table' then return false, 'No clothing pictures' end
     return mine

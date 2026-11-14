@@ -227,7 +227,7 @@ AddEventHandler('playerDropped', function() viewers[source] = nil end)
 -- Reads
 -- ============================================
 
-SecureCallback('whip_core:property:adminList', { ace = ACE, rateLimit = 500 }, function(source)
+SecureCallback('whip_core:property:adminList', { ace = ACE, rateLimit = 500 }, function()
     local recs = {}
     for _, rec in pairs(Properties.getAll()) do recs[#recs + 1] = rec end
     table.sort(recs, function(a, b) return a.propertyId < b.propertyId end)
@@ -240,13 +240,13 @@ end)
 SecureCallback('whip_core:property:adminDetail', {
     ace = ACE, rateLimit = 100, burst = 10,
     params = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(_, _, propertyId)
     local rec = Properties.get(propertyId)
     return rec and detail(rec) or nil
 end)
 
 --- The templates, their units, and the packs they came from.
-SecureCallback('whip_core:property:adminTemplates', { ace = ACE, rateLimit = 500 }, function(source)
+SecureCallback('whip_core:property:adminTemplates', { ace = ACE, rateLimit = 500 }, function()
     local useCount = {}
     for _, rec in pairs(Properties.getAll()) do
         local k = rec.templateId .. ':' .. rec.unitKey
@@ -331,7 +331,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminRevokeKey', {
     ace = ACE, rateLimit = 250,
     params = { {'propertyId', 'id'}, {'charId', 'id'} },
-}, function(source, player, propertyId, charId)
+}, function(source, _, propertyId, charId)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     local ok, err = Properties.revokeKey(propertyId, charId)
@@ -342,7 +342,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminUpdate', {
     ace = ACE, rateLimit = 500,
     params = { {'propertyId', 'id'}, {'fields', 'any'} },
-}, function(source, player, propertyId, fields)
+}, function(source, _, propertyId, fields)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     if type(fields) ~= 'table' then return end
@@ -378,7 +378,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminDelete', {
     ace = ACE, rateLimit = 500,
     params = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(source, _, propertyId)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     local name = rec.name
@@ -401,7 +401,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminResolve', {
     ace = ACE, rateLimit = 500,
     params = { {'propertyId', 'id'}, {'mode', 'string', 8} },
-}, function(source, player, propertyId, mode)
+}, function(source, _, propertyId, mode)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     if mode ~= 'keep' and mode ~= 'pack' then return end
@@ -431,7 +431,7 @@ SecureEvent('whip_core:server:propertyAdminSetSign', {
         {'heading', 'number', 0.0, 360.0, 0.0},
         {'post', 'string', 64, ''},
     },
-}, function(source, player, propertyId, which, scope, x, y, z, heading, post)
+}, function(source, _, propertyId, which, scope, x, y, z, heading, post)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     if which ~= 'sign' and which ~= 'manager' then return end
@@ -471,7 +471,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminAdopt', {
     ace = ACE, rateLimit = 500,
     params = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(source, _, propertyId)
     local rec = Properties.get(propertyId)
     if not rec then return false, GONE end
     local ok, err = Properties.adopt(propertyId)
@@ -507,7 +507,7 @@ local function placeOf(p)
     if type(p) ~= 'table' then return nil end
     local x, y, z, yaw = tonumber(p.x), tonumber(p.y), tonumber(p.z), tonumber(p.yaw or 0)
     if not (finite(x) and finite(y) and finite(z) and finite(yaw)) then return nil end
-    if math.abs(x) > 100000 or math.abs(y) > 100000 or z < -5000 or z > 10000 then return nil end
+    if math.abs(x --[[@as number]]) > 100000 or math.abs(y --[[@as number]]) > 100000 or z < -5000 or z > 10000 then return nil end
     return { hash = PropertyMath.signedHash(p.hash or 0) or 0, x = x, y = y, z = z, yaw = yaw % 360.0 }
 end
 
@@ -529,7 +529,7 @@ end
 local function count(n)
     n = tonumber(n)
     if not finite(n) or n < 0 or n > 5000 then return nil end
-    return math.floor(n)
+    return math.floor(n --[[@as number]])
 end
 
 --- Would a property with this world data be one that already exists? Its stand-in point inside
@@ -697,7 +697,7 @@ local EDIT_PARTS = { space = true, doors = true, visit = true, garage = true }
 SecureEvent('whip_core:server:propertyAdminSavePart', {
     ace = ACE, rateLimit = 1000,
     params = { {'propertyId', 'id'}, {'part', 'string', 16}, {'scope', 'string', 8}, {'value', 'any'} },
-}, function(source, player, propertyId, part, scope, value)
+}, function(source, _, propertyId, part, scope, value)
     local rec = Properties.get(propertyId)
     if not rec then return saved(source, false, 'That property no longer exists') end
     if not EDIT_PARTS[part] then return saved(source, false, 'That part cannot be changed here') end
@@ -756,7 +756,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminRebind', {
     ace = ACE, rateLimit = 1000,
     params = { {'propertyId', 'id'}, {'place', 'any'}, {'layout', 'any'} },
-}, function(source, player, propertyId, p, layout)
+}, function(source, _, propertyId, p, layout)
     local rec = Properties.get(propertyId)
     if not rec then return saved(source, false, 'That property no longer exists') end
     local t = Properties.getTemplate(rec.templateId)
@@ -818,7 +818,7 @@ end)
 SecureCallback('whip_core:property:adminKnown', {
     ace = ACE, rateLimit = 250, burst = 5,
     params = { {'place', 'any'} },
-}, function(source, player, p)
+}, function(_, _, p)
     local place = placeOf(p)
     if not place then return false, 'That is not a place' end   -- `false, why`, not a bare nil
     local templates = {}
@@ -853,7 +853,7 @@ SecureCallback('whip_core:property:adminDoorsNear', {
         {'z', 'number', -5000.0, 10000.0},
         {'r', 'number', 1.0, 80.0},
     },
-}, function(source, player, x, y, z, r)
+}, function(_, _, x, y, z, r)
     local out = {}
     for _, door in ipairs(Doors.getNearby(x, y, z, r)) do
         if math.abs(door.z - z) <= r then
@@ -872,7 +872,7 @@ end)
 SecureCallback('whip_core:property:adminUnit', {
     ace = ACE, rateLimit = 250, burst = 5,
     params = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(_, _, propertyId)
     local rec = Properties.get(propertyId)
     if not rec then return false, 'Unknown property' end
     local t = Properties.getTemplate(rec.templateId)
@@ -935,7 +935,7 @@ end
 SecureCallback('whip_core:property:adminRegisterInfo', {
     ace = ACE, rateLimit = 250, burst = 5,
     params = { {'place', 'any'} },
-}, function(source, player, p)
+}, function(_, _, p)
     local place = placeOf(p)
     if not place or place.hash == 0 then return false, 'That is not an interior' end
     local out = {}
@@ -1031,7 +1031,7 @@ end)
 --- admin flies into and draws the units it would register there.
 SecureCallback('whip_core:property:adminStampTemplates', {
     ace = ACE, rateLimit = 1000,
-}, function(source)
+}, function()
     local out = {}
     for id, t in pairs(Properties.getTemplates()) do
         if (t.archetypeHash or 0) ~= 0 then
@@ -1053,7 +1053,7 @@ end)
 SecureCallback('whip_core:property:adminVerifyInfo', {
     ace = ACE, rateLimit = 100, burst = 20,
     params = { {'propertyId', 'id'} },
-}, function(source, player, propertyId)
+}, function(_, _, propertyId)
     local rec = Properties.get(propertyId)
     if not rec then return false, 'Unknown property' end
     local t = Properties.getTemplate(rec.templateId)
@@ -1082,7 +1082,7 @@ end)
 SecureEvent('whip_core:server:propertyAdminVerified', {
     ace = ACE, rateLimit = 100, burst = 10,
     params = { {'propertyId', 'id'}, {'result', 'any'} },
-}, function(source, player, propertyId, res)
+}, function(source, _, propertyId, res)
     local rec = Properties.get(propertyId)
     if not rec or type(res) ~= 'table' then return end
     local a = (rec.world and rec.world.anchor) or rec.place
@@ -1103,6 +1103,7 @@ SecureEvent('whip_core:server:propertyAdminVerified', {
                 and { rooms = count(res.fingerprint.rooms), portals = count(res.fingerprint.portals) } or nil
             Properties.setTemplateRooms(t.templateId, rooms, fp)
             rec = Properties.get(propertyId)
+            if not rec then return end   -- removed while the rooms were written
         end
     end
 
@@ -1121,7 +1122,7 @@ end)
 SecureCallback('whip_core:property:adminQuickCheck', {
     ace = ACE, rateLimit = 2000,
     params = { {'ids', 'list', {'id', 'id'}, PropertyValidate.LIMITS.properties} },
-}, function(source, player, ids)
+}, function(_, _, ids)
     local checked, bad = 0, {}
     for _, id in ipairs(ids) do
         local rec = Properties.get(id)
@@ -1151,7 +1152,7 @@ SecureCallback('whip_core:property:adminExport', {
         {'packId', 'string', 48, ''},
         {'label', 'string', 100, ''},
     },
-}, function(source, player, templateIds, placements, packId, label)
+}, function(_, _, templateIds, placements, packId, label)
     local res, err = PropertyExport.build(templateIds, {
         placements = placements, id = packId ~= '' and packId or nil, label = label ~= '' and label or nil,
     })

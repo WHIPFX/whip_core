@@ -377,7 +377,7 @@ end
 -- screen's own LB press goes on LB's release, only if no combo was used.
 
 --- Does LB + this button belong to whip's combo rather than to the screen? false when LB is not held.
----@param control number  a frontend control (201 A, 202 B, 203 X, 204 Y, 206 RB, the D-pad 187-190)
+---@param control number|nil  a frontend control (201 A, 202 B, 203 X, 204 Y, 206 RB, the D-pad 187-190)
 ---@return boolean
 exports('PadComboTakes', function(control)
     control = tonumber(control)
@@ -647,8 +647,8 @@ local function vehicleControls(veh)
     -- The engine, then the headlights, then the rest in button order.
     for _, s in ipairs(SLOTS) do
         if layout[s.id] == 'engine' and not bicycle then
-            local running = GetIsVehicleEngineRunning(veh)
-            rows[#rows + 1] = { glyphs = slotGlyphs(s), label = (running == 1 or running == true) and 'Engine off' or 'Start engine' }
+            local engineOn = GetIsVehicleEngineRunning(veh)
+            rows[#rows + 1] = { glyphs = slotGlyphs(s), label = (engineOn == 1 or engineOn == true) and 'Engine off' or 'Start engine' }
         end
     end
     if not bicycle then rows[#rows + 1] = { glyphs = { 'dpad_right' }, label = 'Headlights' } end
@@ -782,7 +782,7 @@ exports('RegisterPadAction', function(id, def)
         label = def.label, command = def.command, onPress = def.onPress, onRelease = def.onRelease,
         where = def.where, menus = def.menus == true, slot = def.slot, ready = def.ready ~= false, owner = owner,
     })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end)
 

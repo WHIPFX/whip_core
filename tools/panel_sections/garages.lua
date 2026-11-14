@@ -141,7 +141,7 @@ local function markers()
                     local r = (Config.GarageSpotRadius or 3.5) * 2.0
                     DrawMarker(1, s.x, s.y, s.z - 0.95,
                         0, 0, 0, 0, 0, 0, r, r, 0.4,
-                        0, 200, 120, 120, false, false, 2, false, nil, nil, false)
+                        0, 200, 120, 120, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 end
             end
         end

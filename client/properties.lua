@@ -328,7 +328,7 @@ end
 local function syncPost(p)
     local sign = type(p.sign) == 'table' and p.sign.x and p.sign or nil
     local post = sign and not p.ownerCharId and PropertyMath.signPost(sign.post) or nil
-    if not post then removePost(p.id) return end
+    if not (sign and post) then removePost(p.id) return end
     local x, y, z, h = PropertyMath.promptToPost(post, sign.x, sign.y, sign.z, sign.heading or 0.0)
     local key = ('%s|%.3f|%.3f|%.3f|%.1f'):format(post.model, x, y, z, h)
     if posts[p.id] and posts[p.id].key == key then
@@ -442,7 +442,7 @@ function addSigns(p)
                             standing.rowTo = 0.0
                         else
                             local index, _, count = Interactions.getSelection(s.outside)
-                            if index and count > 1 then standing.rowTo = PropertyListing.rowFor(index, count) end
+                            if index and count > 1 then standing.rowTo = PropertyListing.rowFor(index, count --[[@as integer]]) end
                         end
                         local row = standing.row or 0.0
                         row = row + ((standing.rowTo or 0.0) - row) * math.min(1.0, GetFrameTime() * ROW_RATE)
@@ -674,7 +674,6 @@ RegisterNetEvent('whip_core:client:propertiesSync', function(list)
         if w and w.id then adopt(w) end
     end
     -- The stream's next pass (500 ms at most) puts back whatever is near.
-    if PropertiesChanged then PropertiesChanged() end
 end)
 
 --- Is a property still in the same place with the same shapes? Compared as JSON: a false "moved"
@@ -696,7 +695,6 @@ RegisterNetEvent('whip_core:client:propertyUpdated', function(w)
         adopt(w)
         removeSigns(w.id)
         addSigns(props[w.id])
-        if PropertiesChanged then PropertiesChanged() end
         return
     end
 
@@ -706,7 +704,6 @@ RegisterNetEvent('whip_core:client:propertyUpdated', function(w)
     forget(w.id)
     adopt(w)
     if wasCurrent then current = nil end
-    if PropertiesChanged then PropertiesChanged() end
 end)
 
 RegisterNetEvent('whip_core:client:propertyDeleted', function(id)
@@ -714,7 +711,6 @@ RegisterNetEvent('whip_core:client:propertyDeleted', function(id)
     if not id then return end
     forget(id)
     props[id] = nil
-    if PropertiesChanged then PropertiesChanged() end
 end)
 
 --- Which properties this character holds a key to: at login, and whenever one comes or goes. Any

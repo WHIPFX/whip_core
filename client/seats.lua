@@ -220,8 +220,9 @@ local function checkEntry(ped)
     end
     local bone = GetEntityBoneIndexByName(veh, 'seat_dside_f')
     if bone == -1 then return end   -- no driver's side to come round from (a bike)
-    local driverX = GetOffsetFromEntityGivenWorldCoords(veh, GetWorldPositionOfEntityBone(veh, bone)).x
-    local pedX = GetOffsetFromEntityGivenWorldCoords(veh, GetEntityCoords(ped)).x
+    local seatAt, pedAt = GetWorldPositionOfEntityBone(veh, bone), GetEntityCoords(ped)
+    local driverX = GetOffsetFromEntityGivenWorldCoords(veh, seatAt.x, seatAt.y, seatAt.z).x
+    local pedX = GetOffsetFromEntityGivenWorldCoords(veh, pedAt.x, pedAt.y, pedAt.z).x
     if driverX * pedX >= 0 then return end   -- at the driver's side: GTA's own door, no slide
     retasked = veh
     local speed = (IsPedRunning(ped) or IsPedSprinting(ped)) and 2.0 or 1.0
@@ -300,7 +301,7 @@ end
 
 --- Move this player to `to` in the vehicle they are in. Runs in a thread (it waits for the server).
 ---@param veh number
----@param to number  -1 is the driver's seat
+---@param to number|nil  -1 is the driver's seat
 ---@return boolean ok, string|nil why
 function Seats.moveTo(veh, to)
     if moving then return false, 'Already changing seat' end

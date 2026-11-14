@@ -6,7 +6,7 @@
 -- whip_core's functions, not its exports: see food.lua. (A satellite: ApplyEffect / NotifyPlayer.)
 local CORE = GetCurrentResourceName()
 
-Inventory.registerUseHandler('damage_reducer', function(source, player, slotData)
+Inventory.registerUseHandler('damage_reducer', function(source)
     -- Its answer is the handler's: a reducer that could not be applied is not used up.
     return Stats.applyEffect(source, 'damage_reduction', {
         duration       = 20,

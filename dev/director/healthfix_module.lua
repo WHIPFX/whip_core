@@ -7,33 +7,33 @@
 local R = DirectorRuntime
 
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 local npcs, nextNpc = {}, 0
-Npcs.spawn = function(_, def)
+rawset(Npcs, 'spawn', function()
     nextNpc = nextNpc + 1
     npcs[nextNpc] = { npcId = nextNpc, netId = 5000 + nextNpc, alive = true, coords = { x = 0.0, y = 0.0, z = 0.0 } }
     return nextNpc, 5000 + nextNpc
-end
-Npcs.get = function(id) return npcs[id] end
-Npcs.setState = function() return true end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+end)
+rawset(Npcs, 'get', function(id) return npcs[id] end)
+rawset(Npcs, 'setState', function() return true end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local kvp = {}
-function GetResourceKvpInt(k) return kvp[k] end
-function SetResourceKvpInt(k, v) kvp[k] = v end
-Inventory.onlyStamped = Inventory.onlyStamped or function(match) return { only = match } end
+rawset(_G, 'GetResourceKvpInt', function(k) return kvp[k] end)
+rawset(_G, 'SetResourceKvpInt', function(k, v) kvp[k] = v end)
+rawset(Inventory, 'onlyStamped', Inventory.onlyStamped or function(match) return { only = match } end)
 
 local at = function(x) return { x = x, y = 0.0, z = 0.0, heading = 0.0 } end
 local function npc(id, x) return { id = id, kind = 'npc', layer = 'run', label = id, def = { model = 's_m_m_security_01', coords = at(x) } } end
@@ -135,15 +135,15 @@ RegisterTestModule({
             local realFind, realTake = Inventory.findAll, Inventory.take
             local answer = { false, 'Paying — wait a moment' }
             local took = {}
-            Inventory.findAll = function(_, item)
+            rawset(Inventory, 'findAll', function(_, item)
                 local r = runOf('hf_take')
                 return { { addr = { kind = 'player', id = 1, sub = 'player', slot = 1 }, amount = 2, item = item,
                            metadata = { fromRun = r and r.id, dworld = 'pkg' } } }
-            end
-            Inventory.take = function(_, item, amount, _, only)
+            end)
+            rawset(Inventory, 'take', function(_, item, amount, _, only)
                 took[#took + 1] = { item = item, amount = amount, only = only }
                 return table.unpack(answer)
-            end
+            end)
             local d = doc({ n('s', 'scenario.started', {}, 1), n('t', 'item.take', { item = { 'pkg' } }),
                             n('w', 'scenario.succeed', {}, 1), n('f', 'scenario.fail', {}, 1) },
                           { l('a', 's', 'out', 't'), l('b', 't', 'taken', 'w'), l('c', 't', 'missing', 'f') })
@@ -194,6 +194,7 @@ RegisterTestModule({
             local sc = Director.build('hf_test', d, { prefix = 'test' })
             local run = Director.startRun(sc, 1, { source = 1 }, { test = true })
             assertNotNil(run, 'a test run')
+            ---@cast run table
             assertTrue(Director.isTesting('hf_test'), 'it is being tested')
             local ok, why = Director.activate('hf_test', d, { rev = 1 })
             assertFalse(ok, 'not switched on while tested')
@@ -211,7 +212,7 @@ RegisterTestModule({
             assertEqual(gave, 2, 'two given')
             assertNil(why, 'no reason on success')
             local realGive = Inventory.give
-            Inventory.give = function() return nil, 'full' end
+            rawset(Inventory, 'give', function() return nil, 'full' end)
             gave, why = DirectorEffects.give(run, 'n', 1, 'food', 2)
             Inventory.give = realGive
             assertEqual(gave, 0, 'none given')
@@ -219,10 +220,10 @@ RegisterTestModule({
         end },
         { name = 'the login sweep takes back a stamp whose run is over (it was a nil call)', fn = function()
             local realCopy, realFind, realTakeAt = Inventory.pocketsCopy, Inventory.findAll, Stores.takeAt
-            Inventory.pocketsCopy = function() return { player = { { item = 'food', amount = 1, metadata = { director = 999 } } } } end
-            Inventory.findAll = function() return { { addr = { kind = 'player', id = 1, sub = 'player', slot = 1 }, amount = 1, metadata = { director = 999 } } } end
+            rawset(Inventory, 'pocketsCopy', function() return { player = { { item = 'food', amount = 1, metadata = { director = 999 } } } } end)
+            rawset(Inventory, 'findAll', function() return { { addr = { kind = 'player', id = 1, sub = 'player', slot = 1 }, amount = 1, metadata = { director = 999 } } } end)
             local taken = 0
-            Stores.takeAt = function() taken = taken + 1 return true end
+            rawset(Stores, 'takeAt', function() taken = taken + 1 return true end)
             local names = DirectorEffects.takeBackStale(1)
             Inventory.pocketsCopy, Inventory.findAll, Stores.takeAt = realCopy, realFind, realTakeAt
             assertEqual(taken, 1, 'taken')
@@ -237,7 +238,7 @@ RegisterTestModule({
         { name = 'a calmed guard can be set on the players again, its vision calm', fn = function()
             local calmed = {}
             local realCalm = Vision.calm
-            Vision.calm = function(w) calmed[#calmed + 1] = w return true end
+            rawset(Vision, 'calm', function(w) calmed[#calmed + 1] = w return true end)
             local run = { alertedNpcs = { [5] = true, [6] = true }, guards = { [5] = { watch = 'w5' } } }
             DirectorGuards.calmed(run, { 5 })
             Vision.calm = realCalm
@@ -247,13 +248,13 @@ RegisterTestModule({
         end },
         { name = 'Bring Item To: looked for each second, one take at a time; a missed take looks again', fn = function()
             local realCarried, realTake = Director.carried, Inventory.take
-            Director.carried = function(_, item) return item == 'food' and 1 or 0 end
+            rawset(Director, 'carried', function(_, item) return item == 'food' and 1 or 0 end)
             local takes, answers = 0, { false, true }
-            Inventory.take = function()
+            rawset(Inventory, 'take', function()
                 takes = takes + 1
                 Wait(2500)
                 return answers[takes]
-            end
+            end)
             local run = start('hf_bring', doc({ n('s', 'scenario.started', {}, 1),
                 n('b', 'goal.bring', { item = 'food', count = 1, at = 'g1', radius = 3, mark = false }, 1), n('w', 'scenario.succeed', {}, 1) },
                 { l('a', 's', 'out', 'b'), l('c', 'b', 'done', 'w') }))
@@ -277,12 +278,12 @@ RegisterTestModule({
             V.__index = V
             V.__sub = function(a, b) return setmetatable({ x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }, V) end
             V.__len = function(a) return math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) end
-            vector3 = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, V) end
-            GetEntityCoords = function() return vector3(0.0, 0.0, 0.0) end
-            DirectorTasks.propSlot = function() return 'set1', 1 end
-            PropSets.wireOf = function() return 'wire1' end
+            rawset(_G, 'vector3', function(x, y, z) return setmetatable({ x = x, y = y, z = z }, V) end)
+            rawset(_G, 'GetEntityCoords', function() return vector3(0.0, 0.0, 0.0) end)
+            rawset(DirectorTasks, 'propSlot', function() return 'set1', 1 end)
+            rawset(PropSets, 'wireOf', function() return 'wire1' end)
             local token
-            TriggerClientEvent = function(name, _, f) if name == 'whip_core:client:directorFire' then token = f.token end end
+            rawset(_G, 'TriggerClientEvent', function(name, _, f) if name == 'whip_core:client:directorFire' then token = f.token end end)
             local world = {}
             for i, w in ipairs(WORLD) do world[i] = w end
             world[#world + 1] = { id = 'gun', kind = 'prop', layer = 'run', label = 'gun',
@@ -355,9 +356,9 @@ RegisterTestModule({
                           coords = { x = 10.0, y = 0.0, z = 30.55, heading = 90.0, ground = 30.0 },
                           lifts = { blista = 0.55, boxville = 1.21, trailers = 1.9 } }
             for model, lift in pairs(def.lifts) do
-                local at = DirectorNodes.carAt(def, model)
-                assertTrue(math.abs(at.z - (30.0 + lift)) < 1e-6, model .. ' at its own height over the ground: ' .. at.z)
-                assertEqual(at.x, 10.0, model .. ' x as placed')
+                local where = DirectorNodes.carAt(def, model) --[[@as vector3]]
+                assertTrue(math.abs(where.z - (30.0 + lift)) < 1e-6, model .. ' at its own height over the ground: ' .. where.z)
+                assertEqual(where.x, 10.0, model .. ' x as placed')
             end
             assertEqual(DirectorNodes.carAt(def, 'adder').z, 30.55, 'a model with no height: where it was placed')
             local old = { model = 'blista', coords = { x = 1.0, y = 2.0, z = 3.0, heading = 0.0 } }
@@ -367,10 +368,10 @@ RegisterTestModule({
             -- Through Spawn Car: the model the pool picked, made at its height
             local realSpawn = Vehicles.spawnTempFor
             local made = {}
-            Vehicles.spawnTempFor = function(model, at, ...)
-                made[#made + 1] = { model = model, z = at.z }
-                return realSpawn(model, at, ...)
-            end
+            rawset(Vehicles, 'spawnTempFor', function(model, where, ...)
+                made[#made + 1] = { model = model, z = where.z }
+                return realSpawn(model, where, ...)
+            end)
             local world = {}
             for i, w in ipairs(WORLD) do world[i] = w end
             world[#world + 1] = { id = 'pool', kind = 'vehicle', layer = 'run', label = 'pool', def = def }
@@ -390,7 +391,7 @@ RegisterTestModule({
         end },
         { name = 'TestDirectorCard: the answer comes as its run ends', fn = function()
             local realCall, realCaller = Actions.call, CALLER
-            Actions.call = function(_, fn, ...) return pcall(fn, ...) end
+            rawset(Actions, 'call', function(_, fn, ...) return pcall(fn, ...) end)
             CALLER = 'hf_sat'
             local ok, why = HARNESS_EXPORTS.RegisterDirectorCard('hfsat.ping', { title = 'Ping', outputs = { 'pong' }, v = 1, __whipCard = 1 },
                 function(op) if op == 'run' then return { pin = 'pong', data = { n = 4 } } end return {} end)

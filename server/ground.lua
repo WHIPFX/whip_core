@@ -91,11 +91,13 @@ function GroundItems.getItemsInCells(cellKeys)
 end
 
 --- Injectable broadcast for item creation (overridden in events_inventory.lua for proximity sync).
+---@diagnostic disable-next-line: duplicate-set-field -- the default; events_inventory.lua replaces it
 GroundItems.broadcastCreate = function(data)
     TriggerClientEvent('whip_core:client:groundItemCreated', -1, data)
 end
 
 --- Injectable broadcast for an amount change (overridden in events_inventory.lua, the same way).
+---@diagnostic disable-next-line: duplicate-set-field -- the default; events_inventory.lua replaces it
 GroundItems.broadcastUpdate = function(data)
     TriggerClientEvent('whip_core:client:groundItemUpdated', -1, data.id, data.amount)
 end
@@ -206,7 +208,7 @@ end
 --- at the call site into silent item loss.
 ---@param item string
 ---@param amount number
----@param metaOrCoords table|vector3  metadata, or coords in the second form
+---@param metaOrCoords table|vector3|nil  metadata, or coords in the second form
 ---@param xOrMeta number|table|nil     x, or metadata in the second form
 ---@param placed boolean|table|nil     POSITIONAL FORM ONLY: truthy = exact placement (placing
 ---                                    mode) — the client renderer trusts the stored z/heading
@@ -242,6 +244,7 @@ function GroundItems.create(item, amount, metaOrCoords, xOrMeta, y, z, heading, 
         heading   = tonumber(y) or 0.0
         createdBy = z
         placed    = nil
+        ---@cast metaOrCoords -nil
         x, y, z   = metaOrCoords.x, metaOrCoords.y, metaOrCoords.z
     else
         metadata = metaOrCoords
@@ -310,7 +313,7 @@ function GroundItems.create(item, amount, metaOrCoords, xOrMeta, y, z, heading, 
 
     GroundItems.cache[insertId] = data
     GroundItems.gridInsert(insertId, x, y)
-    if data.flight then
+    if data.flight and flight then
         GroundItems._flights[insertId] = { netId = data.flight, owner = flight.owner, launchedAt = GetGameTimer() }
     end
 
@@ -865,7 +868,7 @@ exports('GetGroundItemsNearby', function(x, y, z, range)
 end)
 
 --- One ground item by its id, or nil.
----@param id number
+---@param id number|nil
 ---@return table|nil row
 exports('GetGroundItem', function(id)
     id = Sanitize.id(id)

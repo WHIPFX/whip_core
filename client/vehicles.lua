@@ -176,7 +176,7 @@ end
 
 --- Set the engine and driveable state, skipping natives that would change nothing. The only writer,
 --- so `_ignitionAsserted` stays true to the car.
----@param veh number
+---@param veh number|nil
 ---@param engine boolean
 ---@param undriveable boolean
 local function SetIgnitionState(veh, engine, undriveable)
@@ -479,7 +479,7 @@ local function AssertIgnition(veh, vId)
         engineOn = false
         SetIgnitionState(veh, false, false)
         ReportEngine(false)
-        local why = EngineHold(veh)
+        local why = EngineHold(veh) --[[@as string]]   -- the elseif just found it
         if holdNotified ~= why then
             holdNotified = why
             UI.Notify(why, 'error')
@@ -590,8 +590,8 @@ local function SendVehicleHud(carry)
 
             -- A local reading, only for a stat the car carries: a provider changes the number, never whether there is a dial.
             if stored ~= nil then
-                local live = readVehicleStatDisplay(def.name, currentVehicle, v)
-                if live ~= nil then v = live end
+                local reading = readVehicleStatDisplay(def.name, currentVehicle, v)
+                if reading ~= nil then v = reading end
             end
         end
 
@@ -744,7 +744,7 @@ exports('SetVehicleStatDisplay', function(name, fn)
         return false, 'SetVehicleStatDisplay: a stat name and a provider are required'
     end
     local ok, why = _statDisplays:add(owner, name, { fn = fn })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     return true
 end)
 
@@ -772,7 +772,7 @@ exports('SetVehicleStatShown', function(name, fn)
         return false, 'SetVehicleStatShown: a stat name and a rule are required'
     end
     local ok, why = _statShowns:add(owner, name, { fn = fn })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     refreshVehicleHud()
     return true
 end)
@@ -802,7 +802,7 @@ exports('SetVehicleStatIcon', function(name, fn)
         return false, 'SetVehicleStatIcon: a stat name and a rule are required'
     end
     local ok, why = _statIcons:add(owner, name, { fn = fn })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end   -- a refusal's reason
     refreshVehicleHud()
     return true
 end)
@@ -889,7 +889,7 @@ end
 
 -- The push half: a recycled entity handle gets the new car's id here. A bag arriving before its handle is read
 -- lazily by Vehicles.idByEntity.
-AddStateBagChangeHandler(VEHICLE_STATE_KEY, nil, function(bagName, _key, value)
+AddStateBagChangeHandler(VEHICLE_STATE_KEY, nil, function(bagName, _, value)
     local entity = GetEntityFromStateBagName(bagName)
     if not entity or entity == 0 then return end
     _vehicleIdByEntity[entity] = (type(value) == 'number') and value or false
@@ -1036,7 +1036,7 @@ end
 
 --- Takes network control of a vehicle, up to `attempts` times (mod, paint and repair natives do nothing without
 --- it). Never from another player at the wheel: it makes their car rubber-band. Waits, so call it from a thread.
----@param entity number
+---@param entity number|nil
 ---@param opts table|nil  { attempts = 3, wait = 500 } — tries, and ms per try
 ---@return boolean ok, string|nil why
 function Vehicles.takeControl(entity, opts)
@@ -1751,7 +1751,7 @@ end
 --- Releasing reports the car immediately. Always release: a hold left set stops the car's appearance being stored.
 --- A stopping holder is released automatically. Answers (false, reason) when another resource holds the car or the
 --- release is not yours; releasing a car nobody holds answers true.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil  a vehicleId or a vehicle reference
 ---@param held boolean
 ---@return boolean ok
 ---@return string|nil reason
@@ -1762,7 +1762,7 @@ exports('HoldVehicleAppearance', function(vehicleId, held)
 
     if held then
         local ok, why = _appearanceHolds:add(owner, vehicleId, true)
-        if not ok then return false, why end
+        if not ok then return false, why --[[@as string]] end   -- a refusal's reason
         return true
     end
 
@@ -2031,6 +2031,7 @@ end
 --- Tell this client's resources, and the server, that we are now in `seat` of the current car. Both sides'
 --- `whip_core:vehicle:entered` carry the seat (driver is -1). The server is told once the car's id is known.
 local function announceSeat(seat)
+    ---@cast currentVehicle -nil   -- said only from the seat tick, in a car
     currentSeat = seat
     WhipEmit('whip_core:vehicle:entered', {
         vehicleId = currentVehicleId,
@@ -2213,7 +2214,7 @@ CreateThread(function()
                 or optimisticStorageType == 'glovebox'
             -- Not for the dead (F2 is blocked, so they could not close it), a bicycle, or a car whose glovebox is off (hasStorage).
             local wantGlovebox = inVehicle and not PlayerIsDead and not isBicycle(currentVehicle)
-                and hasStorage(currentVehicle, 'glovebox')
+                and hasStorage(currentVehicle --[[@as number]], 'glovebox')   -- in a car: set on entry
 
             if wantGlovebox and not haveGlovebox then
                 if not swapPending and not swapDenied and not vehicleStoragePending
@@ -2619,6 +2620,7 @@ end
 ---@param entity number
 ---@param kind 'trunk'|'glovebox'
 ---@return boolean
+---@diagnostic disable-next-line: duplicate-set-field -- the server's Vehicles is a different table
 function Vehicles.hasStorage(entity, kind)
     if not entity or entity == 0 or not DoesEntityExist(entity) then return false end
     return hasStorage(entity, kind)
@@ -2640,6 +2642,7 @@ function Vehicles.openTrunk(entity)
         trunkDoorEntity = entity
     end
     -- Resolve vehicleId (registers NPC vehicle if needed)
+    ---@type number|false|nil, string|nil
     local vId, why = Vehicles.idByEntity(entity), nil
     if not vId then
         vId, why = Vehicles.resolve(entity)
@@ -2708,6 +2711,7 @@ end
 --- Is this vehicle locked, by GTA's reckoning (2 is locked)? Answers for any car.
 ---@param entity number
 ---@return boolean
+---@diagnostic disable-next-line: duplicate-set-field -- the server's Vehicles is a different table
 function Vehicles.isLocked(entity)
     if not entity or entity == 0 or not DoesEntityExist(entity) then return false end
     return GetVehicleDoorLockStatus(entity) == 2
@@ -2725,6 +2729,7 @@ end
 --- Does the player hold a key for this vehicle?
 ---@param entity number
 ---@return boolean
+---@diagnostic disable-next-line: duplicate-set-field -- the server's Vehicles is a different table
 function Vehicles.playerHasKey(entity)
     if not entity or entity == 0 or not DoesEntityExist(entity) then return false end
     local vId = Vehicles.idByEntity(entity)
@@ -2755,6 +2760,7 @@ end
 function Vehicles.startLockpick(entity)
     if not DoesEntityExist(entity) then return end
     -- Resolved here, unlike the lock toggle: an unknown NPC vehicle is the expected case.
+    ---@type number|false|nil, string|nil
     local vId, why = Vehicles.idByEntity(entity), nil
     if not vId then
         vId, why = Vehicles.resolve(entity)
@@ -2954,7 +2960,7 @@ end
 
 --- Everything this client knows about a vehicle: the client half of the server's GetVehicle, same shape but
 --- less data (no owner name, no stored row). Takes a vehicleId or a vehicle reference.
----@param vehicleId number|table
+---@param vehicleId number|table|nil
 ---@return table|nil
 exports('GetVehicle', function(vehicleId)
     vehicleId = vehicleRefId(vehicleId)

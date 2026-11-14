@@ -27,10 +27,6 @@ local spots = {}          -- [spotId] = spot record from the server
 local prompts = {}        -- [spotId] = interaction id
 local expanded = {}       -- [spotId] = true while showing the vehicle list
 
--- [spotId] = rows last sent for it. Kept only while expanded; the retrieve callback reads it to
--- turn the selected index back into a vehicle.
-local spotRows = {}
-
 --- How close a vehicle has to be to count as parked in a bay.
 local function spotRadius()
     return Config.GarageSpotRadius or 3.5
@@ -167,7 +163,7 @@ end)
 ---
 --- Only bays this player may use (GarageUsable): a car sitting in somebody's private garage is not
 --- in a bay as far as this player is concerned, so it offers no Store and draws no outline.
----@param veh number
+---@param veh number|nil
 ---@return table|nil spot
 function GarageSpotForVehicle(veh)
     if not veh or veh == 0 or not DoesEntityExist(veh) then return nil end
@@ -250,7 +246,6 @@ end
 function collapse(spotId)
     if not expanded[spotId] then return end
     expanded[spotId] = nil
-    spotRows[spotId] = nil
 
     local id = prompts[spotId]
     local spot = spots[spotId]
@@ -269,7 +264,6 @@ local function removeSpotPrompt(spotId)
     if Interactions then Interactions.remove(id) end
     prompts[spotId] = nil
     expanded[spotId] = nil
-    spotRows[spotId] = nil
     -- Cleared here too: the sweep only revisits spots that still exist.
     occupied[spotId] = nil
     takenByMine[spotId] = nil
@@ -450,7 +444,7 @@ end
 ---
 --- Arrives as an event, so `expanded` is set on the keypress and checked here: the player may have
 --- walked away meanwhile.
-RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, garageKey, rows)
+RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, _, rows)
     if not expanded[spotId] then return end
 
     local spot = spots[spotId]
@@ -458,7 +452,6 @@ RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, garageKey, 
     if not spot or not id then return end
 
     rows = rows or {}
-    spotRows[spotId] = rows
 
     if #rows == 0 then
         -- Not silence, and not an empty list: say there is nothing in the garage.

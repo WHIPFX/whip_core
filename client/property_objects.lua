@@ -738,7 +738,7 @@ end)
 -- The hooks client/properties.lua calls
 -- ============================================
 
-function PropertyStreamedIn(propertyId) refreshRooms() end
+function PropertyStreamedIn(_) refreshRooms() end
 
 -- Walking in or out (client/properties.lua): chosen again at once, not at the next pass. (Coming
 -- within Config.PropertyFurnitureDistance of a property is noticed by the once-a-second pass.)
@@ -825,13 +825,13 @@ function PropertyResumeFurniture(propertyId)
 end
 
 --- A room's furniture in WORLD space, fetched now if it is not cached. Blocks; call from a thread.
----@return table[] rows  { id, model, x, y, z, rx, ry, rz }
+--- The rows: { id, model, x, y, z, rx, ry, rz }.
 ---
 --- `fresh` (the furnisher): ask the server whatever the cache holds, and answer `rows, version` — or
 --- NIL when it did not answer. An editor must never open on a room it failed to read: it would look
 --- empty, and its first Save would delete the real furniture.
 ---@param fresh boolean|nil
----@return table|nil rows
+---@return table[]|nil rows
 ---@return number|nil version
 ---@return string|nil why  with nil rows: the server's reason when it refused (nothing when it did not answer)
 function GetPropertyFurnitureRows(propertyId, fresh)

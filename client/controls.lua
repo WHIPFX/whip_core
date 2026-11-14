@@ -80,10 +80,10 @@ local function normalise(spec, allowEmpty)
     end
     local except = {}
     if spec.all == true then
-        local why
-        except, why = controlIds(spec.except)
-        if not except then return nil, why end
-        table.sort(except)
+        local ids, why = controlIds(spec.except)
+        if not ids then return nil, why end
+        table.sort(ids)
+        except = ids
     end
     local controls, switches, names, seen = {}, {}, {}, {}
     local switched = {}
@@ -328,7 +328,7 @@ exports('BlockControls', function(id, spec)
     local value, why = normalise(spec)
     if not value then return false, why end
     local ok, reason = registry:add(owner, id, value)
-    if not ok then return false, reason end
+    if not ok then return false, reason --[[@as string]] end
     return true
 end)
 
@@ -351,7 +351,7 @@ end)
 ---@param id string
 ---@param spec table  as BlockControls; may be empty when `frame` does the work
 ---@param frame function|nil
----@return boolean ok, string|nil why
+---@return boolean ok, string|number|nil why  why not; when held, the block's key (Reg:add's answer)
 function ControlBlocks.hold(id, spec, frame)
     local value, why = normalise(spec, frame ~= nil)
     if not value then return false, why end

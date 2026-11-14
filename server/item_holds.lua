@@ -68,7 +68,7 @@ local function round(v) return math.floor(v * 10000 + 0.5) / 10000 end
 
 SecureCallback('whip_core:itemHolds:get', {
     ace = DEVTOOLS, rateLimit = 500, burst = 4, params = { { 'item', 'key', 64 } },
-}, function(source, player, item)
+}, function(_, _, item)
     if not Config.Items[item] then return false, 'There is no item called ' .. item end
     local h = holds[item] or {}
     return { right = h.right or false, left = h.left or false, walk = Config.Items[item].playerWalk == true,
@@ -87,7 +87,7 @@ end
 --- The item's "Allow player walk animation" (its playerWalk setting), from the editor.
 SecureCallback('whip_core:itemHolds:walk', {
     ace = DEVTOOLS, rateLimit = 1000, burst = 3, params = { { 'item', 'key', 64 }, { 'on', 'bool' } },
-}, function(source, player, item, on)
+}, function(source, _, item, on)
     if not Config.Items[item] then return false, 'There is no item called ' .. item end
     local ok, why = changeItemSetting(source, item, 'playerWalk', on)
     if not ok then return false, why or 'It was not saved' end
@@ -97,7 +97,7 @@ end)
 --- Whether the item is picked up with both hands (its grab setting, '2h' or '1h'), from the editor.
 SecureCallback('whip_core:itemHolds:grab', {
     ace = DEVTOOLS, rateLimit = 1000, burst = 3, params = { { 'item', 'key', 64 }, { 'twoHands', 'bool' } },
-}, function(source, player, item, twoHands)
+}, function(source, _, item, twoHands)
     if not Config.Items[item] then return false, 'There is no item called ' .. item end
     local ok, why = changeItemSetting(source, item, 'grab', twoHands and '2h' or '1h')
     if not ok then return false, why or 'It was not saved' end
@@ -108,7 +108,7 @@ end)
 --- a hand position of its own.
 SecureCallback('whip_core:itemHolds:list', {
     ace = DEVTOOLS, rateLimit = 2000, burst = 2,
-}, function(source, player)
+}, function()
     local out = {}
     for key, def in pairs(Config.Items) do
         out[#out + 1] = {
@@ -128,7 +128,7 @@ SecureCallback('whip_core:itemHolds:save', {
         { 'oz', 'number', -MAX_OFFSET, MAX_OFFSET },
         { 'rx', 'number', -360.0, 360.0 }, { 'ry', 'number', -360.0, 360.0 }, { 'rz', 'number', -360.0, 360.0 },
     },
-}, function(source, player, item, hand, ox, oy, oz, rx, ry, rz)
+}, function(source, _, item, hand, ox, oy, oz, rx, ry, rz)
     if not Settings.mayEdit(source) then return false, 'Only a permanent admin can change how items are held' end
     if not Config.Items[item] then return false, 'There is no item called ' .. item end
     return ItemHolds.store(item, hand, ox, oy, oz, rx, ry, rz, GetPlayerName(source))

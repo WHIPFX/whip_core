@@ -1,3 +1,4 @@
+---@meta
 -- ============================================
 -- whip_core — LuaLS Type Definitions
 -- Shared class/structure definitions used by
@@ -68,19 +69,25 @@ function WhipPlayer:getMetadata(key) end
 
 ---@param key string Metadata key
 ---@param value any Value to set
+---@return boolean ok
+---@return string|nil err
 function WhipPlayer:setMetadata(key, value) end
 
 ---@return vector4
 function WhipPlayer:getCoords() end
 
 --- Save character data (position, vitals, metadata) to DB.
-function WhipPlayer:save() end
+---@param teardown? boolean The last save of this character's session (disconnect, logout)
+---@param seatNoted? boolean A teardown save after the first: the seat is not noted again
+---@return boolean ok
+function WhipPlayer:save(teardown, seatNoted) end
 
 ---@param reason string Kick reason shown to player
 function WhipPlayer:kick(reason) end
 
 --- Log the player out (return to character select).
-function WhipPlayer:logout() end
+---@param invoker? string The resource that asked (LogoutPlayer passes it)
+function WhipPlayer:logout(invoker) end
 
 ---@return table Serialized player data for client
 function WhipPlayer:serialize() end
@@ -90,13 +97,17 @@ function WhipPlayer:getCash() end
 
 ---@param amount number Amount to add
 ---@param why? string Reason shown in the activity log, e.g. 'ATM withdrawal'
+---@param withNext? boolean|'quiet' whip_core only: saved with the bank write that follows
 ---@return boolean success
-function WhipPlayer:addCash(amount, why) end
+---@return string|nil err Why not
+function WhipPlayer:addCash(amount, why, withNext) end
 
 ---@param amount number Amount to remove
 ---@param why? string Reason shown in the activity log, e.g. 'ATM deposit'
+---@param withNext? boolean|'quiet' whip_core only: saved with the bank write that follows
 ---@return boolean success
-function WhipPlayer:removeCash(amount, why) end
+---@return string|nil err Why not
+function WhipPlayer:removeCash(amount, why, withNext) end
 
 -- ============================================
 -- Inventory
@@ -138,6 +149,7 @@ function WhipPlayer:removeCash(amount, why) end
 ---@field grab '1h'|'2h'|nil How it is picked up off the ground: one hand (the default) or both (a rifle, a duffel bag); also on /whip → Items
 ---@field playerWalk boolean|nil Held out to give or throw, the player keeps their own walk instead of the give walk (default false); also on /whip → Items and in the hand position editor
 ---@field metaFields table[]|nil Array of { key, label, format?, value? } for tooltip display; `value` is shown when the item's metadata has no `key`
+---@field fuelCapacity number|nil Makes it a fuel can (read by whip_fuel): how much of a car's tank (100) a full one holds; metadata `fuel` is how full it is, 0-100
 ---@field defaultAction string|nil Context menu default action key
 ---@field contextOptions table[]|nil Right-click options, { action, label, order?, when?, whyNot?, require?, anywhere? }: at the top of the menu under Use, lowest `order` first (none: as listed, after those with one); Give, Place, Split and Destroy below. `when` tests the item's metadata (a test's `default` stands in for a missing field), `whyNot` is said when it fails, `require` tests the player (AddAction's words), `anywhere = true` offers it in a boot, stash or bag too (the handler gets that store's address): server/item_options.lua
 ---@field groundOptions table[]|nil On the ground, after Pick up, { action, label, icon? } (3 at most): `action` is one of the item's own options (contextOptions or defaultAction). Chosen, the item is picked up as Pick up does and, once it is in the pockets, that option runs on the slot it landed in. The prompt says label then the item's name ("Equip Pump Shotgun"); icon is a glyph name: server/item_options.lua
@@ -409,7 +421,7 @@ function WhipPlayer:removeCash(amount, why) end
 -- ============================================
 
 ---@class WhipVehicleStatHudConfig
----@field icon string SVG path data for the gauge icon
+---@field icon string|nil SVG path data for the gauge icon; leave it out for one the dial draws itself (fuel, boost, nitro)
 ---@field iconCritical string|nil Alternate icon shown when the stat is nearly empty; extra paths separated with `|`
 ---@field color string Hex colour, e.g. '#f59e0b'
 ---@field order number|nil Left-to-right position in the vehicle panel (default 99)
@@ -423,7 +435,7 @@ function WhipPlayer:removeCash(amount, why) end
 ---@field default number|nil What a vehicle starts on (default 0)
 ---@field min number|nil Lowest value (default 0)
 ---@field max number|nil Highest value (default 100)
----@field persist boolean|nil Save it with the vehicle (default true)
+---@field persist boolean|'presence'|nil Save it with the vehicle (default true); 'presence': only that the car has it, written when it appears and when it goes, coming back at its default
 ---@field decay number|nil Points changed every decayInterval seconds; negative drains. OMIT to disable — 0 does not disable it
 ---@field decayInterval number|nil Seconds between decay ticks (default 10)
 ---@field hud WhipVehicleStatHudConfig|nil Draw a gauge in the vehicle panel and a meter on its garage card
@@ -544,7 +556,7 @@ function WhipPlayer:removeCash(amount, why) end
 
 ---@class WhipSecureNear
 ---@field at (fun(source: number, player: table, ...: any): number|vector3|table|nil, number?, number?)|vector3|table|'vehicle' A function answering x, y, z (or a vector3 / {x,y,z}); a fixed vector3 or {x,y,z}; or 'vehicle' — the car named by the schema's 'vehicle' param (seated in it counts as near). NO position REFUSES the call
----@field range number|nil Metres (default 5.0)
+---@field range number|(fun(): number)|nil Metres (default 5.0), or a function answering them at each call (a range that follows a setting)
 ---@field message string|false|nil What the player is told when too far (default 'Too far away'); false says nothing
 ---@field allowUnknown boolean|nil Let a call through when `at` finds no position — for a handler that reports an unknown id itself
 

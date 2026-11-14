@@ -50,6 +50,7 @@ end
 
 --- Where the gun points: the middle, or the spot on a wall right in front of the muzzle that the camera sees past.
 local function muzzlePoint(ped)
+    ---@diagnostic disable-next-line: redundant-parameter -- p1, NativeDB's 2nd: not in the natives' docs
     local gun = GetCurrentPedWeaponEntityIndex(ped, 0)
     if not gun or gun == 0 then return 0.5, 0.5, false end
     if gun ~= gunEntity then

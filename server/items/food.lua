@@ -21,6 +21,6 @@
 
 local CORE = GetCurrentResourceName()
 
-Inventory.registerUseHandler('food', function(source, player, slotData)
+Inventory.registerUseHandler('food', function(source)
     return Stats.add(source, 'hunger', 25, 'item:food')
 end, CORE)

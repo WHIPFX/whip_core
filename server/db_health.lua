@@ -162,7 +162,7 @@ function DbHealth.waitForDatabase()
 
     local okV, v = pcall(MySQL.scalar.await, 'SELECT VERSION()')
     local kind, ver = readVersion(okV and v or '')
-    DbHealth.server = { text = okV and tostring(v) or '?', kind = kind, problem = kind and tooOld(kind, ver) or nil }
+    DbHealth.server = { text = okV and tostring(v) or '?', kind = kind, problem = kind and ver and tooOld(kind, ver) or nil }
     if DbHealth.server.problem then print(('^1[whip_core:db] %s.^0'):format(DbHealth.server.problem)) end
     DbHealth.started = true
     return true

@@ -84,7 +84,7 @@ local optionsOf = {}   -- [model] = { c, p } once read
 --- parts with more than one look (a prop: any, since none is one). Read off a ped of that model made here for it,
 --- unseen and gone at once; kept for the model. WAITS (it loads the model): call from a thread. nil and why when it
 --- will not load.
----@param model string
+---@param model string|nil
 ---@return table|nil options
 ---@return string|nil why
 function PedOutfit.options(model)

@@ -351,7 +351,7 @@ end
 
 --- What whip itself knows about this entity, if anything (a car is said in Source).
 ---@return string|nil
-local function WhipInfo(entity, kind)
+local function WhipInfo(entity)
     local ok, door = pcall(GetDoorByEntity, entity)
     if ok and type(door) == 'table' and door.doorId then
         return ('Door #%s (%s)'):format(door.doorId, door.locked and 'locked' or 'unlocked')
@@ -412,7 +412,7 @@ local function BuildRows(entity, kind)
         { k = 'Source',   v = EntityOrigin(entity, kind) },
     }
 
-    local whip = WhipInfo(entity, kind)
+    local whip = WhipInfo(entity)
     if whip then
         rows[#rows + 1] = { k = 'Whip', v = whip }
     end

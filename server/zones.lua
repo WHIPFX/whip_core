@@ -213,6 +213,7 @@ end
 ---@param id string
 ---@param reporter number|nil
 ---@return boolean removed  true if the zone itself was deleted
+---@diagnostic disable-next-line: duplicate-set-field -- the client's Zones is a different table
 function Zones.remove(id, reporter)
     local existing = serverZones[id]
     if not existing then return false end
@@ -354,7 +355,7 @@ function Zones.getVehiclesInZone(id)
     local zone = resolve(id)
     if not zone then return {} end
     local result = {}
-    local allVehicles = GetAllVehicles()
+    local allVehicles = GetAllVehicles() --[[@as integer[] ]]   -- the server native: a list
     for _, entity in ipairs(allVehicles) do
         local pos = GetEntityCoords(entity)
         if safeContains(zone, pos.x, pos.y, pos.z) then
@@ -747,7 +748,7 @@ function Zones.ensureZone(key, data, caller)
             return false, ('zone "%s" is declared by %s'):format(key, by)
         end
         -- The same declaration as last time: an admin's edits since then stand.
-        if by == caller and Registry.deepEquals(ens.decl, d) then return existing end
+        if by == caller and type(ens) == 'table' and Registry.deepEquals(ens.decl, d) then return existing end
 
         if existing.type == d.type then
             local fields = zoneFields(key, d)
@@ -954,7 +955,7 @@ SecureEvent('whip_core:server:zoneRegistered', {
         {'id', 'key', 60},
         {'data', 'any'},
     },
-}, function(source, player, id, data)
+}, function(source, _, id, data)
     if type(data) ~= 'table' then return end
 
     -- Not a database zone's id: those are the server's own ('dbzone_<n>'), and clients never report
@@ -988,7 +989,7 @@ SecureEvent('whip_core:server:zoneRemoved', {
     burst     = 100,
     requirePlayer = false,
     params = { {'id', 'key', 60} },
-}, function(source, player, id)
+}, function(source, _, id)
     -- Drops only THIS player's report. The zone stays while any other player still has it, and
     -- server-registered zones are untouchable. Nothing is broadcast: one client tidying up its
     -- local mirror must not tell everyone else to delete the zone.
@@ -1019,7 +1020,7 @@ SecureEvent('whip_core:server:zeUpdateZone', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'id', 'key', 60}, {'updates', 'any'} },
-}, function(source, player, id, updates)
+}, function(_, _, id, updates)
     if type(updates) ~= 'table' then return end
     -- `clear`: editable fields to take off (the /whip Zones wizard's "no group any more").
     -- A nil sent from the page arrives as no key at all, so it cannot say that on its own.
@@ -1065,7 +1066,7 @@ SecureEvent('whip_core:server:zeDeleteZone', {
     ace = 'whip.devtools',
     rateLimit = 250,
     params = { {'id', 'key', 60} },
-}, function(source, player, id)
+}, function(source, _, id)
     local ok, err = Zones.deleteFromDb(id)
     if not ok then return false, err or 'Zone not deleted' end   -- shown and recorded
     TriggerClientEvent('whip_core:client:zoneDbDeleted', -1, id)
@@ -1192,7 +1193,7 @@ SecureCallback('whip_core:checkAcePermission', {
     rateLimit = 250,
     burst     = 4,
     params    = { {'aceName', 'string', 64} },
-}, function(source, player, aceName)
+}, function(source, _, aceName)
     -- whip.devtools is answered with developer mode (DevTools.hasAce): an admin who has not turned it on
     -- is treated as not holding it — the F1 wheel's admin actions, an admin-only zone.
     return DevTools.hasAce(source, aceName)
@@ -1210,7 +1211,7 @@ SecureCallback('whip_core:getCharName', {
     burst     = 16,
     -- 'id' rather than 'int': the int type CLAMPS, and an id is an address. 'id' rejects instead.
     params    = { {'targetSource', 'id'} },
-}, function(source, player, targetSource)
+}, function(_, _, targetSource)
     local target = Players[targetSource]
     -- `false, why`, whip's refusal
     if not target or not target.fullName then return false, 'No character loaded for that player' end

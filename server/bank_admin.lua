@@ -491,7 +491,7 @@ end
 --- How many, and what came in and went out by day over the last CHART_DAYS. Between the holder's own accounts is
 --- neither.
 local function activityOf(ids)
-    local stamp = os.date('*t')
+    local stamp = os.date('*t') --[[@as osdate]]
     stamp.hour, stamp.min, stamp.sec = 0, 0, 0
     local since = os.time(stamp) - (CHART_DAYS - 1) * 86400
     local out = { count = 0, moneyIn = 0, moneyOut = 0, since = since, days = CHART_DAYS, series = {} }
@@ -603,7 +603,7 @@ SecureCallback('whip_core:bank:dashboard', {
     -- Burst room: a refused read would leave the previous holder's page on screen beside the new row.
     ace = ACE, rateLimit = 100, burst = 5,
     params = { {'kind', 'enum', KINDS}, {'id', 'key', 64}, {'charId', 'id', 0} },
-}, function(source, player, kind, id, charId)
+}, function(_, _, kind, id, charId)
     local scope, why = scopeOf(kind, id, charId)
     if not scope then return false, why end
     local worth, activity
@@ -649,7 +649,7 @@ SecureCallback('whip_core:bank:ledger', {
         {'kind', 'enum', { 'player', 'business', 'lore', 'other', 'account' }}, {'id', 'key', 64}, {'charId', 'id', 0},
         {'accountId', 'id', 0}, {'dir', 'enum', { 'all', 'in', 'out' }, 'all'}, {'beforeId', 'id', 0},
     },
-}, function(source, player, kind, id, charId, accountId, dir, beforeId)
+}, function(_, _, kind, id, charId, accountId, dir, beforeId)
     local ids
     if kind == 'account' then
         local only = Sanitize.id(id)
@@ -676,7 +676,7 @@ end)
 SecureCallback('whip_core:bank:cashLog', {
     ace = ACE, rateLimit = 100, burst = 5,
     params = { {'id', 'key', 64}, {'charId', 'id', 0}, {'beforeId', 'id', 0} },
-}, function(source, player, id, charId, beforeId)
+}, function(_, _, id, charId, beforeId)
     local scope, why = scopeOf('player', id, charId)
     if not scope then return false, why end
     return { rows = Log.cashRows(scope.charIds, beforeId, CASH_PAGE), page = CASH_PAGE }
@@ -685,7 +685,7 @@ end)
 SecureCallback('whip_core:bank:account', {
     ace = ACE, rateLimit = 100, burst = 5,
     params = { {'accountId', 'id'} },
-}, function(source, player, accountId)
+}, function(_, _, accountId)
     local a, why = accountById(accountId)
     if not a then return false, why end
     local lore = loreOfAccount(accountId)
@@ -740,7 +740,7 @@ SecureCallback('whip_core:bank:create', {
         {'accountType', 'enum', { 'personal', 'savings', 'shared', 'business' }, 'personal'},
         {'opening', 'int', 0, MAX_MONEY, 0}, {'reason', 'string', 120, ''},
     },
-}, function(source, player, kind, id, charId, label, accountType, opening, reason)
+}, function(_, player, kind, id, charId, label, accountType, opening, reason)
     label, reason = trim(label), trim(reason)
     if opening > 0 and reason == '' then return false, 'Say why this account starts with money: it goes on its statement' end
     if label == '' then label = accountType == 'savings' and 'Savings Account' or accountType == 'shared' and 'Shared Account' or '' end
@@ -770,7 +770,7 @@ SecureCallback('whip_core:bank:create', {
         end
 
     elseif kind == 'lore' then
-        local c = DirectorLore.get(id)
+        local c = DirectorLore.get(id) --[[@as table]]   -- scopeOf found it, and lore characters are never removed
         if c.accountId and Bank.GetAccount(c.accountId) then return false, 'A lore character has one account, and this one has it' end
         local accountId
         accountId, why = DirectorLore.account(id)
@@ -798,7 +798,7 @@ SecureCallback('whip_core:bank:change', {
     params = {
         {'accountId', 'id'}, {'what', 'enum', { 'label', 'type', 'owner', 'frozen', 'main' }}, {'value', 'string', 60, ''},
     },
-}, function(source, player, accountId, what, value)
+}, function(_, player, accountId, what, value)
     local a, why = accountById(accountId)
     if not a then return false, why end
     if a.closedAt then return false, 'That account is closed' end
@@ -850,7 +850,7 @@ SecureCallback('whip_core:bank:money', {
         {'accountId', 'id'}, {'way', 'enum', { 'add', 'take', 'move' }}, {'amount', 'amount', MAX_MONEY},
         {'reason', 'string', 120, ''}, {'to', 'string', 20, ''},
     },
-}, function(source, player, accountId, way, amount, reason, to)
+}, function(_, player, accountId, way, amount, reason, to)
     reason = trim(reason)
     if reason == '' then return false, 'Say why: it goes on the statement' end
     local a, why = accountById(accountId)
@@ -882,7 +882,7 @@ SecureCallback('whip_core:bank:close', {
         {'accountId', 'id'}, {'money', 'enum', { 'none', 'move', 'remove' }, 'none'},
         {'to', 'string', 20, ''}, {'reason', 'string', 120, ''},
     },
-}, function(source, player, accountId, moneyGoes, to, reason)
+}, function(_, player, accountId, moneyGoes, to, reason)
     reason = trim(reason)
     local a, why = accountById(accountId)
     if not a then return false, why end
@@ -928,7 +928,7 @@ SecureCallback('whip_core:bank:access', {
     params = {
         {'accountId', 'id'}, {'charId', 'id'}, {'role', 'enum', { 'view', 'deposit', 'withdraw', 'manager', 'none' }},
     },
-}, function(source, player, accountId, charId, role)
+}, function(_, player, accountId, charId, role)
     local a, why = accountById(accountId)
     if not a then return false, why end
     if a.closedAt then return false, 'That account is closed' end

@@ -388,12 +388,12 @@ local function frame()
             local lit = id == aimedId
             local c = lit and BLUE or AMBER
             DrawMarker(1, it.x, it.y, it.z - 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, w, w, h,
-                c[1], c[2], c[3], lit and 200 or 120, false, false, 2, false, nil, nil, false)
+                c[1], c[2], c[3], lit and 200 or 120, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             if lit then
                 -- A ring on the ground round the one you are looking at.
                 local r = math.max(0.9, w * 2.5)
                 DrawMarker(25, it.x, it.y, it.z + 0.02, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, r, r, r,
-                    BLUE[1], BLUE[2], BLUE[3], 220, false, false, 2, false, nil, nil, false)
+                    BLUE[1], BLUE[2], BLUE[3], 220, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
 
             -- The point of the view's line nearest the beam (in plan; straight down, nearest the pile),

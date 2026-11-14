@@ -76,6 +76,7 @@ end
 -- payload, which run before that section is compiled.
 local pages     = {}     -- [owner .. ':' .. id] = the page's registration
 local pageKeys  = {}     -- their keys in the order their rows are listed (by label)
+---@type table|nil
 local page      = nil    -- the page on screen: { key, list, title, crumb, view, backTo }; nil = the tool list
 local pageIndex = 1      -- the picked row on that page
 local lastPage  = nil    -- the page the menu was shut on with Esc: /w opens on it again
@@ -86,6 +87,7 @@ local debugSwitch = nil
 for _, t in ipairs(tools) do
     if t.debugSwitch then debugSwitch = t end
 end
+---@cast debugSwitch -nil   (the Debug row in the list above)
 local debugTools    = {}   -- [owner .. ':' .. id] = its row: { name, desc, active, debugTool = key, owner, onToggle }
 local debugToolKeys = {}   -- their keys, by label
 
@@ -484,6 +486,7 @@ end
 --- kept by its id (`keepId`); on a new view it is the row the page names (`select`), else the first that
 --- can be picked.
 local function buildPage(keepId)
+    ---@cast page -nil   (asked for only with a page open)
     local p = pages[page.key]
     local ok, res = callPage(p, 'rows')
     local title, back, rows, pick = p.label, nil, nil, nil
@@ -534,18 +537,18 @@ local function buildPage(keepId)
     page.view = view
 
     local want = sameView and keepId or pick
-    pageIndex = nil
+    local at = nil
     if want ~= nil then
         for i, row in ipairs(list) do
-            if row.rowId == want and selectable(row) then pageIndex = i break end
+            if row.rowId == want and selectable(row) then at = i break end
         end
     end
-    if not pageIndex then
+    if not at then
         for i = 2, #list do
-            if selectable(list[i]) then pageIndex = i break end
+            if selectable(list[i]) then at = i break end
         end
     end
-    pageIndex = pageIndex or 1
+    pageIndex = at or 1
 end
 
 openPage = function(key)
@@ -602,6 +605,7 @@ end
 local function pickPageRow(i)
     local row = page and page.list[i]
     if not row then return end
+    ---@cast page -nil   (the row came from it)
     if row.back then pageBack() return end
     if not selectable(row) then return end
     local key, before = page.key, page.view

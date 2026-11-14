@@ -25,9 +25,11 @@ local KNOWN = {
 local ORDER = { 'chrome', 'has', 'colorMix', 'relativeColor', 'textBalance', 'startingStyle', 'heightAuto',
     'anchor', 'fieldSizing', 'viewTransitions', 'schedulerYield', 'webgpu', 'zoomScreenPx', 'gameView' }
 
+---@type table|nil
 local caps = nil
 
 local function copyCaps()
+    ---@cast caps -nil   -- asked for only once the page has said
     local out = {}
     for key, value in pairs(caps) do out[key] = value end
     return out
@@ -41,7 +43,7 @@ RegisterNUICallback('nuiCaps', function(data, cb)
         if type(data[key]) == kind then fresh[key] = data[key] end
     end
     local changed = caps == nil
-    if not changed then
+    if caps then
         for key in pairs(KNOWN) do
             if caps[key] ~= fresh[key] then changed = true break end
         end

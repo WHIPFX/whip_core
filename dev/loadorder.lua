@@ -27,7 +27,7 @@ local function expand(entry)
     if not entry:find('*', 1, true) then return { entry } end
     local dir = entry:match('^(.*)/[^/]*$') or '.'
     local out = {}
-    local pipe = io.popen('dir /b /on "' .. (R .. dir):gsub('/', '\\') .. '\\*.lua" 2>nul')
+    local pipe = assert(io.popen('dir /b /on "' .. (R .. dir):gsub('/', '\\') .. '\\*.lua" 2>nul'))
     for name in pipe:lines() do out[#out + 1] = dir .. '/' .. name end
     pipe:close()
     return out
@@ -63,7 +63,7 @@ local function readsAtLoad(f)
     local src = h:read('a'):gsub('^\239\187\191', '')
     h:close()
     local t = assert(io.open(TMP, 'wb')); t:write((src:gsub('`', 'Q'))); t:close()
-    local p = io.popen(('luac54 -l -l -p "%s" 2>&1'):format(TMP))
+    local p = assert(io.popen(('luac54 -l -l -p "%s" 2>&1'):format(TMP)))
     local out = p:read('a'); p:close()
     if not out:match('^%s*main <') then return nil end
     local mainPart = out:match('^(.-)\nfunction <') or out

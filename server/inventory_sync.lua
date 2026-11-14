@@ -226,7 +226,7 @@ end
 ---   coords    = vector3    where to drop it if it does not fit, instead of the player's feet
 ---   noDrop    = true       refuse instead of dropping when it does not fit
 ---@return boolean ok
----@return string|false err
+---@return string|false|nil err  false when it was given
 ---@return string|nil placement  'inventory' | 'ground' | nil
 function Inventory.giveOrDrop(source, player, item, amount, metadata, opts)
     if not player or not player.inventory then return false, 'Player not loaded', nil end

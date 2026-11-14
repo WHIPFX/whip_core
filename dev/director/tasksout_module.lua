@@ -6,28 +6,28 @@
 
 local npcs, nextNpc = {}, 0
 local lists = {}   -- [npcId] = the list it plays: { onEnd, from }
-Npcs.spawn = function()
+rawset(Npcs, 'spawn', function()
     nextNpc = nextNpc + 1
     npcs[nextNpc] = { npcId = nextNpc, netId = 5000 + nextNpc, alive = true, coords = { x = 0.0, y = 0.0, z = 0.0 } }
     return nextNpc, 5000 + nextNpc
-end
-Npcs.get = function(id) return npcs[id] end
+end)
+rawset(Npcs, 'get', function(id) return npcs[id] end)
 local function endList(id, why)
     local l = lists[id]
     lists[id] = nil
     if l then l.onEnd(why) end
 end
-Npcs.runTasks = function(_, id, plan, opts)
+rawset(Npcs, 'runTasks', function(_, id, _, opts)
     endList(id, 'stopped')   -- (in place of the one it plays)
     lists[id] = { onEnd = opts.onEnd }
     return true
-end
-Npcs.stopTasks = function(_, id)
+end)
+rawset(Npcs, 'stopTasks', function(_, id)
     if not lists[id] then return nil end
     endList(id, 'stopped')
     return 1
-end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local at = { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 }
 local WORLD = { { id = 'npc1', kind = 'npc', layer = 'run', label = 'Guard', def = { model = 's_m_m_security_01', coords = at,

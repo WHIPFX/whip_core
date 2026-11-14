@@ -5,33 +5,33 @@
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua takeleave_module.lua
 
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 -- Each list a car is given: its take step as it would be sent (resolved).
 local takeSteps = {}
-Actors.setTow = function() return 1 end
-Actors.runTasks = function(_, ent, plan, opts)
+rawset(Actors, 'setTow', function() return 1 end)
+rawset(Actors, 'runTasks', function(_, ent, plan, opts)
     for _, s in ipairs(plan.steps) do
         if s.t == 'take' then takeSteps[#takeSteps + 1] = { ent = ent, p = opts.resolve(s) } end
     end
     if opts.onEnd then SetTimeout(10, function() opts.onEnd('done') end) end
     return #takeSteps
-end
+end)
 local TAKES = { [24] = { id = 24, lengthMs = 20000, start = { x = 2.0, y = 0.0, z = 0.0, heading = 0.0 } } }
-DirectorTakes.get = function(id) return TAKES[math.tointeger(tonumber(id))] end
-DirectorTakes.load = function(id) return TAKES[math.tointeger(tonumber(id))] end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(DirectorTakes, 'get', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+rawset(DirectorTakes, 'load', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local function car(list)
     return { id = 'car3', kind = 'vehicle', layer = 'run', label = 'Phantom', def = { model = 'phantom',
@@ -46,7 +46,7 @@ local function doc(nodes, links, world)
 end
 local function run(key, d)
     local check = DirectorGraph.check
-    DirectorGraph.check = function() return true, {} end
+    rawset(DirectorGraph, 'check', function() return true, {} end)
     local okA, err = pcall(Director.activate, key, d, { rev = 1 })
     DirectorGraph.check = check
     if not okA then error(err) end

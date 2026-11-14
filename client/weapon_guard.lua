@@ -64,15 +64,15 @@ local WEAPON_NAMES = {
 ---@return integer|nil
 local function norm(h)
     if type(h) == 'string' then h = GetHashKey(h) end
-    h = math.tointeger(h)
-    if not h then return nil end
-    if h < 0 then h = h + 4294967296 end
-    return h
+    local n = math.tointeger(h)
+    if not n then return nil end
+    if n < 0 then n = n + 4294967296 end
+    return n
 end
 
 local WEAPONS, NAME = {}, {}
 for _, name in ipairs(WEAPON_NAMES) do
-    local h = norm(name)
+    local h = norm(name) --[[@as integer]]   -- a name always hashes
     WEAPONS[#WEAPONS + 1] = h
     NAME[h] = name
 end

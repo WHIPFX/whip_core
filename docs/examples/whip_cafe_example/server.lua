@@ -29,7 +29,7 @@ Whip.register(function()
     exports.whip_core:SecureEvent('mycafe:buy', {
         rateLimit = 1000,   -- one purchase a second per player
         near = { at = Config.Counter, range = 3.0, message = 'Walk up to the counter' },
-    }, function(source, player)
+    }, function(source)
         local receipt, err = exports.whip_core:ChargePlayer(source, Config.Price, { reason = 'Coffee' })
         if not receipt then
             return false, err   -- could not pay: whip shows them why
@@ -63,12 +63,12 @@ Whip.register(function()
             return false, 'Clock on first'
         end
 
-        local done, why = exports.whip_core:Progress(source, {
+        local done, reason = exports.whip_core:Progress(source, {
             label    = 'Brewing...',
             duration = 6000,
             near     = { coords = Config.Counter, range = 3.0 },   -- still at the counter when it ends
         })
-        if not done then return false, why end
+        if not done then return false, reason end
 
         -- Six seconds went by: still the same character? (they may have logged out)
         if not exports.whip_core:IsSessionCurrent(source, player.session) then return end

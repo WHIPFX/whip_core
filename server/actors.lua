@@ -275,7 +275,7 @@ function Actors.runTasks(owner, entity, plan, opts)
         rec = { id = nextId, owner = owner, ent = entity, netId = NetworkGetNetworkIdFromEntity(entity),
                 hash = GetEntityModel(entity), ver = 1, acked = 0 }
         local ok, why = reg:add(owner, rec.id, rec, opts.tag and { tag = opts.tag } or nil)
-        if not ok then return false, why end
+        if not ok then return false, why --[[@as string]] end
         recs[rec.id] = rec
         byEnt[entity] = rec.id
     end
@@ -320,7 +320,7 @@ function Actors.setTow(owner, entity, trailer, opts)
         rec = { id = nextId, owner = owner, ent = entity, netId = NetworkGetNetworkIdFromEntity(entity),
                 hash = GetEntityModel(entity), ver = 1, acked = 0 }
         local ok, why = reg:add(owner, rec.id, rec, opts.tag and { tag = opts.tag } or nil)
-        if not ok then return false, why end
+        if not ok then return false, why --[[@as string]] end
         recs[rec.id] = rec
         byEnt[entity] = rec.id
     end
@@ -421,7 +421,7 @@ SecureEvent('whip_core:server:actorApplied', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'actorId', 'id'}, {'netId', 'id', 1, 65535}, {'ver', 'int', 0, 1000000} },
     ownerOf = 'netId',
-}, function(source, player, actorId, netId, ver)
+}, function(_, _, actorId, netId, ver)
     local rec = recs[actorId]
     if not rec or rec.netId ~= netId then return end
     if ver == rec.ver then rec.acked = ver end
@@ -431,7 +431,7 @@ SecureEvent('whip_core:server:actorJob', {
     rateLimit = 50, burst = 40, whileDead = true,
     params = { {'actorId', 'id'}, {'netId', 'id', 1, 65535}, {'jobId', 'int', 0, 2000000000}, {'how', 'enum', { 'done', 'failed' }} },
     ownerOf = 'netId',
-}, function(source, player, actorId, netId, jobId, how)
+}, function(_, _, actorId, netId, jobId, how)
     local rec = recs[actorId]
     if not rec or rec.netId ~= netId then return end
     TaskSeq.report(rec, jobId, how)
@@ -483,7 +483,7 @@ end
 SecureEvent('whip_core:server:takeCopyHit', {
     rateLimit = 100, burst = 10,
     params = { { 'netId', 'id', 1, 65535 }, { 'hit', 'any' } },
-}, function(source, player, netId, hit)
+}, function(source, _, netId, hit)
     local s = shows[netId]
     if not s or type(hit) ~= 'table' or not (s.ent and DoesEntityExist(s.ent)) then return end
     if GetPlayerRoutingBucket(source) ~= s.bucket then return end

@@ -409,8 +409,8 @@ local function entityAt(from, dx, dy, dz)
             if n.moves then c = DoesEntityExist(e) and GetEntityCoords(e) or c end
             if passesNear(c, n.r + (n.moves and 0.0 or 0.5), from, sx, sy, sz, len2)
                 and DoesEntityExist(e) and (not met or collisionOff(e)) and seen(e) then
-                local t, vol = boxEntry(e, from, to)
-                if t and t <= limit + 0.0005 and vol < bestVol then best, bestVol = e, vol end
+                local t, vol = boxEntry(e, from, to)   -- (both, or nil)
+                if t and t <= limit + 0.0005 and vol < bestVol then best, bestVol = e, vol --[[@as number]] end
             end
         end
     end

@@ -653,7 +653,7 @@ evalValue = function(ctx, sn, pinKey)
         memo[sn.id] = outs
         if outs then for key, v in pairs(outs) do noteValue(ctx.inst, sn.id, key, v) end end
     end
-    if outs == false then return nil end
+    if not outs then return nil end
     return outs[pinKey]
 end
 
@@ -701,6 +701,7 @@ function CTX:setVar(name, value)
     if self.pulse and self.pulse.status ~= 'running' then return end
     local key, why = scopeKeyOf(self, decl.scope)
     if not key then refuse(why) end
+    ---@cast key -nil   -- refuse() throws
     local v = C.coerce(decl.type, value, Ports.charOf)
     if v == nil and value ~= nil then bad(('%s holds a %s, and that is not one'):format(name, decl.type)) end
     if decl.remember and decl.type == 'text' and v and #v > L.rememberText then
@@ -721,6 +722,7 @@ end
 function CTX:state(scope)
     local key, why = scopeKeyOf(self, scope)
     if not key then refuse(why) end
+    ---@cast key -nil   -- refuse() throws
     local byNode = self.inst.state[self.node.id]
     if not byNode then byNode = {}; self.inst.state[self.node.id] = byNode end
     local s = byNode[key]
@@ -1388,7 +1390,7 @@ local function handleGone()
                     -- come back (and is saved through Ports.remember all along).
                     local key = g.charId ~= nil and ('p:' .. idKey(g.charId)) or nil
                     local store = key and inst.vars[key]
-                    if store then
+                    if key and store then
                         for name in pairs(store) do
                             local decl = inst.graph.vars[name]
                             if not (decl and decl.remember) then store[name] = nil end

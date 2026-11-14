@@ -36,6 +36,7 @@ RegisterTestModule({
             local raw = doc({ n('s', 'scenario.started') })
             local d, why = DirectorDoc.load(raw)
             assertNotNil(d, why)
+            ---@cast d -nil
             assertTrue(d ~= raw and d.nodes ~= raw.nodes, 'a copy')
             assertEqual(d.nodes[1].type, 'scenario.started', 'its cards')
         end },
@@ -51,22 +52,23 @@ RegisterTestModule({
         { name = 'a list that is not one: refused', fn = function()
             local d, why = DirectorDoc.load(doc({}, { links = 'oops' }))
             assertNil(d, 'not read')
+            ---@cast why -nil
             assertTrue(why:find('links are not a list', 1, true) ~= nil, why)
         end },
         { name = 'a card saved older: its own upgrade brings it up to date; the original untouched', fn = function()
             local raw = doc({ n('r', 'test.reshaped', { words = 'hello' }, 1) })
-            local d = DirectorDoc.load(raw)
+            local d = DirectorDoc.load(raw) --[[@as table]]
             assertEqual(d.nodes[1].props.text, 'hello', 'its words where version 2 keeps them')
             assertEqual(d.nodes[1].v, 2, 'its version now')
             assertEqual(raw.nodes[1].props.words, 'hello', 'the original not changed')
             assertEqual(raw.nodes[1].v, 1, 'the original\'s version not changed')
         end },
         { name = 'a card already this version: left as it is', fn = function()
-            local d = DirectorDoc.load(doc({ n('r', 'test.reshaped', { text = 'hi' }, 2) }))
+            local d = DirectorDoc.load(doc({ n('r', 'test.reshaped', { text = 'hi' }, 2) })) --[[@as table]]
             assertEqual(d.nodes[1].props.text, 'hi', 'kept')
         end },
         { name = 'a variant\'s cards upgraded too', fn = function()
-            local d = DirectorDoc.load(doc({}, { variants = { { id = 'v2', nodes = { n('r', 'test.reshaped', { words = 'v' }, 1) }, links = {} } } }))
+            local d = DirectorDoc.load(doc({}, { variants = { { id = 'v2', nodes = { n('r', 'test.reshaped', { words = 'v' }, 1) }, links = {} } } })) --[[@as table]]
             assertEqual(d.variants[1].nodes[1].props.text, 'v', 'upgraded in the variant')
         end },
         { name = 'an upgrade that fails: Check says so, as an error', fn = function()

@@ -135,6 +135,8 @@ devCommand('whip_bank', function(source, args)
 end)
 
 -- Helper: find active player by charId, through the global index (PlayersByCharId).
+---@return WhipPlayer|nil player
+---@return number|nil source  set whenever player is
 local function GetPlayerByCharId(charId)
     local player = PlayersByCharId and PlayersByCharId[charId] or nil
     if player then return player, player.source end
@@ -172,6 +174,7 @@ devCommand('whip_giveitem', function(source, args)
         reply(source, ('No active player with charId %d'):format(charId), 'error')
         return
     end
+    ---@cast playerSrc -nil
 
     if not player.inventory then
         reply(source, 'That player has no inventory loaded', 'error')
@@ -217,6 +220,7 @@ devCommand('whip_removeitem', function(source, args)
         reply(source, ('No active player with charId %d'):format(charId), 'error')
         return
     end
+    ---@cast playerSrc -nil
 
     -- The same path as the RemoveItem export: every container the player carries, and saved
     -- through the store. This removed from the main grid only and wrote with Inventory.save, which
@@ -462,6 +466,7 @@ devCommand('whip_givekey', function(source, args)
         reply(source, ('No active player with charId %d'):format(charId), 'error')
         return
     end
+    ---@cast playerSrc -nil
 
     local ok, msg = Vehicles.giveKey(playerSrc, player, vehicleId)
     reply(source, ('giveKey: %s'):format(tostring(msg)), ok and 'success' or 'error')
@@ -501,6 +506,7 @@ devCommand('whip_revive', function(source, args)
         end
         return
     end
+    ---@cast targetSrc -nil
 
     if not target.isDead then
         local msg = ('%s is not dead'):format(target.fullName)

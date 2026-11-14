@@ -390,7 +390,7 @@ local function processConnection(source, name, deferrals)
     deferrals.done()
 end
 
-AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
+AddEventHandler('playerConnecting', function(name, _, deferrals)
     local source = source
     deferrals.defer()
     Wait(0)
@@ -410,7 +410,7 @@ end)
 SecureEvent('whip_core:server:requestCharacters', {
     rateLimit = 2000,
     requirePlayer = false,
-}, function(source, player)
+}, function(source)
     -- Not with a character loaded: the character screen's private bucket would make a loaded player
     -- invisible to everyone. /logout is the way back to the screen.
     if Players[source] then
@@ -487,7 +487,7 @@ SecureEvent('whip_core:server:selectCharacter', {
     rateLimit = 2000,
     requirePlayer = false,
     params = { {'charId', 'id'}, {'spawnId', 'string', 40, 'last'} },
-}, function(source, player, charId, spawnId)
+}, function(source, _, charId, spawnId)
     -- Loaded is asked first: EnsurePending would re-create a pending entry for a player who already
     -- has a character.
     if Players[source] then
@@ -519,7 +519,7 @@ SecureEvent('whip_core:server:createCharacter', {
         {'dateOfBirth', 'string', 10},
         {'gender', 'enum', {'male', 'female'}, 'male'},
     },
-}, function(source, player, firstName, lastName, dateOfBirth, gender)
+}, function(source, _, firstName, lastName, dateOfBirth, gender)
     -- Loaded is asked before EnsurePending, as in selectCharacter.
     if Players[source] then
         return false, 'Logout first before creating a new character.'
@@ -544,9 +544,11 @@ SecureEvent('whip_core:server:createCharacter', {
     local nameWhy
     firstName, lastName, nameWhy = Character.cleanNames(firstName, lastName)
     if not firstName then
-        refuseLoad(source, nameWhy)
+        refuseLoad(source, nameWhy --[[@as string]])
         return
     end
+    -- (cleanNames answers both names, or neither and why.)
+    ---@cast lastName string
 
     local charId, err = Character.create(pending.userId, firstName, lastName, dateOfBirth, gender)
 
@@ -600,7 +602,7 @@ SecureEvent('whip_core:server:deleteCharacter', {
     rateLimit = 2000,
     requirePlayer = false,
     params = { {'charId', 'id'} },
-}, function(source, player, charId)
+}, function(source, _, charId)
     -- Only from the character screen, like select and create.
     if Players[source] then
         RecordEventRejection('whip_core:server:deleteCharacter', source, 'character loaded')
@@ -678,7 +680,8 @@ end)
 --- if a load is already in flight for it.
 ---@param source number
 ---@return table|nil claim
----@return table|nil pending  the entry itself, since the load builds userData from it
+---@return table|string|nil pending  the entry itself, since the load builds userData from it; or, with no
+---                                 claim, why not (start-up)
 local function beginLoad(source)
     -- Already playing a character: nothing may be loaded over it (createCharacter's inserts yield,
     -- and a select can finish meanwhile).
@@ -1047,7 +1050,7 @@ end
 --- sessions would each save over the other). A throw anywhere in the load releases the claim, so the
 --- player can try again.
 ---@param source number
----@param charId number
+---@param charId number|nil
 ---@param isNewCharacter boolean|nil
 ---@param spawnId string|nil  where to arrive (the spawn picker); nil is where they left
 function LoadCharacterForPlayer(source, charId, isNewCharacter, spawnId)
@@ -1058,6 +1061,7 @@ function LoadCharacterForPlayer(source, charId, isNewCharacter, spawnId)
         if type(pending) == 'string' then refuseLoad(source, pending) end
         return
     end
+    ---@cast pending table
 
     charId = tonumber(charId)
     if not charId or PlayersByCharId[charId] or LoadingCharIds[charId] then
@@ -1257,7 +1261,7 @@ end)
 SecureEvent('whip_core:server:logout', {
     whileDead = true,   -- you can always leave; the dead state is saved with the character
     rateLimit = 2000,
-}, function(source, player)
+}, function(_, player)
     player:logout()
 end)
 
@@ -1333,7 +1337,7 @@ AddEventHandler('onResourceStart', function(resourceName)
     bootWaiting = 'waiting for its database'
     local dbOk, dbWhy = DbHealth.waitForDatabase()
     bootWaiting = nil
-    if not dbOk then return haltBoot(dbWhy) end
+    if not dbOk then return haltBoot(dbWhy --[[@as string]]) end
 
     -- ---- 1. The schema ----
     --

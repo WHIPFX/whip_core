@@ -118,7 +118,7 @@ end
 --- `charOf(player)` turns a player into their character (the walker's Port; nil if the session is not current). It must not throw.
 ---@param t string
 ---@param v any
----@param charOf fun(p: table): number|nil
+---@param charOf? fun(p: table): number|nil
 ---@return any|nil
 function C.coerce(t, v, charOf)
     if v == nil then return nil end
@@ -255,7 +255,7 @@ function C.define(def)
     -- Powers: one ('money') or several ('money,items' or { 'money', 'items' }). Kept as def.powers (sorted) and
     -- def.power (one string, 'items,money').
     if def.power ~= nil then
-        local list = type(def.power) == 'table' and def.power or {}
+        local list = (type(def.power) == 'table' and def.power or {}) --[[@as table]]
         if type(def.power) == 'string' then for p in def.power:gmatch('[^,%s]+') do list[#list + 1] = p end end
         local seen, powers = {}, {}
         for _, p in ipairs(list) do

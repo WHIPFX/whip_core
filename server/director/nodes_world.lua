@@ -976,7 +976,7 @@ end
 local function clearSpot(at, bucket)
     local radius = Config.GarageSpotRadius or 3.5
     local gone = 0
-    for _, veh in ipairs(GetAllVehicles()) do
+    for _, veh in ipairs(GetAllVehicles() --[[@as integer[] ]]) do   -- the server native: a list
         if DoesEntityExist(veh) and GetEntityRoutingBucket(veh) == bucket and streetLife(veh)
            and not Vehicles.getEntityVehicleId(veh) and #(GetEntityCoords(veh) - at) < radius then
             local riders, player = {}, false
@@ -1039,7 +1039,7 @@ local function spawnOne(ctx, worldId, made, byW, asTrailer)
     end
     -- On the ground: at its key spot, which must be placed.
     local spotAt, spotDef
-    if where == 'world' then
+    if key and where == 'world' then
         local s = type(key.spot) == 'string' and ctx:place(key.spot) or nil
         spotDef = type(s) == 'table' and type(s.def) == 'table' and s.def or {}
         spotAt = vec(spotDef.coords)
@@ -1086,7 +1086,7 @@ local function spawnOne(ctx, worldId, made, byW, asTrailer)
     -- Its key on the ground at its spot, or in its glovebox or boot: whip's own key, marked as the run's (a key never
     -- stacks, so the mark costs nothing): a test's is taken back from whoever holds it, a live run's is theirs to keep.
     -- One still on the ground goes when the run ends.
-    if where == 'world' or where == 'glovebox' or where == 'trunk' then
+    if key and (where == 'world' or where == 'glovebox' or where == 'trunk') then
         local run = ctx.run
         local md = Vehicles.keyMetadata(id, { [DirectorEffects.ownField(run)] = run.id, dworld = where == 'world' and key.spot or worldId })
         if run.test then DirectorEffects.handsOut(run, 'vehicle_key') end   -- (listed before it goes: effects.lua)

@@ -100,6 +100,7 @@ end)
 
 local WP_TICK_MS = 500
 local WP_ECHO_MS = 1000
+---@type { x: number, y: number }|false
 local wpKnown = false        -- the waypoint as last seen, shared or received: { x, y }, or false for none
 local wpQuietUntil = 0       -- a received one is settling in: not read as this player's own change
 local wpWatching = false

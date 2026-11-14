@@ -1,3 +1,4 @@
+---@meta
 -- ============================================
 -- whip_core — Server Export Annotations
 -- LuaLS type definitions for all server-side
@@ -830,7 +831,7 @@ function whip_core:SecureEvent(eventName, schema, handler) end
 --- registered it has stopped), or 'No answer from the server'.
 ---@param name string Callback name
 ---@param schema WhipSecureSchema Validation schema
----@param handler fun(source: number, player: table, ...: any): any Handler returns result to client
+---@param handler fun(source: number, player: table, ...: any): ... Every value it returns is the client's answer, as it gave them (`false, 'why'` for a refusal; an error answers `false, 'Server error'`)
 ---@return boolean ok
 ---@return string? reason
 function whip_core:SecureCallback(name, schema, handler) end
@@ -2049,7 +2050,7 @@ function whip_core:DeleteVehicle(vehicleId) end
 --- and `{ now = true }` also calls it once straight away for every car carrying the key. The options
 --- may go third, in place of `id`.
 ---@param key string
----@param callback fun(vehicleId: number, value: any, cleared: boolean, old: any)|fun(change: WhipVehicleChange)
+---@param callback fun(change: WhipVehicleChange)|fun(vehicleId: number, value: any, cleared: boolean, old: any) The first with `{ table = true }` (the one to prefer), else the second
 ---@param id string|WhipVehicleListenOpts|nil Defaults to the key
 ---@param opts WhipVehicleListenOpts|nil
 ---@return boolean registered
@@ -4198,11 +4199,7 @@ function whip_core:OnSettingChanged(key, fn) end
 --
 -- One voice resource runs: whip_voice (its own voice server), or another that registers with RegisterVoiceSystem.
 -- A resource that uses voice calls whichever it is through Whip.voice (lib/satellite.lua), never by name.
-
----@class WhipVoiceSystem
----@field resource string The voice resource's name
----@field label string
----@field features { lines: boolean, speaker: boolean, pickup: boolean, quality: boolean, sounds: 'full'|'basic' }
+-- WhipVoiceSystem, what GetVoiceSystem answers, is declared in types/satellite.lua.
 
 --- For a VOICE RESOURCE: make yourself the voice system. One at a time: refused while another one runs.
 --- Call it in Whip.register; you are let go when your resource stops.

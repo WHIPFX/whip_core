@@ -55,7 +55,7 @@ end
 
 --- Cash never drops: unlike AddItem, banknotes that will not fit are refused, not put on the
 --- floor: a payout that "succeeded" onto the pavement is money the caller thinks it paid.
----@param amount number
+---@param amount number|nil
 ---@param why string|nil  for the activity log, e.g. 'ATM withdrawal'; defaults to the calling resource
 ---@param withNext boolean|'quiet'|nil  whip_core only: saved with the bank write that follows (see persistCash)
 ---@return boolean ok
@@ -87,7 +87,7 @@ function WhipPlayer:addCash(amount, why, withNext)
     return true
 end
 
----@param amount number
+---@param amount number|nil
 ---@param why string|nil  for the activity log, e.g. 'ATM deposit'; defaults to the calling resource
 ---@param withNext boolean|'quiet'|nil  whip_core only: saved with the bank write that follows (see persistCash)
 ---@return boolean ok
@@ -97,7 +97,7 @@ function WhipPlayer:removeCash(amount, why, withNext)
     if not amount then return false, Sanitize.AMOUNT_ERR end
     if not self.inventory then return false, 'Player not loaded' end
 
-    local ok, err = Inventory.removeItemAcrossContainers(self.inventory, 'cash', amount)
+    local ok = Inventory.removeItemAcrossContainers(self.inventory, 'cash', amount)
     if not ok then
         -- Not a fault worth a console line: "they did not have it" is the everyday refusal.
         return false, 'Not enough cash'

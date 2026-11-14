@@ -55,7 +55,7 @@ SecureCallback('whip_core:seats:claim', {
         -- 16 into 15 and claim a seat nobody asked for).
         {'seat',  'id', -1, 15},
     },
-}, function(source, player, netId, seat)
+}, function(source, _, netId, seat)
     local entity = NetworkGetEntityFromNetworkId(netId)
     if not entity or entity == 0 or not DoesEntityExist(entity) or GetEntityType(entity) ~= 2 then
         return false, 'That vehicle is gone'
@@ -88,7 +88,7 @@ end)
 --- `vehicleId` is there only for a car whip looks after (nil for a street car); `netId` always is.
 --- To hear about seat changes instead of asking, listen to whip_core:vehicle:entered (it fires again
 --- with the new seat when someone moves seat without getting out) and whip_core:vehicle:exited.
----@param source number
+---@param source number|string|nil
 ---@return table|false at  { seat, driver, vehicleId?, netId }
 ---@return string|nil why
 exports('GetPlayerSeat', function(source)

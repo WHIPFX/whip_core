@@ -56,7 +56,7 @@ function PlayerText.show(owner, source, text, opts)
     opts = type(opts) == 'table' and opts or {}
     local src = Sanitize.id(source)
     local player = src and Players[src]
-    if not player or not player.charId then return false, 'no such player' end
+    if not src or not player or not player.charId then return false, 'no such player' end
     if type(text) ~= 'string' then return false, 'text is text' end
     local clean = BubbleText.clean(text, MAX_LEN)
     if clean == '' then return false, 'text is empty' end
@@ -100,7 +100,7 @@ end
 function PlayerText.hide(owner, source)
     local src = Sanitize.id(source)
     local rec = src and shown[src]
-    if not rec then return false, 'nothing is shown' end
+    if not src or not rec then return false, 'nothing is shown' end
     if rec.owner ~= owner then return false, ('the text on screen is %s\'s'):format(tostring(rec.owner)) end
     return reg:remove(owner, src)
 end
@@ -163,7 +163,7 @@ function PlayerText.objective(owner, source, id, text, opts)
     opts = type(opts) == 'table' and opts or {}
     local src = Sanitize.id(source)
     local player = src and Players[src]
-    if not player or not player.charId then return false, 'no such player' end
+    if not src or not player or not player.charId then return false, 'no such player' end
     if type(id) ~= 'string' or id == '' then return false, 'id is a name' end
     if type(text) ~= 'string' then return false, 'text is text' end
     local clean = BubbleText.clean(text, MAX_LEN)

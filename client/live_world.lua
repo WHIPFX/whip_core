@@ -96,6 +96,7 @@ local function fxPass()
         local ent, spot = placeOf(e)
         local at = ent and GetEntityCoords(ent) or spot
         local near = at ~= nil and #(at - me) <= FX_RANGE
+        ---@cast at -nil   -- read below only when near
         if e.kind == 'light' then
             if near then
                 local z = ent and (at.z + topOf(ent) + 0.3) or (at.z + 0.6)

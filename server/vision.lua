@@ -339,7 +339,7 @@ end
 SecureEvent('whip_core:server:visionSeen', {
     rateLimit = 12, burst = 12,
     params = { {'ver', 'int', 0, 2000000000}, {'mask', 'int', 0, 0x7fffffff}, {'sneak', 'bool', false} },
-}, function(source, player, ver, mask, sneak)
+}, function(source, _, ver, mask, sneak)
     local p = players[source]
     if not p or ver ~= p.ver then return end   -- about a list it no longer has
     p.mask, p.maskVer, p.sneak, p.at = mask, ver, sneak == true, GetGameTimer()

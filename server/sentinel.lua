@@ -299,7 +299,7 @@ local function makeEntityHandler(key)
         -- at handler time is the suspect. Ownership can migrate between the write and this
         -- handler — rare, and why entity strikes feed the same ladder but the log says
         -- which entity, not just who.
-        local src = NetworkGetEntityOwner(entity)
+        local src = NetworkGetEntityOwner(entity) ---@type integer|nil
         if src and src <= 0 then src = nil end
         record(key, 'entity', src, value, truth)
     end
@@ -320,7 +320,7 @@ Sentinel._keys = Registry.new('SentinelKey', {
     -- arrives as a new reference every time, so its re-registration replaces — which costs one
     -- handler swap and keeps the detection counters (onAdd).
     same  = function(old, new) return old.family == new.family and old.truth == new.truth end,
-    onAdd = function(key, reg, owner, old)
+    onAdd = function(key, reg, _, old)
         if old then
             if old.cookie then RemoveStateBagChangeHandler(old.cookie) end
             reg.detections, reg.lastAt = old.detections, old.lastAt
@@ -383,7 +383,7 @@ function Sentinel.watch(def)
     }
 
     local ok, why = Sentinel._keys:add(owner, def.key, reg)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -549,7 +549,7 @@ end)
 ---
 --- Your own keys only: a key another resource watches is refused, and so are whip's. A key nobody
 --- watches is anyone's to write. Answers `true`, or `false, reason`.
----@param entity number
+---@param entity number|string|nil
 ---@param key string
 ---@param value any
 ---@return boolean ok

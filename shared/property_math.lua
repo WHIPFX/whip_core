@@ -46,7 +46,7 @@ local TWO32, TWO31 = 4294967296, 2147483648
 --- own object. Everything that stores a hash goes through here first.
 ---
 --- A NAME IS HASHED, a numeric string is read as a number, and anything else is refused.
----@param h number|string
+---@param h number|string|nil
 ---@return integer|nil
 function PropertyMath.signedHash(h)
     if type(h) == 'string' then
@@ -289,8 +289,8 @@ function PropertyMath.unitToWorld(place, unit, rooms)
     -- model name: Sign posts above), which the client puts up behind it.
     for _, part in ipairs({ 'sign', 'manager' }) do
         local s = unit[part]
-        if s and s.pos then
-            local w = pointToWorld(place, s.pos)
+        local w = s and pointToWorld(place, s.pos)
+        if w then
             out[part] = { x = w.x, y = w.y, z = w.z,
                           heading = PropertyMath.headingToWorld(place, s.heading or 0.0),
                           post = part == 'sign' and s.post or nil }

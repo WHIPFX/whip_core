@@ -175,7 +175,7 @@ function Log.item(charId, event, slotData, opts)
     local uid, isNew = Log.ensureUid(slotData)
     -- `isNew` or a debt left by whoever minted it (see _firstSeenOwed): the caller has almost always
     -- stamped the uid already.
-    if uid and (isNew or _firstSeenOwed[uid]) then
+    if uid and slotData and (isNew or _firstSeenOwed[uid]) then
         _firstSeenOwed[uid] = nil
         Log.write(charId, 'first_seen', {
             itemKey = slotData.item,
@@ -387,7 +387,7 @@ local function logUnit(h)
         unitDefined = true
         Stores.defineUnit('log', LOG_UNIT)
     end
-    return Stores.unit('log', h)
+    return Stores.unit('log', h) --[[@as table]]   -- the kind is defined just above, and h is a handle
 end
 
 --- Queue a row with what it describes. Inside ONE action: that action's own log unit, tied to it, so

@@ -30,7 +30,6 @@ local KEEP_EVENTS = 200
 local KEEP_DAYS = 90
 
 local scenarios = {}   -- [key] = row (a cache of director_scenarios)
-local byId = {}        -- [id] = key
 local saving = {}      -- [key] = true while a save is with the database
 local summaries = {}   -- [key] = what its DRAFT says about itself (DirectorStore.summarize), for the API
 
@@ -159,7 +158,6 @@ end
 
 local function remember(row)
     scenarios[row.key] = row
-    byId[row.id] = row.key
 end
 
 --- What a scenario document says about itself, for other resources (the Director API): kept in
@@ -217,7 +215,7 @@ end
 function DirectorStore.loadAll()
     local rows, err = q('SELECT * FROM `director_scenarios` WHERE `deletedAt` IS NULL')
     if not rows then return false, err end
-    scenarios, byId = {}, {}
+    scenarios = {}
     for _, r in ipairs(rows) do remember(r) end
 
     -- A run the server stopped in the middle of (txAdmin restarts with no stop handler) is over.
@@ -675,7 +673,7 @@ function DirectorStore.delete(key, by)
     local res = q("UPDATE `director_scenarios` SET `deletedAt` = NOW(), `status` = 'disabled', `updatedBy` = ?, `updatedByName` = ? WHERE `id` = ?",
         { userId, uname, r.id })
     if not res then return false, DB_ERROR end
-    scenarios[key], byId[r.id], summaries[key] = nil, nil, nil
+    scenarios[key], summaries[key] = nil, nil
     return true
 end
 

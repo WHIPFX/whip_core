@@ -82,7 +82,7 @@ local PATTERNS = {
 -- Tracked AND new (not yet added) files: the house rule runs this before committing, when a new file is untracked, and
 -- only the tracked ones were looked at (audit 20, DX-7). lib/ too (lib/cost.lua is whip_core's), but not
 -- lib/satellite.lua, which whip_core never loads (the satellites do, and call whip_core's exports from outside).
-local p = io.popen(('git -C "%s" ls-files --cached --others --exclude-standard -- server client shared tools lib'):format(R))
+local p = assert(io.popen(('git -C "%s" ls-files --cached --others --exclude-standard -- server client shared tools lib'):format(R)))
 local files, seenFile = {}, {}
 for f in p:lines() do
     if f:match('%.lua$') and f ~= 'lib/satellite.lua' and not seenFile[f] then
@@ -115,7 +115,7 @@ end
 local BASELINE = here .. '/selfexports-baseline.txt'
 
 if mode == 'baseline' then
-    local h = io.open(BASELINE, 'w')
+    local h = assert(io.open(BASELINE, 'w'))
     h:write('# whip_core files still allowed to call whip_core\'s own exports, and how many times (dev/selfexports.lua).\n')
     h:write('# Only ever shrinks: a file moved to the functions comes off.\n')
     local names = {}

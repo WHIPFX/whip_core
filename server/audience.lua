@@ -116,7 +116,7 @@ function Audience.has(a, src)
     if p == nil or p.charId == nil then return false end
     if a == 'everyone' then return true end
     if type(a) == 'table' and a.job ~= nil then return inJob(a, p.charId) end
-    if Audience.isExcept(a) then return not p.phantom and not named(a.except, src, p.charId) end
+    if type(a) == 'table' and a.except ~= nil then return not p.phantom and not named(a.except, src, p.charId) end
     if type(a) ~= 'table' or type(a.people) ~= 'table' then return false end
     return named(a.people, src, p.charId)
 end
@@ -137,7 +137,7 @@ function Audience.sources(a)
         local job, but = Audience.isJob(a), Audience.isExcept(a)
         for src, p in pairs(Players or {}) do
             if p.charId ~= nil and not p.phantom and (not job or inJob(a, p.charId))
-                and not (but and named(a.except, src, p.charId)) then
+                and not (but and named((a --[[@as table]]).except, src, p.charId)) then
                 out[src] = true
             end
         end

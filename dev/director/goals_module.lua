@@ -7,27 +7,27 @@
 local pos = { [1] = { x = 0.0, y = 0.0, z = 0.0 } }
 local cars = {}          -- [vehicleId] = { at, driver, wrecked }
 local function carEnt(id) return 900 + id end
-function GetEntityCoords(ent)
+rawset(_G, 'GetEntityCoords', function(ent)
     if ent and ent > 900 then local c = cars[ent - 900] return c and c.at or { x = 0.0, y = 0.0, z = 0.0 } end
     return pos[(ent or 0) - 100] or { x = 0.0, y = 0.0, z = 0.0 }
-end
-function GetPedInVehicleSeat(ent, seat)
+end)
+rawset(_G, 'GetPedInVehicleSeat', function(ent, seat)
     local c = ent and cars[ent - 900]
     return (c and seat == -1 and c.driver) or 0
-end
-function GetVehiclePedIsIn() return 0 end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id } or nil end
-Vehicles.getEntity = function(id) return cars[id] and carEnt(id) or nil end
-Vehicles.claimUnderWay = function() return false end
-VehicleDamage.isWrecked = function(ent) local c = ent and cars[ent - 900] return c ~= nil and c.wrecked == true end
+end)
+rawset(_G, 'GetVehiclePedIsIn', function() return 0 end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and carEnt(id) or nil end)
+rawset(Vehicles, 'claimUnderWay', function() return false end)
+rawset(VehicleDamage, 'isWrecked', function(ent) local c = ent and cars[ent - 900] return c ~= nil and c.wrecked == true end)
 
 -- What the band was told: [text] = true.
 local shown = {}
 local realObjective = DirectorBand.objective
-DirectorBand.objective = function(run, s, text, key)
+rawset(DirectorBand, 'objective', function(run, s, text, key)
     shown[#shown + 1] = text
     return realObjective(run, s, text, key)
-end
+end)
 
 local function n(id, t, props) return { id = id, type = t, v = 1, x = 0, y = 0, props = props or {} } end
 local function l(id, a, ap, b, bp) return { id = id, from = { node = a, pin = ap }, to = { node = b, pin = bp or 'in' } } end
@@ -76,13 +76,13 @@ RegisterTestModule({
     category = 'Goal cards on their base cards', order = 1,
     tests = {
         { name = 'goalCard: every goal\'s fields and Out of time, Survive without a time limit', fn = function()
-            local go = DirectorNodes.get('goal.goTo')
+            local go = DirectorNodes.get('goal.goTo') --[[@as table]]
             assertEqual(keys(go), 'text,at,radius,who,mark,seconds', 'Go To\'s fields')
             assertEqual(table.concat(go.outputs, ','), 'done,timeout', 'Go To\'s outcomes')
             assertEqual(go.labels.timeout, 'Out of time', 'Out of time')
             assertEqual(go.category, 'goals', 'a goal')
             assertNotNil(go.pinWhen and go.pinWhen.timeout, 'Out of time only with a time limit')
-            local sv = DirectorNodes.get('goal.survive')
+            local sv = DirectorNodes.get('goal.survive') --[[@as table]]
             assertEqual(keys(sv), 'text,length,at,radius,mark', 'Survive\'s fields')
             assertEqual(table.concat(sv.outputs, ','), 'done,failed', 'Survive\'s outcomes')
             assertEqual(sv.props[#sv.props].label, 'Mark the area on the map', 'its Mark words')

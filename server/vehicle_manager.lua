@@ -93,6 +93,10 @@ local function vmSendDetail(source, vehicleId)
     if not v.storage then
         Vehicles.loadInventory(vehicleId)
         v = Vehicles.context(vehicleId, { occupants = true })
+        if not v then   -- deleted while the load waited
+            TriggerClientEvent('whip_core:client:vmDetail', source, nil)
+            return
+        end
     end
 
     -- Same offline-owner naming the list rows get.
@@ -121,7 +125,7 @@ end
 
 SecureEvent('whip_core:server:vmOpen', {
     ace = VM_ACE,
-}, function(source, player)
+}, function(source)
     DevTools.viewers.vm[source] = true
 
     -- snapshotAll, not getAll: this crosses to a NUI, and the record does not leave the server.
@@ -144,7 +148,7 @@ SecureEvent('whip_core:server:vmSelect', {
     ace = VM_ACE,
     rateLimit = 100,
     params = { { 'vehicleId', 'id' } },
-}, function(source, player, vehicleId)
+}, function(source, _, vehicleId)
     vmSendDetail(source, vehicleId)
 end)
 
@@ -188,7 +192,7 @@ local function bringOutBeside(vehicleId, forSource)
         if not v or v.state ~= 'out' then return false, rErr end
     end
     local entity, netIdOrErr = Vehicles.spawn(vehicleId, at.x + 3.0, at.y, at.z, GetEntityHeading(ped) or 0.0)
-    if not entity then return false, netIdOrErr end
+    if not entity then return false, netIdOrErr --[[@as string]] end
     return true
 end
 
@@ -325,7 +329,7 @@ SecureEvent('whip_core:server:vmTeleportTo', {
     ace = VM_ACE,
     rateLimit = 500,
     params = { { 'vehicleId', 'id' } },
-}, function(source, player, vehicleId)
+}, function(source, _, vehicleId)
     local v = Vehicles.context(vehicleId)
     if not v then
         return false, 'Vehicle not found'   -- shown and recorded
@@ -359,7 +363,7 @@ SecureEvent('whip_core:server:vmActOn', {
         { 'action', 'enum', { 'moveGarage', 'tpPlayer', 'bringPlayer', 'owner', 'keyTo', 'warpIn' } },
         { 'arg', 'any' },
     },
-}, function(source, player, vehicleId, action, arg)
+}, function(source, _, vehicleId, action, arg)
     local def = Vehicles.getDef(vehicleId)
     if not def then return vmResult(source, vehicleId, false, 'Vehicle not found') end
 
@@ -450,7 +454,7 @@ SecureEvent('whip_core:server:vmSave', {
         { 'vehicleId', 'id' },
         { 'fields', 'any' },
     },
-}, function(source, player, vehicleId, fields)
+}, function(source, _, vehicleId, fields)
     if type(fields) ~= 'table' then return end
 
     -- Only what the panel is allowed to edit. persist would refuse an unknown column anyway; this
@@ -567,7 +571,7 @@ SecureEvent('whip_core:server:vmSetStat', {
         { 'stat', 'key', 40 },
         { 'value', 'number', -1000000, 1000000 },
     },
-}, function(source, player, vehicleId, stat, value)
+}, function(source, _, vehicleId, stat, value)
     -- A registered stat, or one this car already carries (from a satellite that has since stopped).
     -- Anything else is a typo, and would be saved on the car forever — the rule the exports follow.
     local def = Vehicles.getDef(vehicleId)
@@ -703,7 +707,7 @@ end
 SecureCallback('whip_core:vmCatalog', {
     ace       = VM_ACE,
     rateLimit = 1000,
-}, function(source, player)
+}, function()
     local list = catalogList()
     local models = {}
     local function add(model)
@@ -778,6 +782,7 @@ SecureCallback('whip_core:vmWizardCreate', {
     -- Out beside the admin: from its garage, at their feet (the Bring to me path).
     local out, outWhy = false, nil
     if place == 'here' then
+        ---@cast at -nil   -- 'here' was refused above without one
         local retrieved, rErr = Vehicles.retrieve(def.vehicleId, def.garage)
         if retrieved then
             local entity, netOrErr = Vehicles.spawn(def.vehicleId, at.x + 3.0, at.y, at.z, GetEntityHeading(ped) or 0.0)
@@ -954,7 +959,7 @@ end
 SecureCallback('whip_core:vm:modelStorage', {
     ace = VM_ACE, whileDead = true, rateLimit = 250,
     params = { {'withCatalog', 'bool', false} },
-}, function(source, player, withCatalog)
+}, function(_, _, withCatalog)
     return adjustmentsList(withCatalog)
 end)
 
@@ -962,7 +967,7 @@ end)
 SecureCallback('whip_core:vm:setModelStorage', {
     ace = VM_ACE, whileDead = true, rateLimit = 250,
     params = { {'model', 'string', 60}, {'data', 'any'} },
-}, function(source, player, model, data)
+}, function(_, _, model, data)
     model = tostring(model or ''):lower():gsub('%s+', '')
     if model == '' or not model:match('^[%w_%-]+$') then return false, 'A model name is letters, digits, _ and -' end
     local clean, any = cleanFields(data, false)
@@ -986,7 +991,7 @@ end)
 SecureCallback('whip_core:vm:clearModelStorage', {
     ace = VM_ACE, whileDead = true, rateLimit = 250,
     params = { {'model', 'string', 60} },
-}, function(source, player, model)
+}, function(_, _, model)
     model = tostring(model or ''):lower():gsub('%s+', '')
     if not Vehicles.metaCache[model] then return false, 'That model has nothing of its own' end
     local used, why = usedByModel()
@@ -1026,7 +1031,7 @@ end
 SecureCallback('whip_core:vm:setClassStorage', {
     ace = VM_ACE, whileDead = true, rateLimit = 250,
     params = { {'class', 'any'}, {'data', 'any'} },
-}, function(source, player, rawClass, data)
+}, function(_, _, rawClass, data)
     local class = classOf(rawClass)
     if not class then return false, 'No such category' end
     local clean, any = cleanFields(data, true)
@@ -1047,7 +1052,7 @@ end)
 SecureCallback('whip_core:vm:clearClassStorage', {
     ace = VM_ACE, whileDead = true, rateLimit = 250,
     params = { {'class', 'any'} },
-}, function(source, player, rawClass)
+}, function(_, _, rawClass)
     local class = classOf(rawClass)
     if not class then return false, 'No such category' end
     if not Vehicles.classMetaCache[class] then return false, 'That category has nothing of its own' end

@@ -10,21 +10,23 @@
 -- It runs in YOUR resource (whip_core forgets everything when it restarts; this has to remember
 -- across that), on the server and the client alike.
 
+-- The stubs are declared on the class and Whip is given its type at the end of this file, so an editor that also has
+-- lib/satellite.lua open (whip_core itself) reads that file as their implementation, not as second definitions.
 ---@class WhipSatellite
-Whip = {}
+local WhipSatellite = {}
 
 --- Run `fn` when whip_core is ready (whichever of you started first), and again every time
 --- whip_core restarts. Put everything you register with whip in it. Not re-run when some other
 --- resource starts.
 ---@param fn fun()
-function Whip.register(fn) end
+function WhipSatellite.register(fn) end
 
 --- Only for a resource WITHOUT `dependency 'whip_core'` (with it, your resource is stopped first and this
 --- never runs). Run `fn` when whip_core stops — to let go of something that only made sense while it ran.
 --- Registrations need no cleanup. A handler still waiting in `exports.whip_core:Progress` is never
 --- answered, so clear what it holds here — or make that call through Whip.call.
 ---@param fn fun()
-function Whip.onCoreLost(fn) end
+function WhipSatellite.onCoreLost(fn) end
 
 --- A registry of your own, with whip's rule: an entry is its first registrant's; the same again changes nothing;
 --- a changed one replaces it; another resource's is refused (said once in your console); a resource's entries
@@ -34,17 +36,17 @@ function Whip.onCoreLost(fn) end
 ---@param name string
 ---@param opts { label?: string, scoped?: boolean, sweep?: boolean, same?: function|false, validate?: function, onAdd?: function, onRemove?: function, prefixed?: boolean }|nil
 ---@return { add: fun(self, owner: string, id: string|number, value: any, opts?: table): boolean, any, remove: fun(self, owner: string, id: string|number): boolean, string?, get: fun(self, key: any): any, ownerOf: fun(self, key: any): string?, keysOf: fun(self, owner: string): any[], entries: table }
-function Whip.registry(name, opts) end
+function WhipSatellite.registry(name, opts) end
 
 --- The resource calling your export, or your own name when nothing did. Read it first, before anything waits.
 ---@return string
-function Whip.caller() end
+function WhipSatellite.caller() end
 
 --- Run `fn` now if `resource` is running, and again each time it starts: register with another resource's
 --- registry so its restart brings yours back. Each run in its own thread.
 ---@param resource string
 ---@param fn fun()
-function Whip.registerWith(resource, fn) end
+function WhipSatellite.registerWith(resource, fn) end
 
 --- SERVER. A command behind whip's gate, as a SecureEvent is: refused while the player is down (unless
 --- whileDead), rate limited (3 at once, then one a second, unless rateLimit = false), and with dev = true only the
@@ -53,24 +55,24 @@ function Whip.registerWith(resource, fn) end
 ---@param name string
 ---@param opts { dev?: boolean, ace?: string, whileDead?: boolean, rateLimit?: false|{ burst: number, everyMs: number }, console?: boolean }|nil
 ---@param fn fun(source: number, args: string[], raw: string)
-function Whip.command(name, opts, fn) end
+function WhipSatellite.command(name, opts, fn) end
 
 --- Is this server's whip_core at least `min` ('1.2' or '1.2.0')? Says so once in the console when it is not.
 --- Put the same in your fxmanifest.lua (`whip_requires '1.2'`) and the setup report checks it too.
 ---@param min string
 ---@return boolean
-function Whip.requires(min) end
+function WhipSatellite.requires(min) end
 
 --- Has this server's whip_core the export `name` on this side? For a call newer than the oldest whip you support.
 ---@param name string
 ---@return boolean
-function Whip.has(name) end
+function WhipSatellite.has(name) end
 
 --- Is version `have` at least `want`? ('1.2' is 1.2.0.)
 ---@param have string
 ---@param want string
 ---@return boolean
-function Whip.versionAtLeast(have, want) end
+function WhipSatellite.versionAtLeast(have, want) end
 
 --- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
 --- whip_core is not running or the call threw. An export that waits (Progress, SkillCheck, a
@@ -80,7 +82,7 @@ function Whip.versionAtLeast(have, want) end
 ---@param name string The export's name, e.g. 'AddItem'
 ---@param ... any
 ---@return any ...
-function Whip.call(name, ...) end
+function WhipSatellite.call(name, ...) end
 
 --- whip_core's exports, each through Whip.call: `Whip.core:AddItem(source, 'cookie', 1)`. The same params and
 --- answers as `exports.whip_core:AddItem`, plus `false, why` when whip_core is not running, the call threw, or
@@ -88,37 +90,37 @@ function Whip.call(name, ...) end
 --- commands, timers, NUI callbacks); inside one (SecureEvent, SecureCallback, a use handler, a right-click
 --- action) call exports.whip_core straight. Not for per-frame code: each call is a thread of its own.
 ---@type WhipCoreServerExports|WhipCoreClientExports
-Whip.core = {}
+WhipSatellite.core = {}
 
 --- Wait until whip_core is ready. Only inside a thread. False when it timed out.
 ---@param timeoutMs? number
 ---@return boolean ready
-function Whip.ready(timeoutMs) end
+function WhipSatellite.ready(timeoutMs) end
 
 --- Is whip_core running and ready right now?
 ---@return boolean
-function Whip.isReady() end
+function WhipSatellite.isReady() end
 
 --- Your Config as a settings page in /whip → Config: each entry's `key` is a path into `config`
 --- (default: Config), its value there is the default, and an admin's change is written back into it
 --- on every side. docs.html#registersettings has every entry field.
 ---@param def { label: string, settings?: table[], groups?: { label: string, settings: table[] }[], config?: table }
 ---@return boolean ok False when def is not a page (printed)
-function Whip.configPage(def) end
+function WhipSatellite.configPage(def) end
 
 --- fn(value, old, path) after a Config value on your page changes on this side: an admin's change, or
 --- a saved value written over config.lua's as the page is declared. Hears its own path, anything under
 --- it ('Shop' hears 'Shop.radius') and a change to a table it is inside. Call it at file scope.
 ---@param path string
 ---@param fn fun(value: any, old: any, path: string)
-function Whip.onConfigChanged(path, fn) end
+function WhipSatellite.onConfigChanged(path, fn) end
 
 --- CLIENT. A row of yours on the pause menu's Server Settings page: a choice each player makes for
 --- themselves, kept by your resource (get / set). Call it at file scope; it registers inside
 --- Whip.register itself. docs.html#whip-playersetting has every field.
 ---@param def WhipPlayerSettingDef
 ---@return boolean ok False when def has no key, get or set, or on the server (printed)
-function Whip.playerSetting(def) end
+function WhipSatellite.playerSetting(def) end
 
 -- ---- The voice system ----
 
@@ -129,7 +131,7 @@ function Whip.playerSetting(def) end
 
 --- The voice system running now, or false: none. Never name a voice resource; ask this.
 ---@return WhipVoiceSystem|false
-function Whip.voiceSystem() end
+function WhipSatellite.voiceSystem() end
 
 --- Call one of the voice system's exports ('OpenLine', 'CloseLine', 'SetLineSpeaker', 'IsVoiceReady', ...).
 --- Answers what the export answers, or false and why: no voice system, or the call threw. A line is yours
@@ -138,7 +140,7 @@ function Whip.voiceSystem() end
 ---@param ... any
 ---@return any answer
 ---@return string|nil why
-function Whip.voice(name, ...) end
+function WhipSatellite.voice(name, ...) end
 
 -- ---- Director cards and scenarios (SERVER) ----
 
@@ -219,24 +221,24 @@ function WhipDirectorCard:log(fmt, ...) end
 ---@param t string
 ---@param def WhipDirectorCardDef
 ---@return boolean ok False when it is not a card (printed)
-function Whip.card(t, def) end
+function WhipSatellite.card(t, def) end
 
 --- SERVER. Take one of your cards away (it goes by itself when your resource stops).
 ---@param t string
 ---@return boolean ok
 ---@return string|nil why
-function Whip.removeCard(t) end
+function WhipSatellite.removeCard(t) end
 
 --- SERVER. A Director scenario built in code, offered to the server's Director admins (pending until one
 --- accepts it, unless they trust your resource), then read-only there.
 ---@param key string
 ---@param doc table A scenario document, as the editor saves it (format 1)
-function Whip.scenario(key, doc) end
+function WhipSatellite.scenario(key, doc) end
 
 --- SERVER. A starting point in the Director editor's New list: a builder's copy is theirs.
 ---@param name string
 ---@param doc table
-function Whip.template(name, doc) end
+function WhipSatellite.template(name, doc) end
 
 --- SERVER. A thread card's answer, later: card.callId, the outcome (one of its outputs), and data
 --- (data.source: which of the run's players what follows acts for).
@@ -245,7 +247,7 @@ function Whip.template(name, doc) end
 ---@param data? table
 ---@return boolean ok
 ---@return string|nil why
-function Whip.answerCard(callId, outcome, data) end
+function WhipSatellite.answerCard(callId, outcome, data) end
 
 ---@class WhipDirectorTaskField
 ---@field key string                  'at' for a point, 'target' for a target
@@ -284,13 +286,13 @@ function Whip.answerCard(callId, outcome, data) end
 ---@param t string
 ---@param def WhipDirectorTaskDef
 ---@return boolean ok
-function Whip.task(t, def) end
+function WhipSatellite.task(t, def) end
 
 --- BOTH SIDES. Take one of your tasks away on this side (they go by themselves when your resource stops).
 ---@param t string
 ---@return boolean ok
 ---@return string|nil why
-function Whip.removeTask(t) end
+function WhipSatellite.removeTask(t) end
 
 ---@alias WhipWeaponGroup 'pistol'|'smg'|'rifle'|'machine gun'|'shotgun'|'sniper'|'heavy'|'thrown'|'stun gun'|'melee'
 
@@ -313,12 +315,12 @@ function Whip.removeTask(t) end
 ---@param list WhipWeaponDef[]
 ---@param opts? { tag?: string }   tag (16 at most): shown beside each label, "Pump Shotgun (mine)"; your resource's name unless given
 ---@return boolean ok   false when `list` is not a list (printed); whip_core's own refusal is printed too
-function Whip.weapons(list, opts) end
+function WhipSatellite.weapons(list, opts) end
 
 --- BOTH SIDES. Take all of your weapons away on this side (they go by themselves when your resource stops).
 ---@return boolean ok
 ---@return string|nil why
-function Whip.removeWeapons() end
+function WhipSatellite.removeWeapons() end
 
 ---@class WhipDirectorThing   what a button's press is handed
 ---@field id string
@@ -358,13 +360,13 @@ function WhipDirectorThing:back(data) end
 ---@param id string
 ---@param def WhipDirectorButtonDef
 ---@return boolean ok
-function Whip.directorButton(id, def) end
+function WhipSatellite.directorButton(id, def) end
 
 --- CLIENT. Take one of your buttons away (they go by themselves when your resource stops).
 ---@param id string
 ---@return boolean ok
 ---@return string|nil why
-function Whip.removeDirectorButton(id) end
+function WhipSatellite.removeDirectorButton(id) end
 
 ---@class WhipObjectViewerTarget
 ---@field kind 'vehicle'|'player'|'npc'|'object'
@@ -393,13 +395,13 @@ function Whip.removeDirectorButton(id) end
 ---@param id string
 ---@param def WhipObjectViewerOptionDef
 ---@return boolean ok
-function Whip.objectViewerOption(id, def) end
+function WhipSatellite.objectViewerOption(id, def) end
 
 --- CLIENT. Take one of your object viewer options away.
 ---@param id string
 ---@return boolean ok
 ---@return string|nil why
-function Whip.removeObjectViewerOption(id) end
+function WhipSatellite.removeObjectViewerOption(id) end
 
 ---@class WhipSkillCheckGameLevel
 ---@field minMs number       faster than this cannot be honest (it fails as 'too fast')
@@ -423,19 +425,19 @@ function Whip.removeObjectViewerOption(id) end
 ---@param id string
 ---@param def WhipSkillCheckGameDef
 ---@return boolean ok  false when it is not a game (printed)
-function Whip.skillCheckGame(id, def) end
+function WhipSatellite.skillCheckGame(id, def) end
 
 --- BOTH SIDES. Take one of your skill check games away (a check playing it now ends, cancelled).
 ---@param id string
 ---@return boolean ok
-function Whip.removeSkillCheckGame(id) end
+function WhipSatellite.removeSkillCheckGame(id) end
 
 --- CLIENT. This game's player index for a server id, or nil when that player is not in this game. Never
 --- GetPlayerFromServerId's answer alone: it is -1 on Legacy but 0 on Enhanced for a player this game lacks, and 0 can
 --- be a real player (often you).
 ---@param serverId number
 ---@return number|nil
-function Whip.playerIndex(serverId) end
+function WhipSatellite.playerIndex(serverId) end
 
 ---@class WhipPadScreen
 local WhipPadScreen = {}
@@ -461,7 +463,7 @@ function WhipPadScreen:isPad() end
 --- Call it once at file scope. docs.html#whip-padscreen has every field.
 ---@param def? { buttons?: ('up'|'down'|'left'|'right'|'a'|'b'|'x'|'y'|'lb'|'rb'|'menu')[], stick?: boolean, releases?: table<string, boolean>, keepInput?: 'pad'|'always', block?: table|false, onButton?: fun(cmd: string, down: boolean, rep?: integer), onDevice?: fun(pad: boolean), onFrame?: fun() }
 ---@return WhipPadScreen
-function Whip.padScreen(def) end
+function WhipSatellite.padScreen(def) end
 
 -- ============================================
 -- WhipCost (lib/cost.lua): client_script '@whip_core/lib/cost.lua'
@@ -470,13 +472,23 @@ function Whip.padScreen(def) end
 --- Times sections of your client loops for /whipcost, and the memory each makes. Off unless /whipcost is running.
 ---@class WhipCostLib
 ---@field on boolean True while /whipcost runs
-WhipCost = {}
+local WhipCostLib = {}
 
 --- The start of a section: a reading for stop(), or nil while nothing is timing.
 ---@return number|nil
-function WhipCost.start() end
+function WhipCostLib.start() end
 
 --- The end of a section. Never a Wait() in between: a run that waited a frame is left out.
 ---@param name string Its line in the table, as 'area: what'
 ---@param started number|nil What start() returned
-function WhipCost.stop(name, started) end
+function WhipCostLib.stop(name, started) end
+
+--- CLIENT. The end of the timing in this resource: its totals handed to whip_core. /whipcost's stop calls it; your
+--- resource never needs to.
+function WhipCostLib.finish() end
+
+---@type WhipSatellite
+Whip = WhipSatellite
+
+---@type WhipCostLib
+WhipCost = WhipCostLib

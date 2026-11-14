@@ -84,11 +84,11 @@ Whip.register(function()
 
         local run = { done = 0 }
         runs[source] = run   -- held now, so a second press is refused while the van is made
-        local function undo(why, receipt, vanId)
+        local function undo(reason, receipt, vanId)
             if runs[source] == run then runs[source] = nil end
             if vanId then exports.whip_core:DespawnVehicle(vanId) end
             if receipt then exports.whip_core:RefundPlayer(receipt) end
-            return false, why
+            return false, reason
         end
 
         local receipt, err = exports.whip_core:ChargePlayer(source, Config.Deposit, { method = 'bank', reason = 'Van deposit' })
@@ -130,12 +130,12 @@ Whip.register(function()
         local stop = currentStop(run)
         if not exports.whip_core:HasItem(source, PACKAGE) then return false, 'Take a package from the van first' end
 
-        local done, why = exports.whip_core:Progress(source, {
+        local done, reason = exports.whip_core:Progress(source, {
             label    = 'Delivering...',
             duration = 4000,
             near     = { coords = stop.coords, range = 3.0 },
         })
-        if not done then return false, why end
+        if not done then return false, reason end
         if runs[source] ~= run or not exports.whip_core:IsSessionCurrent(source, player.session) then return end
 
         local taken, terr = exports.whip_core:RemoveItem(source, PACKAGE, 1, 'delivered')

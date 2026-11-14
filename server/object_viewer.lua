@@ -191,7 +191,7 @@ local function describe(source, entity, sid)
             holds = { hidden = mask & HIDDEN ~= 0, invincible = mask & INVINCIBLE ~= 0, frozen = mask & FROZEN ~= 0 },
             players = onlineList(source),
         }
-        if out.whip then
+        if v and out.whip then
             out.owner = v.owner and v.owner.charId and {
                 charId = v.owner.charId,
                 name = v.owner.name or (ResolveCharNames({ v.owner.charId }) or {})[v.owner.charId],
@@ -258,7 +258,7 @@ SecureCallback('whip_core:ov:origin', {
     rateLimit = 100,
     burst = 10,
     params = { { 'net', 'id' } },
-}, function(source, player, net)
+}, function(_, _, net)
     if net > 65535 then return false, 'No such entity' end
     local ent = NetworkGetEntityFromNetworkId(net)
     if not ent or ent == 0 or not DoesEntityExist(ent) then return false, 'It is not there any more' end
@@ -271,7 +271,7 @@ SecureCallback('whip_core:ov:describe', {
     rateLimit = 200,
     burst = 5,
     params = { { 'ref', 'any' } },
-}, function(source, player, ref)
+}, function(source, _, ref)
     local entity, sid = resolve(ref)
     if not entity then
         local o = otherOf(ref)
@@ -416,7 +416,7 @@ end
 
 --- A street car (or one whip only noticed) made a saved car of `ownerSid`'s, where it stands: the record first, so
 --- nothing is lost if that fails; then this car goes and theirs comes out in its place.
-local function makeOwned(source, entity, ownerSid, model, props)
+local function makeOwned(_, entity, ownerSid, model, props)
     local owner = Players[ownerSid]
     if not owner then return false, 'They are not loaded in' end
     if type(model) ~= 'string' or model == '' or unsigned(GetHashKey(model)) ~= unsigned(GetEntityModel(entity)) then
@@ -458,16 +458,18 @@ for _, e in ipairs(EmoteList and EmoteList.emotes or {}) do EMOTES[e.cmd] = true
 local ACTIONS = {}
 
 -- ---- whip's own cars ----
+--
+-- (Kind 'saved': misfit has found each one's id before it runs.)
 
-ACTIONS['veh.garage'] = { kind = 'saved', fn = function(source, entity)
-    local vid = savedCar(entity)
+ACTIONS['veh.garage'] = { kind = 'saved', fn = function(_, entity)
+    local vid = savedCar(entity) --[[@as number]]
     local ok, err = Vehicles.despawnToGarage(vid)
     if not ok then return false, err or 'It could not be put away' end
     return true, ('Vehicle #%d is back in its garage'):format(vid)
 end }
 
-ACTIONS['veh.stat'] = { kind = 'saved', fn = function(source, entity, _, arg)
-    local vid = savedCar(entity)
+ACTIONS['veh.stat'] = { kind = 'saved', fn = function(_, entity, _, arg)
+    local vid = savedCar(entity) --[[@as number]]
     local stat = type(arg) == 'table' and Sanitize.key(arg.stat, 40)
     local value = type(arg) == 'table' and tonumber(arg.value)
     if not stat or not value or value ~= value then return false, 'A stat and a number' end
@@ -487,8 +489,8 @@ ACTIONS['veh.delete'] = { kind = 'saved', fn = function(source, entity)
     return true, ('Vehicle #%d deleted'):format(vid), { gone = true }
 end }
 
-ACTIONS['veh.owner'] = { kind = 'saved', fn = function(source, entity, _, arg)
-    local vid = savedCar(entity)
+ACTIONS['veh.owner'] = { kind = 'saved', fn = function(_, entity, _, arg)
+    local vid = savedCar(entity) --[[@as number]]
     local charId = type(arg) == 'table' and Sanitize.id(arg.charId)
     if not charId then return false, 'Pick who it goes to' end
     local ok, err = Vehicles.transferOwner(vid, charId)
@@ -515,7 +517,7 @@ ACTIONS['veh.explode'] = { kind = 'vehicle', fn = function(source, entity)
     return true, 'Boom'
 end }
 
-ACTIONS['veh.eject'] = { kind = 'vehicle', fn = function(source, entity)
+ACTIONS['veh.eject'] = { kind = 'vehicle', fn = function(_, entity)
     local n = ejectAll(entity)
     if n == 0 then return false, 'Nobody is in it' end
     return true, n == 1 and 'One out' or (n .. ' out')
@@ -552,7 +554,7 @@ ACTIONS['veh.own'] = { kind = 'street', fn = function(source, entity, _, arg)
 end }
 
 for name, bit in pairs(HOLD_BIT) do
-    ACTIONS['veh.' .. name] = { kind = 'saved', fn = function(source, entity)
+    ACTIONS['veh.' .. name] = { kind = 'saved', fn = function(_, entity)
         local on = toggleHold(entity, bit)
         return true, nil, { on = on }
     end }
@@ -560,18 +562,18 @@ end
 
 -- ---- players ----
 
-ACTIONS['ply.heal'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.heal'] = { kind = 'player', fn = function(_, _, sid)
     if Players[sid].isDead then return false, 'They are down: Revive them' end
     Stats.set(sid, 'health', 1e9, 'ov:admin')
     return true, 'Health restored'
 end }
 
-ACTIONS['ply.armour'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.armour'] = { kind = 'player', fn = function(_, _, sid)
     Stats.set(sid, 'armour', 1e9, 'ov:admin')
     return true, 'Armour restored'
 end }
 
-ACTIONS['ply.revive'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.revive'] = { kind = 'player', fn = function(_, _, sid)
     local p = Players[sid]
     if not p.isDead then return false, 'They are not down' end
     MarkPlayerAlive(sid, p, 'revive:admin')
@@ -579,13 +581,13 @@ ACTIONS['ply.revive'] = { kind = 'player', fn = function(source, _, sid)
     return true, 'Revived'
 end }
 
-ACTIONS['ply.kill'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.kill'] = { kind = 'player', fn = function(_, _, sid)
     if Players[sid].isDead then return false, 'They are already down' end
     TriggerClientEvent('whip_core:client:devKillMe', sid)
     return true, 'Downed'
 end }
 
-ACTIONS['ply.fire'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.fire'] = { kind = 'player', fn = function(_, _, sid)
     TriggerClientEvent('whip_core:client:ovSelf', sid, 'fire')
     return true, 'On fire'
 end }
@@ -596,13 +598,14 @@ ACTIONS['ply.escort'] = { kind = 'player', fn = function(source, _, sid)
     return true, 'Escorting them'
 end }
 
-ACTIONS['ply.creator'] = { kind = 'player', fn = function(source, _, sid)
+ACTIONS['ply.creator'] = { kind = 'player', fn = function(_, _, sid)
     if Players[sid].isDead then return false, 'They are down' end
     TriggerClientEvent('whip_core:client:ovSelf', sid, 'creator')
     return true, 'Their character editor is open'
 end }
 
-ACTIONS['ply.model'] = { kind = 'player', fn = function(source, _, sid, arg)
+ACTIONS['ply.model'] = { kind = 'player', fn = function(_, _, sid, arg)
+    ---@type string|false|nil
     local model = type(arg) == 'table' and arg.model
     if model ~= false then
         model = type(model) == 'string' and model:match('^[%w_]+$') and #model <= 40 and model or nil
@@ -613,14 +616,14 @@ ACTIONS['ply.model'] = { kind = 'player', fn = function(source, _, sid, arg)
     return true, model and ('Wearing ' .. model) or 'Back in their own look', { model = models[sid] or false }
 end }
 
-ACTIONS['ply.walk'] = { kind = 'player', fn = function(source, _, sid, arg)
+ACTIONS['ply.walk'] = { kind = 'player', fn = function(_, _, sid, arg)
     local walk = type(arg) == 'table' and arg.walk
     if walk ~= false and not WALKS[walk] then return false, 'Pick a walk' end
     TriggerClientEvent('whip_core:client:ovSelf', sid, 'walk', walk)
     return true, walk and ('Walking ' .. walk) or 'Their normal walk'
 end }
 
-ACTIONS['ply.emote'] = { kind = 'player', fn = function(source, _, sid, arg)
+ACTIONS['ply.emote'] = { kind = 'player', fn = function(_, _, sid, arg)
     local cmd = type(arg) == 'table' and arg.cmd
     if cmd ~= false and not EMOTES[cmd] then return false, 'Pick an emote' end
     if Players[sid].isDead then return false, 'They are down' end
@@ -628,7 +631,7 @@ ACTIONS['ply.emote'] = { kind = 'player', fn = function(source, _, sid, arg)
     return true, cmd and ('Playing ' .. cmd) or 'Stopped'
 end }
 
-ACTIONS['ply.stat'] = { kind = 'player', fn = function(source, _, sid, arg)
+ACTIONS['ply.stat'] = { kind = 'player', fn = function(_, _, sid, arg)
     local stat = type(arg) == 'table' and Sanitize.key(arg.stat, 40)
     local value = type(arg) == 'table' and tonumber(arg.value)
     if not stat or not value or value ~= value then return false, 'A stat and a number' end
@@ -638,7 +641,7 @@ ACTIONS['ply.stat'] = { kind = 'player', fn = function(source, _, sid, arg)
 end }
 
 for _, name in ipairs({ 'frozen', 'noCombat' }) do
-    ACTIONS['ply.' .. name] = { kind = 'player', fn = function(source, _, sid)
+    ACTIONS['ply.' .. name] = { kind = 'player', fn = function(_, _, sid)
         local h = pholds[sid] or {}
         h[name] = not h[name]
         pholds[sid] = (h.frozen or h.noCombat) and h or nil
@@ -668,13 +671,13 @@ end }
 
 -- ---- networked objects (another resource's, or GTA's) ----
 
-ACTIONS['obj.remove'] = { kind = 'object', fn = function(source, entity)
+ACTIONS['obj.remove'] = { kind = 'object', fn = function(_, entity)
     DeleteEntity(entity)
     return true, 'Removed', { gone = true }
 end }
 
 for _, name in ipairs({ 'hidden', 'frozen' }) do
-    ACTIONS['obj.' .. name] = { kind = 'object', fn = function(source, entity)
+    ACTIONS['obj.' .. name] = { kind = 'object', fn = function(_, entity)
         return true, nil, { on = toggleHold(entity, HOLD_BIT[name]) }
     end }
 end
@@ -726,6 +729,7 @@ ACTIONS['live.calm'] = { kind = 'live', fn = function(source, entity)
 end }
 
 ACTIONS['live.weapon'] = { kind = 'live', fn = function(source, entity, _, arg)
+    ---@type string|false|nil
     local w = type(arg) == 'table' and arg.weapon
     if w ~= false then
         w = type(w) == 'string' and w:upper() or nil
@@ -759,6 +763,7 @@ ACTIONS['live.key'] = { kind = 'liveCar', fn = function(source, entity, _, arg)
     -- shows the truth, not what was asked: ov_panel.lua.)
     local ok, now, stands = DirectorLive.setKey(source, liveOf(entity), arg)
     if not ok then return false, now, stands and { carKey = stands } or nil end
+    ---@cast now table
     local said = { none = 'No key', player = 'Its key is ' .. tostring(now.who) .. '\'s', ignition = 'Its key is in the ignition',
                    glovebox = 'Its key is in the glovebox', trunk = 'Its key is in the boot', ground = 'Its key is on the ground beside it' }
     return true, (said[now.where] or 'Saved') .. (now.locked and ', locked' or ''), { carKey = now }
@@ -844,10 +849,10 @@ local function logPile(source, event, item, amount, row, what)
         detail = ('%s by %s · on the ground'):format(what, whoName(source)) })
 end
 
-ACTIONS['pile.place'] = { kind = 'pile', fn = function(source, o, _, arg)
+ACTIONS['pile.place'] = { kind = 'pile', fn = function(_, o, _, arg)
     arg = type(arg) == 'table' and arg or {}
     local x, y, z, h = tonumber(arg.x), tonumber(arg.y), tonumber(arg.z), tonumber(arg.heading) or 0.0
-    if not (finite(x) and finite(y) and finite(z) and finite(h)) or math.abs(x) > 20000 or math.abs(y) > 20000 or z < -500 or z > 3000 then
+    if not (finite(x) and finite(y) and finite(z) and finite(h)) or math.abs(x --[[@as number]]) > 20000 or math.abs(y --[[@as number]]) > 20000 or z < -500 or z > 3000 then
         return false, 'That is not a place in the world'
     end
     return withPile(o, function(row)
@@ -860,10 +865,10 @@ end }
 
 --- An NPC moved by hand (Dungeon Mode's markers on a run's or a script's NPC): one of whip's stands there from now on (its
 --- post), or it would walk back to the old one. Another ped has no post: its new place is its owner game's to keep.
-ACTIONS['npc.place'] = { kind = 'npc', fn = function(source, entity, _, arg)
+ACTIONS['npc.place'] = { kind = 'npc', fn = function(_, entity, _, arg)
     arg = type(arg) == 'table' and arg or {}
     local x, y, z, h = tonumber(arg.x), tonumber(arg.y), tonumber(arg.z), tonumber(arg.heading) or 0.0
-    if not (finite(x) and finite(y) and finite(z) and finite(h)) or math.abs(x) > 20000 or math.abs(y) > 20000 or z < -500 or z > 3000 then
+    if not (finite(x) and finite(y) and finite(z) and finite(h)) or math.abs(x --[[@as number]]) > 20000 or math.abs(y --[[@as number]]) > 20000 or z < -500 or z > 3000 then
         return false, 'That is not a place in the world'
     end
     local id = Npcs.by('entity', entity)
@@ -968,7 +973,7 @@ for _, kind in ipairs({ 'smoke', 'sparks', 'flames', 'steam', 'light' }) do
 end
 
 --- A real explosion where it stands, set off by the asker's game (the server makes none): it says where.
-ACTIONS['fx.boom'] = { kind = 'fx', fn = function(source, thing)
+ACTIONS['fx.boom'] = { kind = 'fx', fn = function(_, thing)
     local ft = fxTargetOf(thing)
     if not ft then return false, 'Where?' end
     return true, 'Boom', { boom = ft.at }
@@ -1105,7 +1110,7 @@ SecureCallback('whip_core:ov:act', {
     rateLimit = 150,
     burst = 8,
     params = { { 'ref', 'any' }, { 'action', 'enum', KEYS }, { 'arg', 'any' } },
-}, function(source, player, ref, action, arg)
+}, function(source, _, ref, action, arg)
     if PERMANENT[action] and not DevTools.hasAce(source, OV_ACE) then
         return false, 'Only an admin can do that: it lasts past a restart'
     end
@@ -1121,14 +1126,14 @@ SecureCallback('whip_core:ov:act', {
     if entity then
         what, charId = logName(entity, sid)
         at = GetEntityCoords(entity)
-    elseif other.kind == 'set' then
+    elseif other and other.kind == 'set' then
         local t = liveProp(other)
         if t then what, at = ('a Dungeon prop (%s, made by %s)'):format(tostring(t.model), tostring(t.by)), t.coords
         else what, at = 'a script\'s prop', { x = 0.0, y = 0.0, z = 0.0 } end
-    elseif other.kind == 'pile' then
+    elseif other and other.kind == 'pile' then
         local r = other.row
         what, at = ('a ground item (%s x%d)'):format(tostring(r.item), r.amount or 1), { x = r.x, y = r.y, z = r.z }
-    else
+    elseif other then
         local m = other.map
         what = ('a map prop (%s)'):format(tostring(type(m.name) == 'string' and m.name or m.model))
         at = { x = tonumber(m.x) or 0.0, y = tonumber(m.y) or 0.0, z = tonumber(m.z) or 0.0 }
@@ -1161,7 +1166,7 @@ SecureEvent('whip_core:server:ovMovePlayer', {
     burst = 20,
     params = { { 'sid', 'id' }, { 'x', 'number', -20000, 20000 }, { 'y', 'number', -20000, 20000 },
                { 'z', 'number', -500, 3000 }, { 'heading', 'number', -720, 720 } },
-}, function(source, player, sid, x, y, z, heading)
+}, function(source, _, sid, x, y, z, heading)
     if not Players[sid] then return false, 'They are not loaded in' end
     local ped = GetPlayerPed(sid)
     if not ped or ped == 0 then return false, 'They are not in the world' end

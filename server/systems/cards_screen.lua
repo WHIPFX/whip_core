@@ -201,6 +201,7 @@ define({
             if not src then return 'failed' end
         end
         -- In a Test, "everyone" is the tester.
+        ---@type string|table
         local audience = 'everyone'
         if src then
             local p = Players[src]

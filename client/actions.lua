@@ -89,8 +89,6 @@
 
 Actions = {}
 
-local CORE = GetCurrentResourceName()
-
 --- What each action is mounted as: [key] = { kind, ids = { engineId, ... }, partKey?, entity? }
 local mounted = {}
 
@@ -449,9 +447,11 @@ local function pressTarget(press, ctx, at, here, faceH)
         local ent = ctx.entity
         if ent and DoesEntityExist(ent) then
             -- In the entity's frame, the normal too.
-            local p = GetOffsetFromEntityInWorldCoords(ent, ox, oy, oz)
+            -- (point3 answers all three or none.)
+            local p = GetOffsetFromEntityInWorldCoords(ent, ox, oy --[[@as number]], oz --[[@as number]])
             if normal then
-                normal = GetOffsetFromEntityInWorldCoords(ent, nx, ny, nz) - GetEntityCoords(ent)
+                normal = GetOffsetFromEntityInWorldCoords(ent, nx --[[@as number]], ny --[[@as number]], nz --[[@as number]])
+                    - GetEntityCoords(ent)
             end
             return p, normal
         end
@@ -563,11 +563,11 @@ local function startRiding()
         while next(riding) do
             local gone = {}
             for key, r in pairs(riding) do
-                local x, y, z = ridePoint(r.at)
+                local x, y, z = ridePoint(r.at)   -- (all three, or nil)
                 if r.at.netId ~= nil then
                     if x then
                         if r.live then
-                            Interactions.updatePosition(r.pid, x, y, z)
+                            Interactions.updatePosition(r.pid, x, y --[[@as number]], z --[[@as number]])
                         else
                             -- Back in: re-registered from what it was mounted with.
                             local m = mounted[key]
@@ -582,7 +582,7 @@ local function startRiding()
                     end
                 elseif x then
                     r.missing = 0
-                    Interactions.updatePosition(r.pid, x, y, z)
+                    Interactions.updatePosition(r.pid, x, y --[[@as number]], z --[[@as number]])
                 else
                     r.missing = (r.missing or 0) + 1
                     if r.missing >= RIDE_GONE_TICKS then gone[#gone + 1] = r end
@@ -651,7 +651,7 @@ end
 local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
     local def = entry.def
     local down = menuAt[pid]
-    local list = down and optionsUnder(down) or entry.opts
+    local level = down and optionsUnder(down) or entry.opts
     local options = {}
     local function open() return gate == nil or gate() == true end
 
@@ -671,7 +671,7 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
         }
     end
 
-    for _, o in ipairs(list) do
+    for _, o in ipairs(level) do
         local c = condCtx(entry, o)
         -- Refresh the shared ctx right before each check: what is being typed (a value), the entity (by
         -- netId it can change handle), and a model action's prop details.
@@ -1095,9 +1095,9 @@ local function kindOf(at)
     end
     -- Every prop of a model, or of any of a list.
     if at.model ~= nil then
-        local list = type(at.model) == 'table' and at.model or { at.model }
-        local bad = #list == 0
-        for _, m in ipairs(list) do
+        local models = type(at.model) == 'table' and at.model or { at.model }
+        local bad = #models == 0
+        for _, m in ipairs(models) do
             if type(m) ~= 'string' or m == '' then bad = true end
         end
         if bad then return nil, "at.model is a prop's model name ('prop_vend_soda_01'), or a list of them" end
@@ -1128,9 +1128,9 @@ local function isMenuDef(o) return type(o) == 'table' and type(o.options) == 'ta
 
 --- An option list read field by field (InteractSpec), every menu down; a misspelt field is warned about at its
 --- path. `menus`: false on a place that has none, where a menu is warned about and dropped.
-local function readOptions(list, path, warn, menus)
+local function readOptions(opts, path, warn, menus)
     local out = {}
-    for i, o in ipairs(list) do
+    for i, o in ipairs(opts) do
         local at = ('%s[%d]'):format(path, i)
         if type(o) == 'table' and not InteractSpec.callable(o) then
             local r = InteractSpec.read(o, InteractSpec.ACTION_OPTION, at, warn, InteractSpec.HINT.ACTION_OPTION)
@@ -1154,8 +1154,8 @@ local function readOptions(list, path, warn, menus)
 end
 
 --- Warn about an option that does nothing when pressed (a menu's own entry needs no onSelect).
-local function warnLeaves(list, inherited, path, warn)
-    for i, o in ipairs(list) do
+local function warnLeaves(opts, inherited, path, warn)
+    for i, o in ipairs(opts) do
         local fn = o.onSelect ~= nil and o.onSelect or inherited
         if isMenuDef(o) then
             warnLeaves(o.options, fn, ('%s[%d].options'):format(path, i), warn)
@@ -1167,8 +1167,8 @@ local function warnLeaves(list, inherited, path, warn)
 end
 
 --- Has anything in the action something to do? Its own onSelect, or any option's at any depth.
-local function anySelect(list)
-    for _, o in ipairs(type(list) == 'table' and list or {}) do
+local function anySelect(opts)
+    for _, o in ipairs(type(opts) == 'table' and opts or {}) do
         if type(o) == 'table' and (o.onSelect ~= nil or (isMenuDef(o) and anySelect(o.options))) then return true end
     end
     return false
@@ -1282,9 +1282,9 @@ local reg = Registry.new('action', {
         end
         -- One id per option in each menu (a repeat would silently replace the first), and every option's
         -- require, every level down.
-        local function checkLevel(list, under)
+        local function checkLevel(opts, under)
             local seen = {}
-            for i, o in ipairs(list) do
+            for i, o in ipairs(opts) do
                 if type(o) == 'table' then
                     local oid = o.id ~= nil and tostring(o.id) or ('opt' .. i)
                     if seen[oid] then
@@ -1379,7 +1379,7 @@ function Actions.add(owner, def)
         warnings = warn
     end
     local ok, why = reg:add(owner, copy.id, copy)
-    if not ok then return false, why, warnings end
+    if not ok then return false, why --[[@as string]], warnings end
 
     -- An engine can still refuse (unknown car part, entity gone): the action is not kept and the caller hears why.
     local key = reg:keyOf(owner, copy.id)
@@ -1395,7 +1395,7 @@ end
 --- Change how one of `owner`'s actions looks and moves in place (no fade out and back in). A style's
 --- name, a style table, or nil for 'default'. The third answer is the warnings, as Actions.add's.
 ---@return boolean ok
----@return string|nil reason
+---@return string|false reason
 ---@return string[]|nil warnings
 function Actions.setStyle(owner, id, style)
     local key = reg:keyOf(owner, tostring(id))
@@ -1428,7 +1428,7 @@ end
 --- Change some of an action's fields. `patch` is merged over what it has; `at` is replaced whole.
 --- The third answer is the warnings, as Actions.add's.
 ---@return boolean ok
----@return string|nil reason
+---@return string|false reason
 ---@return string[]|nil warnings
 function Actions.update(owner, id, patch)
     if type(patch) ~= 'table' then return false, 'a patch is a table of the fields to change' end

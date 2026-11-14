@@ -127,7 +127,7 @@ function DirectorGraph.whereOf(doc)
     local function at(id)
         local w = find(id)
         local c = w and type(w.def) == 'table' and w.def.coords or nil
-        if not placed(c) then return nil end
+        if not w or not c or not placed(c) then return nil end
         return { world = id, label = type(w.label) == 'string' and w.label ~= '' and w.label or id,
                  coords = { x = tonumber(c.x), y = tonumber(c.y), z = tonumber(c.z) } }
     end
@@ -173,7 +173,7 @@ local function checkWorld(doc, world, problems)
     for _, n in ipairs(type(doc.nodes) == 'table' and doc.nodes or {}) do
         local def = type(n) == 'table' and DirectorNodes.get(n.type)
         local props = def and type(n.props) == 'table' and n.props or nil
-        if props then
+        if def and props then
             local named = {}
             for _, f in ipairs(def.props) do
                 for _, id in ipairs(Fields.worldIds(f, props[f.key], nil, world)) do
@@ -252,6 +252,7 @@ local function checkWorld(doc, world, problems)
                     worldProblem(problems, 'warning', ('"%s" is standing: it stays where it was placed (only one a run shows rides on what it is attached to)')
                         :format(name), id, uses, 'world')
                 else
+                    ---@type table, string|nil
                     local seen, at = { [id] = true }, to
                     while type(at) == 'string' and world[at] do
                         if seen[at] then
@@ -329,7 +330,7 @@ local function checkWorld(doc, world, problems)
             end
         end
         -- A route (server/director/routes.lua), and what a guard sees.
-        for _, pr in ipairs(DirectorRoutes.problems(w, world)) do
+        for _, pr in ipairs(DirectorRoutes.problems(w)) do
             worldProblem(problems, pr.severity, ('"%s": %s'):format(name, pr.why), id, uses, 'world')
         end
         if w.kind == 'npc' and type(def.vision) == 'table' and def.vision.on == true and w.layer == 'standing' then
@@ -469,7 +470,7 @@ local function checkWorld(doc, world, problems)
         -- Coming into a spot with a marker: before a run there is no crew and no thing of its own.
         local m = mode == 'area' and w and w.kind == 'spot' and type(w.def) == 'table' and type(w.def.marker) == 'table'
             and w.def.marker or nil
-        if m and (m.look == 'circle' or m.look == 'square' or m.look == 'garage') then
+        if w and m and (m.look == 'circle' or m.look == 'square' or m.look == 'garage') then
             if m.activate == 'thing' then
                 startProblem('error', ('It starts by coming into "%s", whose marker a placed thing sets off: before it starts there is none (pick Any player or A vehicle)')
                     :format(tostring(w.label or w.id)))
@@ -692,7 +693,7 @@ local function checkOne(doc)
         for _, to in ipairs(next(made) and pinTo[id .. '.out'] or {}) do
             local list = DirectorNodes.startsTasksForOf(byId[to])
             for _, wid in ipairs(list) do
-                if made[wid] and DirectorTasks.has(world[wid]) then
+                if d and made[wid] and DirectorTasks.has(world[wid]) then
                     local switch = 'Start their tasks'
                     for _, f in ipairs(d.props or {}) do if f.key == 'tasks' then switch = f.label end end
                     problem(problems, 'warning', to, ('%s already starts "%s"\'s tasks as it makes it (its %s): this card starts them again from the top. Take %s, or switch %s off on that card')
@@ -868,16 +869,16 @@ local function checkOne(doc)
         return not DirectorNodes.pinUnused(d, byId[id].props or {}, pin, wiredIn[id], outsOf[id])
     end
     local function reachFrom(strict)
-        local seen, stack = {}, {}
-        for _, id in ipairs(starts) do stack[#stack + 1] = id end
-        while #stack > 0 do
-            local id = table.remove(stack)
+        local seen, todo = {}, {}
+        for _, id in ipairs(starts) do todo[#todo + 1] = id end
+        while #todo > 0 do
+            local id = table.remove(todo)
             if not seen[id] then
                 seen[id] = true
                 local d = DirectorNodes.get(byId[id].type)
                 for _, pin in ipairs(d and d.outputs or {}) do
                     if canFire(id, d, pin, strict) then
-                        for _, to in ipairs(pinTo[id .. '.' .. pin] or {}) do stack[#stack + 1] = to end
+                        for _, to in ipairs(pinTo[id .. '.' .. pin] or {}) do todo[#todo + 1] = to end
                     end
                 end
             end
@@ -1075,7 +1076,7 @@ end
 
 --- Check a scenario document: with variants, each of them (a problem found the same in every one said once; one
 --- found in some, said with its variant: { variant, variantName }), and the variants themselves.
----@param doc table
+---@param raw table          the document, read the one way first (doc.lua)
 ---@return boolean ok        true when there are no errors (warnings allowed)
 ---@return table problems    { { severity = 'error'|'warning', node?, pin?, message, variant?, variantName? } }
 function DirectorGraph.check(raw)

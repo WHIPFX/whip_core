@@ -114,7 +114,7 @@ RegisterNUICallback('smPlaceSpot', function(data, cb)
             local h = GetEntityHeading(ped)
             -- The keeper's feet: a ring with an arrow pointing the way they will face.
             DrawMarker(26, c.x, c.y, c.z - 0.97, 0.0, 0.0, 0.0, 0.0, 0.0, h, 0.9, 0.9, 0.9,
-                255, 255, 255, 170, false, false, 2, false, nil, nil, false)
+                255, 255, 255, 170, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             local now = GetGameTimer()
             if now >= nextAt then
                 nextAt = now + 250

@@ -71,7 +71,7 @@ end
 --- SEPARATE FROM commas BECAUSE AN EMPTY FIELD IS NOT ZERO. Running the buffer through commas would
 --- turn "" into "0", so an untouched field would read "$0|" and look as though a zero had already
 --- been typed — which is exactly the moment the player is deciding whether the thing is listening.
----@param digits string
+---@param digits string|nil
 ---@return string
 local function commasTyped(digits)
     if digits == nil or digits == '' then return '' end

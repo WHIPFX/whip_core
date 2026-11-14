@@ -165,7 +165,7 @@ function Stats.register(name, config, owner)
 
     -- Ownership, the no-op and the broadcast are the registry's (_stats above).
     local ok, why = _stats:add(owner, name, entry)
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
     return true
 end
 
@@ -598,7 +598,7 @@ local developerWrite = false
 --- (never saved, so a typo would work for one session only).
 ---@param source number
 ---@param name string
----@param value number
+---@param value number|string|nil
 ---@param changeSource string|nil  Source of change for debug log (e.g., 'item:food', 'effect:poison')
 ---@return boolean ok
 ---@return string|nil err
@@ -685,7 +685,7 @@ end
 --- number is refused here rather than thrown on as `current + nil`.
 ---@param source number
 ---@param name string
----@param delta number
+---@param delta number|string|nil
 ---@param changeSource string|nil
 ---@return boolean ok
 ---@return string|nil err
@@ -804,6 +804,18 @@ end
 -- Effect System
 -- ============================================
 
+-- An effect's onApply, onRemove or onTick that throws is said once per effect, callback and error, filed under the
+-- resource that applied it (ErrorTap.caught: GetErrorLog lists it as theirs), never swallowed. Once, because onTick
+-- runs every tick.
+local _saidEffectError = {}
+local function effectFailed(effect, name, which, err)
+    local key = ('%s|%s|%s|%s'):format(tostring(effect.resource), tostring(name), which, tostring(err))
+    if _saidEffectError[key] then return end
+    _saidEffectError[key] = true
+    ErrorTap.caught(('[whip_core:stats] ERROR in %s\'s effect "%s" %s: %s')
+        :format(tostring(effect.resource), tostring(name), which, tostring(err)), effect.resource)
+end
+
 --- Apply a temporary effect to a player.
 ---
 --- A second apply under the same name REPLACES the effect — nothing stacks. `replaceSilently = true`
@@ -817,19 +829,6 @@ end
 ---@param owner string|nil  the resource applying it; whip_core when nil (the export passes the caller)
 ---@return boolean ok
 ---@return string|nil err
-
--- An effect's onApply, onRemove or onTick that throws is said once per effect, callback and error, filed under the
--- resource that applied it (ErrorTap.caught: GetErrorLog lists it as theirs), never swallowed. Once, because onTick
--- runs every tick.
-local _saidEffectError = {}
-local function effectFailed(effect, name, which, err)
-    local key = ('%s|%s|%s|%s'):format(tostring(effect.resource), tostring(name), which, tostring(err))
-    if _saidEffectError[key] then return end
-    _saidEffectError[key] = true
-    ErrorTap.caught(('[whip_core:stats] ERROR in %s\'s effect "%s" %s: %s')
-        :format(tostring(effect.resource), tostring(name), which, tostring(err)), effect.resource)
-end
-
 function Stats.applyEffect(source, name, config, owner)
     if type(name) ~= 'string' or name == '' then return false, 'an effect needs a name' end
     if type(config) ~= 'table' then return false, 'an effect needs a config table' end
@@ -1779,7 +1778,7 @@ end)
 SecureEvent('whip_core:server:statsDebugOn', {
     ace = 'whip.devtools',
     rateLimit = 1000,
-}, function(source, player)
+}, function(source)
     Stats._debugViewers[source] = true
     startStatsDebugSender()
 end)
@@ -1789,6 +1788,6 @@ SecureEvent('whip_core:server:statsDebugOff', {
     rateLimit = 1000,
     whileDead = true,
     requirePlayer = false,
-}, function(source, player)
+}, function(source)
     Stats._debugViewers[source] = nil
 end)

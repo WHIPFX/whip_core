@@ -280,7 +280,7 @@ define({
         local tnode = type(target) == 'string' and run.graph.nodes[target] or nil
         local th = tnode and tnode.def and tnode.def.haggle or nil
         local buys, unit, bounds = (ctx:prop('side') or SIDES[1]) == SIDES[1], 'money', nil
-        if th then
+        if tnode and th then
             buys, unit = th.toPlayer == true, th.unit == 'count' and 'count' or 'money'
             bounds = tnode.def._fields[th.key]
         end

@@ -311,7 +311,7 @@ function FreeCam.getCoord()
     return GetCamCoord(cam)
 end
 
----@return vector3  pitch, roll, yaw in rotation order 2
+---@return vector3 rot # pitch, roll, yaw in rotation order 2
 function FreeCam.getRot()
     if not cam then return GetGameplayCamRot(2) end
     return GetCamRot(cam, 2)

@@ -244,7 +244,19 @@ end
 -- A RUN is one playing of a sequence: what it was given (subjects), what it remembers (a chase's spring,
 -- the anchor as it stood, the last good picture), and the frame it is on.
 
+---@class CamRun
+---@field seq table            the clean sequence it plays
+---@field subjects table       names to entities or points
+---@field mem table            [key] = what that key's shot remembers (a chase's spring)
+---@field frame number         counts the frames, so each key is worked out once a frame
+---@field anchor { x: number, y: number, z: number, h: number }|nil  the anchor subject as it stood (captureAnchor)
+---@field last table|nil       the last good picture
+---@field ctl table|nil        the viewer's turn and zoom, when they may steer (client/camera.lua)
+---@field poses table|nil      this frame's key pictures (evaluate)
+---@field subjectCache table|nil  this frame's subjects (client/cam_shots.lua)
+
 --- A run of a clean sequence. `subjects` maps names to entities or points (PlayCameraSequence's).
+---@return CamRun
 function CamSequence.newRun(seq, subjects)
     return { seq = seq, subjects = subjects or {}, mem = {}, frame = 0, anchor = nil, last = nil, ctl = nil }
 end

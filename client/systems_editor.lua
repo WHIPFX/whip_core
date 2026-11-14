@@ -219,14 +219,14 @@ local function drawTestPlaces(places)
             end
             for _, p in ipairs({ a, b }) do
                 DrawMarker(1, p.x, p.y, p.z - 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.35, 0.35, 2.2,
-                    MARK.r, MARK.g, MARK.b, 160, false, false, 2, false, nil, nil, false)
+                    MARK.r, MARK.g, MARK.b, 160, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
         end
     end
     for _, p in ipairs(places.points) do
         if #(me - p) < DRAW_RANGE then
             DrawMarker(25, p.x, p.y, p.z + 0.02, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 1.2, 1.2,
-                MARK.r, MARK.g, MARK.b, 170, false, false, 2, false, nil, nil, false)
+                MARK.r, MARK.g, MARK.b, 170, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
         end
     end
 end
@@ -386,19 +386,19 @@ RegisterNUICallback('systemsPlace', function(d, cb)
             if valid then x, y, z = coords.x, coords.y, coords.z end
             for _, p in ipairs(points) do
                 DrawMarker(28, p.x, p.y, p.z + 0.15, 0, 0, 0, 0, 0, 0, 0.25, 0.25, 0.25, OTHER.r, OTHER.g, OTHER.b, 140,
-                    false, false, 2, false, nil, nil, false)
+                    false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
             for _, l in ipairs(lines) do
                 DrawLine(l[1].x, l[1].y, l[1].z + 0.3, l[2].x, l[2].y, l[2].z + 0.3, OTHER.r, OTHER.g, OTHER.b, 200)
             end
             if partner then
                 DrawMarker(28, partner.x, partner.y, partner.z + 0.15, 0, 0, 0, 0, 0, 0, 0.3, 0.3, 0.3, MARK.r, MARK.g, MARK.b, 200,
-                    false, false, 2, false, nil, nil, false)
+                    false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 if valid then DrawLine(partner.x, partner.y, partner.z + 0.3, x, y, z + 0.3, MARK.r, MARK.g, MARK.b, 255) end
             end
             if valid then
                 DrawMarker(25, x, y, z + 0.02, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 0.8, MARK.r, MARK.g, MARK.b, 200,
-                    false, false, 2, false, nil, nil, false)
+                    false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
             EditorHud.update({ rows = {
                 { label = 'Aim', value = valid and ('%.1f, %.1f'):format(x, y) or 'nothing in reach', tone = valid and 'ok' or 'warn' },

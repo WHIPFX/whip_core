@@ -418,7 +418,7 @@ RegisterNUICallback('radialUseSlot', function(data, cb)
     local slot = type(data) == 'table' and math.tointeger(data.slot) or nil
     local ok = _open and _hotkeys and not _page and slot ~= nil and slot >= 1 and slot <= 5
     CloseRadial()
-    if ok then Inventory.useHotbarSlot(slot, true) end   -- no hotbar after: the wheel showed the slot
+    if ok and slot then Inventory.useHotbarSlot(slot, true) end   -- no hotbar after: the wheel showed the slot
 end)
 
 -- A pick on the page on screen. Only that page's: a pick from a page that has gone closes the wheel.

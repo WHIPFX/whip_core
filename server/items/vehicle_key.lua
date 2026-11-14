@@ -4,6 +4,7 @@
 -- ============================================
 
 --- Returns true if the player's inventory contains a vehicle_key with matching vehicleId
+---@diagnostic disable-next-line: duplicate-set-field -- the client's Vehicles is a different table
 function Vehicles.playerHasKey(player, vehicleId)
     if not player or not player.inventory then return false end
     for _, container in pairs(PlayerContainers) do

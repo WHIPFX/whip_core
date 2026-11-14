@@ -381,7 +381,7 @@ Stores.placementVeto = function(kindId, h, _, md)
         -- cash is put in WHILE the safe is made (Containers.create's items), before Create Container
         -- remembers it.
         local def = type(h) == 'table' and h.def or nil
-        if Containers.isRuntime(def) and def.tag ~= nil and def.tag == run.tag then return false end
+        if def and Containers.isRuntime(def) and def.tag ~= nil and def.tag == run.tag then return false end
         return not runHas(run, 'containerId', type(h) == 'table' and h.containerId or nil)
     end
     return true

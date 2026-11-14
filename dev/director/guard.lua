@@ -10,8 +10,8 @@ local function guard()
 end
 debug.sethook(guard, '', 20000)
 local rawCreate, rawWrap = coroutine.create, coroutine.wrap
-coroutine.create = function(fn) return rawCreate(function(...) debug.sethook(guard, '', 20000) return fn(...) end) end
-coroutine.wrap = function(fn) return rawWrap(function(...) debug.sethook(guard, '', 20000) return fn(...) end) end
+rawset(coroutine, 'create', function(fn) return rawCreate(function(...) debug.sethook(guard, '', 20000) return fn(...) end) end)
+rawset(coroutine, 'wrap', function(fn) return rawWrap(function(...) debug.sethook(guard, '', 20000) return fn(...) end) end)
 -- Run as `lua54 guard.lua <test> ...`: the test gets its own arg list.
 if arg and arg[0] and arg[0]:match('guard%.lua$') and arg[1] then
     local test = arg[1]

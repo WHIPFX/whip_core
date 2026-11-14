@@ -62,7 +62,7 @@ SecureEvent('whip_core:server:devShowPlayers', {
     whileDead = true,
     requirePlayer = false,
     params = { {'on', 'bool'} },
-}, function(source, player, on)
+}, function(source, _, on)
     if not on then
         viewers[source] = nil
         return

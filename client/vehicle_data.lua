@@ -210,7 +210,7 @@ local function onDataBlock(entity, value, knownId)
     _previous[vehicleId] = { entity = entity, block = snapshot }
 end
 
-AddStateBagChangeHandler(VEHICLE_DATA_KEY, nil, function(bagName, _key, value)
+AddStateBagChangeHandler(VEHICLE_DATA_KEY, nil, function(bagName, _, value)
     if next(_listeners) == nil and next(_holders) == nil then return end   -- nobody listening; do no work
     if type(value) ~= 'table' then value = {} end
 
@@ -275,7 +275,7 @@ exports('OnVehicleDataChange', function(key, callback, id, opts)
                 local block = blockOf(veh)
                 local vehicleId = block and Vehicles.idByEntity(veh)
                 local list = _listeners[key]
-                if vehicleId and block[key] ~= nil and list and list[regKey] == reg then
+                if vehicleId and block and block[key] ~= nil and list and list[regKey] == reg then
                     callDataListener(reg, key, vehicleId, block[key], nil, veh)
                 end
             end
@@ -411,7 +411,7 @@ local function watchData(owner, key, data)
         for _, veh in ipairs(GetGamePool('CVehicle')) do
             local block = blockOf(veh)
             local vehicleId = block and block[key] ~= nil and Vehicles.idByEntity(veh)
-            if vehicleId then holders[veh] = { value = block[key], vehicleId = vehicleId } end
+            if vehicleId and block then holders[veh] = { value = block[key], vehicleId = vehicleId } end
         end
     end
 

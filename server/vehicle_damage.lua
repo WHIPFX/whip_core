@@ -241,7 +241,7 @@ SecureEvent('whip_core:server:vehicleDamagePutBack', {
     params = {
         {'vehicleId', 'id'},
     },
-}, function(source, player, vehicleId)
+}, function(source, _, vehicleId)
     local s = sent[vehicleId]
     if not s or not s.to[source] then return end
     local entity = Vehicles.getEntity(vehicleId)
@@ -262,7 +262,7 @@ SecureEvent('whip_core:server:vehicleDamageReport', {
         {'flat',  'int', 0, 255},
         {'rim',   'int', 0, 255},
     },
-}, function(source, player, vehicleId, doors, flat, rim)
+}, function(source, _, vehicleId, doors, flat, rim)
     if not on() or not keeps(vehicleId) then return end
     local entity = Vehicles.getEntity(vehicleId)
     if not entity or not isDone(vehicleId, entity) then return end
@@ -322,7 +322,7 @@ SecureEvent('whip_core:server:vehicleWrecked', {
         {'vehicleId', 'id'},
         {'wrecked', 'bool'},
     },
-}, function(source, player, vehicleId, isWrecked)
+}, function(source, _, vehicleId, isWrecked)
     local entity = Vehicles.getEntity(vehicleId)
     if not entity or NetworkGetEntityOwner(entity) ~= source then return end
     wrecked[vehicleId] = isWrecked and entity or nil

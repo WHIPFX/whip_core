@@ -124,9 +124,9 @@ function mount(pointId, p, ent, spot)
         opts[1] = {
             id = BACK_ID, label = 'Back', icon = 'back', require = up,
             onSelect = function()
-                local up = {}
-                for i = 1, #path - 1 do up[i] = path[i] end
-                level[pointId] = #up > 0 and up or nil
+                local upPath = {}
+                for i = 1, #path - 1 do upPath[i] = path[i] end
+                level[pointId] = #upPath > 0 and upPath or nil
                 remount(pointId)
             end,
         }

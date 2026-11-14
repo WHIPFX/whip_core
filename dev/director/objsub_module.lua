@@ -4,10 +4,10 @@
 
 local shownName = {}   -- what each objective card put up asked for under it, newest last
 local realObjective = PlayerText.objective
-PlayerText.objective = function(owner, src, id, text, opts)
+rawset(PlayerText, 'objective', function(_, _, _, text, opts)
     shownName[#shownName + 1] = { text = text, name = type(opts) == 'table' and opts.name or nil }
     return true
-end
+end)
 
 local function doc(props)
     local function n(id, t, p) return { id = id, type = t, v = 1, x = 0, y = 0, props = p or {} } end
@@ -32,8 +32,8 @@ local function shown(key, props)
         for _, p in ipairs(probs or {}) do if p.severity == 'error' then said[#said + 1] = tostring(p.message) end end
         error({ msg = 'not switched on: ' .. tostring(why) .. ' | ' .. table.concat(said, ' | ') })
     end
-    local run, why = Director.startRun(sc, 1, nil, nil)
-    if not run then error({ msg = 'no run: ' .. tostring(why) }) end
+    local run, whyNoRun = Director.startRun(sc, 1, nil, nil)
+    if not run then error({ msg = 'no run: ' .. tostring(whyNoRun) }) end
     for _ = 1, 10 do HarnessTick(50) end
     local last = shownName[#shownName]
     Director.deactivate(key, 'switched off')

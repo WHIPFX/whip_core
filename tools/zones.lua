@@ -94,7 +94,6 @@ local zeSpeed       = 1.0
 local zeMode        = 'none'     -- 'none','box','sphere','poly'
 local zeCreating    = false
 local zeSelected    = nil
-local zeDraftPos    = nil
 local zeDraftSizeX  = 10.0
 local zeDraftSizeY  = 10.0
 local zeDraftSizeZ  = 5.0
@@ -111,9 +110,18 @@ local zeLabelVis    = true
 -- closes, and the wizard saves the zone whole — name, rules and all — when it is told to.
 local zeCapture     = nil
 -- MOVING A POLYGON'S CORNERS for the wizard (zwAdjust, below): { points, minZ, maxZ, carry, carryFrom }.
+---@class ZoneAdjust
+---@field points table[]
+---@field minZ number
+---@field maxZ number
+---@field carry integer|nil
+---@field carryFrom { x: number, y: number }|nil
+
+---@type ZoneAdjust|nil
 local zeAdjust      = nil
 
 -- Vertex Editor state
+---@type false|'position'|'height'
 local zeVertexMode    = false
 local zeVertexIndex   = nil
 local zeVertexOriginal = nil
@@ -129,7 +137,6 @@ local rsSimplified    = {}
 local rsMinZ          = nil
 local rsMaxZ          = nil
 local rsLastBurstPos  = nil
-local rsBurstQueue    = {}
 local rsBurstOrigin   = nil
 local rsFadeLines     = {}
 local rsRayCount      = 72
@@ -436,7 +443,6 @@ rsReset = function()
     rsMinZ = nil
     rsMaxZ = nil
     rsLastBurstPos = nil
-    rsBurstQueue = {}
     rsBurstOrigin = nil
     rsBurstIndex = 0
     rsBurstActive = false
@@ -533,6 +539,7 @@ end
 --- One frame of Move corners: its keys, then the outline drawn.
 local function zeAdjustFrame(groundPos)
     local a = zeAdjust
+    ---@cast a -nil   (called only while it runs)
     local pts = a.points
 
     -- The corner being carried follows the aim.
@@ -609,7 +616,7 @@ local function zeAdjustFrame(groundPos)
         if lit then r, g, b = (a.carry and 60 or 255), 255, (a.carry and 60 or 255) end
         DrawMarker(28, p.x, p.y, (pLo + pHi) / 2, 0, 0, 0, 0, 0, 0,
             lit and 0.45 or 0.3, lit and 0.45 or 0.3, pHi - pLo, r, g, b, lit and 170 or 70,
-            false, false, 2, false, nil, nil, false)
+            false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
         SetDrawOrigin(p.x, p.y, pHi + 0.4, 0)
         SetTextScale(0.0, 0.3)
         SetTextFont(4)
@@ -688,7 +695,6 @@ local function zeLoop()
 
             -- Ground position (raycast)
             local groundPos = zeGetGroundPos()
-            zeDraftPos = groundPos
 
             -- Moving a polygon's corners for the wizard: its own keys and outline (zeAdjustFrame).
             if zeAdjust then zeAdjustFrame(groundPos) end
@@ -953,7 +959,6 @@ local function zeLoop()
                         rsMinZ = nil
                         rsMaxZ = nil
                         rsLastBurstPos = nil
-                        rsBurstQueue = {}
                         rsBurstOrigin = nil
                         rsBurstIndex = 0
                         rsBurstActive = false
@@ -1047,10 +1052,10 @@ local function zeLoop()
                     end
                 elseif zeMode == 'sphere' then
                     DrawMarker(28, groundPos.x, groundPos.y, groundPos.z, 0, 0, 0, 0, 0, 0,
-                        zeDraftRadius*2, zeDraftRadius*2, zeDraftRadius*2, 255, 200, 0, 40, false, false, 2, false, nil, nil, false)
+                        zeDraftRadius*2, zeDraftRadius*2, zeDraftRadius*2, 255, 200, 0, 40, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 elseif zeMode == 'poly' then
                     for i, p in ipairs(zePolyPoints) do
-                        DrawMarker(28, p.x, p.y, p.z, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 255, 200, 0, 200, false, false, 2, false, nil, nil, false)
+                        DrawMarker(28, p.x, p.y, p.z, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 255, 200, 0, 200, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                         if i > 1 then
                             DrawLine(zePolyPoints[i-1].x, zePolyPoints[i-1].y, zePolyPoints[i-1].z,
                                      p.x, p.y, p.z, 255, 200, 0, 200)
@@ -1059,7 +1064,7 @@ local function zeLoop()
                     if #zePolyPoints > 0 and groundPos and not zePolyClosed then
                         local last = zePolyPoints[#zePolyPoints]
                         DrawLine(last.x, last.y, last.z, groundPos.x, groundPos.y, groundPos.z, 255, 200, 0, 100)
-                        DrawMarker(28, groundPos.x, groundPos.y, groundPos.z, 0, 0, 0, 0, 0, 0, 0.3, 0.3, 0.3, 255, 255, 0, 150, false, false, 2, false, nil, nil, false)
+                        DrawMarker(28, groundPos.x, groundPos.y, groundPos.z, 0, 0, 0, 0, 0, 0, 0.3, 0.3, 0.3, 255, 255, 0, 150, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                     end
                     if zePolyClosed and #zePolyPoints >= 3 then
                         local first = zePolyPoints[1]
@@ -1105,6 +1110,7 @@ local function zeLoop()
                     end
 
                     if rsBurstActive then
+                        ---@cast rsBurstOrigin -nil   (set with rsBurstActive)
                         for _ = 1, RS_RAYS_PER_FRAME do
                             rsBurstIndex = rsBurstIndex + 1
                             if rsBurstIndex > rsRayCount then
@@ -1219,7 +1225,7 @@ local function zeLoop()
                 for i = startIdx, #rsAllHitPoints do
                     local p = rsAllHitPoints[i]
                     DrawMarker(28, p.x, p.y, p.z, 0,0,0, 0,0,0, 0.15,0.15,0.15, 0,255,0, 150,
-                        false, false, 2, false, nil, nil, false)
+                        false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 end
 
                 if #rsSimplified >= 3 then
@@ -1236,7 +1242,7 @@ local function zeLoop()
                     for _, p in ipairs(rsSimplified) do
                         DrawMarker(28, p.x, p.y, (minZ + maxZ) / 2, 0,0,0, 0,0,0,
                             0.3, 0.3, maxZ - minZ, 0, 220, 255, 40,
-                            false, false, 2, false, nil, nil, false)
+                            false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                     end
                 end
 
@@ -1244,7 +1250,7 @@ local function zeLoop()
                     local pulse = math.abs(math.sin(now / 300.0)) * 0.1 + 0.2
                     DrawMarker(28, rsBurstOrigin.x, rsBurstOrigin.y, rsBurstOrigin.z, 0,0,0, 0,0,0,
                         pulse, pulse, pulse, 255,255,255, 200,
-                        false, false, 2, false, nil, nil, false)
+                        false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 end
             end
 
@@ -1292,15 +1298,15 @@ local function zeLoop()
                             local pulse2 = math.abs(math.sin(GetGameTimer() / 200.0)) * 0.15 + 0.35
                             DrawMarker(28, px, py, vtxMidZ, 0,0,0, 0,0,0,
                                 pulse2, pulse2, vtxHeight, 0, 255, 0, 180,
-                                false, false, 2, false, nil, nil, false)
+                                false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                         elseif zeVertexMode == 'height' then
                             DrawMarker(28, px, py, vtxMidZ, 0,0,0, 0,0,0,
                                 0.3, 0.3, vtxHeight, 60, 160, 255, 120,
-                                false, false, 2, false, nil, nil, false)
+                                false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                         else
                             DrawMarker(28, px, py, vtxMidZ, 0,0,0, 0,0,0,
                                 0.3, 0.3, vtxHeight, 255, 200, 0, 120,
-                                false, false, 2, false, nil, nil, false)
+                                false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                         end
 
                         SetDrawOrigin(px, py, vtxMaxZ + 0.5, 0)
@@ -1324,7 +1330,7 @@ local function zeLoop()
             -- Draw crosshair marker at ground pos
             if groundPos and zeCreating then
                 DrawMarker(28, groundPos.x, groundPos.y, groundPos.z + 0.05, 0, 0, 0, 0, 0, 0,
-                    0.15, 0.15, 0.15, 255, 255, 255, 200, false, false, 2, false, nil, nil, false)
+                    0.15, 0.15, 0.15, 255, 255, 255, 200, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
 
             -- Draw labels on existing zones
@@ -1485,6 +1491,7 @@ RegisterNUICallback('zwAdjust', function(data, cb)
     zeCapture = { shape = 'adjust' }
     WhipPanelSuspend()
     EnterZoneEditor()
+    ---@cast zeCam integer   (EnterZoneEditor made it: the editor was shut)
     zeMode = 'adjust'; zeCreating = true
     -- Above the outline, looking down on it, whoever opened it from wherever.
     local camZ = maxZ + 10.0
@@ -1563,6 +1570,7 @@ local deById       = {}    -- doorId -> its record
 local deNear       = {}    -- those within DE_NEAR of the camera, picked four times a second
 local deNearAt     = 0
 local deSlots      = {}    -- doorId -> { entity, lookAt }: its object (DoorLeaf.entity)
+---@type { set: fun(ent: integer|nil) }|nil
 local deOutline    = nil   -- DoorLeaf.outliner(), while the editor is open
 local deReading    = false
 local deReadAt     = 0
@@ -1572,6 +1580,7 @@ local deReadAt     = 0
 -- The wizard opens this editor to pick ONE door: one leaf, or both leaves of a double door. { leaves = { { model,
 -- x, y, z, heading } }, done } while it does. G (A) takes the door aimed at or lets a taken one go, Enter (☰) goes
 -- back with them, Esc (B) goes back without. Nothing is saved here: the wizard's Create saves the door whole.
+---@type { leaves: table[], done: boolean }|nil
 local deCapture    = nil
 
 local DE_NEAR    = 60.0
@@ -1697,6 +1706,7 @@ end
 
 --- Picking for the wizard: what is taken, and the three keys.
 local function deCaptureCard(aimDoor, aimEnt)
+    ---@cast deCapture -nil   (only asked for while picking: deCard)
     local leaves = deCapture.leaves
     local n = #leaves
     local leafAt = deLeafOf(aimEnt)
@@ -2042,6 +2052,7 @@ local function deLoop()
                 local p = GetEntityCoords(aimEnt)
                 DoorLeaf.draw(GetEntityModel(aimEnt), aimEnt, p.x, p.y, p.z, GetEntityHeading(aimEnt), DE_RGB.new, 110, 255)
             end
+            ---@cast deOutline -nil   (made before the editor opens, gone after it shuts)
             deOutline.set(aimEnt)
 
             -- Its name over its top.

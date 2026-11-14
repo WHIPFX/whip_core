@@ -98,12 +98,6 @@ local _lastOpenPayload = nil
 --- Does this client hold the item definitions yet? Sent with each open request so the server can leave them out. Set only when they arrive.
 local _haveItemDefs = false
 
---- The cached payload (the live table: do not mutate).
----@return table|nil
-local function getCachedOpenPayload()
-    return _lastOpenPayload
-end
-
 -- Is an open wanted? Set when F2 asks the server, cleared by any close, so a late reply does not reopen it.
 local inventoryOpenRequested = false
 
@@ -275,7 +269,7 @@ function Inventory.registerItemFlagFor(owner, flagName, itemOrFilter, filter)
     local ok, why = _itemFlags:add(owner, flagName, { item = itemKey, filter = filterFn })
     if not ok then
         print(('[whip_core:inv] item flag refused for %s: %s'):format(owner, tostring(why)))
-        return false, why
+        return false, why --[[@as string]]   -- a refusal's reason
     end
     return true
 end
@@ -317,6 +311,7 @@ end
 --- @param itemKey string
 --- @param filter function|nil   Optional metadata filter
 --- @return number
+---@diagnostic disable-next-line: duplicate-set-field -- the server's Inventory is a different table
 function Inventory.getItemCount(itemKey, filter)
     if not _cachedInventory then return 0 end
     if type(filter) == 'number' or type(filter) == 'string' or type(filter) == 'boolean' then filter = nil end
@@ -697,7 +692,7 @@ exports('SetUIOpen', function(open, key, opts)
 end)
 
 --- Does a resource other than `owner` have a screen open? Dialogs ask before opening (client/ui.lua).
----@param owner string
+---@param owner string|nil
 ---@return boolean
 function ExternalUIOpenForOthers(owner)
     for res in pairs(externalUIs) do
@@ -712,7 +707,7 @@ AddEventHandler('onResourceStop', function(res)
 end)
 
 --- The inventory's own screens (inventory, container, boot or glovebox, panel, shop, another player's pockets): what the inventory key toggles and Inventory.close tears down.
----@return boolean
+---@return boolean|nil
 local function inventoryScreenOpen()
     return invOpen or Inventory.activeContainerId ~= nil or Inventory.activeVehicleStorage ~= nil
         or hasActivePanel() or ActiveShopId ~= nil or activePlayerInv
@@ -809,7 +804,7 @@ end
 exports('IsGameInputFree', function() return IsGameInputFree() end)
 
 --- Does another screen hold the NUI focus? A screen about to take it asks this, leaving itself out (`except`). Holds come from client/focus.lua with `screen = true`.
----@param except 'composer'|'radial'|'panel'|'none'
+---@param except string|nil  'composer' | 'radial' | 'panel' | 'ovPanel' | 'none' (nothing left out)
 ---@return boolean
 function FocusScreenUp(except)
     if Focus.screenUp(except) then return true end
@@ -823,7 +818,7 @@ function FocusScreenUp(except)
 end
 
 --- May a new screen take the focus now (F1 wheel, /whip panel)? Not over another UI or focus holder.
----@param me 'radial'|'panel'
+---@param me? string  the screen asking ('radial', 'panel', 'ovPanel'), left out of the check
 ---@return boolean
 function MayOpenScreen(me)
     if FocusScreenUp(me) then return false end
@@ -935,7 +930,7 @@ end
 local GATE_MS = 500
 local gateLoopRunning = false
 local lastGates = nil
-local gated, gatedFor = nil, nil   -- the options that have a require, and the defs they came from
+local gated, gatedFor = {}, nil   -- the options that have a require, and the defs they came from
 
 --- The answers for every option with a require, in the definitions the page holds.
 local function workOutGates()
@@ -1287,7 +1282,7 @@ function Inventory.hasOptimisticPanel()
 end
 
 --- Update part of a remembered payload so a reopen shows what happened while it was open.
----@param key string
+---@param key string|nil
 ---@param patch table  field names to overwrite in the remembered payload
 function Inventory.patchRememberedPanel(key, patch)
     local remembered = key and optimisticMemory[key]
@@ -1365,6 +1360,7 @@ local giveMode       = false
 --- Is give mode on (the item in hand, before it is thrown)? For IsGameInputFree.
 ---@return boolean
 function isGiveModeActive() return giveMode end
+Inventory.isGiveModeActive = isGiveModeActive   -- (client/ped_hold.lua: the function above is this file's own local)
 local giveContainer  = nil
 local giveSlot       = nil
 local giveItemName   = ''
@@ -1555,7 +1551,7 @@ end)
 --- Turn a UI slot reference into a store address for whip_core:server:storeMove.
 --- The NUI calls both a world stash and a vehicle's trunk or glovebox "container"; the address names which, and the server checks it against its open lock.
 ---@param container string  'player' | 'accessory' | 'container'
----@param slot number
+---@param slot number|nil
 ---@param containerId number|nil  the open stash, when container == 'container'
 ---@return table
 function Inventory.storeAddr(container, slot, containerId)
@@ -2035,7 +2031,7 @@ RegisterNUICallback('giveItem', function(data, cb)
     cb('ok')
     -- The ball and the item go in the hands, so not while they are blocked (client/hands.lua).
     local blocked, why = Inventory.handsBlocked()
-    if blocked then UI.Notify(why, 'error') return end
+    if blocked then UI.Notify(why --[[@as string]], 'error') return end   -- a block always has its words
     giveContainer  = data.container
     giveSlot       = tonumber(data.slot)
     giveItemName   = data.itemName or 'Item'
@@ -2068,7 +2064,7 @@ RegisterNUICallback('giveItem', function(data, cb)
     SetPedConfigFlag(ped, 48, false)
     WeaponGuard.permit(GetCurrentResourceName(), 'WEAPON_BALL', true)   -- before the give: client/weapon_guard.lua
     GiveWeaponToPed(ped, GetHashKey('WEAPON_BALL'), 1, false, true)
-    SetCurrentPedWeapon(ped, GetHashKey('WEAPON_BALL'))
+    SetCurrentPedWeapon(ped, GetHashKey('WEAPON_BALL'), false)
 
     -- The item in the throwing hand (server held prop): the seat's guess until an aim shows it
     giveSeenHand, giveSide, giveSteady = nil, nil, nil
@@ -2275,8 +2271,8 @@ local function watchThrows()
 end
 
 --- A throw was launched; watched until it lands. No thrower, no watch.
----@param netId number
----@param throwerServerId number
+---@param netId number|nil
+---@param throwerServerId number|string|nil
 function Inventory.watchThrow(netId, throwerServerId)
     throwerServerId = tonumber(throwerServerId)
     if not netId or not throwerServerId or watched[netId] then return end
@@ -2301,7 +2297,7 @@ local THROW_TWIST_MAX = 4.0
 local THROW_GRAVITY = 9.81
 
 --- The velocity that carries a throw from `from` to land on `to` at THROW_SPEED, on the low (flatter) arc. nil when out of reach or straight above or below.
----@return number|nil vx, number vy, number vz
+---@return number|nil vx, number|nil vy, number|nil vz
 local function throwVelocity(from, to)
     local dx, dy, dz = to.x - from.x, to.y - from.y, to.z - from.z
     local d = math.sqrt(dx * dx + dy * dy)
@@ -2505,7 +2501,7 @@ local function giveTick()
                         if not vx or rayHit ~= 1 or (vx * camFwd.x + vy * camFwd.y) <= 0.0 then
                             vx, vy, vz = dirX * THROW_SPEED, dirY * THROW_SPEED, dirZ * THROW_SPEED + THROW_LOFT
                         end
-                        SetEntityVelocity(obj, vx, vy, vz)
+                        SetEntityVelocity(obj, vx, vy --[[@as number]], vz --[[@as number]])   -- they come with vx
                         -- A little tumble each time (THROW_TWIST_*).
                         local function twist()
                             local t = THROW_TWIST_MIN + math.random() * (THROW_TWIST_MAX - THROW_TWIST_MIN)
@@ -2624,7 +2620,7 @@ RegisterNetEvent('whip_core:client:playerThrew', function(throwerServerId, netId
 end)
 
 --- Handoff animation, triggered by the server on giver and receiver. Animation only: the item moves as the server's held prop at the clip's middle.
-RegisterNetEvent('whip_core:client:playGiveAnim', function(otherServerId, isGiver, itemKey)
+RegisterNetEvent('whip_core:client:playGiveAnim', function(otherServerId, isGiver)
     local ped  = PlayerPedId()
     local dict = 'mp_common'
     local clip = isGiver and 'givetake1_a' or 'givetake1_b'

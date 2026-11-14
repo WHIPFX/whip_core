@@ -900,7 +900,7 @@ end
 --- Exactly what the Give Item card does (server/director/nodes_basics.lua): real in a live run, theirs to keep;
 --- stamped and taken back when a Test ends. `opts` is no longer read (its `keep` went: a live run's items are always
 --- kept). WAITS.
-function METHODS.give(rec, src, item, count, metadata, opts)
+function METHODS.give(rec, src, item, count, metadata)
     local w = waits(rec, 'give')
     if w then return false, w end
     local run = rec.run
@@ -1168,7 +1168,7 @@ local function refit(key, sc)
             local was = type(n) == 'table' and v.graph.nodes[n.id] or nil
             local d = was and was.def
             local owner = d and d.satellite and type(n.type) == 'string' and DirectorNodes.ownerOf(n.type) or nil
-            if owner ~= nil and owner ~= d.owner then
+            if d and owner ~= nil and owner ~= d.owner then
                 moved = ('%s now comes from %s (was %s): switch it on again to accept'):format(n.type, owner, d.owner)
                 break
             end

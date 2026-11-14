@@ -6,21 +6,21 @@ local R = DirectorRuntime
 -- ---- what the cards reach, faked: NPCs made, prompts put up (their onUse kept, to press) ----
 local npcN = 0
 local spawned = {}
-Npcs.spawn = function(_, def, _) npcN = npcN + 1; spawned[#spawned + 1] = def.model; return npcN, 500 + npcN end
-Npcs.get = function(id) return { npcId = id, coords = { x = 0, y = 0, z = 0 }, alive = true } end
-Npcs.despawn = function() return true end
+rawset(Npcs, 'spawn', function(_, def, _) npcN = npcN + 1; spawned[#spawned + 1] = def.model; return npcN, 500 + npcN end)
+rawset(Npcs, 'get', function(id) return { npcId = id, coords = { x = 0, y = 0, z = 0 }, alive = true } end)
+rawset(Npcs, 'despawn', function() return true end)
 local points, pointN = {}, 0
-RuntimePoints.add = function(_, def) pointN = pointN + 1; points[pointN] = def; return pointN end
-RuntimePoints.remove = function(_, id) points[id] = nil; return true end
-RuntimePoints.update = function(_, id, patch)
+rawset(RuntimePoints, 'add', function(_, def) pointN = pointN + 1; points[pointN] = def; return pointN end)
+rawset(RuntimePoints, 'remove', function(_, id) points[id] = nil; return true end)
+rawset(RuntimePoints, 'update', function(_, id, patch)
     if points[id] then for k, v in pairs(patch) do points[id][k] = v end end
     return true
-end
-Players[2] = { source = 2, charId = 8, fullName = 'Second Player', userId = 4 }
+end)
+rawset(Players, 2, { source = 2, charId = 8, fullName = 'Second Player', userId = 4 })
 -- (satellite_api.lua is not loaded here: the standing layer's news goes nowhere.)
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 NOTIFIED = {}
-NotifyPlayer = function(s, text) NOTIFIED[#NOTIFIED + 1] = tostring(s) .. ':' .. tostring(text) end
+rawset(_G, 'NotifyPlayer', function(s, text) NOTIFIED[#NOTIFIED + 1] = tostring(s) .. ':' .. tostring(text) end)
 
 local function tick(n) for _ = 1, n or 6 do HarnessTick(50) end end
 local function newestPoint(filter)
@@ -88,7 +88,7 @@ RegisterTestModule({
             local run = runOf('open_a')
             local p = newestPoint(function(x) return x.talk and x.audience == nil end)
             local res = table.pack(p.onUse(1, { useId = 77 }))
-            assertTrue(res[1] ~= false, 'the press is taken', res[2])
+            assertTrue(res[1] ~= false, 'the press is taken (' .. tostring(res[2]) .. ')')
             assertTrue(run.players[1] == true and run.starter == 1, 'they are in it, its starter')
             assertNil(run.open, 'open no more')
             assertNil(run.pre, 'no Scenario Run Started By Player card: the job started as they joined')
@@ -151,9 +151,9 @@ RegisterTestModule({
             tick()
             local run = runOf('open_e')
             local got, why = Director.startRun(Director.active.open_e, 2, nil, nil)
-            assertTrue(got == run, 'the same run', why)
+            assertTrue(got == run, 'the same run (' .. tostring(why) .. ')')
             assertTrue(run.players[2] == true and not run.open, 'they joined it')
-            local again, why2 = Director.startRun(Director.active.open_e, 1, nil, nil)
+            local again = Director.startRun(Director.active.open_e, 1, nil, nil)
             assertFalse(again, 'nobody else while it is theirs')
             Director.deactivate('open_e', 'switched off')
         end },
@@ -176,7 +176,7 @@ RegisterTestModule({
         { name = 'Player Arrives: the first to come near joins', fn = function()
             local SPOT = { id = 'lot', kind = 'spot', layer = 'run', label = 'Lot', def = { coords = at } }
             local realEligible = Director.eligibleNow
-            Director.eligibleNow = function() return { { src = 2, x = 1, y = 0, z = 0 } } end
+            rawset(Director, 'eligibleNow', function() return { { src = 2, x = 1, y = 0, z = 0 } } end)
             activate('open_g', doc({ n('start', 'scenario.started'), n('near', 'area.entered', { at = 'lot', radius = 10 }),
                                      n('win', 'scenario.succeed') },
                                    { l('a', 'start', 'out', 'near'), l('b', 'near', 'entered', 'win') }, { SPOT }))

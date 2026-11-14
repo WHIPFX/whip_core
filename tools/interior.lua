@@ -38,7 +38,8 @@ end
 --- Where one interior stands: its archetype hash and its placement. Cheap — no rooms, no portals —
 --- so Stamp mode can ask it several times a second. `id` is GetInteriorFromEntity's handle (the
 --- probe's §9: the at-coords natives answer with a different number).
----@return table place { hash, x, y, z, yaw }, boolean yawOnly
+---@return table place # { hash, x, y, z, yaw }
+---@return boolean yawOnly
 function Interior.placementOf(id)
     local _, hash = GetInteriorLocationAndNamehash(id)
     local o  = GetOffsetFromInteriorInWorldCoords(id, 0.0, 0.0, 0.0)

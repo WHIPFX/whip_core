@@ -144,7 +144,7 @@ end
 local function dot(p, c, size)
     size = size or 0.05
     DrawMarker(28, p.x, p.y, p.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, size, size,
-        c[1], c[2], c[3], 220, false, false, 2, false, nil, nil, false)
+        c[1], c[2], c[3], 220, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
 end
 
 local BOX_EDGES = { { 1, 2 }, { 2, 4 }, { 4, 3 }, { 3, 1 }, { 5, 6 }, { 6, 8 }, { 8, 7 }, { 7, 5 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, { 4, 8 } }

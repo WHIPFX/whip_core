@@ -519,7 +519,7 @@ end
 
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then
-        for id, obj in pairs(containerProps) do
+        for _, obj in pairs(containerProps) do
             if DoesEntityExist(obj) then
                 DeleteEntity(obj)
             end

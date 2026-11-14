@@ -157,7 +157,7 @@ SecureEvent('whip_core:server:groundDebug', {
     whileDead = true,
     requirePlayer = false,
     params = { {'on', 'bool'} },
-}, function(source, player, on)
+}, function(source, _, on)
     if not on then
         viewers[source] = nil
         _pushes[source] = nil

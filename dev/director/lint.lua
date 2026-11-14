@@ -18,7 +18,7 @@ local HERE = (arg[0]:match('^(.*)[/\\]') or '.')
 local CORE = HERE .. '/../..'
 local WIN = package.config:sub(1, 1) == '\\'
 
-function IsDuplicityVersion() return true end
+rawset(_G, 'IsDuplicityVersion', function() return true end)
 dofile(CORE .. '/shared/director/kit.lua')
 dofile(CORE .. '/shared/director/steps.lua')
 dofile(CORE .. '/shared/director/things.lua')
@@ -36,7 +36,7 @@ local OTHER_KINDS = {
 local function list(dir, pattern)
     local cmd = WIN and ('dir /b "%s" 2>nul'):format(dir:gsub('/', '\\')) or ('ls "%s" 2>/dev/null'):format(dir)
     local out = {}
-    local p = io.popen(cmd)
+    local p = assert(io.popen(cmd))
     for name in p:lines() do if name:match(pattern) then out[#out + 1] = dir .. '/' .. name end end
     p:close()
     table.sort(out)

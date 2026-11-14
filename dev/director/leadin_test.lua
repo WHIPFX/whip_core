@@ -2,20 +2,20 @@
 -- lead-in holds no Runs at once, it has its own time; from Started on the run counts.
 -- lua54 guard.lua leadin_test.lua [whip_core path]   (from dev/director; default: the whip_core it is in)
 local root = arg[1] or (((arg[0] or ''):match('^(.*)[/\\]') or '.') .. '/../..')
-function GetCurrentResourceName() return 'whip_core' end
-function GetGameTimer() return 0 end
-function CreateThread(fn) fn() end
-Citizen = { CreateThreadNow = function(fn) fn() end }
-Director = {}
-Registry = { new = function(_, o)
+rawset(_G, 'GetCurrentResourceName', function() return 'whip_core' end)
+rawset(_G, 'GetGameTimer', function() return 0 end)
+rawset(_G, 'CreateThread', function(fn) fn() end)
+rawset(_G, 'Citizen', { CreateThreadNow = function(fn) fn() end })
+rawset(_G, 'Director', {})
+rawset(_G, 'Registry', { new = function(_, o)
     return {
         seed = function(_, k, v) o.store[k] = v; if o.onAdd then o.onAdd() end end,
         add = function(_, _, k, v) o.store[k] = v; return true end,
         remove = function() return true end,
         ownerOf = function() return 'whip_core' end,
     }
-end }
-function IsDuplicityVersion() return true end
+end })
+rawset(_G, 'IsDuplicityVersion', function() return true end)
 dofile(root .. '/shared/director/kit.lua')
 dofile(root .. '/shared/director/steps.lua')
 dofile(root .. '/server/director/fields.lua')
@@ -33,12 +33,12 @@ end
 
 -- Director.beginRun as main.lua's, in short: `refuse` says why not.
 local refuse = nil
-function Director.beginRun(run)
+rawset(Director, 'beginRun', function(run)
     if refuse then return refuse end
     run.pre = nil
     run.begunAt = now
     return nil
-end
+end)
 
 local function def(d) local okd, why = DirectorNodes.define(d); assert(okd, why) end
 -- Waits for the test to say which way (a talk).

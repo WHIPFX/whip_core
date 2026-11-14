@@ -7,6 +7,6 @@
 -- whip_core's functions, not its exports: see food.lua (and for why Stats.add's answer is returned).
 local CORE = GetCurrentResourceName()
 
-Inventory.registerUseHandler('drink', function(source, player, slotData)
+Inventory.registerUseHandler('drink', function(source)
     return Stats.add(source, 'thirst', 25, 'item:drink')
 end, CORE)

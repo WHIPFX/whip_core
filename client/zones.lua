@@ -1677,7 +1677,6 @@ local _debugOverlayTick = 0
 
 local function updateDebugOverlayData()
     _debugOverlayData = {}
-    local myPed = PlayerPedId()
 
     -- Fetched once per tick, not per debug zone.
     local activePlayers = GetActivePlayers()
@@ -1903,6 +1902,7 @@ local function zoneSetter(name, fn)
     Zones[(name:gsub('^Zone(%u)', string.lower))] = function(idOrKey, ...) return set(CORE, idOrKey, ...) end
 end
 
+---@diagnostic disable-next-line: duplicate-set-field -- the server's Zones is a different table
 function Zones.remove(id) return removeOwnZone(id, CORE) end
 
 zoneSetter('ZoneUpdatePosition', function(_, id, pos) updatePosition(id, pos) end)
@@ -1982,7 +1982,7 @@ exports('ZoneGetNearby', function(pos, radius)
     radius = radius or 50.0
     local result = {}
     local radiusSq = radius * radius
-    for id, zone in pairs(zones) do
+    for _, zone in pairs(zones) do
         local dx = zone.pos.x - pos.x
         local dy = zone.pos.y - pos.y
         if (dx * dx + dy * dy) <= radiusSq then
@@ -2133,7 +2133,7 @@ end)
 
 function GetAllZones()
     local result = {}
-    for id, zone in pairs(zones) do
+    for _, zone in pairs(zones) do
         result[#result + 1] = {
             id       = zone.id,
             type     = zone.type,

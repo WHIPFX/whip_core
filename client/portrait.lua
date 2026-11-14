@@ -84,7 +84,7 @@ RegisterNUICallback('portraitTaken', function(data, cb)
     cb('ok')
     local id = type(data) == 'table' and tonumber(data.id) or nil
     local p = id and shots[id]
-    if not p then return end
+    if not (id and p) then return end
     shots[id] = nil
     local image = data.image
     p:resolve(type(image) == 'string' and image:sub(1, 11) == 'data:image/' and image or nil)

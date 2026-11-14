@@ -58,7 +58,8 @@ local function cloneRider(ped, veh, seat, real)
     if seat then
         SetPedIntoVehicle(clone, veh, seat)
     else
-        local off = GetOffsetFromEntityGivenWorldCoords(real, GetEntityCoords(ped))
+        local at = GetEntityCoords(ped)
+        local off = GetOffsetFromEntityGivenWorldCoords(real, at.x, at.y, at.z)
         AttachEntityToEntity(clone, veh, 0, off.x, off.y, off.z, 0.0, 0.0, GetEntityHeading(ped) - GetEntityHeading(real),
             false, false, false, true, 2, true)
     end

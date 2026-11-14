@@ -32,7 +32,7 @@ SecureEvent('whip_core:server:closeContainer', {
     rateLimit = 250,
     burst     = 5,
     params = { {'containerId', 'id'} },
-}, function(source, player, containerId)
+}, function(source, _, containerId)
     if not Stores.isViewer(source, 'container:' .. tostring(containerId)) then
         RecordEventRejection('whip_core:server:closeContainer', source, 'not a viewer of that container')
         return
@@ -54,7 +54,7 @@ SecureEvent('whip_core:server:closeStore', {
     rateLimit = 250,
     burst     = 5,
     params = { {'storeId', 'string', 120} },
-}, function(source, player, storeId)
+}, function(source, _, storeId)
     -- A resource's own kind only: whip's stashes, boots and panels close through their own events,
     -- which also save, release and unload; this only drops the view.
     local kindName = storeId:match('^([^:]+):')
@@ -72,7 +72,7 @@ end)
 --- Container Manager — permission-gated open
 SecureEvent('whip_core:server:cmGetAll', {
     ace = 'whip.devtools',
-}, function(source, player)
+}, function(source)
     TriggerClientEvent('whip_core:client:cmAllData', source, Containers.getAll())
 end)
 
@@ -159,7 +159,7 @@ SecureEvent('whip_core:server:updateContainer', {
         {'containerId', 'id'},
         {'data', 'any'},
     },
-}, function(source, player, containerId, data)
+}, function(source, _, containerId, data)
     if type(data) ~= 'table' then return end
 
     if data.name      ~= nil then data.name      = Sanitize.string(data.name, 100, 'Container') end

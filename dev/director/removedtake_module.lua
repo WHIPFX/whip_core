@@ -2,38 +2,37 @@
 -- Event task, not by a Play Scripted Driving Event card, and Check says so. Its row is kept (older revisions name it),
 -- so the server could still read it. Run from whip_core/dev/director:
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua removedtake_module.lua
-local R = DirectorRuntime
 
 -- ---- what the cards reach, faked: cars made (entity = 900 + id), the lists they are given ----
 local cars, nextCar = {}, 0
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 local lists = {}
-Actors.setTow = function() return 1 end
-Actors.runTasks = function(_, ent, plan, opts)
+rawset(Actors, 'setTow', function() return 1 end)
+rawset(Actors, 'runTasks', function(_, ent, plan, opts)
     local first = plan.steps[1]
     lists[#lists + 1] = { ent = ent, t = first.t, p = opts.resolve(first) }
     return #lists
-end
+end)
 -- Both takes still in the database: the old one (20) removed from the car's page, the new one (24) on it.
 local TAKES = {
     [20] = { id = 20, lengthMs = 20000, start = { x = 1.0, y = 0.0, z = 0.0, heading = 0.0 } },
     [24] = { id = 24, lengthMs = 20000, start = { x = 2.0, y = 0.0, z = 0.0, heading = 0.0 } },
 }
-DirectorTakes.get = function(id) return TAKES[math.tointeger(tonumber(id))] end
-DirectorTakes.load = function(id) return TAKES[math.tointeger(tonumber(id))] end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(DirectorTakes, 'get', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+rawset(DirectorTakes, 'load', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local function car(take)
     return { id = 'car3', kind = 'vehicle', layer = 'run', label = 'Phantom Custom', def = { model = 'phantom', coords = { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 },
@@ -57,7 +56,7 @@ end
 -- scenario switched on before the take was removed.
 local function start(key, d)
     local check = DirectorGraph.check
-    DirectorGraph.check = function() return true, {} end
+    rawset(DirectorGraph, 'check', function() return true, {} end)
     local okA, err = pcall(Director.activate, key, d, { rev = 1 })
     DirectorGraph.check = check
     if not okA then error(err) end

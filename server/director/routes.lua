@@ -143,7 +143,7 @@ end
 -- ============================================
 
 --- { { severity, why } } for one placed thing.
-function DirectorRoutes.problems(w, world)
+function DirectorRoutes.problems(w)
     local out = {}
     local def = type(w) == 'table' and type(w.def) == 'table' and w.def or {}
     local function add(sev, why) out[#out + 1] = { severity = sev, why = why } end

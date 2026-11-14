@@ -10,6 +10,57 @@
 
 PropertyWizard = {}
 
+--- A door that could be the unit's: found by the scan, added by hand (G), or one the unit already has.
+---@class PropertyWizardDoor
+---@field model number           signed hash
+---@field pos table              { x, y, z } in the interior's space
+---@field heading number         in the interior's space
+---@field world table            { x, y, z }
+---@field worldHeading number
+---@field body table             DoorLeaf.body's { x, y, z, top, bottom, width }
+---@field kind string            'door' | 'garage'
+---@field source string          where it came from: the scan's, 'picked', 'saved'
+---@field role? string           'entrance' | 'interior' | 'garage'; nil: not this unit's
+---@field lock? boolean          an inner door whip locks
+---@field key? string
+---@field seeded? boolean        a door the property already had: it keeps its key
+---@field pairKey? string        the other leaf's key, as saved
+---@field pairWith? integer      the other leaf's place in the candidates
+---@field conflict? string       whose door it is already, when it is somebody else's
+---@field doorId? number         the whip door it already is, ours
+---@field adopt? number          a whip door nobody manages, adopted at save
+---@field entity? number         its object, once found (DoorLeaf.entity)
+
+--- The property being set up (or the part of one being edited), in the interior's own space.
+---@class PropertyDraft
+---@field mode string            'new' | 'edit'
+---@field part? string           editing: 'interior' (Re-bind) | 'space' | 'doors' | 'garage'
+---@field adding? boolean        editing the doors: keep the ones it has (Add doors)
+---@field propertyId? number
+---@field name? string
+---@field unitUses? number
+---@field saving? boolean
+---@field world boolean          no interior: a house on the open map
+---@field place? table           { hash, x, y, z, yaw }
+---@field rooms? table[]         the interior's rooms { name, min, max }
+---@field fingerprint? table     { rooms, portals }
+---@field reading? table         the last Interior.read
+---@field readWhy? string
+---@field known? table           what whip knows of the interior (adminKnown)
+---@field spaceKind string       'interior' | 'rooms' | 'draw'
+---@field pickRooms table<string, boolean>
+---@field drawn table[]
+---@field drawHeight number
+---@field visit? table           { x, y, z }
+---@field candidates PropertyWizardDoor[]
+---@field scanned boolean
+---@field sign? table            { pos, heading, post? }
+---@field manager? table         { pos, heading }
+---@field bays table[]           { pos, heading }
+
+--- nil while no property is being set up. The helpers below only run with one (the page's buttons ask
+--- needDraft first), hence their casts.
+---@type PropertyDraft|nil
 local draft = nil
 
 local ROLE_PREFIX = { entrance = 'entrance', interior = 'door', garage = 'garage' }
@@ -36,7 +87,7 @@ end
 
 --- The unit's space, in the interior's own space.
 local function localSpace()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if d.spaceKind == 'interior' then return { { type = 'interior' } } end
     if d.spaceKind == 'rooms' then
         local names = {}
@@ -77,6 +128,7 @@ local function uiRole(c)
 end
 
 local function keyTaken(key, except)
+    ---@cast draft -nil
     for _, c in ipairs(draft.candidates) do
         if c ~= except and c.role and c.key == key then return true end
     end
@@ -84,6 +136,7 @@ local function keyTaken(key, except)
 end
 
 local function unpair(c)
+    ---@cast draft -nil
     local other = c.pairWith and draft.candidates[c.pairWith]
     if other and other.pairWith and draft.candidates[other.pairWith] == c then other.pairWith = nil end
     c.pairWith = nil
@@ -109,6 +162,7 @@ end
 
 --- The unit's door list: every candidate with a role.
 local function unitDoors()
+    ---@cast draft -nil
     local out = {}
     for _, c in ipairs(draft.candidates) do
         if c.role then
@@ -124,6 +178,7 @@ local function unitDoors()
 end
 
 local function firstEntrance()
+    ---@cast draft -nil
     for _, c in ipairs(draft.candidates) do
         if c.role == 'entrance' then return c end
     end
@@ -147,6 +202,7 @@ end
 
 --- The other properties near the draft, for drawing grey around it.
 local function neighbours()
+    ---@cast draft -nil
     local out = {}
     local a = draft.place
     if not a then return out end
@@ -270,6 +326,8 @@ end
 -- Starting, and the interior
 -- ============================================
 
+---@param mode string  'new' | 'edit'
+---@return PropertyDraft
 local function blank(mode)
     return {
         mode = mode, place = nil, rooms = nil, fingerprint = nil, reading = nil, readWhy = nil,
@@ -280,7 +338,7 @@ end
 
 --- Clear everything that was captured against the old placement.
 local function resetParts()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     d.spaceKind = d.world and 'draw' or 'interior'
     d.pickRooms, d.drawn, d.visit = {}, {}, nil
     d.candidates, d.scanned = {}, false
@@ -294,6 +352,7 @@ end
 --- in it wherever it is now.
 local INSIDE_LOAD_MS = 8000
 
+---@param d PropertyDraft
 local function goInsideFor(d)
     if d.world or not d.place or not d.propertyId then return end
     local ped = PlayerPedId()
@@ -314,6 +373,7 @@ end
 
 --- What a Re-bind reading found, said in words as it is read: the interior against the saved placement, its rooms against the template's, and what Save will do.
 --- Answers the sentence, and true when it is bad news (a different interior).
+---@param d PropertyDraft
 local function rebindNote(d)
     local r = d.reading
     if not r or not d.place then return nil end
@@ -325,7 +385,7 @@ local function rebindNote(d)
     local relaid = was and (was.rooms ~= r.roomCount or was.portals ~= r.portalCount)
     local found = {}
     if not same then found[#found + 1] = ('it has moved %.2f m and %.1f°'):format(dist, dyaw) end
-    if relaid then
+    if relaid and was then
         found[#found + 1] = ('its rooms have changed — %d rooms and %d doorways, it had %d and %d')
             :format(r.roomCount or 0, r.portalCount or 0, was.rooms or 0, was.portals or 0)
     end
@@ -341,6 +401,7 @@ end
 --- and answers what it found (rebindNote).
 ---@return string|nil note, boolean|nil bad
 local function readInterior()
+    ---@cast draft -nil
     if draft.mode == 'edit' and draft.part == 'interior' then goInsideFor(draft) end
     local info, why = Interior.read()
     draft.reading, draft.readWhy = info, why
@@ -363,6 +424,7 @@ end
 --- No interior: a house on the open map. The placement is where the admin stands, facing north,
 --- so its local space is plain metres from that spot.
 local function useWorld()
+    ---@cast draft -nil
     local c = GetEntityCoords(PlayerPedId())
     local changed = not draft.world
     draft.world = true
@@ -409,7 +471,7 @@ end
 --- Load a property's unit into a draft, for editing one part of it.
 ---@param part string  'interior' (Re-bind) | 'space' | 'doors' | 'garage'
 ---@param adding boolean|nil  doors only: keep the doors it has and add to them ("Add doors")
----@return boolean ok, string|nil why
+---@return boolean ok, string|nil why, boolean|nil bad  opened for Re-bind: what it read (bad: a different interior)
 function PropertyWizard.edit(propertyId, part, adding)
     local info = Callback('whip_core:property:adminUnit', propertyId)
     if not info then return false, 'That property is not there any more' end
@@ -490,7 +552,7 @@ local function checkKnown(list, cx, cy, cz, r)
             local dx, dy, dz = door.x - c.world.x, door.y - c.world.y, door.z - c.world.z
             if dx * dx + dy * dy + dz * dz <= 0.5 * 0.5 and PropertyMath.signedHash(door.model) == PropertyMath.signedHash(c.model) then
                 local mb = door.manager
-                if mb and mb.system == 'property' and tonumber(mb.id) == draft.propertyId then
+                if mb and mb.system == 'property' and draft and tonumber(mb.id) == draft.propertyId then
                     c.doorId = door.doorId
                 elseif mb then
                     c.conflict = mb.label or ('%s #%s'):format(tostring(mb.system), tostring(mb.id))
@@ -507,10 +569,10 @@ end
 --- GARAGE_NEAR_SPACE). Doors already in the draft keep their roles; a door another property already
 --- manages is marked. Any other door is added by hand in the picker (G).
 local function scanDoors()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     local shapes = worldShapes()
-    if #shapes == 0 then return false, 'Set the space first — the doors are found around it' end
     local bounds = Shapes.bbox(shapes)
+    if not bounds then return false, 'Set the space first — the doors are found around it' end
 
     local ped = PlayerPedId()
     local interiorId = GetInteriorFromEntity(ped)
@@ -597,6 +659,7 @@ end
 
 --- The candidate the camera looks at: nearest to the view ray, within 30 m and 0.9 m of it.
 local function aimedCandidate()
+    ---@cast draft -nil
     local cam = GetFinalRenderedCamCoord()
     local fx, fy, fz = InteractGetCameraForward()
     local best, bestD = nil, 0.9
@@ -636,7 +699,7 @@ end
 --- door, and give it the role that kind usually has. Answers its number, and whether it is shaped
 --- like a door at all (anything may be picked: whip's door system takes any model).
 local function addPicked(ent)
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     local model = PropertyMath.signedHash(GetEntityModel(ent))
     local p = GetEntityCoords(ent)
     local wh = GetEntityHeading(ent)
@@ -659,12 +722,13 @@ local function addPicked(ent)
 end
 
 local function pickDoors()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     -- No scan needed: a door can be added by hand here (G).
     if not d.place then return false, 'Choose the interior first' end
     local before = {}
     for i, c in ipairs(d.candidates) do before[i] = { role = c.role, lock = c.lock, key = c.key, pairWith = c.pairWith } end
 
+    ---@type integer|nil, integer, integer|nil
     local focus, tabFocus, pairFrom = nil, 1, nil
     -- What the camera looks at: an asynchronous ray each frame, read the next (objects and the world,
     -- so a door behind a wall is not taken). The object hit, or 0.
@@ -707,6 +771,7 @@ local function pickDoors()
         elseif f then sub = ('Door %d of %d'):format(focus, n)
         elseif n == 0 then sub = 'No doors yet: aim at one and add it'
         else sub = 'Aim at a door' end
+        ---@type table|false
         local chip = false   -- false, not nil: an update merges, and a missing chip would keep the last one
         if f then
             local role = uiRole(f)
@@ -722,9 +787,8 @@ local function pickDoors()
                 { label = 'Entrances', value = counts.entrance, tone = counts.entrance > 0 and 'ok' or 'warn' },
                 { label = 'Locked inner', value = counts.lockable },
                 { label = 'Garage', value = counts.garage },
-                { label = 'This one', value = not f and '—'
-                    or f.conflict and ('belongs to ' .. f.conflict)
-                    or f.pairWith and ('paired with door %d'):format(f.pairWith) or 'not paired',
+                { label = 'This one', value = f and (f.conflict and ('belongs to ' .. f.conflict)
+                    or f.pairWith and ('paired with door %d'):format(f.pairWith) or 'not paired') or '—',
                   tone = f and f.conflict and 'err' or nil },
             },
             hints = {
@@ -919,7 +983,8 @@ local DRAW_NEEDS = { rect = 2, edge = 3 }
 
 --- The local shape these world points make, or nil while they do not make one yet.
 local function shapeFrom(kind, pts, height)
-    local P = draft.place
+    ---@cast draft -nil
+    local P = draft.place --[[@as table]]   -- drawSpace checked it
     if #pts == 0 then return nil end
     local L, floorZ = {}, math.huge
     for i, p in ipairs(pts) do
@@ -958,6 +1023,7 @@ local function shapeFrom(kind, pts, height)
 end
 
 local function previewDrawn()
+    ---@cast draft -nil
     ZonePreview.clearPrefix('pe:drawn:')
     for i, s in ipairs(draft.drawn) do
         local w = PropertyMath.shapeToWorld(draft.place, s)
@@ -967,6 +1033,7 @@ end
 
 --- Does a world shape reach into another property? Its corners and middle are tested.
 local function overlapsOther(w)
+    ---@cast draft -nil
     local p = Shapes.prepare(w)
     if not p then return nil end
     local pts = p.type == 'box' and Shapes.boxCorners(p) or p.points
@@ -985,7 +1052,7 @@ local function overlapsOther(w)
 end
 
 local function drawSpace()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if not d.place then return false, 'Choose the interior (or no interior) first' end
     local before = {}
     for i, s in ipairs(d.drawn) do before[i] = s end
@@ -1100,13 +1167,13 @@ local function drawSpace()
                 if w then ZonePreview.set('pe:draft', { w }, 'draft') else ZonePreview.clear('pe:draft') end
                 for i, p in ipairs(pts) do
                     DrawMarker(28, p.x, p.y, p.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.12, 0.12,
-                        250, 204, 21, 220, false, false, 2, false, nil, nil, false)
+                        250, 204, 21, 220, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                     local q = pts[i + 1] or (hit and { x = hx, y = hy, z = hz }) or nil
                     if q then DrawLine(p.x, p.y, p.z + 0.02, q.x, q.y, q.z + 0.02, 250, 204, 21, 220) end
                 end
                 if hit then
                     DrawMarker(28, hx, hy, hz, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.09, 0.09, 0.09,
-                        255, 255, 255, 200, false, false, 2, false, nil, nil, false)
+                        255, 255, 255, 200, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 end
 
                 local now = GetGameTimer()
@@ -1142,7 +1209,7 @@ end
 -- written until the property is saved.
 
 local function placeBays()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if not d.place then return false, 'Choose the interior first' end
     local world = {}
     for i, b in ipairs(d.bays) do
@@ -1180,7 +1247,7 @@ end
 --- The draft in the world: its space blue, its doors as markers, its signs, the neighbours grey;
 --- or (what = 'rooms') the interior's room boxes, each labelled. Nothing to edit.
 local function showDraft(what)
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if not d.place then return false, 'Choose the interior first' end
     local rooms = what == 'rooms'
     if rooms and not (d.rooms and #d.rooms > 0) then return false, 'No rooms were read from this interior' end
@@ -1210,7 +1277,7 @@ local function showDraft(what)
                 if c.role then
                     local rgb = ROLE_RGB[uiRole(c)]
                     DrawMarker(0, c.body.x, c.body.y, c.body.top + 0.35, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.28, 0.28, 0.28,
-                        rgb[1], rgb[2], rgb[3], 220, false, false, 2, false, nil, nil, false)
+                        rgb[1], rgb[2], rgb[3], 220, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                 end
             end
             -- Each sign as a dot, with a line out the way it faces (towards whoever reads it).
@@ -1222,7 +1289,7 @@ local function showDraft(what)
                     local r, g, b = 74, 222, 128
                     if part == 'manager' then r, g, b = 96, 165, 250 end
                     DrawMarker(28, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.12, 0.12,
-                        r, g, b, 220, false, false, 2, false, nil, nil, false)
+                        r, g, b, 220, false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
                     DrawLine(x, y, z, x - math.sin(h) * 0.6, y + math.cos(h) * 0.6, z, r, g, b, 230)
                     drawText3D(x, y, z + 0.3, part == 'sign' and 'Outside sign' or 'Manager')
                 end
@@ -1258,7 +1325,7 @@ end
 --- height, facing out; the manager just inside it, facing in. Which side is out is the side of
 --- the door that is not in the space.
 local function suggestSign(which)
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     local door = firstEntrance()
     if not door then return false, 'Pick an entrance door first — the suggestion goes beside it' end
     local shapes = worldShapes()
@@ -1294,7 +1361,7 @@ local function suggestSign(which)
 end
 
 local function placeSign(which)
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if not d.place then return false, 'Choose the interior first' end
     local current = d[which]
     local start = nil
@@ -1325,11 +1392,11 @@ end
 --- The outside sign on a sign post (Config.PropertySignPosts; PropertyEditor.placeSignPost): kept as every sign is,
 --- the prompt's spot, with the post's model. Put up again, it starts as the one there and turned as it was.
 local function placeSignPost()
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if not d.place then return false, 'Choose the interior first' end
     local cur = d.sign
     local post = cur and PropertyMath.signPost(cur.post)
-    local heading = post and select(4, PropertyMath.promptToPost(post, 0.0, 0.0, 0.0,
+    local heading = cur and post and select(4, PropertyMath.promptToPost(post, 0.0, 0.0, 0.0,
         PropertyMath.headingToWorld(d.place, cur.heading))) or nil
     local ok = PropertyEditor.placeSignPost({
         name = d.name or 'New property',
@@ -1362,7 +1429,7 @@ local saveTimer = 0
 
 --- The page's form, and the draft, as what the server is sent.
 local function save(form)
-    local d = draft
+    local d = draft --[[@as PropertyDraft]]
     if d.saving then return false, 'Saving already' end
     form = type(form) == 'table' and form or {}
 
@@ -1382,9 +1449,9 @@ local function save(form)
             theme = tonumber(form.theme),
         })
     elseif d.part == 'interior' then
-        if not d.reading then return false, 'Stand inside the interior and read it again' end
-        -- With its layout as read here: the server takes it for the template when it has changed.
         local r = d.reading
+        if not r then return false, 'Stand inside the interior and read it again' end
+        -- With its layout as read here: the server takes it for the template when it has changed.
         TriggerServerEvent('whip_core:server:propertyAdminRebind', d.propertyId, r.place,
             { rooms = r.rooms, fingerprint = { rooms = r.roomCount, portals = r.portalCount } })
     else
@@ -1470,6 +1537,7 @@ end)
 
 RegisterNUICallback('pwReadInterior', function(_, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     -- A read that worked says so (Re-bind: what it found, rebindNote); one that did not says why.
     local note, bad = readInterior()
     if not draft.reading then answer(cb, false, draft.readWhy) return end
@@ -1478,6 +1546,7 @@ end)
 
 RegisterNUICallback('pwUseWorld', function(_, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     if draft.mode ~= 'new' then answer(cb, false, 'Only a new property can change its interior') return end
     useWorld()
     answer(cb, true)
@@ -1485,6 +1554,7 @@ end)
 
 RegisterNUICallback('pwSpace', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local kind = data and data.kind
     if kind ~= 'interior' and kind ~= 'rooms' and kind ~= 'draw' then answer(cb, false, 'Unknown space') return end
     if kind ~= 'draw' and not (draft.rooms and #draft.rooms > 0) then
@@ -1497,6 +1567,7 @@ end)
 
 RegisterNUICallback('pwRoom', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local name = data and tostring(data.name or ''):lower()
     if name == '' then answer(cb, false) return end
     draft.pickRooms[name] = not draft.pickRooms[name] or nil
@@ -1512,6 +1583,7 @@ end)
 
 RegisterNUICallback('pwDrawRemove', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local i = tonumber(data and data.i)
     if i and draft.drawn[i] then table.remove(draft.drawn, i) end
     answer(cb, true)
@@ -1519,6 +1591,7 @@ end)
 
 RegisterNUICallback('pwVisit', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     if data and data.clear then
         draft.visit = nil
     else
@@ -1545,6 +1618,7 @@ end)
 
 RegisterNUICallback('pwDoorSet', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local c = draft.candidates[tonumber(data and data.i) or -1]
     local role = data and data.role
     local valid = { none = true, entrance = true, lockable = true, interior = true, garage = true }
@@ -1555,6 +1629,7 @@ end)
 
 RegisterNUICallback('pwDoorPair', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local i, j = tonumber(data and data.i), tonumber(data and data.j)
     local a = draft.candidates[i or -1]
     if not a then answer(cb, false) return end
@@ -1596,6 +1671,7 @@ end)
 
 RegisterNUICallback('pwSignClear', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local which = data and data.which == 'manager' and 'manager' or 'sign'
     draft[which] = nil
     answer(cb, true)
@@ -1609,6 +1685,7 @@ end)
 
 RegisterNUICallback('pwBayRemove', function(data, cb)
     if not needDraft(cb) then return end
+    ---@cast draft -nil
     local i = tonumber(data and data.i)
     if i and draft.bays[i] then table.remove(draft.bays, i) end
     answer(cb, true)

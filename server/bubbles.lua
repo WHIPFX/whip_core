@@ -54,8 +54,8 @@ function Bubbles.show(target, text, opts)
     local range = (own or CFG.range or 20.0) + far
     local except = tonumber(opts.except)
     local sent = 0
-    for _, id in ipairs(GetPlayers()) do
-        id = tonumber(id)
+    for _, idStr in ipairs(GetPlayers()) do
+        local id = tonumber(idStr)
         if id and id ~= except and GetPlayerRoutingBucket(id) == bucket and IsPlayerNear(id, at.x, at.y, at.z, range) then
             if target.source then
                 TriggerClientEvent('whip_core:client:bubble', id, tonumber(target.source), clean, lines, far > 0 and far or nil, own)
@@ -105,12 +105,12 @@ function Bubbles.showMany(list)
     end
     if #ready == 0 then return 0 end
     local sent = 0
-    for _, id in ipairs(GetPlayers()) do
-        id = tonumber(id)
+    for _, idStr in ipairs(GetPlayers()) do
+        local id = tonumber(idStr)
         -- (As IsPlayerNear asks it: one in the character creator is near nothing.)
         local p = id and Players and Players[id]
         local ped = id and not (p and p._inCreator) and GetPlayerPed(id) or nil
-        if ped and ped ~= 0 then
+        if id and ped and ped ~= 0 then
             local pos, bucket = GetEntityCoords(ped), GetPlayerRoutingBucket(id)
             for _, b in ipairs(ready) do
                 local dx, dy, dz = pos.x - b.at.x, pos.y - b.at.y, pos.z - b.at.z
@@ -144,8 +144,8 @@ SecureEvent('whip_core:server:me', {
     local bucket = GetPlayerRoutingBucket(source)
     local range = CFG.range or 20.0
 
-    for _, id in ipairs(GetPlayers()) do
-        id = tonumber(id)
+    for _, idStr in ipairs(GetPlayers()) do
+        local id = tonumber(idStr)
         if id and GetPlayerRoutingBucket(id) == bucket and IsPlayerNear(id, at.x, at.y, at.z, range) then
             TriggerClientEvent('whip_core:client:bubble', id, source, text)
         end

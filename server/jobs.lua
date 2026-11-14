@@ -2339,6 +2339,8 @@ end)
 exports('ClockOn', function(who, job, opts)
     local charId, source = WhoIs(who)
     if not charId then return false, WHY.player end
+    -- (With a charId, WhoIs answers their source or nil, not a why.)
+    ---@cast source number|nil
     if not source then return false, WHY.offline end
     local def = Jobs.resolve(job)
     if not def then return false, WHY.job end
@@ -2355,6 +2357,8 @@ end)
 exports('ClockOff', function(who, job)
     local charId, source = WhoIs(who)
     if not charId then return false, WHY.player end
+    -- (With a charId, WhoIs answers their source or nil, not a why.)
+    ---@cast source number|nil
     if job == nil then return Jobs.clockOffAll(charId, source) end
     local def = Jobs.resolve(job)
     if not def then return false, WHY.job end

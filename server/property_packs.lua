@@ -128,7 +128,7 @@ PropertyPacks.plain = function(v) return plain(v, '', 0) end
 ---
 --- A PARSER, NOT A LOADER: it walks the text once, left to right, and every loop in it consumes at
 --- least one character, so it finishes on any input.
----@return table data
+---@return any data  the file's value (runSource checks it is a table)
 local function readLiteral(src)
     local pos, len = 1, #src
 
@@ -298,9 +298,9 @@ local function readLiteral(src)
 end
 
 --- A .lua pack's text as a table: parsed if it is plain data, refused otherwise. Never run.
----@param chunkname string|nil  unused since code packs went; kept so callers need not change
+---@param _ string|nil  unused since code packs went; kept so callers need not change
 ---@return table|nil data, string|nil err
-function PropertyPacks.runSource(src, chunkname)
+function PropertyPacks.runSource(src, _)
     if type(src) ~= 'string' then return nil, 'no file' end
     if #src > SOURCE_CAP then return nil, ('the file is %d KB; a pack can be at most %d KB'):format(#src // 1024, SOURCE_CAP // 1024) end
     if src:byte(1) == 27 then return nil, 'compiled Lua is not accepted — ship the .lua text' end
@@ -408,7 +408,7 @@ end
 
 --- Write a normalised pack into the templates and properties. The "may and may not" of the header
 --- is enforced here. Returns what changed, for the log.
-local function writePack(pack, resource, previous)
+local function writePack(pack, _, previous)
     local source = 'pack:' .. pack.id
     local counts = { templates = 0, created = 0, updated = 0, claimed = 0, tombstoned = 0 }
     local templates = {}
@@ -556,7 +556,7 @@ end
 ---@return boolean ok, string howOrErr  'applied' | 'unchanged', or why not
 function PropertyPacks.apply(data, resource)
     local pack, err = PropertyValidate.pack(data)
-    if not pack then return false, err end
+    if not pack then return false, err --[[@as string]] end
 
     local row = _packs[pack.id]
     if row and row.resource ~= resource and GetResourceState(row.resource) == 'started' then
@@ -570,7 +570,7 @@ function PropertyPacks.apply(data, resource)
     end
 
     local counts, werr = writePack(pack, resource, row and row.pack)
-    if not counts then return false, werr end
+    if not counts then return false, werr --[[@as string]] end
 
     local ok, dberr = pcall(MySQL.query.await,
         'INSERT INTO `property_packs` (`packId`,`resource`,`version`,`label`,`snapshot`,`appliedAt`) '

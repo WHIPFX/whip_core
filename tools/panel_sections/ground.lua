@@ -133,7 +133,8 @@ end)
 
 --- Teleport to ground item
 RegisterNUICallback('gimTeleport', function(data, cb)
-    local id = data.id and math.floor(tonumber(data.id))
+    local n = tonumber(data.id)
+    local id = n and math.floor(n)
     local cached = id and gimItemCache[id]
     if cached then
         local ped = PlayerPedId()
@@ -144,7 +145,8 @@ end)
 
 --- Toggle blip for a single ground item
 RegisterNUICallback('gimToggleBlip', function(data, cb)
-    local id = data.id and math.floor(tonumber(data.id))
+    local n = tonumber(data.id)
+    local id = n and math.floor(n)
     if not id then cb('ok') return end
 
     if gimBlips[id] then
@@ -159,7 +161,8 @@ end)
 
 --- Toggle marker for a single ground item
 RegisterNUICallback('gimToggleMarker', function(data, cb)
-    local id = data.id and math.floor(tonumber(data.id))
+    local n = tonumber(data.id)
+    local id = n and math.floor(n)
     if not id then cb('ok') return end
 
     if gimMarkers[id] then
@@ -183,7 +186,8 @@ end)
 
 --- Delete a ground item
 RegisterNUICallback('gimDeleteItem', function(data, cb)
-    local id = data.id and math.floor(tonumber(data.id))
+    local n = tonumber(data.id)
+    local id = n and math.floor(n)
     if id then
         TriggerServerEvent('whip_core:server:gimDeleteItem', id)
         -- Clean up local blip/marker
@@ -262,7 +266,7 @@ local function markerLoop()
                     0.0, 0.0, 0.0,              -- rotation
                     1.0, 1.0, 100.0,            -- scale (1m wide, 100m tall)
                     255, 50, 50, 120,           -- RGBA (red, semi-transparent)
-                    false, false, 2, false, nil, nil, false
+                    false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false
                 )
             end
             Wait(0)

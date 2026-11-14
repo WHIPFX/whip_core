@@ -280,7 +280,7 @@ exports('ListScenarios', function(filter)
         local v = scenarioView(key, false)
         local ok = v ~= nil and (filter.on == nil or v.on == (filter.on == true))
             and (filter.startMode == nil or v.startMode == filter.startMode)
-        if ok and kind then
+        if v and ok and kind then
             ok = false
             for _, k in ipairs(v.kinds) do if k == kind then ok = true break end end
         end

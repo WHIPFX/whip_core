@@ -181,7 +181,7 @@ local function geometry(post, sign)
 end
 
 --- Show (or update) a property's listing on its post's board. Unchanged words send nothing.
----@param id number
+---@param id number|string   a property's id, or the editor's preview
 ---@param entity number      the post
 ---@param post table         its Config.PropertySignPosts entry (panel with w and h)
 ---@param sign table         the outside sign's spot { x, y, z, heading }

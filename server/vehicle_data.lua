@@ -161,8 +161,8 @@ function VehicleData.replicate(vehicleId)
     -- Empty replicates as ABSENT, not as an empty table: the Sentinel truth for this key maps empty to
     -- nil, and a `[]` bag on the entity would read as tampering (three of those is a kick). An absent
     -- key also replicates nothing at all. The rule liveBlock in server/vehicle_stats.lua follows.
-    local block = VehicleData.getAll(vehicleId)
-    if next(block) == nil then block = nil end
+    local all = VehicleData.getAll(vehicleId)
+    local block = next(all) ~= nil and all or nil
 
     Sentinel.setEntityKey(entity, VEHICLE_DATA_KEY, block)   -- whip's own write
 end
@@ -202,7 +202,7 @@ local function blockQueries(vehicleId)
 
     -- An empty block is stored as NULL, not as "[]" (json.encode({}) is a JSON array): the same rule
     -- as replicate, absence is the meaning.
-    local value = encoded
+    local value = encoded ---@type string|nil
     if value == '[]' or value == '{}' then value = nil end
 
     -- The owners ride along in the same column (see OWNERS_FIELD), so who owns which key survives a
@@ -262,6 +262,7 @@ end
 function VehicleData.set(vehicleId, key, value, owner)
     local block, owners = blockOf(vehicleId)
     if not block then return false, 'no such vehicle' end
+    ---@cast owners -nil   -- blockOf answers both or neither
     if not validKey(key) then
         return false, ('key must be 1-%d characters of [A-Za-z0-9_]'):format(MAX_KEY_LEN)
     end
@@ -338,6 +339,7 @@ end
 function VehicleData.stage(vehicleId, values, clear, owner)
     local block, owners = blockOf(vehicleId)
     if not block or type(values) ~= 'table' then return nil, 'no such vehicle' end
+    ---@cast owners -nil   -- blockOf answers both or neither
 
     -- One foreign key refuses the WHOLE batch, named, before anything is touched. Writing the
     -- rest and quietly skipping it would leave the caller believing a key it does not own is set.
@@ -494,6 +496,8 @@ function VehicleData.clearAll(vehicleId, owner)
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'no such vehicle' end
     local block, owners = blockOf(vehicleId)
+    ---@cast block -nil   -- the def is there (above), so blockOf answers both
+    ---@cast owners -nil
 
     if owner then
         local removed = {}

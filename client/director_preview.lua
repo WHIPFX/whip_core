@@ -194,6 +194,9 @@ local function trailersFor(r, tow)
         -- (The fetch waits: Stopped meanwhile, nothing more is set going. The caller says nothing more either.)
         if not still(r) then return {}, nil end
         if samples then
+            -- (Fetched only for a copy here, found by its id.)
+            ---@cast it -nil
+            ---@cast w -nil
             if not own then
                 own = { id = w, kind = 'vehicle', label = w, it = it, ent = it.obj, gen = r.gen, steps = {}, after = 'stop', along = true }
                 runs[w] = own

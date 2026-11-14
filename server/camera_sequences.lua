@@ -47,6 +47,7 @@ function CameraSequences.loadAll()
     seqs = {}
     for _, r in ipairs(res) do
         local okJson, data = pcall(json.decode, r.data or '')
+        ---@type table|nil, string|nil
         local clean, why = nil, 'is not readable'
         if okJson then clean, why = CamSequence.clean(data) end
         if clean then
@@ -137,7 +138,7 @@ end)
 SecureCallback('whip_core:camseq:save', {
     ace = DEVTOOLS, rateLimit = 1000, burst = 3,
     params = { { 'name', 'string', 60 }, { 'data', 'any' } },
-}, function(source, player, name, data)
+}, function(source, _, name, data)
     if not Settings.mayEdit(source) then return false, 'Only a permanent admin can save camera sequences' end
     local clean, why = CameraSequences.save(source, name, data)
     if not clean then return false, why end
@@ -147,7 +148,7 @@ end)
 SecureCallback('whip_core:camseq:delete', {
     ace = DEVTOOLS, rateLimit = 1000, burst = 3,
     params = { { 'name', 'string', 60 } },
-}, function(source, player, name)
+}, function(source, _, name)
     if not Settings.mayEdit(source) then return false, 'Only a permanent admin can delete camera sequences' end
     local ok, why = CameraSequences.delete(source, name)
     if not ok then return false, why end
@@ -159,7 +160,7 @@ end)
 SecureCallback('whip_core:camseq:fetch', {
     rateLimit = 250, burst = 8, whileDead = true,
     params = { { 'name', 'string', 60 } },
-}, function(source, player, name)
+}, function(_, _, name)
     local data = CameraSequences.get(name)
     if not data then return false, 'There is no camera sequence called ' .. tostring(name) end
     return data

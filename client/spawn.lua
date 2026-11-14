@@ -220,6 +220,7 @@ local function CompleteJoinSpawn()
     SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
 
     -- The handshake: without it the client never finishes joining ("awaiting scripts").
+    ---@diagnostic disable-next-line: param-type-mismatch, redundant-parameter -- as it always went; the natives' typing has fewer parameters than the game reads
     NetworkResurrectLocalPlayer(x, y, z, heading, true, true, false)
     PedHold.reapply()   -- it can hand back a new ped, which starts with none of the holds
     ClearPedTasksImmediately(ped)

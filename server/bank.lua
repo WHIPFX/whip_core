@@ -242,7 +242,7 @@ end
 -- ============================================
 
 --- Create a new bank account with owner access row
----@param ownerCharId number
+---@param ownerCharId number|nil  nil for an account no character owns
 ---@param label string|nil
 ---@param accountType string|nil  'personal','savings','business','shared'
 ---@param isDefault boolean|nil
@@ -265,10 +265,10 @@ function Bank.CreateAccount(ownerCharId, label, accountType, isDefault, jobId)
     if ownerCharId ~= nil and not tonumber(ownerCharId) then
         return nil, 'An account owner is a character id'
     end
-    isDefault = isDefault and 1 or 0
+    local defaultFlag = isDefault and 1 or 0
     jobId = jobId or nil
 
-    local startBalance = isDefault == 1 and Config.StartingBalance or 0
+    local startBalance = defaultFlag == 1 and Config.StartingBalance or 0
 
     -- A number nobody has, asked first: the transaction below answers only "rolled back", so it can't
     -- tell a colliding number from any other failure (a collision in the milliseconds between is
@@ -288,7 +288,7 @@ function Bank.CreateAccount(ownerCharId, label, accountType, isDefault, jobId)
     local byNumber = '(SELECT `accountId` FROM `bank_accounts` WHERE `accountNumber` = ?)'
     local queries = {
         { query = 'INSERT INTO `bank_accounts` (`accountNumber`, `label`, `type`, `ownerCharId`, `jobId`, `balance`, `isDefault`) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          values = { accountNumber, label, accountType, ownerCharId, jobId, startBalance, isDefault } },
+          values = { accountNumber, label, accountType, ownerCharId, jobId, startBalance, defaultFlag } },
     }
     -- Owner access (skip for system-owned accounts with no owner).
     if ownerCharId then
@@ -323,7 +323,7 @@ function Bank.CreateAccount(ownerCharId, label, accountType, isDefault, jobId)
         Bank._permCache[ownerCharId][accountId] = 'owner'
     end
     -- A new main account: GetBalance's "no account" (or an older main) for its owner is forgotten.
-    if isDefault == 1 then _mainOf, _mainGen = {}, _mainGen + 1 end
+    if defaultFlag == 1 then _mainOf, _mainGen = {}, _mainGen + 1 end
     noteBalance(accountId, startBalance)
 
     local account = {
@@ -334,7 +334,7 @@ function Bank.CreateAccount(ownerCharId, label, accountType, isDefault, jobId)
         ownerCharId   = ownerCharId,
         jobId         = jobId,
         balance       = startBalance,
-        isDefault     = isDefault == 1,
+        isDefault     = defaultFlag == 1,
         frozen        = false,
     }
 
@@ -467,8 +467,9 @@ function Bank.CanUse(charId, accountId, role)
     if not RoleLevel[role] then
         return false, ('unknown role "%s" (view, deposit, withdraw, manager, owner)'):format(tostring(role))
     end
-    charId, accountId = Sanitize.id(charId), Sanitize.id(accountId)
-    if not charId or not accountId then return false, 'a charId and an accountId are needed' end
+    local cid, aid = Sanitize.id(charId), Sanitize.id(accountId)
+    if not cid or not aid then return false, 'a charId and an accountId are needed' end
+    charId, accountId = cid, aid
     local account, readErr = Bank.GetAccount(accountId)
     if not account then return false, readErr or 'Account not found' end
     if Bank.HasPermission(accountId, charId, role) then return true end
@@ -768,8 +769,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.Deposit(accountId, amount, actorCharId, message)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
 
     -- Check permission (deposit level)
     if not Bank.HasPermission(accountId, actorCharId, 'deposit') then
@@ -806,14 +808,10 @@ function Bank.Deposit(accountId, amount, actorCharId, message)
     return true
 end
 
---- The debit itself, once the caller has decided it may happen — Withdraw by checking the actor's
---- permission, SystemWithdraw by being the system. One body, so the two cannot drift.
----@param accountId number
----@param amount integer  already a whole number of 1 or more
----@param actorCharId number|nil
----@param message string|nil  as given (the event carries it as given)
 --- Whether an account can be debited `amount` now: found, not frozen, holding enough, and (`actor`, a player
 --- withdrawing on their own permission) not another character of theirs (Bank.notOwnOther).
+---@param accountId number
+---@param amount integer
 ---@param actor number|nil
 ---@return boolean ok
 ---@return string|nil why
@@ -872,6 +870,12 @@ local function announceDebit(accountId, amount, actorCharId, message)
     bankEmit('whip_core:bank:balanceChanged', txData)
 end
 
+--- The debit itself, once the caller has decided it may happen — Withdraw by checking the actor's
+--- permission, SystemWithdraw by being the system. One body, so the two cannot drift.
+---@param accountId number
+---@param amount integer  already a whole number of 1 or more
+---@param actorCharId number|nil
+---@param message string|nil  as given (the event carries it as given)
 ---@param ledgerDefault string  what the ledger says when no message was given
 ---@param hooks table|nil  { before, undo, with } — see bankWrite (the ATM's withdrawal, the pump's fuel)
 ---@param asActor boolean|nil  the actor withdraws on their own permission (Withdraw): see debitCheck
@@ -911,7 +915,7 @@ function Bank.prepareWithdraw(accountId, amount, actorCharId, message)
         return nil, 'No withdraw permission on this account'
     end
     local okCheck, why = debitCheck(accountId, amount, actorCharId)
-    if not okCheck then return nil, why end
+    if not okCheck then return nil, why --[[@as string]] end
     local queries = debitQueries(accountId, amount, actorCharId, message, 'Withdrawal')
     return queries, function()
         -- What was written: a refund of part of it before it landed made the debit smaller (Bank.setDebitAmount, on
@@ -930,8 +934,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.Withdraw(accountId, amount, actorCharId, message, hooks)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
 
     if not Bank.HasPermission(accountId, actorCharId, 'withdraw') then
         return false, 'No withdraw permission on this account'
@@ -949,8 +954,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.SystemWithdraw(accountId, amount, message, actorCharId)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
     return debit(accountId, amount, actorCharId, message, 'System withdrawal')
 end
 
@@ -1023,8 +1029,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.Transfer(fromAccountId, toAccountId, amount, actorCharId, message)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
     if fromAccountId == toAccountId then return false, 'Cannot transfer to the same account' end
 
     if not Bank.HasPermission(fromAccountId, actorCharId, 'withdraw') then
@@ -1043,8 +1050,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.SystemTransfer(fromAccountId, toAccountId, amount, message, actorCharId)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
     return move(fromAccountId, toAccountId, amount, actorCharId, message, 'System transfer')
 end
 
@@ -1060,8 +1068,9 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.SystemPayFrom(fromAccountId, toAccountId, amount, message, madeNote)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
     if fromAccountId == toAccountId then return false, 'Cannot transfer to the same account' end
     local fromAccount, fromErr = Bank.GetAccount(fromAccountId)
     if not fromAccount then return false, fromErr or 'Source account not found' end
@@ -1297,15 +1306,16 @@ end
 ---@return boolean success
 ---@return string|nil error
 function Bank.SystemDeposit(accountId, amount, message, actorCharId, hooks)
-    amount = Sanitize.amount(amount)
-    if not amount then return false, AMOUNT_ERR end
+    local whole = Sanitize.amount(amount)
+    if not whole then return false, AMOUNT_ERR end
+    amount = whole
 
     -- During whip_core's own stop, sent without waiting: a stop step that waits never comes back (a
     -- pump's unspent bank prepay is refunded at step 20). One transaction with no read first: the CHECK
     -- constraints still refuse a closed account, and an unknown one changes no row. (It can't say what
     -- happened, so it is only for the stop.)
     if CoreStop and CoreStop.running then
-        local sent = pcall(MySQL.transaction, {
+        local sent = pcall(MySQL.transaction --[[@as function]], {
             { query = 'UPDATE `bank_accounts` SET `balance` = `balance` + ? WHERE `accountId` = ?', values = {amount, accountId} },
             { query = 'INSERT INTO `bank_transactions` (`actorCharId`, `toAccountId`, `amount`, `type`, `message`, `toBalance`) VALUES (?, ?, ?, ?, ?, (SELECT `balance` FROM `bank_accounts` WHERE `accountId` = ?))', values = {actorCharId, accountId, amount, 'deposit', message or 'System deposit', accountId} },
         })
@@ -1470,7 +1480,7 @@ exports('GetBalance', function(who)
         main = acc and tonumber(acc.accountId) or false
         if _mainGen == gen then _mainOf[charId] = main end
         -- The row read has its balance: kept when no balance anywhere moved while it was read.
-        if main and _balance[main] == nil and _balanceTick == tick then _balance[main] = tonumber(acc.balance) end
+        if acc and main and _balance[main] == nil and _balanceTick == tick then _balance[main] = tonumber(acc.balance) end
     end
     if not main then return false, 'They have no bank account' end
     return balanceOfAccount(main)
@@ -1519,7 +1529,7 @@ end)
 ---@return string|nil err
 exports('CreateBankAccount', function(owner, label, accountType, job)
     local ownerCharId, why = WhoIs(owner)
-    if not ownerCharId then return false, why end
+    if not ownerCharId then return false, why --[[@as string]] end
     -- The job by jobId or KEY, and one that exists, as every Jobs export takes it: a linked account
     -- joins that job's payroll-access sync.
     local jobId = nil

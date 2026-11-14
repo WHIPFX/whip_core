@@ -180,8 +180,8 @@ local function overlay(base, s)
     if s.labelWeight ~= nil or s.labelOutline ~= nil or s.labelOutlineColour ~= nil or s.labelCase ~= nil
         or s.labelShadow ~= nil then
         local f = {}
-        local base = r.labelFmtOwn
-        if base then for k, v in pairs(base) do f[k] = v end end
+        local own = r.labelFmtOwn
+        if own then for k, v in pairs(own) do f[k] = v end end
         if s.labelWeight ~= nil then f.weight = math.floor(s.labelWeight / 100 + 0.5) * 100 end
         if s.labelOutline ~= nil then f.outline = s.labelOutline end
         if s.labelOutlineColour ~= nil then

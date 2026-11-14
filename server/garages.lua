@@ -678,9 +678,9 @@ end)
 --- Counts a garage's parking bays as part of it, and takes an optional `maxRange`:
 ---
 ---     local key = exports.whip_core:GetNearestGarage(x, y, z, 10.0)   -- nil unless within 10m
----@param x number
----@param y number
----@param z number
+---@param x number|vector3|vector4|table|nil  or the coords, then y is maxRange
+---@param y number|nil
+---@param z number|nil
 ---@param maxRange number|nil
 ---@return string|nil key, number|nil distance
 exports('GetNearestGarage', function(x, y, z, maxRange)
@@ -707,7 +707,7 @@ end)
 exports('CanUseGarage', function(key, who)
     if type(key) ~= 'string' or not Garages.get(key) then return false, 'No such garage' end
     local charId, why = WhoIs(who)
-    if not charId then return false, why end
+    if not charId then return false, why --[[@as string]] end
     if Garages.canUse(key, charId) then return true end
     local owner = Garages.ownerLabel(key)
     return false, owner and ('That garage belongs to %s'):format(owner) or 'That garage is private'
@@ -787,7 +787,7 @@ end)
 --- garage, or a dealership delivering to the buyer's garage of choice, both need exactly this.
 --- Lives here rather than vehicles.lua because the garage-key validation is the half that earns
 --- its keep; the vehicle write goes through Vehicles.persist either way.
----@param vehicleId number
+---@param vehicleId number|WhipVehicleRef|nil  a vehicleId or a vehicle reference
 ---@param garageKey string
 ---@return boolean ok, string|nil err
 exports('SetVehicleGarage', function(vehicleId, garageKey)

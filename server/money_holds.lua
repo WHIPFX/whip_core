@@ -111,7 +111,7 @@ Character.onLife('loaded', function(e)
         end
     end
     for _, owed in ipairs(list) do
-        local amount = math.floor(tonumber(owed.amount))
+        local amount = math.floor(tonumber(owed.amount) --[[@as number]])   -- (owedList keeps only those with one)
         if refundWith(player, owed, amount, { playerUnit(e.source) }) and amount > 0 then
             NotifyPlayer(e.source, ('$%d refunded for %s you paid for and did not get'):format(amount,
                 tostring(owed.reason or 'something')), 'success', 8000)
@@ -157,7 +157,7 @@ function MoneyHolds.open(src, amount, opts, owner)
     local charged, receipt, err = pcall(Money.charge, src, amount,
         { method = method, accountId = accountId, reason = reason }, owner, Log.reasonFrom(reason), { playerUnit(src) })
     Stores.unhold(noteHold)
-    if not charged then receipt, err = nil, tostring(receipt) end
+    if not charged then receipt, err = false, tostring(receipt) end
     if not receipt then
         dropOwed(player, token)
         return nil, err or 'Payment failed'

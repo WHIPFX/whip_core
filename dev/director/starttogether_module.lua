@@ -3,43 +3,42 @@
 -- joins that start instead of starting them all again. Everything made already: started at once, as before. One never
 -- made: the rest start when the wait runs out, and it is said. Against the real Director under the dev harness:
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua starttogether_module.lua
-local R = DirectorRuntime
 
 local cars, nextCar = {}, 0
 local CAR_TAKES_MS = 1000
-Vehicles.spawnTempFor = function(model, at)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     Wait(CAR_TAKES_MS)   -- (a car takes a moment to be made)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 local npcs, nextNpc = {}, 0
-Npcs.spawn = function(_, def)
+rawset(Npcs, 'spawn', function()
     nextNpc = nextNpc + 1
     npcs[nextNpc] = { npcId = nextNpc, netId = 5000 + nextNpc, alive = true, coords = { x = 0.0, y = 0.0, z = 0.0 } }
     return nextNpc, 5000 + nextNpc
-end
-Npcs.get = function(id) return npcs[id] end
+end)
+rawset(Npcs, 'get', function(id) return npcs[id] end)
 local starts = {}
-Npcs.runTasks = function(_, npc, plan, opts)
+rawset(Npcs, 'runTasks', function(_, _, plan, opts)
     -- (The NPC's first step, resolved as its game would be handed it.)
     local p = opts.resolve(plan.steps[1])
     starts[#starts + 1] = { who = 'npc', at = GetGameTimer(), step = plan.steps[1].t, p = p }
     return true
-end
-Actors.runTasks = function(_, ent, plan)
+end)
+rawset(Actors, 'runTasks', function(_, ent, plan)
     starts[#starts + 1] = { who = 'car', at = GetGameTimer(), step = plan.steps[1].t, ent = ent }
     return #starts
-end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local at = { x = 0.0, y = 0.0, z = 0.0, heading = 0.0 }
 local function world(withCar)

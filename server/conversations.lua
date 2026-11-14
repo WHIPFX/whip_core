@@ -418,10 +418,11 @@ function Conversations.start(owner, source, spec)
     if type(spec) ~= 'table' or callable(spec) then return false, 'a conversation is a table: { fromUse, npcId, line, options }' end
     local src = Sanitize.id(source)
     local player = src and Players[src]
-    if not player or not player.charId then return false, 'no such player' end
+    if not src or not player or not player.charId then return false, 'no such player' end
     if player.isDead then return false, 'they are down' end
 
-    local use = RuntimePoints.recentUse(src, Sanitize.id(spec.fromUse), START_MS)
+    local useId = Sanitize.id(spec.fromUse)
+    local use = useId and RuntimePoints.recentUse(src, useId, START_MS)
     if not use then return false, 'not from an interaction: open it from a point\'s onUse, with fromUse = use.useId' end
 
     local npcId, netId = nil, nil
@@ -509,7 +510,7 @@ end
 function Conversations.finish(owner, convId)
     local id = Sanitize.id(convId)
     local rec = id and convs[id]
-    if not rec or rec.owner ~= owner then return false, 'no such conversation of yours' end
+    if not id or not rec or rec.owner ~= owner then return false, 'no such conversation of yours' end
     rec.endWhy = rec.endWhy or 'ended'
     return reg:remove(owner, id)
 end
@@ -595,7 +596,7 @@ SecureEvent('whip_core:server:conversationChoice', {
     rateLimit = 250, burst = 4,
     -- value: the amount typed, for an answer that takes one (checked against it below).
     params = { {'convId', 'id'}, {'optionId', 'string', 40}, {'value', 'any'} },
-}, function(source, player, convId, optionId, value)
+}, function(source, _, convId, optionId, value)
     local rec = convs[convId]
     if not rec or rec.source ~= source then return false, 'That conversation is over' end
     if rec.pending or rec.paying then return false, 'Wait for an answer' end
@@ -683,7 +684,7 @@ end)
 SecureEvent('whip_core:server:conversationLeft', {
     whileDead = true, rateLimit = 250, burst = 4,
     params = { {'convId', 'id'}, {'why', 'enum', { 'left', 'blocked', 'gone', 'replaced' }, 'left'} },
-}, function(source, player, convId, why)
+}, function(source, _, convId, why)
     local rec = convs[convId]
     if not rec or rec.source ~= source then return end
     endWith(rec, why)

@@ -51,7 +51,6 @@ local CORE = GetCurrentResourceName()
 local DEVTOOLS = 'whip.devtools'
 
 -- The settings every item has. Their keys are taken: an item's own may not use them.
-local BASE_KEYS = { 'name', 'desc', 'weight', 'grab', 'playerWalk' }
 local IS_BASE = { name = true, desc = true, weight = true, grab = true, playerWalk = true }
 -- What an item's own setting may be: a value or an on/off ("values or toggles"). The Items page
 -- edits each on one line.
@@ -414,6 +413,7 @@ end
 local function changed(key, path, value, old)
     if path == 'pictures' then
         -- Onto its definition: the rows saved, or (Reset) its own `images` again.
+        ---@type WhipItemDef|nil
         local def = Config.Items[key]
         if type(def) ~= 'table' then return end
         def.images = picturesInForce(key, declaredPics[key])
@@ -593,6 +593,7 @@ end
 ---@param key string
 ---@param path string
 ---@return any
+---@diagnostic disable-next-line: duplicate-set-field -- the client's ItemSettings is a different table
 function ItemSettings.get(key, path)
     if type(key) ~= 'string' or type(path) ~= 'string' then return nil end
     if IS_BASE[path] then
@@ -680,7 +681,7 @@ end
 SecureCallback('whip_core:itemSettings:get', {
     ace = DEVTOOLS, rateLimit = 150, burst = 10, whileDead = true,
     params = { { 'key', 'key', 60 } },
-}, function(source, player, key)
+}, function(source, _, key)
     if not Config.Items[key] then return false, 'There is no item ' .. key end
     return {
         key = key, mayEdit = Settings.mayEdit(source), groups = ItemSettings.panel(key),

@@ -537,7 +537,7 @@ function DirectorPacks.requiresOf(doc)
             -- who provides each is a hint only (a folder may be renamed).
             local t = type(n) == 'table' and n.type or nil
             local owner = type(t) == 'string' and DirectorNodes.ownerOf(t) or nil
-            if owner and owner ~= CORE then cards[t] = true providers[t] = owner end
+            if t and owner and owner ~= CORE then cards[t] = true providers[t] = owner end
         end
     end
     local function sorted(set) local l = {} for k in pairs(set) do l[#l + 1] = k end table.sort(l) return l end

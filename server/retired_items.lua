@@ -350,7 +350,7 @@ function RetiredItems.retire(name, reason, owner)
     end
 
     local ok, why = _retired:add(owner, name, { reason = reason })
-    if not ok then return false, why end
+    if not ok then return false, why --[[@as string]] end
 
     if Config.Items[name] ~= nil then
         local gone, goneWhy = Inventory.unregisterItem(name, owner)

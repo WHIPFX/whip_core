@@ -1,41 +1,40 @@
 -- Trailers (a car's Tows, a take's tow: server/director/takes.lua towOf, nodes_world.lua Spawn Car, nodes_tasks.lua
 -- Play Take and towTracks), against the real Director under the dev harness. Run from whip_core/dev/director:
 --   MEMCAP_MB=256 lua54 guard.lua harness.lua tow_module.lua
-local R = DirectorRuntime
 
 -- ---- what the cards reach, faked: cars made (entity = 900 + id), actors' lists and trailers kept ----
 local cars, made = {}, {}
 local nextCar = 0
-Vehicles.spawnTempFor = function(model, at, opts)
+rawset(Vehicles, 'spawnTempFor', function(model, at)
     nextCar = nextCar + 1
     cars[nextCar] = { model = model, at = at }
     made[#made + 1] = model
     return nextCar
-end
-Vehicles.getDef = function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end
-Vehicles.getEntity = function(id) return cars[id] and 900 + id or nil end
-Vehicles.spotBlocked = function() return nil end
-Vehicles.despawnByRef = function(id) cars[id] = nil end
-Vehicles.getEntityVehicleId = function() return nil end
-function NetworkGetNetworkIdFromEntity(ent) return ent + 10000 end
-function GetAllVehicles() return {} end
-function GetAllPeds() return {} end
+end)
+rawset(Vehicles, 'getDef', function(id) return cars[id] and { plate = 'P' .. id, model = cars[id].model } or nil end)
+rawset(Vehicles, 'getEntity', function(id) return cars[id] and 900 + id or nil end)
+rawset(Vehicles, 'spotBlocked', function() return nil end)
+rawset(Vehicles, 'despawnByRef', function(id) cars[id] = nil end)
+rawset(Vehicles, 'getEntityVehicleId', function() return nil end)
+rawset(_G, 'NetworkGetNetworkIdFromEntity', function(ent) return ent + 10000 end)
+rawset(_G, 'GetAllVehicles', function() return {} end)
+rawset(_G, 'GetAllPeds', function() return {} end)
 local towSet, lists = {}, {}
-Actors.setTow = function(_, ent, trailer) towSet[#towSet + 1] = { ent = ent, trailer = trailer } return 1 end
-Actors.runTasks = function(_, ent, plan, opts)
+rawset(Actors, 'setTow', function(_, ent, trailer) towSet[#towSet + 1] = { ent = ent, trailer = trailer } return 1 end)
+rawset(Actors, 'runTasks', function(_, ent, plan, opts)
     local first = plan.steps[1]
     local p = opts.resolve(first)
     lists[#lists + 1] = { ent = ent, t = first.t, p = p, onEnd = opts.onEnd }
     return #lists
-end
+end)
 -- Takes as the database would give them: the truck's 20 s, the trailer's own track starting at its placed spot.
 local TAKES = {
     [11] = { id = 11, lengthMs = 20000, start = { x = 10.0, y = 0.0, z = 0.0, heading = 90.0 } },
     [12] = { id = 12, lengthMs = 20000, start = { x = 30.0, y = 5.0, z = 0.0, heading = 0.0 } },
 }
-DirectorTakes.get = function(id) return TAKES[math.tointeger(tonumber(id))] end
-DirectorTakes.load = function(id) return TAKES[math.tointeger(tonumber(id))] end
-if type(rawget(Director, 'standingMade')) ~= 'function' then Director.standingMade = function() end end
+rawset(DirectorTakes, 'get', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+rawset(DirectorTakes, 'load', function(id) return TAKES[math.tointeger(tonumber(id))] end)
+if type(rawget(Director, 'standingMade')) ~= 'function' then rawset(Director, 'standingMade', function() end) end
 
 local at = function(x) return { x = x, y = 0.0, z = 0.0, heading = 0.0 } end
 local function car(id, model, x, extra)
@@ -52,7 +51,6 @@ end
 local function n(id, t, props) return { id = id, type = t, v = 1, x = 0, y = 0, props = props or {} } end
 local function l(id, a, ap, b, bp) return { id = id, from = { node = a, pin = ap }, to = { node = b, pin = bp or 'in' } } end
 local function tick(k) for _ = 1, k or 10 do HarnessTick(50) end end
-local function runOf(key) for _, r in ipairs(R.list()) do if r.scenarioId == key and r.status == 'running' then return r end end end
 local function start(key, d)
     local ok, probs = Director.activate(key, d, { rev = 1 })
     if not ok then
@@ -75,6 +73,7 @@ RegisterTestModule({
             local g = { world = { truck = car('truck', 'phantom', 0, { takes = { { id = 11, tow = TAKE_TOW } } }) } }
             local tow = DirectorTakes.towOf(g, 11)
             assertNotNil(tow, 'read')
+            ---@cast tow -nil
             assertEqual(tow.tracks.trailer, 12, 'the trailer\'s own track')
             assertEqual(#tow.events, 2, 'the moment for a trailer with no track left out')
             assertTrue(tow.events[1].t == 4200 and tow.events[1].on and tow.events[2].t == 15000 and not tow.events[2].on, 'in order')

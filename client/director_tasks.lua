@@ -39,6 +39,7 @@ local function argsOf(p)
     end
     if p.target then
         local e = (p.tEnt and DoesEntityExist(p.tEnt) and p.tEnt) or (p.tSid and pedOfServerId(p.tSid)) or entityOfNet(p.tNet)
+        ---@type table|nil
         local c = e and GetEntityCoords(e) or nil
         if not c and type(p.tAt) == 'table' then c = { x = p.tAt.x, y = p.tAt.y, z = p.tAt.z } end
         a.target = { kind = p.target, entity = e, coords = c and { x = c.x, y = c.y, z = c.z } or nil }

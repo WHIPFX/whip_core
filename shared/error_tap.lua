@@ -113,13 +113,16 @@ end
 ErrorTap.counting = nil
 
 local nativeThread, nativeNow, nativeTimeout = Citizen.CreateThread, Citizen.CreateThreadNow, Citizen.SetTimeout
+---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (HOW, at the top of this file)
 Citizen.CreateThread = function(fn) return nativeThread(threadGuard(fn)) end
+---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (HOW, at the top of this file)
 Citizen.CreateThreadNow = function(fn, name)
     local count = ErrorTap.counting
     if count ~= nil and type(fn) == 'function' then fn = count(fn, name) end
     -- Named by the runtime (an event handler, a call into whip_core): that name is what shows
     return nativeNow(name ~= nil and guard(fn) or threadGuard(fn), name)
 end
+---@diagnostic disable-next-line: duplicate-set-field -- wrapped on purpose (HOW, at the top of this file)
 Citizen.SetTimeout = function(ms, fn)
     local count = ErrorTap.counting
     if count ~= nil and type(fn) == 'function' then

@@ -82,7 +82,7 @@ exports('SetActiveTheme', function(resource)
         if holder and holder ~= owner then
             return false, ('the active theme belongs to %s — stop it first'):format(holder)
         end
-        return false, why
+        return false, why --[[@as string]]
     end
     return true
 end)

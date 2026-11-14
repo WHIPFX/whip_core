@@ -389,6 +389,7 @@ end
 --- forgets it. Answers false and why when the value is too big to keep.
 function SystemStore.rememberValue(systemId, scope, name, value)
     defineUnit()   -- here, not at the top: stores.lua loads later in the manifest (house rule)
+    ---@type string|false
     local enc = false
     if value ~= nil then
         local ok, s = pcall(json.encode, { v = value })
