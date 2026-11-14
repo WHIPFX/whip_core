@@ -661,11 +661,19 @@ local function vehicleControls(veh)
     return rows
 end
 
---- The key a binding is on, as GTA's help text names it ('t_E' -> 'E'), or nil for one with no short name
---- (a mouse wheel) or none at all.
+--- What GTA's help text names a binding: 't_E' for a key, 'b_115' for a mouse wheel.
+local function bindingName(command)
+    return GetControlInstructionalButton(0, GetHashKey(command) | 0x80000000, true)
+end
+
+--- The key a binding is on ('t_E' -> 'E'), or nil for one with no short name (a mouse wheel) or no key at all.
+--- AN UNBOUND COMMAND ANSWERS 't_E' TOO, as a command never registered does (probed 2026-11-13), so a binding
+--- that names what a made-up command names counts as none. A toggle really put on E reads as none as well; E
+--- is Interact's anyway.
 ---@return string|nil
 local function boundKey(command)
-    local s = GetControlInstructionalButton(0, GetHashKey(command) | 0x80000000, true)
+    local s = bindingName(command)
+    if s == bindingName('+whip_no_such_binding') then return nil end
     local key = type(s) == 'string' and s:match('^t_(.+)$') or nil
     return (key and key ~= '' and #key <= 8) and key:upper() or nil
 end
