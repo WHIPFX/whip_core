@@ -2881,16 +2881,6 @@ function whip_core:SetShopLayout(shopId, data) end
 ---@async
 function whip_core:SetShopItemPrice(target, itemKey, price, forSale) end
 
---- Price the item ON a shelf slot of a stocked shop (from before prices were per item): every slot
---- holding that item takes the price.
----@param target number|{ shopId: number } The shop's stock container id, or the shop itself
----@param slot number A shelf slot holding the item
----@param price number Price (a negative price is set to 0)
----@param forSale boolean Whether the item is for sale
----@return boolean success, string|nil err 'Unknown container' | 'Invalid slot' | 'Invalid price' | 'That shelf slot is empty' | 'Could not save that (database error)'
----@async
-function whip_core:SetShopSlotPrice(target, slot, price, forSale) end
-
 --- Get the list of players currently viewing a shop.
 ---@param shopId number Shop ID
 ---@return number[] Array of source IDs

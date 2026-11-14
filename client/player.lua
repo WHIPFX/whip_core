@@ -117,8 +117,7 @@ RegisterNetEvent('whip_core:client:playerLoaded', function(data)
             viaMap = false
         end
 
-        -- 2. Put the finished ped where it belongs. Called directly rather than through
-        --    spawned:ready (TriggerEvent returns as soon as a handler yields).
+        -- 2. Put the finished ped where it belongs. Called directly, so this waits for it.
         --
         --    A brand new character does not go to the spawn point yet: they are built on the
         --    creator's own mark, in the private bucket they still hold from the character screen,

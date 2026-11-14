@@ -11,7 +11,7 @@
 --   classes.lua          — Shared type definitions (WhipPlayer, WhipItemDef, etc.)
 --   server.lua           — Server-side export signatures
 --   client.lua           — Client-side export signatures
---   events.lua           — Every event whip fires, with its payload type (and old name)
+--   events.lua           — Every event whip fires, with its payload type
 --   director.lua         — The Director API's shapes (DirectorRunView, DirectorScenarioView, its events)
 --   satellite.lua        — The Whip.* helper from '@whip_core/lib/satellite.lua'
 --   oxmysql.lua          — oxmysql's MySQL global, as whip calls it

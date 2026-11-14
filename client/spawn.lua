@@ -176,18 +176,6 @@ function SpawnCharacterAt(data, posOverride)
 end
 
 -- ============================================
--- Listen for player loaded → spawn at character position
--- ============================================
---
--- Kept for anything outside whip_core that fires it. The normal character load does NOT come
--- through here any more — client/player.lua calls SpawnCharacterAt directly so it can wait.
-
-RegisterNetEvent('whip_core:client:spawned:ready', function(data)
-    if not data then return end
-    SpawnCharacterAt(data)
-end)
-
--- ============================================
 -- The join spawn, then character select
 -- ============================================
 

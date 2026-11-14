@@ -1814,9 +1814,8 @@ end
 -- Lock State (persisted to DB, applied via server-side native)
 -- ============================================
 
---- Lock or unlock a car: saved, applied to the entity, and announced, only when the state changed. Two names, one
---- payload `{ vehicleId, plate, locked, source }`: `whip_core:vehicle:lockChanged` (fires on lock and unlock) and
---- the alias `whip_core:vehicle:locked`.
+--- Lock or unlock a car: saved, applied to the entity, and announced, only when the state changed:
+--- `whip_core:vehicle:lockChanged` with `{ vehicleId, plate, locked, source }`, on lock and unlock.
 ---@param vehicleId number
 ---@param locked boolean
 ---@param source number|nil  the player who did it, when a player did

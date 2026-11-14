@@ -1847,8 +1847,8 @@ function Shops.setItemPrice(containerId, itemKey, price, forSale, slot)
     return true
 end
 
---- Price the item ON a shelf slot: the stock view's right-click, and the SetShopSlotPrice export. The
---- price is the item's, so every slot holding it takes it.
+--- Price the item ON a shelf slot: the stock view's right-click. The price is the item's, so every slot
+--- holding it takes it.
 ---
 --- `price` nil keeps the item's price, `forSale` nil its for-sale: the stock view changes one of the
 --- two, and its copy of the other may be stale.
@@ -2571,17 +2571,6 @@ exports('SetShopItemPrice', function(target, itemKey, price, forSale)
     local theirs = shopOfAnother(shopOfContainer(containerId), caller)
     if theirs then return false, theirs end
     return Shops.setItemPrice(containerId, itemKey, price, forSale)
-end)
-
---- Price the item on one slot of a STOCKED shop's shelf: it prices that ITEM, so every slot holding it
---- takes the price (SetShopItemPrice says so outright).
-exports('SetShopSlotPrice', function(target, slot, price, forSale)
-    local caller = Registry.caller()
-    local containerId, err = stockTarget(target)
-    if not containerId then return false, err end
-    local theirs = shopOfAnother(shopOfContainer(containerId), caller)
-    if theirs then return false, theirs end
-    return Shops.setSlotPrice(containerId, slot, price, forSale)
 end)
 
 --- One shop, found by something other than its id — the GetVehicleBy shape:

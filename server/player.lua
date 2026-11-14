@@ -754,8 +754,8 @@ function WhipPlayer:logout(invoker)
     -- and fades for half a second, which everyone else would watch it stand frozen through.
     if EnterCharSelectBucket then EnterCharSelectBucket(source) end
 
-    -- Logout event before cleanup (whip_core:player:logout, why = 'logout'; playerLogout is the
-    -- legacy name). Core's own hooks first (Character.onLife), then the news.
+    -- Logout event before cleanup (whip_core:player:logout, why = 'logout'). Core's own hooks first
+    -- (Character.onLife), then the news.
     local sheet = self:serialize()
     local ended = { source = source, charId = self.charId, player = sheet, why = 'logout' }
     Character.runHooks('logout', ended)

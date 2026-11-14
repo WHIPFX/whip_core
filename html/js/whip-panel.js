@@ -28,7 +28,6 @@
 import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
 import { createPadCursor } from './pad-cursor.js';
-import { timeOfDay } from './wp/format.js';
 import { PauseMap } from './pause-map.js';
 
 // ---- registry ----
@@ -1659,11 +1658,6 @@ export const WP = {
         WP._dialogResolve = null;
         if (resolve) resolve(false);
         return true;
-    },
-
-    /** "14:02:33". Kept for satellites' pages; whip's own import timeOfDay from wp/format.js. */
-    fmtTime(t) {
-        return timeOfDay(t);
     },
 
     /** The panel speaks: show a result in the shell's strip. type: 'ok' | 'err' | undefined.

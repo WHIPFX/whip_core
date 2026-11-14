@@ -7060,18 +7060,6 @@ end)</code></pre>
 <pre><code class="lang-lua">exports.whip_core:SetShopItemPrice({ shopId = shopId }, 'drink', 5, true)   -- water at $5</code></pre>
 </div></div>
 
-<div class="export-card" data-search="setshopslotprice shop price slot stocked">
-<div class="export-header"><span class="export-name">SetShopSlotPrice(containerId, slot, price, forSale)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p><strong>Deprecated:</strong> use <code>SetShopItemPrice</code>. Prices the item in a shelf slot; every slot holding it takes the price.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>containerId</td><td>number|table</td><td>The stock container ID, or <code>{ shopId = n }</code></td></tr>
-  <tr><td>slot</td><td>number</td><td>A shelf slot holding the item</td></tr>
-  <tr><td>price</td><td>number</td><td>Dollars (0 = free)</td></tr>
-  <tr><td>forSale</td><td>boolean</td><td><code>true</code>: listed for sale</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: <code>'Unknown container'</code>, <code>'Invalid slot'</code> (not a slot it has), <code>'Invalid price'</code>, <code>'That shelf slot is empty'</code></div>
-</div></div>
-
 <h3 id="client-shops">Client</h3>
 
 <div class="export-card" data-search="isshopopen shop open check client">
@@ -7660,7 +7648,7 @@ exports.whip_core:ZoneBox({
 <h3>Events</h3>
 <p>Any client resource hears the local player cross any zone. On the server, give a zone <code>trackPlayers = true</code> and listen for the <a href="#zones-server-events">server events</a> of the same names.</p>
 <pre><code class="lang-lua">AddEventHandler('whip_core:zone:entered', function(zone)
-    if zone.group == 'police' then --[[ zone.id, zone.label ]] end
+    if zone.group == 'police' then --[[ zone.zoneId, zone.label ]] end
 end)
 AddEventHandler('whip_core:zone:exited', function(zone) end)</code></pre>
 
@@ -12188,7 +12176,7 @@ end)</code></pre>
 <h3>World and vehicles</h3>
 <table class="event-table">
 <tr><th>Event</th><th>Payload</th><th>When</th></tr>
-<tr><td>whip_core:zone:entered / :exited</td><td><code>{ zoneId, key?, label, group }</code></td><td>Entered or left a zone. Match on <code>key</code> (the <code>EnsureZone</code> name), as on the server. <code>id</code> is also sent, equal to <code>zoneId</code></td></tr>
+<tr><td>whip_core:zone:entered / :exited</td><td><code>{ zoneId, key?, label, group }</code></td><td>Entered or left a zone. Match on <code>key</code> (the <code>EnsureZone</code> name), as on the server</td></tr>
 <tr><td>whip_core:weather:layerChanged</td><td><code>{ name, layer }</code></td><td>A local time/weather layer set (<code>layer</code> its settings) or removed (nil)</td></tr>
 <tr><td>whip_core:vehicle:entered</td><td><code>{ vehicleId, entity, plate, seat }</code></td><td>Got into any vehicle or changed seat. Driver: <code>seat == -1</code>, as on the server</td></tr>
 <tr><td>whip_core:vehicle:exited</td><td><code>{ vehicleId, entity, plate, seat }</code></td><td>Got out of any vehicle</td></tr>
@@ -12666,7 +12654,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankAccountByNumber","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetShopSlotPrice","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankAccountByNumber","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

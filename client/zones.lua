@@ -37,9 +37,9 @@ local function zoneKeyOf(zoneId)
 end
 
 --- The enter/exit payload: the server's field names (`zoneId`, `key`) plus the client's own
---- (`label`, `group`), and `id`: one shape under one event name on both sides.
+--- (`label`, `group`): one shape under one event name on both sides.
 local function zoneEventPayload(zone)
-    return { zoneId = zone.id, id = zone.id, key = zoneKeyOf(zone.id), label = zone.label, group = zone.group }
+    return { zoneId = zone.id, key = zoneKeyOf(zone.id), label = zone.label, group = zone.group }
 end
 
 -- Forward declarations (defined later, needed before their definition point)

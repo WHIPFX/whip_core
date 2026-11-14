@@ -1072,8 +1072,7 @@ end
 -- The payload is one table: { source, item, amount, count = what they carry now, reason = the
 -- caller's reason, by = the resource that asked }. reason and by are known only for changes made
 -- through the exports (AddItem, RemoveItem, the cash exports, StoreGive...), which note them just
--- before they push. The legacy names itemAdded / itemRemoved fire alongside, positional
--- (source, item, amount, { count, reason, by }).
+-- before they push.
 
 --- [source] = { [itemKey] = count } as last announced; nil until the baseline is taken.
 local _carried = {}
@@ -1134,7 +1133,7 @@ function Inventory.resetCarried(source, player)
     _pendingReason[source] = nil
 end
 
---- Fire itemAdded / itemRemoved for everything that changed since the last call for this player.
+--- Fire whip_core:item:added / :removed for everything that changed since the last call for this player.
 ---@param source number
 ---@param player table
 function Inventory.announceChanges(source, player)
@@ -1154,7 +1153,6 @@ function Inventory.announceChanges(source, player)
     local reason = note and note.reason or nil
     local by     = note and note.by or nil
 
-    -- whip_core:item:added / :removed; itemAdded / itemRemoved are the legacy names.
     for item, n in pairs(now) do
         local was = before[item] or 0
         if n > was then

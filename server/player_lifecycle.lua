@@ -1197,8 +1197,7 @@ AddEventHandler('playerDropped', function(reason)
         if Stats and Stats.endEffects then Stats.endEffects(source, 'disconnect') end
         SafeSavePlayer(player, 'disconnect', true)
         Inventory.clearCooldowns(source)
-        -- Core's own hooks first (Character.onLife), then whip_core:player:logout (why = 'disconnect';
-        -- playerLogout is the legacy name).
+        -- Core's own hooks first (Character.onLife), then whip_core:player:logout (why = 'disconnect').
         local sheet = player:serialize()
         local ended = { source = source, charId = player.charId, player = sheet, why = 'disconnect' }
         Character.runHooks('logout', ended)

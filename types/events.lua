@@ -144,7 +144,7 @@
 ---@field slot number 1-5
 
 --- S  whip_core:inventory:changed — { source }: something in a player's pockets changed, any way —
---- a move between their own slots too, which the two below never hear. Once per change. (No old name.)
+--- a move between their own slots too, which the two below never hear. Once per change.
 ---
 --- S  whip_core:item:added / whip_core:item:removed — a player carries more / less of an item,
 --- by any route.
@@ -224,7 +224,7 @@
 ---@class WhipEvtShopPrice
 ---@field containerId number
 ---@field item string The item priced (one price per item)
----@field slot number|nil The shelf slot it was priced from, when it was (SetShopSlotPrice, the stock view)
+---@field slot number|nil The shelf slot it was priced from, when it was (the stock view)
 ---@field price number
 ---@field forSale boolean
 
@@ -253,7 +253,6 @@
 --- C  whip_core:zone:entered / whip_core:zone:exited: the local player
 ---@class WhipEvtZone
 ---@field zoneId string
----@field id string          the same as zoneId (the old name)
 ---@field key string|nil     the zone's own key, for matching on
 ---@field label string|nil
 ---@field group string|nil
