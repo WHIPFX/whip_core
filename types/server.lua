@@ -977,11 +977,11 @@ function whip_core:BankWithdraw(accountId, amount, actor, opts) end
 ---@param toId number Destination account ID
 ---@param amount number Whole number, 1 or more
 ---@param actor WhipPersonRef Who is transferring (required)
----@param reason? string Shown on the statement
+---@param opts? { reason?: string } reason: shown on the statement
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankTransfer(fromId, toId, amount, actor, reason) end
+function whip_core:BankTransfer(fromId, toId, amount, actor, opts) end
 
 --- The SYSTEM pays in — a wage, a sale's takings, a reward. No permission check: you decide.
 --- Written to the activity log with your resource's name.

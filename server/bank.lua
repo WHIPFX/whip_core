@@ -1655,7 +1655,9 @@ exports('BankWithdraw', function(accountId, amount, actor, opts)
     return Bank.Withdraw(accountId, amount, charId, reason)
 end)
 
-exports('BankTransfer', function(fromId, toId, amount, actor, reason)
+exports('BankTransfer', function(fromId, toId, amount, actor, opts)
+    local reason, bad = optsReason(opts)
+    if bad then return false, bad end
     local charId, why = WhoIs(actor)
     if not charId then return false, why end
     return Bank.Transfer(fromId, toId, amount, charId, reason)
