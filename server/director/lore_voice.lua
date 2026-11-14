@@ -370,8 +370,8 @@ local function busyOf(voice, line)
 end
 LoreVoice.busyOf = busyOf
 
---- The next line waiting for this NPC, said now (one that waited too long is dropped). From a thread. An item is one
---- of its lines (`line`) or a recording of a card's own (`v`: Play Custom Voice Line).
+--- The next line waiting for this NPC, said now (one that waited too long is dropped): true when there was one. From
+--- a thread. An item is one of its lines (`line`) or a recording of a card's own (`v`: Play Custom Voice Line).
 local function nextQueued(npcId)
     local q = queued[npcId]
     while q and #q > 0 do
@@ -384,7 +384,7 @@ local function nextQueued(npcId)
                 else o.busy = 'cut'; ok, why = LoreVoice.sayFrom(npcId, item.line, o) end
                 if item.p then item.p:resolve(ok and 'done' or (why or 'failed')) end
             end)
-            return
+            return true
         end
         if item.p then item.p:resolve('it waited too long') end
     end
@@ -485,14 +485,14 @@ function LoreVoice.playFrom(npcId, v, opts)
             return exports[VOICE]:PlayWorldVoice(mine, v.url, function(_, how)
                 -- (Stopped for a line cutting in: cut, as one whip_voice cuts.)
                 if me.cut then how = 'cut' end
-                -- Ended (not cut by a line that has the voice now): its usual reach again, the megaphone down and off
-                -- the radio, and the next line waiting.
+                -- Ended (not cut by a line that has the voice now): its usual reach again, and the next line waiting.
+                -- The megaphone goes down and the voice off the radio only with no next line: the next one changes
+                -- just what differs, so on the same frequency its listeners stay connected.
                 if how ~= 'cut' then
                     if saying[npcId] == me then saying[npcId] = nil end
                     speaking[npcId] = nil
                     if bonus > 0 then reach(npcId, mine, 0) end
-                    devices(npcId, mine, {})
-                    nextQueued(npcId)
+                    if not nextQueued(npcId) then devices(npcId, mine, {}) end
                 end
                 if p then
                     if playing[npcId] == p then playing[npcId] = nil end
