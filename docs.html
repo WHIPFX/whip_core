@@ -1790,7 +1790,7 @@ end)</code></pre>
 <tr><td>A fact about a character: a licence, quest progress</td><td><code>SetPlayerFlag</code> or <code>SetPlayerMetadata</code> while they're online; <code>GiveOnLogin</code> or the bank for someone offline</td><td>WHIP, with the character</td><td>Their game too: never a secret</td></tr>
 <tr><td>Something about a car: a fitted part, a finance flag</td><td><code>SetVehicleData</code>; a gauge (fuel, boost) is a <a href="#registervehiclestat">vehicle stat</a></td><td>WHIP, with the car</td><td>Games near the car, for a stat</td></tr>
 <tr><td>Items kept somewhere new: a mailbox, a vault</td><td>A container (<code>EnsureContainer</code>) or a <a href="#store-kinds">store kind</a> of your own</td><td>WHIP</td><td>Whoever its rules let open it</td></tr>
-<tr><td>Your resource's settings</td><td>A settings page: <code>Whip.configPage</code> or <code>RegisterSettings</code> (<a href="#resource-settings">Settings pages</a>)</td><td>WHIP, in the database</td><td>Admins edit it in <code>/whip</code>; every game reads it unless the setting says <code>sides = 'server'</code></td></tr>
+<tr><td>Your resource's settings</td><td>A settings page: <code>Whip.configPage</code> (<a href="#resource-settings">Settings pages</a>)</td><td>WHIP, in the database</td><td>Admins edit it in <code>/whip</code>; every game reads it unless the setting says <code>sides = 'server'</code></td></tr>
 <tr><td>A player's own choice: a volume, a toggle</td><td><code>Whip.playerSetting</code> (<a href="#player-settings">player settings</a>)</td><td>Their own PC</td><td>That player</td></tr>
 <tr><td>Anything else: a ledger, a leaderboard</td><td>A table of your own, made with <a href="#ensuretable"><code>EnsureTable</code></a></td><td>You; use <a href="#commitwithaction"><code>CommitWithAction</code></a> after an inventory change</td><td>Whoever your code shows it to</td></tr>
 <tr><td>An item for a character who's away</td><td><a href="#giveonlogin"><code>GiveOnLogin</code></a></td><td>WHIP, until their next login</td><td>Them, when it arrives</td></tr>
@@ -3968,7 +3968,7 @@ images = {                                                   -- by the slot's co
 
 <h3 id="item-settings">Item settings</h3>
 <p>Admins can change any item's <strong>name, description and weight</strong> on the Items page; your definition is the default, and an admin's change stays until Reset.</p>
-<p>An item can declare <strong>its own settings</strong> too (a magazine's size, a gun's reload time), shown on its Items page. Each entry in its <code>settings</code> list is a <a href="#resource-settings"><code>RegisterSettings</code></a> entry: <code>key</code>, <code>type</code> (<code>'int'</code>, <code>'number'</code>, <code>'bool'</code>, <code>'string'</code> or <code>'enum'</code>), <code>default</code>, <code>label</code>, and the <code>min</code>, <code>max</code>, <code>step</code>, <code>unit</code>, <code>maxLen</code>, <code>nullable</code>, <code>options</code> or <code>help</code> its type takes.</p>
+<p>An item can declare <strong>its own settings</strong> too (a magazine's size, a gun's reload time), shown on its Items page. Each entry in its <code>settings</code> list is a <a href="#registersettings">setting entry</a>: <code>key</code>, <code>type</code> (<code>'int'</code>, <code>'number'</code>, <code>'bool'</code>, <code>'string'</code> or <code>'enum'</code>), <code>default</code>, <code>label</code>, and the <code>min</code>, <code>max</code>, <code>step</code>, <code>unit</code>, <code>maxLen</code>, <code>nullable</code>, <code>options</code> or <code>help</code> its type takes.</p>
 <pre><code class="lang-lua">Whip.register(function()
     Whip.core:RegisterItem('my_guns_mag', {
         name = 'Pistol Magazine', weight = 0.2, stack = false,
@@ -6393,19 +6393,7 @@ if key then exports.whip_core:StoreVehicle(vehicleId, key) end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>table[]</code>; <code>{}</code> for a key that names no garage</div>
 </div></div>
 
-<div class="export-card" data-search="getgaragespot parking spot bay">
-<div class="export-header"><span class="export-name">GetGarageSpot(spotId)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>One parking bay, by id.</p>
-  <div class="return-info"><strong>Returns: </strong><code>{ spotId, garageKey, x, y, z, heading, label }</code> or <code>nil</code></div>
-</div></div>
 
-<div class="export-card" data-search="getgaragespots parking spots all bays">
-<div class="export-header"><span class="export-name">GetGarageSpots()</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>Every parking bay the server knows.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table[]</code>, each as <code>GetGarageSpot</code> returns</div>
-</div></div>
 
 <h3>Managing garages</h3>
 
@@ -7175,19 +7163,7 @@ if not ok then exports.whip_core:RefundPlayer(receipt) return false, why end</co
 
 <h3>Furniture and stashes</h3>
 
-<div class="export-card" data-search="getpropertyobjectcount furniture count limit">
-<div class="export-header"><span class="export-name">GetPropertyObjectCount(propertyId)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>How many pieces of furniture a property holds. The default limit is <code>Config.PropertyMaxObjects</code>.</p>
-<div class="return-info"><strong>Returns: </strong><code>number</code></div>
-</div></div>
 
-<div class="export-card" data-search="getpropertyobjectversion furniture version save stale">
-<div class="export-header"><span class="export-name">GetPropertyObjectVersion(propertyId)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>The furniture's version, which goes up with every save and clear. A save over any other version is refused, so a stale editor can't overwrite the room.</p>
-<div class="return-info"><strong>Returns: </strong><code>number</code>: 0 for a room never furnished this session</div>
-</div></div>
 
 <div class="export-card" data-search="getpropertystashes stash container furniture property storage">
 <div class="export-header"><span class="export-name">GetPropertyStashes(propertyId)</span><span class="export-side side-server">SERVER</span></div>
@@ -7257,12 +7233,6 @@ end</code></pre>
 
 <h3>Prop catalogue</h3>
 
-<div class="export-card" data-search="getpropcatalog props catalogue placeable list">
-<div class="export-header"><span class="export-name">GetPropCatalog()</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>The placeable-prop catalogue, in the shape the client is sent.</p>
-<div class="return-info"><strong>Returns: </strong><code>table[]</code></div>
-</div></div>
 
 <div class="export-card" id="registerprops" data-search="registerprops add-on props prop pack mlo furniture furnisher picture">
 <div class="export-header"><span class="export-name">RegisterProps(list)</span><span class="export-side side-server">SERVER</span></div>
@@ -7274,14 +7244,6 @@ end</code></pre>
 })</code></pre>
 </div></div>
 
-<div class="export-card" data-search="haspropimage prop preview image thumbnail">
-<div class="export-header"><span class="export-name">HasPropImage(model)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-<p>Whether a prop model has a preview image on disk.</p>
-<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-<tr><td>model</td><td>string</td><td>Prop model name, any case</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
-</div></div>
 
 <div class="export-card" data-search="isplaceableprop prop allowed placeable check">
 <div class="export-header"><span class="export-name">IsPlaceableProp(model)</span><span class="export-side side-server">SERVER</span></div>
@@ -9086,16 +9048,7 @@ local hint = exports.whip_core:KeyHint('Scroll', { 'lt', 'rt' }) .. ' Turn'</cod
 <pre><code class="lang-lua">AddEventHandler('whip_core:pad:deviceChanged', function(e) onPad = e.pad == true end)</code></pre>
 </div></div>
 
-<div class="export-card" data-search="padcombotakes padcomboused controller gamepad pad lb combo modifier talk radio">
-<div class="export-header"><span class="export-name">PadComboTakes(control) / PadComboUsed()</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>For your own pad loop (<code>Whip.padScreen</code> already asks): a press with LB held may be WHIP's combo. Ask on a press, not every frame.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>control</td><td>number</td><td>A frontend control just pressed: <code>201</code>-<code>204</code>, <code>206</code>, D-pad <code>187</code>-<code>190</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>PadComboTakes</code>: <code>true</code> while LB is held and the button is A, X, or one whose LB slot works in menus. <code>PadComboUsed</code>: <code>true</code> if a combo button went down during the current or last LB hold</div>
-<pre><code class="lang-lua">if IsDisabledControlJustPressed(0, id) and not exports.whip_core:PadComboTakes(id) then press(id) end
-if IsDisabledControlJustReleased(0, 205) and not exports.whip_core:PadComboUsed() then pageBack() end</code></pre>
-</div></div>
+<p>A pad screen of your own: <a href="#whip-padscreen"><code>Whip.padScreen</code></a> leaves a press with LB held to WHIP's combos for you.</p>
 <h2 id="guide-camera">Camera System</h2>
 <p class="lede">Scripted cameras for cutscenes, intros, showrooms and cinematics. One camera plays at a time, and it belongs to the resource that started it: when that resource stops, WHIP hands the view back.</p>
 
@@ -9259,12 +9212,6 @@ exports.whip_core:StopCamera()</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code></div>
 </div></div>
 
-<div class="export-card" data-search="getcamerasequence camera sequence saved name server">
-<div class="export-header"><span class="export-name">GetCameraSequence(name)</span><span class="export-side side-server">SERVER</span></div>
-<div class="export-body">
-  <p>A copy of a sequence saved in the Camera Creator, ready to send to a player's game for <code>PlayCameraSequence</code>.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
-</div></div>
 <h2 id="guide-theming">Theming &amp; Skins</h2>
 <p class="lede">WHIP's colours, fonts, radii, shadows and spacing are CSS custom properties in <code>whip_core/html/css/base.css</code>. A skin is a resource of its own, an <code>fxmanifest.lua</code> and a <code>theme.css</code> that overrides them, so it survives every whip_core update.</p>
 
@@ -9486,111 +9433,23 @@ end</code></pre>
 <div class="info-box warn"><strong>Keep an atlas inside the game's limit.</strong> <code>CreateDui</code> throws for a page wider than the game allows: 8192 pixels on GTA V Enhanced. Pack cells into more rows rather than one long strip.</div>
 <h2 id="resource-settings">Settings pages for your resource</h2>
 <p class="lede">Put your resource's settings in <code>/whip</code> → Settings beside Config, so server owners never open your config file. You declare the settings; WHIP builds the page, checks and saves values, sends changes to every player and calls you back.</p>
-<p>The page is named by your <code>label</code>, and only permanent admins see it. Declare it on <strong>both sides</strong>, in a shared script, in <code>Whip.register</code>: the server checks and saves, and each player's game needs your defaults and callbacks.</p>
+<p>The page is named by your <code>label</code>, and only permanent admins see it. Declare it with <code>Whip.configPage</code> from WHIP's helper, in a shared script: the server checks and saves, and each player's game needs your defaults.</p>
 <div class="info-box warn"><strong>Values follow the folder name.</strong> Saved values are kept under the name the server runs your resource by. Renaming the folder (<code>mycafe</code> to <code>mycafe-v2</code>) starts from your defaults again, so tell owners to keep the name across updates.</div>
 
-<h3>Declaring a page</h3>
-<div class="export-card" id="registersettings" data-search="registersettings settings page config panel admin satellite declare">
-<div class="export-header"><span class="export-name">RegisterSettings(def)</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>Declares your resource's settings page. Saved values are checked again: one that no longer passes (you lowered a <code>max</code>) is dropped with a console line, and your default stands. The page goes when your resource stops; saved values stay.</p>
-  <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
-  <tr><td>label</td><td>string</td><td>The page's name in Settings, up to 40 characters</td></tr>
-  <tr><td>settings</td><td>table</td><td>The entries, in order (below)</td></tr>
-  <tr><td>groups</td><td>table|nil</td><td>Instead of <code>settings</code>, for a long page: <code>{ { label = 'Prices', settings = { … } }, … }</code>, each a group on the left</td></tr></table>
-  <p>Each entry:</p>
-  <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
-  <tr><td>key</td><td>string</td><td>Letters, digits, <code>_</code> and <code>.</code>, starting with a letter or <code>_</code>, up to 64; unique on the page. A dot makes a path: a callback on <code>'prices'</code> also hears <code>'prices.coffee'</code></td></tr>
-  <tr><td>type</td><td>string</td><td><code>'int'</code>, <code>'number'</code>, <code>'bool'</code>, <code>'string'</code>, <code>'enum'</code>, <code>'vec3'</code>, <code>'vec4'</code>, <code>'list'</code>, <code>'records'</code>, <code>'map'</code> or <code>'record'</code> (one card of <code>fields</code>, each its own setting: <code>'turbo.gain'</code>, its default from the card's <code>default</code> table)</td></tr>
-  <tr><td>default</td><td>any</td><td>The value until an admin changes it. It must pass the entry's checks or the row is left off (the console says which); the page is refused only when none pass</td></tr>
-  <tr><td>shownWhen</td><td>table|nil</td><td><code>{ path = 'key', equals = value }</code>: show the row (or whole card) only while that setting has that value</td></tr>
-  <tr><td>label / help</td><td>string</td><td>The row's name, and the line under it</td></tr>
-  <tr><td>min / max / step</td><td>number|nil</td><td><code>int</code> and <code>number</code>: range, and the arrows' step</td></tr>
-  <tr><td>unit</td><td>string|nil</td><td><code>int</code> and <code>number</code>: <code>'$'</code> goes in front, anything else (<code>'m'</code>, <code>'ms'</code>) after</td></tr>
-  <tr><td>options</td><td>table</td><td><code>enum</code>: <code>{ { value = 'slow', label = 'Slow' }, … }</code></td></tr>
-  <tr><td>maxLen / pattern / patternWhy</td><td>number / string</td><td><code>string</code>: most characters; a Lua pattern it must match (use <code>^…$</code> for the whole text); the message when it doesn't</td></tr>
-  <tr><td>nullable / emptyLabel</td><td>boolean / string</td><td>An empty box is <code>nil</code>, and the row calls it this (default <code>'none'</code>)</td></tr>
-  <tr><td>offWhenEmpty</td><td>boolean</td><td><code>int</code>, <code>number</code>, <code>string</code>: an empty box is <code>false</code> ("off"), for a cap that can be switched off</td></tr>
-  <tr><td>apply</td><td>string|nil</td><td><code>'live'</code> (default): in force at once, everywhere. <code>'restart'</code>: in force when your resource or whip_core next starts; read it at start, <code>OnSettingChanged</code> isn't called. <code>'readonly'</code>: shown, never changed</td></tr>
-  <tr><td>why</td><td>string|nil</td><td>For <code>'restart'</code> or <code>'readonly'</code>: the reason shown on the row</td></tr>
-  <tr><td>sides</td><td>string|nil</td><td><code>'both'</code> (default), or <code>'server'</code>: never sent to players, for a key or password. Admins still see it</td></tr>
-  <tr><td>cross</td><td>function|nil</td><td><code>function(get)</code>, run on the server when this setting is in a save; <code>get(key)</code> returns any setting as it will be saved. Return <code>true</code>, or <code>false, 'why'</code> to refuse. Give both entries of a two-setting rule the check</td></tr>
-  <tr><td>here / limits</td><td>boolean / table</td><td><code>vec3</code>, <code>vec4</code>: a <em>Use where I stand</em> button, and <code>{ x = { min, max }, … }</code> per ranged axis</td></tr>
-  <tr><td>item</td><td>table</td><td><code>list</code>: every entry's shape, as an entry with no <code>key</code>: <code>{ type = 'int', min = 1, max = 9 }</code>. <code>int</code>, <code>number</code>, <code>string</code> or <code>enum</code>, edited as one comma-separated line. For positions, use <code>records</code> with a <code>vec3</code> field</td></tr>
-  <tr><td>fields</td><td>table</td><td><code>records</code>, a <code>map</code> of rows, or <code>record</code>: the fields, each an entry with a <code>key</code></td></tr>
-  <tr><td>widget / marker</td><td>string / table</td><td><code>widget = 'mapPoints'</code>: <code>records</code> with a <code>vec3</code> and a <code>string</code> field show as map icons, dragged to move, clicked to rename or remove, added where the admin stands. <code>marker = { sprite = 361, colour = 1, name = 'Gas Station' }</code>: the blip and a new row's name</td></tr>
-  <tr><td>each</td><td>table</td><td><code>map</code> of single values: each value's shape, e.g. <code>{ type = 'string', maxLen = 20 }</code></td></tr>
-  <tr><td>minItems / maxItems / unique</td><td>number / string</td><td>How many entries or rows (a <code>map</code> takes <code>maxItems</code> only), and for <code>records</code> a field no two rows share. Set them equal to fix a table's rows</td></tr>
-  <tr><td>keyKind / keyPattern / keyWhy</td><td>string|nil</td><td><code>map</code>: <code>keyKind = 'hash'</code> takes a model name and keeps its hash (as <code>GetEntityModel</code> returns). <code>'number'</code> keeps a digits-only key as a number (a mod slot, a wheel type). Name keys are checked against <code>keyPattern</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: ok, and why not, naming the entry</div>
-<pre><code class="lang-lua">-- shared.lua (shared_script, after WHIP's helper)
-Whip.register(function()
-    Whip.core:RegisterSettings({
-        label = 'My Cafe',
-        settings = {
-            { key = 'price', type = 'int', min = 1, max = 500, unit = '$', default = 5,
-              label = 'Coffee price', help = 'What one coffee costs at the counter.' },
-            { key = 'open', type = 'bool', default = true,
-              label = 'Counter open', help = 'Off: the counter sells nothing.' },
-            { key = 'size', type = 'enum', default = 'regular', label = 'Cup size',
-              options = { { value = 'small', label = 'Small' }, { value = 'regular', label = 'Regular' } } },
-        },
-    })
-end)</code></pre>
-  <div class="info-box warn"><strong>Declare before you read.</strong> Until <code>RegisterSettings</code> runs, <code>GetSetting</code> returns <code>nil</code>. Declare it before anything that reads it, in <code>Whip.register</code> or <code>Whip.register</code>: on the server, a page declared before whip_core has finished starting is refused. Declared on the server only, players' games have no defaults.</div>
-</div></div>
-
-<h3>Reading and reacting</h3>
-<div class="export-card" id="getsetting" data-search="getsetting setting read value config panel satellite">
-<div class="export-header"><span class="export-name">GetSetting(key)</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>One of your settings: what an admin saved, else your default. Read it where you use it, so a <code>'live'</code> change counts from the next read. On a player's game, a <code>sides = 'server'</code> setting returns its default.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>key</td><td>string</td><td>The entry's <code>key</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>any</code>: the value (a table is your own copy), or <code>nil</code> for a key your page doesn't have</div>
-<pre><code class="lang-lua">if not exports.whip_core:GetSetting('open') then
-    return false, 'The counter is closed'
-end
-local price = exports.whip_core:GetSetting('price')</code></pre>
-</div></div>
-
-<div class="export-card" id="getsettings" data-search="getsettings settings all values config panel satellite">
-<div class="export-header"><span class="export-name">GetSettings()</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>Every setting on your page, defaults included.</p>
-  <div class="return-info"><strong>Returns: </strong><code>table</code>: <code>{ [key] = value }</code></div>
-<pre><code class="lang-lua">local s = exports.whip_core:GetSettings()
-print(s.price, s.size, s.open)</code></pre>
-</div></div>
-
-<div class="export-card" id="onsettingchanged" data-search="onsettingchanged setting changed callback hook config panel satellite live">
-<div class="export-header"><span class="export-name">OnSettingChanged(key, fn)</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>Calls <code>fn</code> after a <code>'live'</code> setting changes on this side: on the server when an admin applies it, on each game when the change arrives. Use it for what you set up once (a blip, a loop's timing). One function per key; declare it in <code>Whip.register</code>.</p>
-  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>key</td><td>string</td><td>The entry's <code>key</code></td></tr>
-  <tr><td>fn</td><td>function</td><td><code>function(value, old, key)</code>. Mustn't wait: start a thread for anything slow</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code></div>
-<pre><code class="lang-lua">-- client.lua: hide the counter's blip while it's closed
-Whip.register(function()
-    Whip.core:OnSettingChanged('open', function(open)
-        SetBlipAlpha(counterBlip, open and 255 or 0)
-    end)
-end)</code></pre>
-</div></div>
-
 <h3 id="config-page">Your config.lua as the page</h3>
-<p>If your resource already reads a <code>Config</code> table, <code>Whip.configPage</code> (from <code>@whip_core/lib/satellite.lua</code>) puts chosen <code>Config</code> values on your page. Each <code>key</code> is a path in <code>Config</code>, its default is <code>config.lua</code>'s value, and saved values are written into <code>Config</code> on both sides, so your code keeps reading <code>Config.X</code>.</p>
+<p>Your resource reads a <code>Config</code> table, and <code>Whip.configPage</code> (from <code>@whip_core/lib/satellite.lua</code>) puts chosen <code>Config</code> values on your page. Each <code>key</code> is a path in <code>Config</code>, its default is <code>config.lua</code>'s value, and saved values are written into <code>Config</code> on both sides, so your code keeps reading <code>Config.X</code>.</p>
 <p>Saved values arrive when whip_core is ready, after your files load. Code that reads <code>Config</code> at file scope sees <code>config.lua</code>'s values first: rebuild what it works out with <code>Whip.onConfigChanged</code>. whip_autos's <code>shared/settings.lua</code> is a worked example.</p>
 
 <div class="export-card" id="whip-configpage" data-search="whip.configpage configpage config.lua settings page satellite helper onconfigchanged">
 <div class="export-header"><span class="export-name">Whip.configPage(def)</span><span class="export-side side-server">SERVER</span> <span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Call once at file scope (not in <code>Whip.register</code>), in a shared script after <code>config.lua</code>; it declares the page whenever whip_core is ready. Use this or <code>RegisterSettings</code>, not both. Entries are <code>RegisterSettings</code>' without <code>default</code>; tables are changed in place, so a local copy of <code>Config.Shop</code> sees new values.</p>
+  <p>Call once at file scope (not in <code>Whip.register</code>), in a shared script after <code>config.lua</code>; it declares the page on both sides whenever whip_core is ready. Entries are the <a href="#registersettings">setting entries</a> below, without <code>default</code>; tables are changed in place, so a local copy of <code>Config.Shop</code> sees new values.</p>
+  <p>Saved values are checked again: one that no longer passes (you lowered a <code>max</code>) is dropped with a console line, and <code>config.lua</code>'s value stands. The page goes when your resource stops; saved values stay.</p>
   <p>Values are kept as their check returns them (text trimmed, <code>keyKind = 'hash'</code> maps keyed by hash). <code>sides = 'server'</code> values go into the server's <code>Config</code> only. Only data goes on a page: an entry holding a function, or an undeclared table or position field in a row, is left off with a console line.</p>
   <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
   <tr><td>label</td><td>string</td><td>The page's name in Settings</td></tr>
-  <tr><td>settings / groups</td><td>table</td><td>As <code>RegisterSettings</code>; each <code>key</code> a path such as <code>'Tuning.EngineSwapPrice'</code></td></tr>
+  <tr><td>settings</td><td>table</td><td>The <a href="#registersettings">entries</a>, in order; each <code>key</code> a path such as <code>'Tuning.EngineSwapPrice'</code></td></tr>
+  <tr><td>groups</td><td>table|nil</td><td>Instead of <code>settings</code>, for a long page: <code>{ { label = 'Prices', settings = { … } }, … }</code>, each a group on the left</td></tr>
   <tr><td>config</td><td>table|nil</td><td>The table the keys are in. Default <code>Config</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean</code>: <code>false</code> when <code>def</code> isn't a page (printed). whip_core's own refusal is printed when the page is declared</div>
 <pre><code class="lang-lua">-- settings.lua (shared_script, after config.lua)
@@ -9620,8 +9479,33 @@ Whip.configPage({
     local c = Config.Counter.coords
     SetBlipCoords(counterBlip, c.x, c.y, c.z)
 end)</code></pre>
-  <div class="info-box warn"><strong>Not with OnSettingChanged.</strong> Don't use <code>OnSettingChanged</code> on a <code>configPage</code> key: one callback per key, so one would be lost.</div>
 </div></div>
+
+<h3 id="registersettings">Setting entries</h3>
+<p>Each entry of a page's <code>settings</code>, and of an <a href="#item-settings">item's own settings</a>:</p>
+  <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td>key</td><td>string</td><td>Letters, digits, <code>_</code> and <code>.</code>, starting with a letter or <code>_</code>, up to 64; unique on the page. A dot makes a path: a callback on <code>'prices'</code> also hears <code>'prices.coffee'</code></td></tr>
+  <tr><td>type</td><td>string</td><td><code>'int'</code>, <code>'number'</code>, <code>'bool'</code>, <code>'string'</code>, <code>'enum'</code>, <code>'vec3'</code>, <code>'vec4'</code>, <code>'list'</code>, <code>'records'</code>, <code>'map'</code> or <code>'record'</code> (one card of <code>fields</code>, each its own setting: <code>'turbo.gain'</code>, its default from the card's <code>default</code> table)</td></tr>
+  <tr><td>default</td><td>any</td><td>The value until an admin changes it: an item's setting gives one; on a <code>Whip.configPage</code> page it's <code>config.lua</code>'s value. It must pass the entry's checks or the row is left off (the console says which); the page is refused only when none pass</td></tr>
+  <tr><td>shownWhen</td><td>table|nil</td><td><code>{ path = 'key', equals = value }</code>: show the row (or whole card) only while that setting has that value</td></tr>
+  <tr><td>label / help</td><td>string</td><td>The row's name, and the line under it</td></tr>
+  <tr><td>min / max / step</td><td>number|nil</td><td><code>int</code> and <code>number</code>: range, and the arrows' step</td></tr>
+  <tr><td>unit</td><td>string|nil</td><td><code>int</code> and <code>number</code>: <code>'$'</code> goes in front, anything else (<code>'m'</code>, <code>'ms'</code>) after</td></tr>
+  <tr><td>options</td><td>table</td><td><code>enum</code>: <code>{ { value = 'slow', label = 'Slow' }, … }</code></td></tr>
+  <tr><td>maxLen / pattern / patternWhy</td><td>number / string</td><td><code>string</code>: most characters; a Lua pattern it must match (use <code>^…$</code> for the whole text); the message when it doesn't</td></tr>
+  <tr><td>nullable / emptyLabel</td><td>boolean / string</td><td>An empty box is <code>nil</code>, and the row calls it this (default <code>'none'</code>)</td></tr>
+  <tr><td>offWhenEmpty</td><td>boolean</td><td><code>int</code>, <code>number</code>, <code>string</code>: an empty box is <code>false</code> ("off"), for a cap that can be switched off</td></tr>
+  <tr><td>apply</td><td>string|nil</td><td><code>'live'</code> (default): in force at once, everywhere. <code>'restart'</code>: in force when your resource or whip_core next starts; read it at start, <code>Whip.onConfigChanged</code> isn't called. <code>'readonly'</code>: shown, never changed</td></tr>
+  <tr><td>why</td><td>string|nil</td><td>For <code>'restart'</code> or <code>'readonly'</code>: the reason shown on the row</td></tr>
+  <tr><td>sides</td><td>string|nil</td><td><code>'both'</code> (default), or <code>'server'</code>: never sent to players, for a key or password. Admins still see it</td></tr>
+  <tr><td>cross</td><td>function|nil</td><td><code>function(get)</code>, run on the server when this setting is in a save; <code>get(key)</code> returns any setting as it will be saved. Return <code>true</code>, or <code>false, 'why'</code> to refuse. Give both entries of a two-setting rule the check</td></tr>
+  <tr><td>here / limits</td><td>boolean / table</td><td><code>vec3</code>, <code>vec4</code>: a <em>Use where I stand</em> button, and <code>{ x = { min, max }, … }</code> per ranged axis</td></tr>
+  <tr><td>item</td><td>table</td><td><code>list</code>: every entry's shape, as an entry with no <code>key</code>: <code>{ type = 'int', min = 1, max = 9 }</code>. <code>int</code>, <code>number</code>, <code>string</code> or <code>enum</code>, edited as one comma-separated line. For positions, use <code>records</code> with a <code>vec3</code> field</td></tr>
+  <tr><td>fields</td><td>table</td><td><code>records</code>, a <code>map</code> of rows, or <code>record</code>: the fields, each an entry with a <code>key</code></td></tr>
+  <tr><td>widget / marker</td><td>string / table</td><td><code>widget = 'mapPoints'</code>: <code>records</code> with a <code>vec3</code> and a <code>string</code> field show as map icons, dragged to move, clicked to rename or remove, added where the admin stands. <code>marker = { sprite = 361, colour = 1, name = 'Gas Station' }</code>: the blip and a new row's name</td></tr>
+  <tr><td>each</td><td>table</td><td><code>map</code> of single values: each value's shape, e.g. <code>{ type = 'string', maxLen = 20 }</code></td></tr>
+  <tr><td>minItems / maxItems / unique</td><td>number / string</td><td>How many entries or rows (a <code>map</code> takes <code>maxItems</code> only), and for <code>records</code> a field no two rows share. Set them equal to fix a table's rows</td></tr>
+  <tr><td>keyKind / keyPattern / keyWhy</td><td>string|nil</td><td><code>map</code>: <code>keyKind = 'hash'</code> takes a model name and keeps its hash (as <code>GetEntityModel</code> returns). <code>'number'</code> keeps a digits-only key as a number (a mod slot, a wheel type). Name keys are checked against <code>keyPattern</code></td></tr></table>
 
 <h3 id="player-settings">Each player's own settings</h3>
 <p>A choice each player makes for their own screen (volume, units, shown or hidden) goes on the pause menu's <strong>Server Settings</strong> page as a row of yours. Your resource stores the value (its own KVP, on the player's PC); the page calls your <code>get</code> and <code>set</code>. The row goes when your resource stops and comes back when whip_core restarts.</p>
@@ -9655,15 +9539,6 @@ Whip.playerSetting({
 })</code></pre>
 </div></div>
 
-<div class="export-card" id="registerplayersetting" data-search="registerplayersetting player setting export pause menu server settings">
-<div class="export-header"><span class="export-name">RegisterPlayerSetting(def)</span><span class="export-side side-client">CLIENT</span></div>
-<div class="export-body">
-  <p>The export behind <code>Whip.playerSetting</code>, which calls it for you. Same <code>def</code>; called yourself, declare it in <code>Whip.register</code> or the row is lost on a whip_core restart. Refused for a key another running resource holds, one of whip_core's, or a row with no default.</p>
-  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
-<pre><code class="lang-lua">Whip.register(function()
-    Whip.core:RegisterPlayerSetting(soundsRow)
-end)</code></pre>
-</div></div>
 
 <div class="export-card" id="getplayersetting" data-search="getplayersetting player setting read value preference speed unit">
 <div class="export-header"><span class="export-name">GetPlayerSetting(key)</span><span class="export-side side-client">CLIENT</span></div>
@@ -10995,8 +10870,8 @@ end)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>var</code>, <code>state</code>, <code>place</code>, <code>made</code>: the value, or <code>nil, why</code>. The rest: <code>true</code>, or <code>false, why</code></div>
 </div></div>
 
-<div class="export-card" data-search="whip.answercard answerdirectorcard later officer respond callid">
-<div class="export-header"><span class="export-name">Whip.answerCard(callId, outcome, data?) · AnswerDirectorCard</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="whip.answercard later officer respond callid">
+<div class="export-header"><span class="export-name">Whip.answerCard(callId, outcome, data?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Answers a waiting card later: an officer pressing <kbd>E</kbd> at the place, a phone reply. <code>outcome</code> is one of the card's own; <code>data.source</code> is which of the run's players what follows acts for. Only the card's own resource may answer.</p>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (no longer waiting, or not one of its outcomes)</div>
@@ -11635,7 +11510,7 @@ end</code></pre>
 <tr><td><code>VehicleKeySlots</code> / <code>VehicleKeyMaxWeight</code></td><td><code>1</code> / <code>1.0</code></td><td>The ignition: one key</td></tr>
 <tr><td><code>VehicleLockRange</code></td><td><code>8.0</code></td><td>Metres to lock with <kbd>L</kbd></td></tr>
 <tr><td><code>UnlockOnExit</code></td><td><code>true</code></td><td>Getting out unlocks the car. <code>false</code>: it stays locked</td></tr>
-<tr><td><code>LockpickGame</code></td><td><code>'ring'</code></td><td>Skill check for lockpicks and the ignition hack, or a <code>RegisterSkillCheckGame</code> game (falls back to the ring)</td></tr>
+<tr><td><code>LockpickGame</code></td><td><code>'ring'</code></td><td>Skill check for lockpicks and the ignition hack, or a <code>Whip.skillCheckGame</code> game (falls back to the ring)</td></tr>
 <tr><td><code>Seats</code></td><td><code>{ NoAutoShuffle = true }</code></td><td>Passengers stay in their seat (<a href="#guide-vehicles">Vehicles &amp; Keys</a>)</td></tr>
 <tr><td><code>VehicleTrunkRange</code></td><td><code>2.5</code></td><td>Metres from the rear to open the boot</td></tr>
 <tr><td><code>GarageSpotRadius</code></td><td><code>3.5</code></td><td>How close to a bay's middle a car must be to store there. Occupancy uses the bay's outline</td></tr>
@@ -12618,7 +12493,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

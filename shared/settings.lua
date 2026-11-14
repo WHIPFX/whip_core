@@ -331,7 +331,7 @@ local pages = {}   -- [owner] = { owner, label, groups = { { id, label, settings
 local index = {}   -- [owner][path] = entry
 
 --- Declare a page of settings. whip_core's is ConfigSchema (shared/config_schema.lua); a
---- satellite's comes through RegisterSettings. Answers the page.
+--- satellite's comes through __RegisterSettings (Whip.configPage). Answers the page.
 ---@param owner string
 ---@param label string
 ---@param groups table
@@ -782,19 +782,18 @@ end
 --
 -- A resource declares its settings and whip does the rest: the page in /whip → Settings (its own
 -- section, beside Config), the checks, saving, sending changes to every player, and calling back.
--- Declared on BOTH sides (a shared script, inside Whip.register so it comes back after a whip_core
--- restart): the server checks and saves, a player's game needs the defaults and its own callbacks.
+-- Declared on BOTH sides: the server checks and saves, a player's game needs the defaults and its own
+-- callbacks. A satellite does it through Whip.configPage (lib/satellite.lua), which declares the page with
+-- __RegisterSettings whenever whip_core is ready, reads values with __GetSetting and hears changes with
+-- __OnSettingChanged, writing them into the resource's Config:
 --
---     exports.whip_core:RegisterSettings({
+--     Whip.configPage({
 --         label = 'Autos',
 --         settings = {
---             { key = 'price', type = 'int', min = 0, max = 100000, unit = '$', default = 2500,
+--             { key = 'Tune.price', type = 'int', min = 0, max = 100000, unit = '$',
 --               label = 'Tune price', help = 'What a tune costs.' },
---             { key = 'nitro', type = 'bool', default = true, label = 'Nitrous', help = '...' },
 --         },
 --     })
---     local price = exports.whip_core:GetSetting('price')
---     exports.whip_core:OnSettingChanged('price', function(value, old) ... end)
 --
 -- An entry is a ConfigSchema entry (shared/config_schema.lua) with `key` in place of `path` and a
 -- `default`. Many groups: `groups = { { label = 'Prices', settings = { ... } }, ... }`.
@@ -890,7 +889,7 @@ function Settings.register(owner, def, opts)
     if type(owner) ~= 'string' or owner == '' or owner == CORE then return false, 'only another resource declares a settings page' end
     -- The record keeps a resource name in 64 characters (whip_settings.owner).
     if #owner > 64 then return false, 'a settings page needs a resource name of 64 characters or fewer' end
-    if type(def) ~= 'table' then return false, 'RegisterSettings takes { label, settings = { ... } }' end
+    if type(def) ~= 'table' then return false, 'a settings page is { label, settings = { ... } }' end
     -- Not before the server's boot has read what is saved: the page would be checked against
     -- nothing and the settings files written empty. Whip.register only runs once it is ready.
     if IsDuplicityVersion() and CoreReady ~= true then
@@ -1031,26 +1030,26 @@ CreateThread(function()
     end)
 end)
 
-exports('RegisterSettings', function(def)
+exports('__RegisterSettings', function(def)
     local owner = Registry.caller()   -- first, before anything can yield
     return Settings.register(owner, def)
 end)
 
 --- A setting of the calling resource's page: what is saved, else its default.
-exports('GetSetting', function(key)
+exports('__GetSetting', function(key)
     return copy(Settings.read(Registry.caller(), key))
 end)
 
 --- All of the calling resource's settings: { [key] = value }.
-exports('GetSettings', function()
+exports('__GetSettings', function()
     return Settings.valuesOf(Registry.caller())
 end)
 
 --- fn(value, old, key) after one of the calling resource's settings changes, on this side. ONE per
 --- key: calling again replaces it, so a Whip.register that runs again does not stack them.
-exports('OnSettingChanged', function(key, fn)
+exports('__OnSettingChanged', function(key, fn)
     local owner = Registry.caller()
-    if type(key) ~= 'string' or fn == nil then return false, 'OnSettingChanged(key, function(value, old, key) end)' end
+    if type(key) ~= 'string' or fn == nil then return false, '__OnSettingChanged(key, function(value, old, key) end)' end
     hooks[owner] = hooks[owner] or {}
     hooks[owner][key] = { fn }
     return true

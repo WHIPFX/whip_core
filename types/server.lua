@@ -425,58 +425,11 @@ function whip_core:GetScenarioStats(key) end
 ---@return table[]
 function whip_core:ListDirectorCards(filter) end
 
---- Add (or change) a card of yours in the Director's palette. THROUGH Whip.card ONLY
---- (@whip_core/lib/satellite.lua): it sends the card as data and the one function that runs your code on
---- your side; a definition that did not come through it is refused. The type is '<namespace>.<name>':
---- the first running resource to use a namespace has it (for its events too), whip_core's are nobody's.
----@param cardType string   '<namespace>.<name>'
----@param card table   Whip.card's data
----@param entry function   Whip.card's
----@return boolean ok
----@return string|nil reason
-function whip_core:RegisterDirectorCard(cardType, card, entry) end
-
---- Take one of your cards out of the palette (they go by themselves when your resource stops).
----@param cardType string
----@return boolean ok
----@return string|nil reason
-function whip_core:RemoveDirectorCard(cardType) end
-
---- A thread card's answer, later, from anywhere (an officer's Accept): the run goes on from `outcome`, one
---- of the card's own. data.source (one of the run's players) is who what follows acts for. Yours only;
---- refused once the card stopped waiting (it took too long, its run ended). Never send a callId to a
---- player's game: keep your own id there and check the player in a SecureEvent.
----@param callId string   card.callId
----@param outcome string
----@param data? table
----@return boolean ok
----@return string|nil reason
-function whip_core:AnswerDirectorCard(callId, outcome, data) end
-
---- A Director scenario built in your code (Whip.scenario does this for you): offered to the server's
---- Director admins as a shipped one is, pending until one accepts it (or trusts your resource), then
---- read-only there; off while your resource is stopped. The same scenario again changes nothing (its
---- fingerprint is of its data, keys sorted). WAITS: call it from Whip.register or a thread.
----@param key string   its key on every server
----@param doc table    a scenario document (format 1), as the editor saves it
----@return string|false status   'pending' | 'accepted' | 'refused' | 'deleted', or false
----@return string|nil reason
----@async
-function whip_core:RegisterDirectorScenario(key, doc) end
-
 --- Take one of your code scenarios off the Shipped list (what was accepted stays in the store).
 ---@param key string
 ---@return boolean ok
 ---@return string|nil reason
 function whip_core:RemoveDirectorScenario(key) end
-
---- A starting point in the Director editor's New list (Whip.template does this for you): a builder's copy
---- is theirs to edit. A card a builder may not add (a gated card) is refused in their copy.
----@param name string   at most 60 characters ("Bank alarm (police)")
----@param doc table
----@return boolean ok
----@return string|nil reason
-function whip_core:RegisterDirectorTemplate(name, doc) end
 
 --- Take one of your templates away.
 ---@param name string
@@ -534,28 +487,6 @@ function whip_core:SteerDirectorTest(runId, op, ...) end
 ---@param runId number
 ---@return table|nil result
 function whip_core:GetDirectorTestResult(runId) end
-
---- What a card's methods call (Whip.card makes them: card:var, card:give, card:pay ...). Yours only, and
---- only while the card is at work: otherwise false, 'that card is no longer running'.
----@param callId string
----@param method string
----@return any ...
-function whip_core:DirectorCardDo(callId, method, ...) end
-
---- Add (or change) a task of yours in the Tasks list of the Director's NPCs and cars. THROUGH Whip.task ONLY
---- (@whip_core/lib/satellite.lua): the type as data; each game holds the code (RegisterDirectorTaskStep). The
---- type is '<namespace>.<name>', the namespace yours as your cards' are.
----@param taskType string
----@param spec table   Whip.task's data
----@return boolean ok
----@return string|nil reason
-function whip_core:RegisterDirectorTask(taskType, spec) end
-
---- Take one of your tasks away (they go by themselves when your resource stops).
----@param taskType string
----@return boolean ok
----@return string|nil reason
-function whip_core:RemoveDirectorTask(taskType) end
 
 --- What YOU keep on a placed thing (your Director buttons' saves, client Whip.directorButton): a copy, or nil when
 --- nothing is saved; false and why when there is no such run, scenario or thing.
@@ -727,32 +658,6 @@ function whip_core:GetRegistrations(resource) end
 ---@param name string
 ---@return boolean
 function whip_core:HasExport(name) end
-
---- Add guns to whip's weapon list, the whole list your resource gives (one it gave before and not now goes).
---- Use Whip.weapons, which calls it on both sides. Nothing is added when any entry is refused.
----@param list { name: string, label: string, group: string, model?: string }[]
----@param opts { tag?: string }|nil  shown beside each label (16 characters; your resource's name unless given)
----@return boolean ok
----@return string|nil why
-function whip_core:AddWeapons(list, opts) end
-
---- Take back all the guns your resource added (they go by themselves when it stops).
----@return boolean
-function whip_core:RemoveWeapons() end
-
---- The server half of a skill check game. Use Whip.skillCheckGame, which builds both halves.
----@param id string
----@param spec table
----@param entry any
----@return boolean ok
----@return string|nil why
-function whip_core:RegisterSkillCheckGame(id, spec, entry) end
-
---- Take back one of your skill check games (they go by themselves when your resource stops).
----@param id string
----@return boolean ok
----@return string|nil why
-function whip_core:RemoveSkillCheckGame(id) end
 
 --- Remove everything YOU registered under one run tag (`{ tag = 'run:42' }` on a registration), in
 --- every whip module, and close the tag: later registrations under it are refused ("... has ended").
@@ -3738,17 +3643,6 @@ function whip_core:GivePropertyKey(propertyId, who) end
 ---@async
 function whip_core:RemovePropertyKey(propertyId, who) end
 
---- How many pieces of furniture a property holds.
----@param propertyId number
----@return number
-function whip_core:GetPropertyObjectCount(propertyId) end
-
---- The version of a property's furniture: it goes up with every save and clear. A furniture save
---- names the version it was made over, and is refused over any other (someone saved in between).
----@param propertyId number
----@return number version  0 for a room never furnished this session
-function whip_core:GetPropertyObjectVersion(propertyId) end
-
 --- A property's stashes: the furniture in it that holds things (Config.PropertyStashProps), which
 --- only its owner and keyholders open. Plain data, by containerId; open one with the container calls.
 ---@param propertyId number
@@ -3784,21 +3678,8 @@ function whip_core:RegisterPropertyPack(data) end
 function whip_core:GetPropertyPacks() end
 
 -- ============================================
--- Garage spots and the prop catalogue
+-- The prop catalogue
 -- ============================================
-
---- One parking spot within a garage.
----@param spotId number
----@return table|nil
-function whip_core:GetGarageSpot(spotId) end
-
---- Every parking spot the server knows about.
----@return table[]
-function whip_core:GetGarageSpots() end
-
---- The placeable-prop catalogue, in the shape the client is sent.
----@return table[]
-function whip_core:GetPropCatalog() end
 
 --- Your prop pack's props in the furnisher while your resource runs, under one of its categories, with your
 --- pictures. The whole list each call: one left out goes. A model whip already lists keeps its row and takes your
@@ -3808,11 +3689,6 @@ function whip_core:GetPropCatalog() end
 ---@return string|nil why
 ---@async
 function whip_core:RegisterProps(list) end
-
---- Does this prop model have a preview image on disk?
----@param model string
----@return boolean
-function whip_core:HasPropImage(model) end
 
 --- May this prop model be placed? False for an unknown model or one marked unavailable.
 ---@param model string
@@ -4067,42 +3943,6 @@ function whip_core:GetNpc(ref) end
 ---@param filter? { tag?: string }
 ---@return WhipNpcInfo[]
 function whip_core:ListNpcs(filter) end
-
-
--- ============================================
--- Settings (your page in /whip → Config)
--- ============================================
-
---- Declare your resource's settings page (docs.html#registersettings has every entry field). Declare it
---- first in Whip.register, on both sides: before it, GetSetting answers nil, and on the server a page
---- declared before whip_core has finished starting is refused. The page goes when your resource stops;
---- what was saved for it stays.
----@param def { label: string, settings?: table[], groups?: { label: string, settings: table[] }[] }
----@return boolean ok
----@return string|nil why Naming the entry
-function whip_core:RegisterSettings(def) end
-
---- One of your settings: what an admin saved, else its default. Nil before RegisterSettings.
----@param key string
----@return any value
-function whip_core:GetSetting(key) end
-
---- All your settings: { [key] = value }.
----@return table<string, any>
-function whip_core:GetSettings() end
-
---- A sequence saved in the Camera Creator, by name (a copy, for a player's PlayCameraSequence); nil for none.
----@param name string
----@return table|nil
-function whip_core:GetCameraSequence(name) end
-
---- fn(value, old, key) after one of your settings changes, on this side. One per key: calling again
---- replaces it. Not called for an `apply = 'restart'` setting.
----@param key string A key on your page; a callback on 'prices' also hears 'prices.coffee'
----@param fn fun(value: any, old: any, key: string)
----@return boolean ok
----@return string|nil why
-function whip_core:OnSettingChanged(key, fn) end
 
 -- ============================================
 -- The voice system (server/voice_system.lua)

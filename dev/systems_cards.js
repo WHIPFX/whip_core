@@ -20,7 +20,7 @@ const LEFT_OUT_SECTIONS = {
     'Themes': 'the look of whip\'s screens',
     'Export binding': 'plumbing',
     'Vehicle Catalog & Images': 'the vehicle pictures and catalogue, for screens',
-    'Garage spots and the prop catalogue': 'the furnisher\'s and the garage editor\'s',
+    'The prop catalogue': 'the furnisher\'s',
     'Damage Modifiers': 'a combat modifier outlives a system: it needs a tag first (core gap)',
 };
 
@@ -131,10 +131,9 @@ const LEFT_OUT = {
     RegisterStat: 'S3d Registers', GetAllStats: 'every stat at once: Their Stat reads one', GetEffects: 'every effect at once: Has Effect? asks about one',
     // Properties: sales and packs are another session's, and the furnisher's
     GetProperties: 'every property at once', GetCharacterProperties: 'whose homes are whose is private',
-    SetPropertyOwner: 'property sales (the housing system\'s)', GetPropertyObjectCount: 'the furnisher\'s', GetPropertyObjectVersion: 'the furnisher\'s',
+    SetPropertyOwner: 'property sales (the housing system\'s)',
     RegisterPropertyPack: 'the housing system\'s', GetPropertyPacks: 'the housing system\'s',
-    GetGarageSpot: 'the garage editor\'s', GetGarageSpots: 'the garage editor\'s', GetPropCatalog: 'the furnisher\'s',
-    HasPropImage: 'the furnisher\'s', IsPlaceableProp: 'the furnisher\'s',
+    IsPlaceableProp: 'the furnisher\'s',
     ListPoints: 'a system\'s points are its Point Used cards\'',
     UpdatePoint: 'a system\'s points are its Point Used cards\'', RemovePoint: 'as UpdatePoint',
     SetVehicleAppearance: 'a car\'s look is a customs screen\'s (S4)', RestoreVehicleAppearance: 'as SetVehicleAppearance',

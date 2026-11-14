@@ -314,7 +314,7 @@ function WhipSatellite.removeTask(t) end
 --- Director's NPC weapons and Hold a Weapon step, its Fixed Weapons, Dungeon Mode, the Object Viewer's Give a weapon.
 --- Called again, the new list replaces the old; they go when your resource stops. ONE bad entry refuses the WHOLE
 --- list (printed with why). An NPC given one carries the gun itself, never your item: your ammo and reload code is
---- not on it. Through the exports AddWeapons / RemoveWeapons.
+--- not on it.
 ---
 ---     Whip.weapons({
 ---         { name = 'WEAPON_MY_PUMP', label = 'Pump Shotgun', group = 'shotgun', model = 'w_sg_my_pump' },

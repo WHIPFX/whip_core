@@ -582,7 +582,7 @@ end
 
 -- ---- Skill check games from other resources (server/skillcheck.lua) ----
 -- The client half of a game: the owner's entry function (Whip.skillCheckGame). entry('start', { token, difficulty })
--- plays it in its own thread and answers with SkillCheckGameDone(token, passed, why); entry('cancel', { token })
+-- plays it in its own thread and answers with __SkillCheckGameDone(token, passed, why); entry('cancel', { token })
 -- calls it off. It holds the one blocking slot while it plays.
 
 local _gameRun = nil      -- the game playing now: { token, game, owner, id, entry }
@@ -605,8 +605,8 @@ local _games = Registry.new('skillCheckGame', {
     onRemove = function(key) if _gameRun and _gameRun.game == key then _endGame(CANCELLED) end end,
 })
 
---- RegisterSkillCheckGame(id, entry) -> true | false, why: the client half of a game. Use Whip.skillCheckGame.
-exports('RegisterSkillCheckGame', function(id, entry)
+--- __RegisterSkillCheckGame(id, entry) -> true | false, why: the client half of a game. Use Whip.skillCheckGame.
+exports('__RegisterSkillCheckGame', function(id, entry)
     local owner = GetInvokingResource() or RESOURCE
     if type(id) ~= 'string' or not id:match('^[a-z][a-z0-9_]*%.[a-z][a-z0-9_]*$') then
         return false, 'a skill check game id is "<yours>.<name>"'
@@ -617,14 +617,14 @@ exports('RegisterSkillCheckGame', function(id, entry)
     return _games:add(owner, id, entry)
 end)
 
-exports('RemoveSkillCheckGame', function(id)
+exports('__RemoveSkillCheckGame', function(id)
     return _games:remove(GetInvokingResource() or RESOURCE, id)
 end)
 
---- SkillCheckGameDone(token, passed, why) -> true | false: the game's answer. Only from the game's owner, for
+--- __SkillCheckGameDone(token, passed, why) -> true | false: the game's answer. Only from the game's owner, for
 --- the game playing now.
 local GAME_WHY = { failed = true, cancelled = true, timeout = true, busy = true }
-exports('SkillCheckGameDone', function(token, passed, why)
+exports('__SkillCheckGameDone', function(token, passed, why)
     local by = GetInvokingResource() or RESOURCE
     local run = _gameRun
     if not run or run.token ~= token or run.owner ~= by then return false end

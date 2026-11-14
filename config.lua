@@ -1475,7 +1475,7 @@ Config.SkillCheckDifficulty = {
 }
 
 -- The game whip's own lockpicks play (car and door lockpicks at medium, the ignition hack at hard): 'ring', the
--- check above, or the name of a game another resource adds (RegisterSkillCheckGame). If that resource is not
+-- check above, or the name of a game another resource adds (Whip.skillCheckGame). If that resource is not
 -- running, the ring is played and the console says so.
 Config.LockpickGame = 'ring'
 

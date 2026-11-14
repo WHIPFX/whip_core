@@ -563,5 +563,5 @@ SecureEvent('whip_core:server:propertyObjectsSave', {
     TriggerClientEvent('whip_core:client:propertyFurnishSaved', source, ok == true, PropertyObjects.version(propertyId), stashes)
 end)
 
-exports('GetPropertyObjectCount', function(propertyId) return PropertyObjects.count(propertyId) end)
-exports('GetPropertyObjectVersion', function(propertyId) return PropertyObjects.version(propertyId) end)
+exports('__GetPropertyObjectCount', function(propertyId) return PropertyObjects.count(propertyId) end)
+exports('__GetPropertyObjectVersion', function(propertyId) return PropertyObjects.version(propertyId) end)

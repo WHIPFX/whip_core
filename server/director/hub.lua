@@ -190,7 +190,7 @@ cb('list', {}, function(source)
     end
     local pending = 0
     for _, p in ipairs(DirectorPacks.list()) do if p.status == 'pending' then pending = pending + 1 end end
-    -- templates: other resources' starting points (RegisterDirectorTemplate, packs.lua), beside the examples.
+    -- templates: other resources' starting points (Whip.template, packs.lua), beside the examples.
     return { off = off(), scenarios = rows, files = files, runs = liveRuns(), examples = EXAMPLES, lore = lore,
              templates = DirectorPacks.templates and DirectorPacks.templates() or {},
              admin = Permissions.has(source, ADMIN), pendingPacks = pending,
@@ -564,7 +564,7 @@ function(source, _, key, name, from)
         if not DirectorStore.get(other) then return false, 'No scenario called ' .. other end
         doc, dwhy = DirectorStore.revision(other)
     elseif from:sub(1, 9) == 'template:' and DirectorPacks.template then
-        -- Another resource's starting point (RegisterDirectorTemplate): the builder's own copy.
+        -- Another resource's starting point (Whip.template): the builder's own copy.
         doc, dwhy = DirectorPacks.template(from:sub(10))
     else
         return false, 'Start from nothing, an example, a template or a copy'

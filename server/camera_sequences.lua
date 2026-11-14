@@ -167,4 +167,4 @@ SecureCallback('whip_core:camseq:fetch', {
 end)
 
 --- A saved sequence by name (a copy), or nil: for a server script that hands one to a player.
-exports('GetCameraSequence', function(name) return CameraSequences.get(name) end)
+exports('__GetCameraSequence', function(name) return CameraSequences.get(name) end)

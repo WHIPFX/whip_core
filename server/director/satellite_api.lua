@@ -3,7 +3,7 @@
 -- ============================================
 --
 -- TASKS. A resource adds a type to the Tasks list of NPCs and cars with Whip.task (@whip_core/lib/satellite.lua),
--- one call in a shared file: on the server it sends the type as DATA (RegisterDirectorTask, checked here and kept by
+-- one call in a shared file: on the server it sends the type as DATA (__RegisterDirectorTask, checked here and kept by
 -- server/director/tasks.lua beside whip_core's), and on every game it hands in the code that plays a step
 -- (client/director_tasks.lua). A run plays it as whip_core's own: the game that owns the thing runs it, a new owner
 -- is sent it again, and a step that waits is done when that code says so. Its fields are a few of the kinds whip_core's
@@ -258,9 +258,9 @@ end
 -- Exports
 -- ============================================
 
---- RegisterDirectorTask(taskType, spec) -> true | false, why. Through Whip.task only: it sends the type as data
---- (its step's code stays on each game: RegisterDirectorTaskStep there).
-exports('RegisterDirectorTask', function(taskType, spec)
+--- __RegisterDirectorTask(taskType, spec) -> true | false, why. Through Whip.task only: it sends the type as data
+--- (its step's code stays on each game: __RegisterDirectorTaskStep there).
+exports('__RegisterDirectorTask', function(taskType, spec)
     local owner = Registry.caller()
     if owner == CORE then return false, 'whip_core\'s own tasks are defined in server/director/tasks.lua' end
     local def, why = buildTask(taskType, spec)
@@ -272,8 +272,8 @@ exports('RegisterDirectorTask', function(taskType, spec)
     return true
 end)
 
---- RemoveDirectorTask(taskType) -> true | false, why. Only your own (they go by themselves when you stop).
-exports('RemoveDirectorTask', function(taskType)
+--- __RemoveDirectorTask(taskType) -> true | false, why. Only your own (they go by themselves when you stop).
+exports('__RemoveDirectorTask', function(taskType)
     local owner = Registry.caller()
     if type(taskType) ~= 'string' then return false, 'taskType is the task\'s type' end
     return DirectorTasks.remove(owner, taskType)

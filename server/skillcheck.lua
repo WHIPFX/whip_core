@@ -175,16 +175,16 @@ local function mayStart(g, source)
     return false, type(res.words) == 'string' and res.words ~= '' and res.words:sub(1, 120) or "You can't do that right now"
 end
 
---- RegisterSkillCheckGame(id, spec, entry) -> true | false, why. Use Whip.skillCheckGame, which builds both.
-exports('RegisterSkillCheckGame', function(id, spec, entry)
+--- __RegisterSkillCheckGame(id, spec, entry) -> true | false, why. Use Whip.skillCheckGame, which builds both.
+exports('__RegisterSkillCheckGame', function(id, spec, entry)
     local owner = Registry.caller()
     local g, why = gameOf(id, spec, entry)
     if not g then return false, why end
     return Games:add(owner, id, g)
 end)
 
---- RemoveSkillCheckGame(id) -> true | false, why. Only your own (they go by themselves when your resource stops).
-exports('RemoveSkillCheckGame', function(id)
+--- __RemoveSkillCheckGame(id) -> true | false, why. Only your own (they go by themselves when your resource stops).
+exports('__RemoveSkillCheckGame', function(id)
     local owner = Registry.caller()
     return Games:remove(owner, id)
 end)
@@ -520,7 +520,7 @@ end)
 _ENV.Skill = Skill
 
 --- The skill check whip's own lockpicks (cars, doors) and ignition hack play: Config.LockpickGame, 'ring' (whip's)
---- or a game another resource adds (RegisterSkillCheckGame). One that is not running when a lock is picked is said
+--- or a game another resource adds (Whip.skillCheckGame). One that is not running when a lock is picked is said
 --- once in the console, and the ring is played: a stopped resource must not leave every lock unpickable. Judged
 --- like any check, with a one-second floor (an honest quick pass is about 1.5 s).
 local lockpickGameMissingSaid = nil

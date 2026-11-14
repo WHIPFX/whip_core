@@ -219,8 +219,14 @@ if (whyName) {
 const out = {};
 for (const side of ['server', 'client', 'shared']) {
   const all = [...exportsOf[side].entries()];
-  // The __Test* seams (server/testseams.lua) are left out: they are not stubbed or documented.
-  out[side] = { total: all.length, waits: all.filter(([n, k]) => why.has(k) && !n.startsWith('__')).map(([n]) => n).sort() };
+  const waiting = all.filter(([, k]) => why.has(k)).map(([n]) => n).sort();
+  // A __ name is internal: not stubbed or documented, so only lib/satellite.lua's list holds it (its helpers call
+  // these through Whip.call). The __Test* seams (server/testseams.lua) are left out of every list.
+  out[side] = {
+    total: all.length,
+    waits: waiting.filter((n) => !n.startsWith('__')),
+    internal: waiting.filter((n) => n.startsWith('__') && !n.startsWith('__Test')),
+  };
 }
 
 // The stubs' ---@async marks, by side. They are kept by hand, so they also hold a wait the scan cannot follow.
@@ -231,29 +237,29 @@ for (const side of ['server', 'client']) {
 }
 
 // --write: the two WAITS lists, one line of JSON each: what the scan finds, plus what a stub marks ---@async that the
-// scan cannot follow (GetScenarioStats), while it is still an export on that side. Only the list changes, so a
-// second run writes nothing.
+// scan cannot follow (GetScenarioStats), while it is still an export on that side; lib/satellite.lua's also holds the
+// internal __ exports that wait. Only the lists change, so a second run writes nothing.
 if (writeMode) {
-  const lists = {};
+  const publicLists = {}, satLists = {};
   for (const side of ['server', 'client']) {
     const names = new Set(out[side].waits);
     for (const n of asyncMarks[side]) if (exportsOf[side].has(n) || exportsOf.shared.has(n)) names.add(n);
-    lists[side] = [...names].sort();
+    publicLists[side] = [...names].sort();
+    satLists[side] = [...names, ...out[side].internal].sort();
   }
-  const json = JSON.stringify(lists);
   const targets = [
-    { file: 'docs.html', re: /(var WAITS = )\{[\s\S]*?\}(;)/, what: '`var WAITS = {...};`' },
-    { file: 'lib/satellite.lua', re: /(local WAITS = json\.decode\(\[\[)\{[\s\S]*?\}(\]\]\))/, what: '`local WAITS = json.decode([[{...}]])`' },
+    { file: 'docs.html', lists: publicLists, re: /(var WAITS = )\{[\s\S]*?\}(;)/, what: '`var WAITS = {...};`' },
+    { file: 'lib/satellite.lua', lists: satLists, re: /(local WAITS = json\.decode\(\[\[)\{[\s\S]*?\}(\]\]\))/, what: '`local WAITS = json.decode([[{...}]])`' },
   ];
   let failed = false;
   for (const t of targets) {
     const file = path.join(root, t.file);
     const src = fs.readFileSync(file, 'utf8');
     if (!t.re.test(src)) { failed = true; console.log(`${t.file}: no ${t.what} list to write`); continue; }
-    const next = src.replace(t.re, (_, open, close) => open + json + close);
+    const next = src.replace(t.re, (_, open, close) => open + JSON.stringify(t.lists) + close);
     if (next === src) { console.log(`${t.file}: unchanged`); continue; }
     fs.writeFileSync(file, next);
-    console.log(`${t.file}: written (${lists.server.length} server, ${lists.client.length} client)`);
+    console.log(`${t.file}: written (${t.lists.server.length} server, ${t.lists.client.length} client)`);
   }
   process.exit(failed ? 1 : 0);
 }
@@ -289,7 +295,9 @@ const satListed = sat.match(/local WAITS = json\.decode\(\[\[(\{[\s\S]*?\})\]\]\
 if (!satListed) { bad++; console.log('lib/satellite.lua: no `local WAITS = json.decode([[{...}]])` list'); }
 else {
   const w = JSON.parse(satListed[1]);
-  for (const side of ['server', 'client']) compare(`lib/satellite.lua WAITS.${side}`, out[side].waits, w[side] || []);
+  for (const side of ['server', 'client']) {
+    compare(`lib/satellite.lua WAITS.${side}`, [...out[side].waits, ...out[side].internal], w[side] || []);
+  }
 }
 console.log(bad ? `${bad} difference(s)` : `OK — ${out.server.waits.length} server and ${out.client.waits.length} client exports that can wait, marked in the stubs, the docs and lib/satellite.lua`);
 process.exit(bad ? 1 : 0);

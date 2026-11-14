@@ -217,7 +217,7 @@ local _waiting = {}
 -- The exports that can wait, on each side: dev/waits.js finds them, its --write writes this list and the docs' WAITS
 -- list, and its --check keeps both the same as the stubs' ---@async marks. Only these get Whip.call's thread and
 -- promise; every other call goes straight through (cheap enough for a loop).
-local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterDirectorScenario","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]}]])
+local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptOrCreateDoor","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","ReleaseDoor","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleDataMany","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop","__RegisterDirectorScenario"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]}]])
 local WAITS_HERE = {}
 for _, n in ipairs(WAITS[IsDuplicityVersion() and 'server' or 'client'] or {}) do WAITS_HERE[n] = true end
 
@@ -689,7 +689,7 @@ end
 -- Each key is a path in your Config, and its default is what config.lua says. What an admin saved
 -- is written into Config on this side when the page is declared and whenever a change arrives
 -- (a table in place, so a file holding Config.Shop sees the new values), so your code keeps reading
--- Config.X. The entries are RegisterSettings' (whip_core's docs: Settings pages) with no `default`.
+-- Config.X. The entries are whip_core's settings entries (docs.html#registersettings) with no `default`.
 -- A 'record' entry is one card for several values of one table: key = 'Turbo', fields = { { key =
 -- 'TorqueGain', ... }, ... }, each field kept as its own setting ('Turbo.TorqueGain').
 -- The page is declared again whenever whip_core starts; a refusal is printed here, with why.
@@ -826,7 +826,7 @@ function Whip.configPage(def)
         page.groups[gi] = { id = type(g) == 'table' and g.id or nil, label = type(g) == 'table' and g.label or nil, settings = list }
     end
     Whip.register(function()
-        local ok, why = exports[CORE]:RegisterSettings(page)
+        local ok, why = exports[CORE]:__RegisterSettings(page)
         if ok ~= true then
             print(('[%s] settings page refused: %s'):format(SELF, tostring(why)))
             return
@@ -835,10 +835,10 @@ function Whip.configPage(def)
         -- whip_core left off the page (its default failed its check: printed there) reads nil, and
         -- keeps config.lua's value.
         for _, key in ipairs(keys) do
-            exports[CORE]:OnSettingChanged(key, function(value, _, changed)
+            exports[CORE]:__OnSettingChanged(key, function(value, _, changed)
                 configApply(root, changed or key, value)
             end)
-            local value = exports[CORE]:GetSetting(key)
+            local value = exports[CORE]:__GetSetting(key)
             if value ~= nil then configApply(root, key, value) end
         end
     end)
@@ -893,7 +893,7 @@ function Whip.playerSetting(def)
         return false
     end
     Whip.register(function()
-        local ok, why = exports[CORE]:RegisterPlayerSetting(def)
+        local ok, why = exports[CORE]:__RegisterPlayerSetting(def)
         if ok ~= true then
             print(('[%s] player setting %s refused: %s'):format(SELF, def.key, tostring(why)))
         end
@@ -1058,10 +1058,10 @@ if not IsDuplicityVersion() then
                                 lbHere = true
                             elseif not down and was.lb and lbHere then
                                 lbHere = false
-                                if Whip.call('PadComboUsed') ~= true then call('onButton', onButton, 'lb', true) end
+                                if Whip.call('__PadComboUsed') ~= true then call('onButton', onButton, 'lb', true) end
                             end
                         elseif down and not was[cmd] then
-                            if not (lbDown and Whip.call('PadComboTakes', id) == true) then
+                            if not (lbDown and Whip.call('__PadComboTakes', id) == true) then
                                 held[cmd], nextAt[cmd], reps[cmd] = true, now + FIRST, 0
                                 call('onButton', onButton, cmd, true)
                             end
@@ -1233,7 +1233,7 @@ if IsDuplicityVersion() then
                 local ok, s = pcall(string.format, tostring(args[1]), table.unpack(args, 2, args.n))
                 args = table.pack(ok and s or tostring(args[1]))
             end
-            local r = table.pack(Whip.call('DirectorCardDo', rawget(self, 'callId'), m, table.unpack(args, 1, args.n)))
+            local r = table.pack(Whip.call('__DirectorCardDo', rawget(self, 'callId'), m, table.unpack(args, 1, args.n)))
             if GETTERS[m] then
                 if r[1] == true then return r[2] end
                 return nil, r[2]
@@ -1354,7 +1354,7 @@ if IsDuplicityVersion() then
             _cardSenders[t] = function()
                 local now = _cards[t]
                 if not now then return end   -- (removed since)
-                local ok, why = Whip.call('RegisterDirectorCard', t, specOf(now), entry)
+                local ok, why = Whip.call('__RegisterDirectorCard', t, specOf(now), entry)
                 if ok ~= true then print(('[%s] Director card %s refused: %s'):format(SELF, t, tostring(why))) end
             end
             Whip.register(_cardSenders[t])
@@ -1365,7 +1365,7 @@ if IsDuplicityVersion() then
     --- Take one of this resource's cards away (it goes by itself when this resource stops).
     function Whip.removeCard(t)
         _cards[t] = nil
-        return Whip.call('RemoveDirectorCard', t)
+        return Whip.call('__RemoveDirectorCard', t)
     end
 
     --- A Director scenario built in code: offered to the server's Director
@@ -1375,7 +1375,7 @@ if IsDuplicityVersion() then
     ---@param doc table    a scenario document, as the editor saves it (format 1)
     function Whip.scenario(key, doc)
         Whip.register(function()
-            local status, why = Whip.call('RegisterDirectorScenario', key, doc)
+            local status, why = Whip.call('__RegisterDirectorScenario', key, doc)
             if status == false then print(('[%s] Director scenario %s refused: %s'):format(SELF, tostring(key), tostring(why))) end
         end)
     end
@@ -1385,17 +1385,17 @@ if IsDuplicityVersion() then
     ---@param doc table
     function Whip.template(name, doc)
         Whip.register(function()
-            local ok, why = Whip.call('RegisterDirectorTemplate', name, doc)
+            local ok, why = Whip.call('__RegisterDirectorTemplate', name, doc)
             if ok ~= true then print(('[%s] Director template %s refused: %s'):format(SELF, tostring(name), tostring(why))) end
         end)
     end
 
-    --- A thread card's answer, later (from anywhere): AnswerDirectorCard.
+    --- A thread card's answer, later (from anywhere): __AnswerDirectorCard.
     ---@param callId string  card.callId (never send it to a player's game)
     ---@param outcome string
     ---@param data table|nil  data.source: which of the run's players what follows acts for
     function Whip.answerCard(callId, outcome, data)
-        return Whip.call('AnswerDirectorCard', callId, outcome, data)
+        return Whip.call('__AnswerDirectorCard', callId, outcome, data)
     end
 end
 
@@ -1471,7 +1471,7 @@ do
                         print(('[%s] skill check game %s failed: %s'):format(SELF, id, tostring(passed)))
                         passed, why = false, 'failed'
                     end
-                    Whip.call('SkillCheckGameDone', token, passed == true, type(why) == 'string' and why or nil)
+                    Whip.call('__SkillCheckGameDone', token, passed == true, type(why) == 'string' and why or nil)
                 end)
                 return { ok = true }
             elseif not IS_SERVER and op == 'cancel' then
@@ -1516,12 +1516,12 @@ do
             if not now then return end   -- (removed since)
             local ok, why
             if IS_SERVER then
-                ok, why = Whip.call('RegisterSkillCheckGame', id, {
+                ok, why = Whip.call('__RegisterSkillCheckGame', id, {
                     label = now.label, desc = now.desc, levels = levelsOf(now.levels),
                     canStart = type(now.canStart) == 'function' or nil,
                 }, entry)
             else
-                ok, why = Whip.call('RegisterSkillCheckGame', id, entry)
+                ok, why = Whip.call('__RegisterSkillCheckGame', id, entry)
             end
             if ok ~= true then print(('[%s] skill check game %s refused: %s'):format(SELF, id, tostring(why))) end
         end
@@ -1532,7 +1532,7 @@ do
     --- Take one of this resource's games away (they go by themselves when this resource stops).
     function Whip.removeSkillCheckGame(id)
         _gameDefs[id] = nil
-        return Whip.call('RemoveSkillCheckGame', id)
+        return Whip.call('__RemoveSkillCheckGame', id)
     end
 end
 
@@ -1677,14 +1677,14 @@ do
             send = function()
                 local now = _tasks[t]
                 if not now then return end   -- (removed since)
-                local ok, why = Whip.call('RegisterDirectorTask', t, taskSpec(now))
+                local ok, why = Whip.call('__RegisterDirectorTask', t, taskSpec(now))
                 if ok ~= true then print(('[%s] Director task %s refused: %s'):format(SELF, t, tostring(why))) end
             end
         else
             local entry = stepEntry(t)
             send = function()
                 if not _tasks[t] then return end
-                local ok, why = Whip.call('RegisterDirectorTaskStep', t, entry)
+                local ok, why = Whip.call('__RegisterDirectorTaskStep', t, entry)
                 if ok ~= true then print(('[%s] Director task %s (its step) refused: %s'):format(SELF, t, tostring(why))) end
             end
         end
@@ -1696,7 +1696,7 @@ do
     --- Take one of this resource's tasks away, on this side (it goes by itself when this resource stops).
     function Whip.removeTask(t)
         _tasks[t] = nil
-        return Whip.call(IsDuplicityVersion() and 'RemoveDirectorTask' or 'RemoveDirectorTaskStep', t)
+        return Whip.call(IsDuplicityVersion() and '__RemoveDirectorTask' or '__RemoveDirectorTaskStep', t)
     end
 end
 
@@ -1736,7 +1736,7 @@ do
         end
         _weaponSender = function()
             if not _weapons then return end
-            local ok, why = Whip.call('AddWeapons', _weapons.list, _weapons.opts)
+            local ok, why = Whip.call('__AddWeapons', _weapons.list, _weapons.opts)
             if ok ~= true then print(('[%s] Whip.weapons refused: %s'):format(SELF, tostring(why))) end
         end
         Whip.register(_weaponSender)
@@ -1746,7 +1746,7 @@ do
     --- Take all of this resource's weapons away, on this side (they go by themselves when it stops).
     function Whip.removeWeapons()
         _weapons = nil
-        return Whip.call('RemoveWeapons')
+        return Whip.call('__RemoveWeapons')
     end
 end
 
@@ -1782,8 +1782,8 @@ if not IsDuplicityVersion() then
     local _buttons, _buttonSenders = {}, {}
 
     local thingMethods = {}
-    function thingMethods.save(self, data) return Whip.call('DirectorButtonDo', rawget(self, 'token'), 'save', data) end
-    function thingMethods.back(self, data) return Whip.call('DirectorButtonDo', rawget(self, 'token'), 'back', data) end
+    function thingMethods.save(self, data) return Whip.call('__DirectorButtonDo', rawget(self, 'token'), 'save', data) end
+    function thingMethods.back(self, data) return Whip.call('__DirectorButtonDo', rawget(self, 'token'), 'back', data) end
     local thingMeta = { __index = thingMethods }
 
     --- The one function whip_core holds: it runs your press here, in a thread, and answers at once.
@@ -1833,7 +1833,7 @@ if not IsDuplicityVersion() then
             for i, k in ipairs(type(now.kinds) == 'table' and now.kinds or {}) do kinds[i] = k end
             local spec = { __whipButton = 1, label = now.label, icon = now.icon, hint = now.hint, kinds = kinds,
                            where = now.where, takesOver = now.takesOver == true }
-            local ok, why = Whip.call('RegisterDirectorButton', id, spec, entry)
+            local ok, why = Whip.call('__RegisterDirectorButton', id, spec, entry)
             if ok ~= true then print(('[%s] Director button %s refused: %s'):format(SELF, id, tostring(why))) end
         end
         Whip.register(_buttonSenders[id])
@@ -1843,7 +1843,7 @@ if not IsDuplicityVersion() then
     --- Take one of this resource's buttons away (it goes by itself when this resource stops).
     function Whip.removeDirectorButton(id)
         _buttons[id] = nil
-        return Whip.call('RemoveDirectorButton', id)
+        return Whip.call('__RemoveDirectorButton', id)
     end
 end
 
@@ -1913,7 +1913,7 @@ if not IsDuplicityVersion() then
             for i, k in ipairs(type(now.kinds) == 'table' and now.kinds or {}) do kinds[i] = k end
             local spec = { __whipOvOption = 1, label = now.label, hint = now.hint, group = now.group, tint = now.tint,
                            kinds = kinds, whip = now.whip }
-            local ok, why = Whip.call('RegisterObjectViewerOption', id, spec, entry)
+            local ok, why = Whip.call('__RegisterObjectViewerOption', id, spec, entry)
             if ok ~= true then print(('[%s] object viewer option %s refused: %s'):format(SELF, id, tostring(why))) end
         end
         Whip.register(_optionSenders[id])
@@ -1923,7 +1923,7 @@ if not IsDuplicityVersion() then
     --- Take one of this resource's options away (it goes by itself when this resource stops).
     function Whip.removeObjectViewerOption(id)
         _options[id] = nil
-        return Whip.call('RemoveObjectViewerOption', id)
+        return Whip.call('__RemoveObjectViewerOption', id)
     end
 end
 

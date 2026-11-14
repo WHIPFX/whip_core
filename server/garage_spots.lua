@@ -252,5 +252,5 @@ end
 -- server/devtools.lua's (whip_core:gmWizardCreate for a new garage, whip_core:gmWizardSave for a saved
 -- one: they add, move and remove, leashed to the admin).
 
-exports('GetGarageSpots', function() return GarageSpots.all() end)
-exports('GetGarageSpot', function(spotId) return GarageSpots.get(spotId) end)
+exports('__GetGarageSpots', function() return GarageSpots.all() end)
+exports('__GetGarageSpot', function(spotId) return GarageSpots.get(spotId) end)

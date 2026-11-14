@@ -52,7 +52,7 @@ local NAV_HELD = {
 --- `combo` marks the two that are LB + A / LB + X while LB is held (client/pad.lua): those presses
 --- talk and are not sent. tabPrev (205, LB) is not here: LB is the combo key, so it goes on LB's
 --- release — see DriveFrame. Any other button with LB is the combo's too while the player's layout
---- puts something that works in menus on it (PadComboTakes).
+--- puts something that works in menus on it (PadComboInMenus).
 local NAV_PRESS = {
     { nav = 'select',  control = 201, combo = true },
     { nav = 'back',    control = 202 },
@@ -464,8 +464,8 @@ end
 ---@param y number  left stick Y this frame, with up positive (STICK_UP_SIGN applied)
 ---@return boolean
 local function DirectionHeld(nav, control, x, y)
-    -- The D-pad, unless LB + it talks (PadComboTakes); the stick still moves through the menu then.
-    if IsDisabledControlPressed(0, control) and not PadComboTakes(control) then return true end
+    -- The D-pad, unless LB + it talks (PadComboInMenus); the stick still moves through the menu then.
+    if IsDisabledControlPressed(0, control) and not PadComboInMenus(control) then return true end
 
     if nav == 'left'  then return x < -STICK_DEADZONE end
     if nav == 'right' then return x > STICK_DEADZONE end
@@ -634,7 +634,7 @@ local function DriveFrame()
     for i = 1, #NAV_PRESS do
         local b = NAV_PRESS[i]
         if IsDisabledControlJustPressed(0, b.control) and not (b.combo and WhipPadModHeld)
-            and not PadComboTakes(b.control) then
+            and not PadComboInMenus(b.control) then
             SendNav(b.nav)
         end
     end

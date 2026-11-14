@@ -35,7 +35,7 @@
 --
 -- A SATELLITE'S ROW (whip_chat's chat visibility, whip_voice's volumes) is the satellite's own value, kept
 -- where it always was: it registers with `get` and `set` (Whip.playerSetting in lib/satellite.lua, or the
--- RegisterPlayerSetting export), and this page only shows it and changes it through them. Its row goes when
+-- __RegisterPlayerSetting export, behind Whip.playerSetting), and this page only shows it and changes it through them. Its row goes when
 -- its resource stops.
 
 PlayerPrefs = {}
@@ -275,7 +275,7 @@ local satReg = Registry.new('playerSettings', {
     end,
 })
 
-exports('RegisterPlayerSetting', function(def)
+exports('__RegisterPlayerSetting', function(def)
     local owner = Registry.caller()
     local d, why = normalise(def)
     if not d then return false, why end

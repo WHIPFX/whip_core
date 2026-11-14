@@ -630,7 +630,7 @@ function CTX:emit(pin, data)
 end
 
 --- Continue when R.answer(id, pin, data) names a pin: for a card whose answer comes from OUTSIDE the
---- runtime (another resource's card: a thread it runs, or AnswerDirectorCard from an officer's accept
+--- runtime (another resource's card: a thread it runs, or Whip.answerCard from an officer's accept
 --- button). Answers the hold's id. While it is open the card is busy: a pulse into it is dropped, never
 --- a second call of the other resource's code.
 function CTX:hold()

@@ -7,7 +7,7 @@
 // Apply, which sends them all at once; the server checks every one, saves them in one go, puts the
 // live ones in force on the server and every player, and the panel redraws from what it then holds.
 //
-// makeSettingsSection builds one page's section, so a satellite's settings page (RegisterSettings)
+// makeSettingsSection builds one page's section, so a satellite's settings page (Whip.configPage)
 // is the same renderer with another owner. Only permanent admins see these sections
 // (permanentOnly); the server refuses anyone else regardless.
 //

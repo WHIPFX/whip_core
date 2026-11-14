@@ -1,10 +1,10 @@
 -- Cards from other resources. A resource adds cards to the Director's palette with Whip.card, which calls
--- RegisterDirectorCard here with the card as data and one function, its entry: entry(op, payload) runs the author's
+-- __RegisterDirectorCard here with the card as data and one function, its entry: entry(op, payload) runs the author's
 -- run / event filter / check / onEnd on the resource's own side inside a pcall and answers a plain table. whip_core
 -- never holds the author's functions (one from another resource throws when indexed), so a failure comes back as data.
 -- Three kinds of card:
 --   * Thread (the default): runs in its own thread outside the scheduler's pass and may wait. It answers an outcome,
---     or nothing, then AnswerDirectorCard(card.callId, pin, data) answers later. Every thread card has Took Too Long
+--     or nothing, then Whip.answerCard(card.callId, pin, data) answers later. Every thread card has Took Too Long
 --     (its "Give up after" field, 30 s) and Didn't Work (resource stopped, code threw, unknown pin); an unwired
 --     Didn't Work faults the run. onEnd(callId, why) tells the resource it ended without its answer. Pulsed again
 --     while it runs, the pulse is dropped.
@@ -12,7 +12,7 @@
 --     card:charge) is refused before it acts; anything else that waits faults the run.
 --   * Event (event = { name, match, once, filter }): no inputs; goes on when the resource sends its event
 --     (SendDirectorEvent). match: 'player' (one of the run's players, the default), 'run' (opts.runId), 'any'.
--- The card a resource's code is handed is a copy with methods; each is an export call back here (DirectorCardDo),
+-- The card a resource's code is handed is a copy with methods; each is an export call back here (__DirectorCardDo),
 -- refused for any other resource and once the activation is over.
 -- In a test another resource's card does not run unless it says test = 'run': the tester is told what it would do and
 -- it goes on from the outcome picked on the test strip, or its first after 15 seconds.
@@ -657,7 +657,7 @@ threadRun = function(ctx)
         if rec.done then return end
         if not res then didntWork(rec, why) return end
         if res.pin ~= nil then answer(rec, res.pin, res.data) end
-        -- Nothing: AnswerDirectorCard answers it later (or its time runs out).
+        -- Nothing: Whip.answerCard answers it later (or its time runs out).
     end)
     return nil
 end
@@ -759,7 +759,7 @@ failFilter = function(ctx, p)
 end
 
 -- ============================================
--- The card's methods (DirectorCardDo)
+-- The card's methods (__DirectorCardDo)
 -- ============================================
 
 local function runPlayer(rec, src)
@@ -1319,9 +1319,9 @@ end
 -- Exports
 -- ============================================
 
---- RegisterDirectorCard(cardType, card, entry) -> true | false, why. Through Whip.card only: it sends
+--- __RegisterDirectorCard(cardType, card, entry) -> true | false, why. Through Whip.card only: it sends
 --- the card as data and the one function that runs its code.
-exports('RegisterDirectorCard', function(cardType, card, entry)
+exports('__RegisterDirectorCard', function(cardType, card, entry)
     local owner = Registry.caller()
     if owner == CORE then return false, 'whip_core\'s own cards are defined in its files' end
     local def, why = buildDef(owner, cardType, card, entry)
@@ -1334,8 +1334,8 @@ exports('RegisterDirectorCard', function(cardType, card, entry)
     return true
 end)
 
---- RemoveDirectorCard(cardType) -> true | false, why. Only your own.
-exports('RemoveDirectorCard', function(cardType)
+--- __RemoveDirectorCard(cardType) -> true | false, why. Only your own.
+exports('__RemoveDirectorCard', function(cardType)
     local owner = Registry.caller()
     if type(cardType) ~= 'string' then return false, 'cardType is the card\'s type' end
     local ok, why = DirectorNodes.remove(owner, cardType)
@@ -1343,9 +1343,9 @@ exports('RemoveDirectorCard', function(cardType)
     return ok, why
 end)
 
---- AnswerDirectorCard(callId, outcome, data?) -> true | false, why. A thread card's answer, later: the
+--- __AnswerDirectorCard(callId, outcome, data?) -> true | false, why. A thread card's answer, later: the
 --- run goes on from `outcome` (one of the card's own), `data.source` (one of its players) acting for.
-exports('AnswerDirectorCard', function(callId, outcome, data)
+exports('__AnswerDirectorCard', function(callId, outcome, data)
     local by = Registry.caller()
     local rec = type(callId) == 'string' and calls[callId] or nil
     if not rec or rec.done or rec.owner ~= by or rec.instant or rec.testPick or not R.holding(rec.holdId) then
@@ -1355,8 +1355,8 @@ exports('AnswerDirectorCard', function(callId, outcome, data)
     return answer(rec, outcome, data)
 end)
 
---- DirectorCardDo(callId, method, ...) -> what the method answers. The card's methods (Whip.card's).
-exports('DirectorCardDo', function(callId, method, ...)
+--- __DirectorCardDo(callId, method, ...) -> what the method answers. The card's methods (Whip.card's).
+exports('__DirectorCardDo', function(callId, method, ...)
     local by = Registry.caller()
     local rec = type(callId) == 'string' and calls[callId] or nil
     -- (The same answer for someone else's card: a handle another resource holds or guesses tells it nothing.)

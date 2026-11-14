@@ -199,22 +199,22 @@ end)
 
 -- Exports
 
---- RegisterDirectorButton(id, spec, entry) -> true | false, why. Through Whip.directorButton only.
-exports('RegisterDirectorButton', function(id, spec, entry)
+--- __RegisterDirectorButton(id, spec, entry) -> true | false, why. Through Whip.directorButton only.
+exports('__RegisterDirectorButton', function(id, spec, entry)
     local owner = Registry.caller()
     local b, why = buttonOf(owner, id, spec, entry)
     if not b then return false, why end
     return ButtonReg:add(owner, id, b)
 end)
 
---- RemoveDirectorButton(id) -> true | false, why. Only your own.
-exports('RemoveDirectorButton', function(id)
+--- __RemoveDirectorButton(id) -> true | false, why. Only your own.
+exports('__RemoveDirectorButton', function(id)
     return ButtonReg:remove(Registry.caller(), id)
 end)
 
---- DirectorButtonDo(token, op, data?) -> true | false, why. Behind thing:save and thing:back: 'save' keeps `data`
+--- __DirectorButtonDo(token, op, data?) -> true | false, why. Behind thing:save and thing:back: 'save' keeps `data`
 --- on the thing (nil removes it), 'back' hands the screen back, saving `data` first when given.
-exports('DirectorButtonDo', function(token, op, data)
+exports('__DirectorButtonDo', function(token, op, data)
     local by = Registry.caller()
     local p = type(token) == 'string' and presses[token] or nil
     if not p or p.owner ~= by then return false, 'that press is over' end

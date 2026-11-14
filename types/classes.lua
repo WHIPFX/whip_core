@@ -153,7 +153,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field groundOptions table[]|nil On the ground, after Pick up, { action, label, icon? } (3 at most): `action` is one of the item's own options (contextOptions or defaultAction). Chosen, the item is picked up as Pick up does and, once it is in the pockets, that option runs on the slot it landed in. The prompt says label then the item's name ("Equip Pump Shotgun"); icon is a glyph name: server/item_options.lua
 ---@field images table[]|nil Pictures for states, { when?, image }: the first whose when passes is drawn, else its own. `image` is a path in the item's resource; {field} fills from metadata, {make} is a car's maker. An admin can change them on /whip → Items
 ---@field pictureFields table[]|nil Metadata an admin can show a picture by on /whip → Items: { key, label?, type? = 'bool' | 'number' | 'text' }
----@field settings table[]|nil Settings of this item's own, changed on /whip → Items: RegisterSettings entries { key, type = 'int'|'number'|'bool'|'string'|'enum', default, label, min?, max?, step?, unit?, maxLen?, nullable?, options?, help? }, 20 at most; read with GetItemSetting (server/item_settings.lua)
+---@field settings table[]|nil Settings of this item's own, changed on /whip → Items: settings-page entries { key, type = 'int'|'number'|'bool'|'string'|'enum', default, label, min?, max?, step?, unit?, maxLen?, nullable?, options?, help? }, 20 at most; read with GetItemSetting (server/item_settings.lua)
 
 -- ============================================
 -- Bank
