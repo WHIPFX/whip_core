@@ -10785,7 +10785,7 @@ end)</code></pre>
 <pre><code class="lang-lua">-- fxmanifest.lua of your pack
 whip_director_scenario 'scenarios/bank_job.json'
 whip_director_scenario 'scenarios/drug_run.json'</code></pre>
-<p>Each file is a scenario document as the editor saves it (<code>"format": 1</code>, at most 512 KB), with <code>"key"</code> (its key on every server) and <code>"requires": { "items": [...], "models": [...], "resources": [...] }</code>. Things it ships unplaced (<code>"coords": "spot"</code>) are placed by each server in a copy. <strong>Export as a pack</strong> (a Director admin, on a scenario in <code>/whip</code>) writes one in exactly this shape to <code>whip_core/pack_exports/</code>, with its manifest beside it.</p>
+<p>Each file is a scenario document as the editor saves it (<code>"format": 2</code>, at most 512 KB), with <code>"key"</code> (its key on every server) and <code>"requires": { "items": [...], "models": [...], "resources": [...] }</code>. Its <code>"taskTimes": 2</code> says a task time of 0 is no end and a give-up of 0 is never; in a document without it, either 0 is a tenth of a second. Things it ships unplaced (<code>"coords": "spot"</code>) are placed by each server in a copy. <strong>Export as a pack</strong> (a Director admin, on a scenario in <code>/whip</code>) writes one in exactly this shape to <code>whip_core/pack_exports/</code>, with its manifest beside it.</p>
 <ul>
 <li>whip_core reads each file when the resource starts, checks it, and offers it to a Director admin to accept.</li>
 <li>Accepted, it's a scenario like any other but <strong>read-only</strong>: Duplicate it to change it. It goes off while its resource is stopped and comes back on with it.</li>

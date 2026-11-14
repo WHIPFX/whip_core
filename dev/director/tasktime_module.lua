@@ -1,7 +1,8 @@
 -- A task's time (shared/director/steps.lua THE TIMING): a step with no time saved plays its type's, as it always did (a
 -- scenario saved before plays as it was built); 0 is no end, sent as NO_END_MS; a time set is that time, at most a day;
 -- a step that is one action (a throw, the horn, a prop's slide: `length`) keeps a time and its 0 is at once; a give-up is
--- its type's unless one is typed, and a typed 0 is never. Against the real compile (server/director/tasks.lua):
+-- its type's unless one is typed, and a typed 0 is never; a scenario saved before 0 was no end reads its 0 as the tenth
+-- of a second it played (server/director/doc.lua TASK_TIMES). Against the real compile (server/director/tasks.lua):
 --   MEMCAP_MB=512 lua54 guard.lua harness.lua tasktime_module.lua
 
 local NO_END = DirectorSteps.NO_END_MS
@@ -87,6 +88,47 @@ RegisterTestModule({
             assertEqual(s[2].ms, NO_END, 'the Wait has no end')
             assertGte(DirectorTasks.length({ steps = s }), NO_END, 'its length is past any run')
             assertGt(NO_END, 24 * 3600 * 1000, 'longer than a day')
+        end },
+        { name = 'a scenario saved before 0 was no end plays its times of 0 as it did, a tenth of a second', fn = function()
+            local function thing(id, kind, list) return { id = id, kind = kind, def = { tasks = { list = list, after = 'stop' } } } end
+            local raw = { format = DirectorDoc.FORMAT, name = 'Old', vars = {}, nodes = {}, links = {},
+                world = { thing('n1', 'npc', { { k = 'a', t = 'wait', sec = 0 },
+                                               { k = 'b', t = 'goTo', at = at, giveUp = 0 },
+                                               { k = 'c', t = 'shootAt', target = 'nearest', sec = -2 },
+                                               { k = 'd', t = 'wander', sec = '0' },
+                                               { k = 'e', t = 'aimAt', target = 'nearest', sec = 5 },
+                                               { k = 'f', t = 'wander' } }),
+                          thing('p1', 'prop', { { k = 'a', t = 'slideTo', at = at, sec = 0 }, { k = 'b', t = 'wait', sec = 0 } }) },
+                variants = { { id = 'v2', name = 'B', nodes = {}, links = {}, world = { thing('n2', 'npc', { { k = 'a', t = 'wait', sec = 0 } }) } } } }
+            local doc = DirectorDoc.load(raw)
+            assertNotNil(doc, 'it loads')
+            assertEqual(doc.taskTimes, DirectorDoc.TASK_TIMES, 'and is marked')
+            assertEqual(raw.world[1].def.tasks.list[1].sec, 0, 'what was saved is not changed')
+            local s = compile('npc', doc.world[1].def.tasks.list)
+            assertEqual(s[1].ms, 100, 'a Wait of 0: a tenth, as before')
+            assertEqual(s[2].giveUpMs, 100, 'a give-up of 0: a tenth, as before')
+            assertEqual(s[3].ms, 100, 'less than 0: a tenth')
+            assertEqual(s[4].ms, 100, 'a 0 saved as text: a tenth')
+            assertEqual(s[5].ms, 5000, 'a time set is kept')
+            assertEqual(s[6].ms, 20000, 'no time saved: its type\'s')
+            local p = compile('prop', doc.world[2].def.tasks.list)
+            assertEqual(p[1].ms, 100, 'a prop\'s slide of 0: a tenth')
+            assertEqual(DirectorTasks.length({ steps = p }), 200, 'its list as long as it was')
+            assertEqual(compile('npc', doc.variants[1].world[1].def.tasks.list)[1].ms, 100, 'every variant\'s')
+        end },
+        { name = 'a scenario saved since keeps its 0 as no end, saved and read again', fn = function()
+            local raw = { format = DirectorDoc.FORMAT, name = 'New', vars = {}, nodes = {}, links = {}, taskTimes = DirectorDoc.TASK_TIMES,
+                world = { { id = 'n1', kind = 'npc', def = { tasks = { list = { { k = 'a', t = 'shootAt', target = 'nearest', sec = 0 },
+                                                                               { k = 'b', t = 'goTo', at = at, giveUp = 0 } } } } } } }
+            local doc = DirectorDoc.load(raw)
+            local s = compile('npc', doc.world[1].def.tasks.list)
+            assertEqual(s[1].ms, NO_END, 'a 0: no end')
+            assertEqual(s[2].giveUpMs, NO_END, 'a give-up of 0: never')
+            -- (The editor sends back what it was given, the mark with it: an old one, once read, is not read as old again.)
+            local old = DirectorDoc.load({ format = DirectorDoc.FORMAT, name = 'Old', vars = {}, nodes = {}, links = {}, world = {} })
+            old.world[1] = { id = 'n1', kind = 'npc', def = { tasks = { list = { { k = 'a', t = 'shootAt', target = 'nearest', sec = 0 } } } } }
+            local again = DirectorDoc.load(old)
+            assertEqual(compile('npc', again.world[1].def.tasks.list)[1].ms, NO_END, 'a 0 set after the mark: no end')
         end },
     },
 })

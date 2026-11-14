@@ -12,7 +12,7 @@ standon_module.lua                       2 passed, 0 failed, 0 skipped
 starttogether_module.lua                 3 passed, 0 failed, 0 skipped
 takeleave_module.lua                     5 passed, 0 failed, 0 skipped
 tasksout_module.lua                      4 passed, 0 failed, 0 skipped
-tasktime_module.lua                      7 passed, 0 failed, 0 skipped
+tasktime_module.lua                      9 passed, 0 failed, 0 skipped
 tow_module.lua                           5 passed, 0 failed, 0 skipped
 watch_module.lua                         8 passed, 0 failed, 0 skipped
 after_test.lua                           7 passed, 0 failed

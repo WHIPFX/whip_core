@@ -3,14 +3,39 @@
 --   2. its lists must be lists and its settings a table
 --   3. renamed cards get their current names (DirectorNodes.applyRenames)
 --   4. older card versions are brought up by the card's own `upgrade(props, fromVersion)` (nodes.lua)
--- Shape (see graph.lua): { format, name, description, settings, vars, world, nodes, links, comments, variants }.
+--   5. task times saved before 0 was no end are read as they played (oldTaskTimes)
+-- Shape (see graph.lua): { format, name, description, settings, vars, world, nodes, links, comments, variants, taskTimes }.
 
 DirectorDoc = {}
 
 --- The document format this Director reads and writes (same as FORMAT in html/js/director/doc.js).
 DirectorDoc.FORMAT = 2
 
+--- What a task time of 0 means in a document marked with it (`taskTimes`): 2, no end (a give-up of 0: never;
+--- shared/director/steps.lua THE TIMING). A document without it was saved when a time of 0 or less played as a tenth
+--- of a second: as it is read, those are made that tenth, and it is marked (the editor keeps the mark, so a 0 set after
+--- is never read as an old one).
+DirectorDoc.TASK_TIMES = 2
+
 local LISTS = { 'nodes', 'links', 'vars', 'world', 'comments', 'variants' }
+local TIMES = { 'sec', 'giveUp' }
+
+--- The task times of a world list saved before TASK_TIMES: a time or a give-up of 0 or less is the tenth of a second it
+--- played as.
+local function oldTaskTimes(world)
+    for _, w in ipairs(type(world) == 'table' and world or {}) do
+        local tasks = type(w) == 'table' and type(w.def) == 'table' and w.def.tasks or nil
+        local list = type(tasks) == 'table' and tasks.list or nil
+        for _, s in ipairs(type(list) == 'table' and list or {}) do
+            if type(s) == 'table' then
+                for _, key in ipairs(TIMES) do
+                    local n = DirectorKit.number(tonumber(s[key]))
+                    if n and n <= 0 then s[key] = 0.1 end
+                end
+            end
+        end
+    end
+end
 
 --- Each card of a node list brought up to date: renamed types read as now, older versions upgraded by their card.
 local function upgradeNodes(nodes, problems)
@@ -76,6 +101,14 @@ copyOf = function(raw)
             doc.variants[i] = v
             upgradeNodes(v.nodes, problems)
         end
+    end
+    local times = math.tointeger(doc.taskTimes)
+    if not times or times < DirectorDoc.TASK_TIMES then
+        oldTaskTimes(doc.world)
+        for _, v in ipairs(doc.variants or {}) do
+            if type(v) == 'table' then oldTaskTimes(v.world) end
+        end
+        doc.taskTimes = DirectorDoc.TASK_TIMES
     end
     return doc, nil, #problems > 0 and problems or nil
 end
