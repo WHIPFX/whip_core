@@ -622,10 +622,13 @@ end)
 --- A door from the client's cache: by its doorId, or `{ entity = }` for the saved door a world entity is (by
 --- model and position, among the doors nearby). Global as well: the door and object tools read it without the
 --- export.
----@param ref number|{ entity: number }|nil
+---@param ref number|{ entity: number }|{ id: number }|nil
 ---@return table|nil
 function GetClientDoor(ref)
-    if type(ref) == 'table' then return getDoorByEntity(ref.entity) end
+    if type(ref) == 'table' then
+        if ref.entity ~= nil then return getDoorByEntity(ref.entity) end
+        return clientDoors[ref.id]   -- { id = n }, as every GetX(ref) takes
+    end
     return clientDoors[ref]
 end
 

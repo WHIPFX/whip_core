@@ -1239,6 +1239,11 @@ local _zoneIds = Registry.new('ServerZone', {
 --- Register a server-side zone. Returns (true) or (false, reason).
 exports('RegisterZone', function(id, data)
     local owner = Registry.caller()   -- first, before anything can yield
+    -- The client's RegisterZone(data) makes up its own id; the server's takes yours first. Said plainly, as shared
+    -- code calling the client form here is the likely mistake.
+    if type(id) == 'table' and data == nil then
+        return false, "the server's RegisterZone takes (id, data): an id of your own first, then the zone"
+    end
     if type(data) ~= 'table' then return false, 'RegisterZone: data must be a table' end
     -- The shape read as a client's report is: a zone nothing can ever be inside is refused
     -- with what was wrong, not stored. trackPlayers is a server zone's own word.

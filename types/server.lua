@@ -827,7 +827,7 @@ function whip_core:GetSentinelTruth(src, key) end
 ---@alias WhipBankRole 'view'|'deposit'|'withdraw'|'manager'|'owner'  -- each includes those before it
 
 --- One bank account: by its ID, or by its display number, `{ number = 'WB-123456' }`.
----@param ref number|{ number: string }|{ accountId: number } An accountId, or a reference
+---@param ref number|{ number: string }|{ accountId: number }|{ id: number } An accountId, or a reference
 ---@return WhipBankAccount|nil
 ---@async
 function whip_core:GetBankAccount(ref) end
@@ -1862,7 +1862,8 @@ function whip_core:SpawnVehicle(vehicleId, coords) end
 ---
 --- `opts.garage` puts the car away in that garage instead of its own. Then only an owned car that is `out` is taken:
 --- a street or temporary car is refused (neither has a garage row), as is one already put away, or a key that
---- names no garage. `opts.refuseOccupied` refuses a car with somebody inside.
+--- names no garage. `opts.refuseOccupied` refuses a car with somebody inside: on by default with a garage, off
+--- without one.
 ---
 ---     exports.whip_core:DespawnVehicle(vehicleId, { garage = 'impound', refuseOccupied = true })
 ---@param vehicleId number|WhipVehicleRef

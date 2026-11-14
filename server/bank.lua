@@ -1445,11 +1445,12 @@ local function outRows(rows, err)
     return rows or {}, err
 end
 
---- One account: by its accountId, or `{ number = 'WB-123456' }` (its display number) or `{ accountId = n }`.
+--- One account: by its accountId, or `{ number = 'WB-123456' }` (its display number), `{ accountId = n }` or
+--- `{ id = n }` (as every GetX(ref) takes).
 exports('GetBankAccount', function(ref)
     if type(ref) == 'table' then
         if ref.number ~= nil then return outRow(Bank.GetAccountByNumber(ref.number)) end
-        ref = ref.accountId
+        ref = ref.accountId or ref.id
     end
     return outRow(Bank.GetAccount(ref))
 end)

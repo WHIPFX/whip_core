@@ -221,8 +221,16 @@ local WAITS = json.decode([[{"server":["AddCatalogItem","AddItem","AdoptVehicle"
 local WAITS_HERE = {}
 for _, n in ipairs(WAITS[IsDuplicityVersion() and 'server' or 'client'] or {}) do WAITS_HERE[n] = true end
 
---- The coroutine running the registrations right now, if any (see Whip.register).
-local _runningCo = nil
+--- The coroutines running registrations right now (see Whip.register): [co] = how many passes it is inside. A set,
+--- not one saved-and-restored value: two passes can overlap (one waits on a slow export while another starts), and
+--- the first to end must not hide the other's refusals.
+local _passes = {}
+
+--- Is this coroutine inside a registration pass?
+local function inPass()
+    local co = coroutine.running()
+    return co ~= nil and _passes[co] ~= nil
+end
 
 --- One call into whip_core: Whip.call without its refusal line.
 ---@param name string  the export's name
@@ -251,7 +259,9 @@ local function callCore(name, ...)
 
     -- An export that cannot wait (most of them): straight through, no thread and no promise.
     if not WAITS_HERE[name] then
-        local packed = table.pack(pcall(exports[CORE][name], exports[CORE], ...))
+        -- The lookup inside the pcall too: FiveM raises "No such export" for a name whip_core does not have (one
+        -- renamed, or a typo), and that must answer false like any failure rather than throw out of a Whip.register.
+        local packed = table.pack(pcall(function(...) return exports[CORE][name](exports[CORE], ...) end, ...))
         if not packed[1] then
             return false, ('whip_core:%s failed: %s'):format(tostring(name), tostring(packed[2]))
         end
@@ -325,7 +335,7 @@ end
 ---@param name string  the export's name
 ---@return any ...
 function Whip.call(name, ...)
-    if _runningCo ~= nil and coroutine.running() == _runningCo and type(name) == 'string' and declares(name) then
+    if type(name) == 'string' and inPass() and declares(name) then
         return sayRefusal(name, callCore(name, ...))
     end
     return callCore(name, ...)
@@ -350,15 +360,15 @@ local function runAll(list, what)
     -- A copy of the list: a registration added while these run (from another thread, during a wait)
     -- has already run when it was added, and must not run again here.
     local snapshot = table.move(list, 1, #list, 1, {})
-    local outer = _runningCo
-    _runningCo = coroutine.running()
+    local co = coroutine.running()
+    _passes[co] = (_passes[co] or 0) + 1
     for _, fn in ipairs(snapshot) do
         local ok, err = pcall(fn)
         if not ok then
             print(('[%s] %s failed: %s'):format(SELF, what, tostring(err)))
         end
     end
-    _runningCo = outer
+    _passes[co] = _passes[co] > 1 and _passes[co] - 1 or nil
 end
 
 --- Run `fn` whenever your registrations are needed: when whip_core becomes ready, and every time
@@ -382,7 +392,7 @@ end
 --- time it runs.
 ---@param fn function
 function Whip.register(fn)
-    if _runningCo ~= nil and coroutine.running() == _runningCo then
+    if inPass() then
         runAll({ fn }, 'Whip.register')
         return
     end

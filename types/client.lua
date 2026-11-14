@@ -1330,7 +1330,7 @@ function whip_core:GetLoadedDoors() end
 --- model and position, among the doors nearby).
 ---
 ---     local door = exports.whip_core:GetDoor({ entity = entity })
----@param ref number|{ entity: number } A doorId, or a reference
+---@param ref number|{ entity: number }|{ id: number } A doorId, or a reference
 ---@return table|nil doorData
 function whip_core:GetDoor(ref) end
 

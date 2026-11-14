@@ -1902,6 +1902,28 @@ local PATCH = {
 --- In this order: where the zone is first, then its size.
 local PATCH_ORDER = { 'pos', 'size', 'condition', 'debug', 'trackVehicles', 'label', 'priority', 'notify', 'rules' }
 
+--- A point: a vector3 or vector4, or a table with numeric x and y (and z when `needZ`).
+local function isPoint(v, needZ)
+    local t = type(v)
+    if t == 'vector3' or t == 'vector4' then return true end
+    return t == 'table' and type(v.x) == 'number' and type(v.y) == 'number' and (not needZ or type(v.z) == 'number')
+end
+
+--- Why `patch` cannot apply to `zone`, or nil. The checks a value fails only once it is half applied are made here
+--- first: a bad pos used to take the zone off its cells and then throw, leaving it on none.
+local function patchRefusal(zone, patch)
+    if patch.pos ~= nil and not isPoint(patch.pos) then return 'UpdateZone: pos is a vector3' end
+    local size = patch.size
+    if size ~= nil then
+        if zone.type == 'poly' then return 'a poly zone is resized by editing its points' end
+        if zone.type == 'box' and not isPoint(size, true) then return "UpdateZone: a box zone's size is a vector3" end
+        if zone.type == 'sphere' and type(size) ~= 'number' and not isPoint(size) then
+            return "UpdateZone: a sphere zone's size is its radius (a number)"
+        end
+    end
+    return nil
+end
+
 --- Change a zone of `caller`'s: each key of `patch` (PATCH above), checked before any is applied, so a bad key
 --- changes nothing. Returns `true`, or `false, why`.
 ---@param caller string
@@ -1918,6 +1940,8 @@ local function updateZone(caller, idOrKey, patch)
     end
     local zone, id, why = ownZone(idOrKey, caller)
     if not zone then return false, why end
+    local refused = patchRefusal(zone, patch)
+    if refused then return false, refused end
     for _, k in ipairs(PATCH_ORDER) do
         local v = patch[k]
         if v ~= nil then

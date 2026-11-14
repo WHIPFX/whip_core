@@ -3939,8 +3939,8 @@ end)
 --- first. With no garage it goes where it belongs: someone's own car into its garage, a temporary car is forgotten,
 --- a street car handed back to GTA. `opts.garage` puts an owned car that is out away in that garage, the
 --- Vehicles.store rules: a street or temporary car is refused, as neither has a row to be garaged in.
---- `opts.refuseOccupied` refuses a car with somebody in it. SpawnVehicle brings it out again. `(ok, err)` like every
---- other verb.
+--- `opts.refuseOccupied` refuses a car with somebody in it: on by default with a garage (as StoreVehicle always
+--- refused), off without one. SpawnVehicle brings it out again. `(ok, err)` like every other verb.
 ---@param vehicleId number|WhipVehicleRef|nil
 ---@param opts { garage?: string, refuseOccupied?: boolean }|nil
 ---@return boolean ok, string|nil err
@@ -3951,7 +3951,11 @@ function Vehicles.despawnByRef(vehicleId, opts)
     local def = Vehicles.getDef(vehicleId)
     if not def then return false, 'Vehicle not found' end
     opts = type(opts) == 'table' and opts or {}
-    local refuseOccupied = opts.refuseOccupied == true
+    -- With a garage, refused unless the caller says otherwise: StoreVehicle, which this took in, always refused an
+    -- occupied car, and putting one away with people in it is not what "store it" means.
+    local refuseOccupied
+    if opts.refuseOccupied ~= nil then refuseOccupied = opts.refuseOccupied == true
+    else refuseOccupied = opts.garage ~= nil end
 
     -- Into a garage named: an owned car that is out, into a garage that exists (a key that names none is refused)
     if opts.garage ~= nil then
@@ -4496,6 +4500,11 @@ local function keyPockets(who)
     ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
     local player = src and Players[src]
     if player then return player end
+    -- Their last session's save first (its pockets are `player:<charId>`): read before it lands, and these are the
+    -- keys they had before that session.
+    if not Stores.settle('player:' .. tostring(charId)) then
+        return nil, 'Their last save has not landed yet — try again in a moment'
+    end
     local ok, rows = pcall(MySQL.query.await,
         'SELECT `container`, `slot`, `item`, `metadata` FROM `character_inventory` WHERE `charId` = ?', { charId })
     if not ok then return nil, 'The database could not be reached — try again' end

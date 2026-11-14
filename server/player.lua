@@ -1050,6 +1050,11 @@ end
 ---@return table|nil metadata
 ---@return string|nil why
 local function offlineMetadata(charId)
+    -- Their last session's save first (a failed teardown write still owed, `player:<charId>` holds the metadata):
+    -- read before it lands, and the row is the one from before that session. The login settles it the same way.
+    if not Stores.settle('player:' .. tostring(charId)) then
+        return nil, 'Their last save has not landed yet — try again in a moment'
+    end
     -- The row, not the column alone: a character whose metadata is NULL is still a character.
     local ok, row = pcall(MySQL.single.await,
         'SELECT `metadata` FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL', { charId })
@@ -1081,12 +1086,10 @@ local CORE_METADATA_KEYS = {
     whipFlags = true, moneyHeldOwed = true, pourRefundOwed = true, lastSeat = true,
 }
 
---- [charId] = true while an offline character's metadata is being written: one write at a time, or the second
---- would read before the first lands and put the old value back.
-local _offlineMetadataWrite = {}
-
---- Set one key on a character who is not playing: their row, read and written back. Refused while they are logging
---- in (the login reads the row, and would keep the old one).
+--- Set one key on a character who is not playing: their row, read and written back. The whole read-and-write holds
+--- the character in LoadingCharIds as 'metadata' (as a delete holds it as 'deleting'): a login refuses a character
+--- held there, so it can neither read the row before this write lands and save over it, nor start between the two,
+--- and a second write waits its turn the same way. Refused while they are logging in.
 ---@return boolean ok
 ---@return string|nil why
 local function setOfflineMetadata(charId, key, value)
@@ -1094,17 +1097,13 @@ local function setOfflineMetadata(charId, key, value)
         return false, ('metadata "%s" cannot be saved (not JSON-encodable — store plain numbers, strings and tables)')
             :format(key)
     end
-    if (LoadingCharIds and LoadingCharIds[charId]) or _offlineMetadataWrite[charId] then
+    if PlayersByCharId[charId] or LoadingCharIds[charId] then
         return false, 'That character is busy right now — try again in a moment'
     end
-    _offlineMetadataWrite[charId] = true
+    LoadingCharIds[charId] = 'metadata'
     local ok, done, why = pcall(function()
         local metadata, readWhy = offlineMetadata(charId)
         if not metadata then return false, readWhy end
-        -- Logged in while it was read: the live sheet is the one to change now.
-        if PlayersByCharId[charId] or (LoadingCharIds and LoadingCharIds[charId]) then
-            return false, 'That character is busy right now — try again in a moment'
-        end
         metadata[key] = value
         -- (No count check: a write that changes nothing may count 0 rows.)
         local wrote = pcall(MySQL.update.await,
@@ -1113,7 +1112,7 @@ local function setOfflineMetadata(charId, key, value)
         if not wrote then return false, 'Could not save that (database error)' end
         return true
     end)
-    _offlineMetadataWrite[charId] = nil
+    if LoadingCharIds[charId] == 'metadata' then LoadingCharIds[charId] = nil end
     if not ok then return false, tostring(done) end
     if not done then return false, why end
     return true

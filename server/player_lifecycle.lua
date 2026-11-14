@@ -1066,7 +1066,9 @@ function LoadCharacterForPlayer(source, charId, isNewCharacter, spawnId)
     charId = tonumber(charId)
     if not charId or PlayersByCharId[charId] or LoadingCharIds[charId] then
         releaseClaim(source, claim)
-        refuseLoad(source, 'That character is already in the game.')
+        -- 'metadata': another resource is writing this character's row while it is offline (SetPlayerMetadata).
+        refuseLoad(source, LoadingCharIds[charId] == 'metadata' and 'That character is being saved. Try again in a moment.'
+            or 'That character is already in the game.')
         return
     end
     -- Set BEFORE the first yield, so a second load of the same character is refused the moment this

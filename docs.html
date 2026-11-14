@@ -5589,7 +5589,7 @@ if not vehicleId then exports.whip_core:RefundPlayer(receipt) return false, why 
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
   <tr><td>opts.garage</td><td>string?</td><td>Put it away in this garage instead (an impound). Only an owned car that is out: <code>'A street car cannot be put in a garage'</code>, <code>'A temporary car cannot be put in a garage'</code>, <code>'Vehicle is already stored'</code>, <code>'No such garage: …'</code></td></tr>
-  <tr><td>opts.refuseOccupied</td><td>boolean?</td><td>Refuse a car with somebody inside: <code>'Somebody is still in that vehicle'</code></td></tr></table>
+  <tr><td>opts.refuseOccupied</td><td>boolean?</td><td>Refuse a car with somebody inside: <code>'Somebody is still in that vehicle'</code>. On by default with a <code>garage</code>, off without one</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil err</code>: success if already out of the world; <code>false, 'Vehicle is busy'</code> mid-spawn, store or delete (retry shortly)</div>
   <div class="info-box warn"><strong>A street car stays in the world.</strong> WHIP hands it back to GTA and forgets it: its id means nothing, its boot and glovebox items are logged as lost, and <code>released</code> fires.</div>
 </div></div>
