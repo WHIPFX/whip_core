@@ -11555,7 +11555,7 @@ end</code></pre>
 end)</code></pre>
 </div></div>
 <h2 id="running-whip">Running WHIP</h2>
-<p class="lede">What happens behind the <a href="#quickstart">Quick Start</a>: the database, oxmysql, a player's first download, and Legacy versus Enhanced. When something goes wrong, the <strong>whip setup</strong> report in the server console says what to fix (<code>whipsetup</code> prints it again).</p>
+<p class="lede">What happens behind the <a href="#quickstart">Quick Start</a>: the database, oxmysql, a player's first download, and Legacy versus Enhanced. When something goes wrong, the <strong>WHIP setup</strong> report in the server console says what to fix (<code>whipsetup</code> prints it again).</p>
 
 <h3>The database</h3>
 <p>WHIP needs MariaDB 10.2.3+ or MySQL 8.0.16+: older versions ignore the rules that stop a bank balance going below zero. The setup report says when yours is too old.</p>
@@ -11985,7 +11985,7 @@ end)</code></pre>
 
 <h3>Bans</h3>
 <p>Bans are checked on connect against <strong>every identifier</strong> (licence, Steam, Discord, FiveM): any match blocks the player.</p>
-<p><strong>Rank decides who can act.</strong> Nobody kicks or bans someone of their own rank or above, or lifts a ban placed by someone above them. An admin from server.cfg can't be kicked or banned from the panel, and neither can an account sharing a licence, Steam, Discord or FiveM identifier with one. Someone given dev tools from the panel can be kicked or banned only by a server.cfg admin, and a ban takes the tools away. A ban a server.cfg admin placed (or one with no placer on record) is lifted only by one of them.</p>
+<p><strong>Rank decides who can act.</strong> Nobody kicks or bans someone of their own rank or above, or lifts a ban placed by someone above them. An admin from server.cfg can't be kicked or banned from the panel. Nor can an account that shares a licence, Steam, Discord or FiveM identifier with one be banned: the ban would turn the admin away too. Someone given dev tools from the panel can be kicked or banned only by a server.cfg admin, and a ban takes the tools away. A ban a server.cfg admin placed (or one with no placer on record) is lifted only by one of them.</p>
 <p>A temporary ban ends by itself. The player sees:</p>
 <pre><code class="lang-text">You are banned from this server.
 
