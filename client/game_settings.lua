@@ -2,8 +2,8 @@
 -- GAME SETTINGS — GTA's own settings, on whip's pause menu page
 -- ============================================
 --
--- The pause menu's Settings (html/js/game-settings.js) is GTA's settings in whip's look: every tab GTA has (Audio,
--- Display, Graphics...) read from GTA, and changed through GTA, so they are kept where GTA keeps them.
+-- The pause menu's Settings (html/js/settings-page.js), under Game, is GTA's settings in whip's look: every tab GTA has
+-- (Audio, Display, Graphics...) read from GTA, and changed through GTA, so they are kept where GTA keeps them.
 --
 -- GTA'S SETTINGS MENU RUNS UNDER WHIP'S PAGE, NOT DRAWN. stream/scaleform/pause_menu_pages_settings.gfx is GTA's
 -- settings page with whip's questions added (its source and how to build it: dev/pause_settings/). Asked for a column

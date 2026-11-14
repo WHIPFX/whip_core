@@ -150,8 +150,8 @@
     text-align: center;
 }
 
-/* ---- the preview (Server Settings → Minimap; prefs-page.js lays it over its place on the right, and says under it
-   what it shows) ---- */
+/* ---- the preview (Settings → Server → Minimap; settings-page.js lays it over its place in the inspector, and says
+   beside it what it shows) ---- */
 
 .mm-preview-map {
     position: relative;
