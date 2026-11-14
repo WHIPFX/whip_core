@@ -365,8 +365,14 @@ local function modeLoop()
                     if car and DoesEntityExist(car) and NetworkGetEntityIsNetworked(car) then
                         answer.netId = NetworkGetNetworkIdFromEntity(car)
                         answer.offset = GetOffsetFromEntityGivenWorldCoords(car, placeHitX, placeHitY, placeHitZ)
+                        -- Its turn within the car's: the car's taken off its own (rotation order 2, as AttachEntityToEntity
+                        -- reads it). Its angles less the car's were right only on a level car or facing the car's way: a
+                        -- speaker turned on the roof of a car on a slope sat tilted (WLVF's second review).
                         local cr = GetEntityRotation(car, 2)
-                        answer.offsetRot = vector3(placeRx - cr.x, placeRy - cr.y, (placeHeading - cr.z) % 360.0)
+                        local qc = CamMath.quatFromEuler(cr.x, cr.y, cr.z)
+                        local q = CamMath.quatMul({ qc[1], -qc[2], -qc[3], -qc[4] }, CamMath.quatFromEuler(placeRx, placeRy, placeHeading))
+                        local rx, ry, rz = CamMath.quatToEuler(q)
+                        answer.offsetRot = vector3(rx, ry, rz % 360.0)
                     end
                     placeSession = nil
                     CancelPlaceMode()
