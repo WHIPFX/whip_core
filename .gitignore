@@ -1,3 +1,4 @@
 # Written by whip_core at runtime: mirrors of the settings in its database (server/settings.lua).
 settings.json
 server_settings.json
+/.githooks/__pycache__
