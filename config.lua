@@ -452,8 +452,8 @@ Config.Hunger = true
 Config.Thirst = true
 
 -- How long each takes to drain from full to empty, in minutes, while it is on.
-Config.HungerMinutes = 42
-Config.ThirstMinutes = 28
+Config.HungerMinutes = 120
+Config.ThirstMinutes = 90
 
 -- What an empty one costs: health lost every 10 seconds while hunger or thirst is at 10 or below
 -- (health runs to 200). 0 = they never hurt.
