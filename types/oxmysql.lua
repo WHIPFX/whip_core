@@ -5,8 +5,9 @@
 --
 -- '@oxmysql/lib/MySQL.lua' (fxmanifest.lua's server_scripts) makes the MySQL global at run time, and it carries no
 -- annotations of its own; without these the editor took MySQL's shape from dev/director/harness.lua's stand-in, whose
--- functions take no arguments. Only the calls whip makes are here. The .await forms wait, so call them from a thread
--- or a handler, and a failed query raises an error instead of answering nil.
+-- functions take no arguments. Only the calls whip makes are typed in full. The .await forms wait, so call them from a
+-- thread or a handler; a failed query raises an error instead of answering nil, and a transaction that fails is rolled
+-- back and answers false.
 
 ---@alias WhipSqlParams table|nil Positional (`?`) values in order, or named (`@name`, `:name`) values by name
 
@@ -59,11 +60,12 @@ local Update = {}
 ---@return integer
 function Update.await(query, params) end
 
----@class WhipMySQLTransaction: WhipMySQLMethod
+---@class WhipMySQLTransaction
+---@overload fun(queries: table, params?: WhipSqlParams|fun(ok: boolean), cb?: fun(ok: boolean))
 local Transaction = {}
---- Runs every query or none: true when they all ran.
+--- Runs every query or none: true when they all ran, false when one failed and they were rolled back.
 ---@async
----@param queries table A list of queries ({ query = sql, values = params } or { sql, params }), or a map of sql to params
+---@param queries table A list: of { query = sql, values = params }, of { sql, params }, or of SQL strings that all take `params`
 ---@param params? WhipSqlParams Shared values for every query
 ---@return boolean
 function Transaction.await(queries, params) end
@@ -82,8 +84,10 @@ function Ready.await() end
 ---@field single WhipMySQLSingle
 ---@field insert WhipMySQLInsert
 ---@field update WhipMySQLUpdate
----@field prepare WhipMySQLQuery
----@field rawExecute WhipMySQLQuery
 ---@field transaction WhipMySQLTransaction
 ---@field ready WhipMySQLReady
+---@field startTransaction fun(cb: fun(query: function): boolean|nil): any
+---@field Async table The older callback forms (MySQL.Async.fetchAll, .execute...)
+---@field Sync table The older blocking forms (MySQL.Sync.fetchAll, .execute...)
+---@field [string] any Any other name is passed on to oxmysql's export of that name (prepare, rawExecute...)
 MySQL = {}

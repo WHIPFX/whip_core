@@ -711,7 +711,8 @@ RegisterNUICallback('handEditWalk', function(data, cb)
     if not ed then return end
     if not (ed.busy or ed.asking) then ed.walk = type(data) == 'table' and data.on == true end
     SendNUIMessage({ action = 'handEditWalk', on = ed.walk })
-    if tiedNow() and not ed.busy then CreateThread(walkNow) end
+    -- (The thread starts next tick: the editor may have closed by then.)
+    if tiedNow() and not ed.busy then CreateThread(function() if ed then walkNow() end end) end
 end)
 
 -- The second switch: "Picked up with both hands" for the item on screen (its grab setting: '2h' on, '1h' off; how

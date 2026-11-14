@@ -123,13 +123,15 @@ end
 
 local function readHere()
     local info, why = Interior.read()
-    reg = { active = true, read = info ~= nil, why = why, templates = {} }
+    local r = { active = true, read = info ~= nil, why = why, templates = {} }
+    reg = r
     if not info then return end
-    reg.place, reg.hash, reg.yawOnly = info.place, info.hash, info.yawOnly
+    r.place, r.hash, r.yawOnly = info.place, info.hash, info.yawOnly
     local known = Callback('whip_core:property:adminRegisterInfo', info.place)
+    if reg ~= r then return end   -- closed (or read again) while it asked
     for _, t in ipairs((known and known.templates) or {}) do
         sortUnits(t.units)
-        reg.templates[#reg.templates + 1] = t
+        r.templates[#r.templates + 1] = t
     end
 end
 
@@ -208,7 +210,7 @@ end)
 RegisterNUICallback('prRead', function(_, cb)
     readHere()
     PropertyScale.pushRegister()
-    ---@cast reg -nil
+    if not reg then cb({ ok = false }) return end   -- closed while it read
     cb({ ok = reg.read, why = reg.why })
 end)
 

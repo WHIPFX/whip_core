@@ -59,7 +59,7 @@ PropertyWizard = {}
 ---@field bays table[]           { pos, heading }
 
 --- nil while no property is being set up. The helpers below only run with one (the page's buttons ask
---- needDraft first), hence their casts.
+--- needDraft first), hence their casts; readInterior waits, so it checks again after each wait.
 ---@type PropertyDraft|nil
 local draft = nil
 
@@ -402,8 +402,10 @@ end
 ---@return string|nil note, boolean|nil bad
 local function readInterior()
     ---@cast draft -nil
+    local mine = draft
     if draft.mode == 'edit' and draft.part == 'interior' then goInsideFor(draft) end
     local info, why = Interior.read()
+    if draft ~= mine then return end   -- cancelled (or started again) while it read
     draft.reading, draft.readWhy = info, why
     if not info then return end
     if draft.mode ~= 'new' then
@@ -418,7 +420,9 @@ local function readInterior()
     draft.rooms = info.rooms
     draft.fingerprint = { rooms = info.roomCount, portals = info.portalCount }
     if changed then resetParts() end
-    draft.known = Callback('whip_core:property:adminKnown', info.place) or nil   -- (a refusal is false, why)
+    local known = Callback('whip_core:property:adminKnown', info.place) or nil   -- (a refusal is false, why)
+    if draft ~= mine then return end
+    draft.known = known
 end
 
 --- No interior: a house on the open map. The placement is where the admin stands, facing north,
@@ -1540,6 +1544,7 @@ RegisterNUICallback('pwReadInterior', function(_, cb)
     ---@cast draft -nil
     -- A read that worked says so (Re-bind: what it found, rebindNote); one that did not says why.
     local note, bad = readInterior()
+    if not draft then answer(cb, false, 'The wizard was closed') return end
     if not draft.reading then answer(cb, false, draft.readWhy) return end
     answer(cb, not bad, note)
 end)

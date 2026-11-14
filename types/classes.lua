@@ -59,8 +59,6 @@
 ---@field steam string|nil Steam hex identifier
 ---@field discord string|nil Discord identifier
 ---@field fivem string|nil FiveM identifier
----@field dirty boolean True if character data changed since last save
----@field inventoryDirty boolean True if inventory changed since last save
 local WhipPlayer = {}
 
 ---@param key? string Specific key, or nil to get entire metadata table

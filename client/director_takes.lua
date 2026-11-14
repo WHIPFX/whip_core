@@ -468,7 +468,8 @@ end
 
 --- One attempt: back on the spot, count, record until saved, tried again or thrown away.
 local function attempt()
-    ---@cast R -nil   -- (newAttempt: a recording is up; current(run) says it still is)
+    -- newAttempt starts this on the next tick: the recording may have been thrown away by then (F4, death).
+    if not R then return end
     local run = R.run
     local veh = R.veh
     letGoOfAll(R)   -- (driven again while the last one's save was unanswered)

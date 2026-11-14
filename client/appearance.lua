@@ -826,7 +826,7 @@ local function undressedFor(ped)
     if not body then return nil end
     local out = { components = {} }
     for comp, item in pairs(UNDRESSED[body]) do
-        local id = tonumber(comp) --[[@as integer]]   -- (UNDRESSED's keys are all numbers)
+        local id = tonumber(comp) --[[@as integer]]   -- (UNDRESSED's keys are all digit strings)
         local d = -1
         if item[1] == 'base' then
             d = item[2]

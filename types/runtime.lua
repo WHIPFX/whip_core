@@ -64,6 +64,18 @@ function TriggerClientEventInternal(eventName, eventTarget, eventPayload, payloa
 -- The scheduler
 -- ============================================
 
+--- Run `callback` in a new thread after `msec`. Answers the timeout's id, for ClearTimeout. (The extension declares
+--- no answer.)
+---@param msec number
+---@param callback fun()
+---@return integer id
+function Citizen.SetTimeout(msec, callback) end
+
+---@param msec number
+---@param callback fun()
+---@return integer id
+function SetTimeout(msec, callback) end
+
 --- Cancel a SetTimeout that has not run yet, by the id SetTimeout answered. The extension declares SetTimeout only.
 ---@param id integer
 function ClearTimeout(id) end

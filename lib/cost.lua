@@ -158,8 +158,10 @@ local function countedWait(waitMs)
             file(list, name, kbNow - from, kbNow)
         end
     end
-    ---@cast nativeWait -nil   -- this is Wait only while countLoops holds the real one there
-    nativeWait(waitMs)
+    -- nativeWait is nil once counting stops; a countedWait kept from before (`local wait = Wait`) then waits with the
+    -- real Wait, which is back by then.
+    local wait = nativeWait or Wait
+    wait(waitMs)
     if co and loops then wokeAt[co] = collectgarbage('count') end
 end
 
@@ -179,9 +181,10 @@ local function threadEnded(co, fn, ...)
 end
 
 local function countedThread(fn)
-    ---@cast nativeThread -nil   -- this is CreateThread only while countLoops holds the real one there
-    if type(fn) ~= 'function' or not loops then return nativeThread(fn) end
-    return nativeThread(function(...)
+    ---@type function   (a counted thread passes its function's answers on)
+    local spawn = nativeThread or CreateThread   -- (as in countedWait: the real one is back once counting stops)
+    if type(fn) ~= 'function' or not loops then return spawn(fn) end
+    return spawn(function(...)
         local co = coroutine.running()
         if loops then wokeAt[co] = collectgarbage('count') end
         return threadEnded(co, fn, fn(...))

@@ -1602,14 +1602,17 @@ local function padPress(nav)
         pushState()
     elseif nav == 'back' then
         if carrying then
-            local from = carrying.from
+            local from, index = carrying.from, carrying.index
             carrying = nil
             blocked = false
-            if from then
-                ---@cast it -nil   -- `from` is set only on a carry of the selection (buttonX); padFrame drops a stale one
+            -- `from` is set only on a carry of the selection (buttonX). padFrame drops a stale carry (nothing selected,
+            -- or another selection) on its next frame; one that went stale since then is only let go of.
+            if from and it and index == selected then
                 -- Back where it was picked up.
                 it.x, it.y, it.z, it.rx, it.ry, it.rz = from[1], from[2], from[3], from[4], from[5], from[6]
                 applySelected()
+                pushState()
+            elseif from then
                 pushState()
             else
                 dropFresh(selected)   -- just picked: B takes it back out, as if it never was

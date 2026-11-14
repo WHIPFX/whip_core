@@ -507,7 +507,7 @@ SecureEvent('whip_core:server:pmKick', {
     local userId = (loaded or PendingPlayers[targetSource] or {}).userId
     local name = loaded and loaded.fullName or GetPlayerName(targetSource)
     -- Auto-add note. A note that did not save does not stop the kick; the admin is told.
-    ---@type boolean, string|integer
+    ---@type boolean, string|integer|nil
     local noted, noteId = false, 'no account yet (still connecting)'
     if userId then
         noted, noteId = pcall(MySQL.insert.await,

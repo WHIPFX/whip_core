@@ -5,15 +5,15 @@
 -- The public fields and methods are declared in types/classes.lua; these are the ones whip_core keeps
 -- to itself.
 ---@class WhipPlayer
----@field session number                 this character load's number (IsSessionCurrent)
+---@field session number|nil            this character load's number (IsSessionCurrent); nil on a load-test phantom
 ---@field inventory WhipInventoryCache|nil the pockets; set before the player is in Players (a phantom has none)
 ---@field accountNumber string|nil       the default bank account's number, cached at the load
 ---@field phantom boolean|nil            a load-test stand-in (__TestPhantoms): nothing about it is saved
 ---@field closing boolean|nil            logging out or dropped: the session's events are refused from here on
 ---@field dropped boolean|nil            disconnected
 ---@field _inCreator boolean|nil         in the character creator, until creatorDone
----@field placed boolean                 the ped has arrived where the character was sent (getCoords)
----@field loadedAt number                GetGameTimer() at the load (or the creator's end)
+---@field placed boolean|nil            the ped has arrived where the character was sent (getCoords)
+---@field loadedAt number|nil           GetGameTimer() at the load (or the creator's end); nil on a phantom
 ---@field diedAt number|nil              GetGameTimer() at the death, while dead
 ---@field lifeGen number|nil             counts revivals, so a death timer can tell its life from the next
 ---@field _haveItemDefs boolean|nil      the client already has the item definitions
