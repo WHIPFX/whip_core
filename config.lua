@@ -699,8 +699,9 @@ Config.AtmBadgeOffset = {
 Config.AtmMaxDigits = 9
 
 -- Logs every vehicle storage open (trunk, glovebox, ignition) on both sides, one line per keypress, to find out
--- whether the server refused or the client never sent the request. false silences it.
-Config.LogVehicleStorage = true
+-- whether the server refused or the client never sent the request. Off by default: turn it on while finding out why
+-- a boot, glovebox or ignition will not open.
+Config.LogVehicleStorage = false
 
 Config.VehicleLockRange  = 8.0   -- How far away you can still lock/unlock with L
 
