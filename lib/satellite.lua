@@ -326,7 +326,7 @@ end
 --- wait for the player; anything that reads the database waits for it. That wait lives in
 --- whip_core, and when whip_core stops it is gone with it — the call never returns, and your
 --- handler stays stuck holding whatever it held (a "busy" latch, a half-done flow) until your
---- resource restarts. Called through here, it answers `false, 'whip_core stopped'` instead.
+--- resource restarts. Called through here, it returns `false, 'whip_core stopped'` instead.
 --- `exports.whip_core:Progress(...)` straight gets no such answer. (With `dependency 'whip_core'`
 --- your resource stops with whip_core and starts fresh, so nothing stays stuck either way.)
 ---
@@ -343,8 +343,10 @@ end
 
 --- whip_core's exports, each called through Whip.call: `Whip.core:AddItem(source, 'cookie', 1)` is
 --- `Whip.call('AddItem', source, 'cookie', 1)`. Typed like exports.whip_core (types/satellite.lua), so the editor
---- shows each export's params and answers, where Whip.call('Name') shows none and a misspelt name only answers false.
---- Written with a colon like an export; a dot works too.
+--- shows each export's params and returns, where Whip.call('Name') shows none and a misspelt name only returns false.
+--- Written with a colon like an export; a dot works too. Typed here too, so an editor that has this file open (a
+--- workspace holding whip_core) still underlines a misspelt name.
+---@type WhipCoreServerExports|WhipCoreClientExports
 Whip.core = setmetatable({}, {
     __index = function(proxy, name)
         local fn = function(first, ...)

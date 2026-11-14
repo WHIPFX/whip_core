@@ -4505,6 +4505,11 @@ local function keyPockets(who)
     if not Stores.settle('player:' .. tostring(charId)) then
         return nil, 'Their last save has not landed yet — try again in a moment'
     end
+    -- A charId with no character (never made, or deleted) is said so, not answered as one with no keys.
+    local found, exists = pcall(MySQL.scalar.await,
+        'SELECT 1 FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL', { charId })
+    if not found then return nil, 'The database could not be reached — try again' end
+    if not exists then return nil, 'No such character' end
     local ok, rows = pcall(MySQL.query.await,
         'SELECT `container`, `slot`, `item`, `metadata` FROM `character_inventory` WHERE `charId` = ?', { charId })
     if not ok then return nil, 'The database could not be reached — try again' end

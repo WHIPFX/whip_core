@@ -1701,7 +1701,7 @@ end)</code></pre>
 <h3>Calls you know</h3>
 <table class="event-table">
 <tr><th>QBCore / ESX / ox</th><th>WHIP</th></tr>
-<tr><td><code>GetCoreObject()</code>, <code>getSharedObject()</code></td><td>Nothing to fetch: add <code>dependency 'whip_core'</code> and <code>@whip_core/lib/satellite.lua</code> to the manifest, then call <code>exports.whip_core:…</code></td></tr>
+<tr><td><code>GetCoreObject()</code>, <code>getSharedObject()</code></td><td>Nothing to fetch: add <code>dependency 'whip_core'</code> and <code>@whip_core/lib/satellite.lua</code> to the manifest, then call <code>Whip.core:…</code> inside <code>Whip.register</code> and <code>exports.whip_core:…</code> anywhere else</td></tr>
 <tr><td><code>QBCore.Functions.GetPlayer(src)</code>, <code>ESX.GetPlayerFromId(src)</code></td><td><a href="#getplayer"><code>GetPlayer(source)</code></a>: a plain table with no methods; act through exports</td></tr>
 <tr><td><code>PlayerData.citizenid</code>, <code>xPlayer.identifier</code></td><td><code>player.charId</code> (a number; save this one)</td></tr>
 <tr><td><code>PlayerData.job</code>, <code>xPlayer.job</code></td><td>On duty: <code>GetPlayerJob(source)</code> (<code>nil</code> off duty). Has the job at all: <code>GetPlayerRole(source, 'police')</code></td></tr>
@@ -2243,7 +2243,7 @@ end)
 -- client.lua: sent like any other event
 TriggerServerEvent('mycafe:tip', 20)</code></pre>
 <ul>
-  <li><strong>Declare it in <code>Whip.register</code></strong>, so it survives a whip_core restart (<a href="#quickstart-satellite">Your First Resource, step 3</a>).</li>
+  <li><strong>Declare it in <code>Whip.register</code></strong>, so it survives a whip_core restart (<a href="#quickstart-satellite">Your First Resource, step 3</a>). Later examples show the call alone.</li>
   <li><strong>Start the name with your resource's</strong> and no other resource can take it.</li>
   <li><strong>The handler gets <code>source</code>, <code>player</code>, then your values</strong> in <code>params</code> order. Use this <code>source</code>, not the global. <code>player</code> is a copy of the <a href="#whipplayer">player sheet</a>.</li>
 </ul>
@@ -2320,7 +2320,7 @@ end)</code></pre>
 <pre><code class="lang-lua">local PRICES = { mycafe_coffee = 15, mycafe_muffin = 8 }   -- the server's prices, never the client's
 
 -- server.lua, inside Whip.register
-exports.whip_core:SecureCallback('mycafe:getPrice', {
+Whip.core:SecureCallback('mycafe:getPrice', {
     rateLimit = 500,
     params    = { {'itemKey', 'key', 60} },
 }, function(source, player, itemKey)
@@ -2503,7 +2503,7 @@ if not stock then return exports.whip_core:Notify(why, 'error') end</code></pre>
   <tr><td>def.family</td><td>string</td><td><code>'player'</code> or <code>'entity'</code></td></tr>
   <tr><td>def.truth</td><td>function?</td><td>Required for entity keys: <code>function(entity) → value|nil</code>, run when the key changes. <code>nil</code> removes the key: return it at the default, not <code>{}</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code>. Watches go when your resource stops</div>
-<pre><code class="lang-lua">exports.whip_core:RegisterSentinelKey({ key = 'mygang_tag', family = 'player' })   -- inside Whip.register</code></pre>
+<pre><code class="lang-lua">Whip.core:RegisterSentinelKey({ key = 'mygang_tag', family = 'player' })   -- inside Whip.register</code></pre>
 </div></div>
 
 <div class="export-card" data-search="setsentinelplayerkey getsentineltruth sentinel write read player statebag ledger truth">
@@ -5239,7 +5239,7 @@ Whip.register(function()
 end)
 
 -- server.lua, inside Whip.register
-exports.whip_core:SecureEvent('tow:hookVehicle', {
+Whip.core:SecureEvent('tow:hookVehicle', {
     rateLimit = 2000,
     params = { {'vehicle', 'vehicle', { anyOwner = true, session = true }} },   -- anybody's car, street cars too
     near   = { at = 'vehicle', range = 8.0 },   -- where the car is now
@@ -7253,7 +7253,7 @@ end</code></pre>
 <h3>Declaring your resource's doors</h3>
 <p>A map, MLO or job resource declares its doors with <a href="#server-doors"><code>EnsureDoors</code></a>: the list is your whole set, each door named by a key. Every start, new keys are made, changed ones updated and dropped ones released.</p>
 <pre><code class="lang-lua">-- Server, inside Whip.register
-exports.whip_core:EnsureDoors({
+Whip.core:EnsureDoors({
     { key = 'front', label = 'PD Front Door', folder = 'Mission Row PD',
       model = 631614199, coords = vector4(434.7, -980.6, 30.7, 180.0),
       requirements = { jobs = { 'police', 'ems' }, lockpick = true } },
@@ -7405,7 +7405,7 @@ end)</code></pre>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>doorId</td><td>number|table</td><td>Door id, or <code>{ key = … }</code> for a door you declared</td></tr>
 <tr><td>updates</td><td>table</td><td>Fields to change. Clear requirements with <code>{}</code>, not <code>nil</code></td></tr>
-<tr><td>manager</td><td>table?</td><td>For a door you <a href="#doors-managed">manage</a>: the <code>{ id, key?, label? }</code> you manage it as</td></tr></table>
+<tr><td>manager</td><td>table?</td><td>For a door you <a href="#doors-managed">manage</a>: its set, <code>{ id = 'doors' }</code> (or your <code>opts.id</code>, or <code>'door:&lt;key&gt;'</code>)</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'Door not found'</code>, someone else's managed door, bad fields)</div>
 </div></div>
 
@@ -7442,6 +7442,7 @@ end)</code></pre>
 
 <h3 id="doors-managed">Managed and held doors</h3>
 <p>A <strong>managed</strong> door belongs to one resource, as the doors you declare with <code>EnsureDoors</code> do: the Doors page and other resources can't change its requirements, link or auto-lock. A <strong>held</strong> door is yours only while a job runs.</p>
+<p>A declared door sits in a set: <code>'doors'</code> for <code>EnsureDoors</code> with no <code>opts.id</code>, your <code>opts.id</code> otherwise, and <code>'door:&lt;key&gt;'</code> for one from <code>EnsureDoor</code>. That set is the <code>manager</code> that <code>UpdateDoor</code>, <code>DeleteDoor</code>, <code>LinkDoors</code> and <code>UnlinkDoors</code> take: <code>{ id = 'doors' }</code>. To give a door back, declare its set without it; for one from <code>EnsureDoor</code>, <code>EnsureDoors({}, { id = 'door:&lt;key&gt;' })</code>. It is deleted if it was made for you and restored if you adopted it.</p>
 
 <div class="export-card" data-search="getmanageddoors managed doors list manager">
 <div class="export-header"><span class="export-name">GetManagedDoors(id)</span><span class="export-side side-server">SERVER</span></div>
@@ -10259,7 +10260,7 @@ AddEventHandler('whip_rope:pulledFromHand', function(id, which, resource)
 end)
 
 -- Server, inside Whip.register: drop it at their feet
-exports.whip_core:SecureEvent('mytow:dropLine', { params = { { 'id', 'id', 1, 2147483647 } } }, function(source, player, id)
+Whip.core:SecureEvent('mytow:dropLine', { params = { { 'id', 'id', 1, 2147483647 } } }, function(source, player, id)
     local rope = exports.whip_rope:GetRope(id)
     if not rope or rope.tail.type ~= 'held' or rope.tail.heldBy ~= source then return end   -- theirs to drop
     exports.whip_rope:SetRopeEnd(id, 'tail', { type = 'fixed', pos = GetEntityCoords(GetPlayerPed(source)) })

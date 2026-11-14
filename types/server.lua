@@ -3068,8 +3068,11 @@ function whip_core:GetDoors() end
 ---@async
 function whip_core:CreateDoor(data) end
 
+--- Which of your door sets a door belongs to, for UpdateDoor, DeleteDoor, LinkDoors and UnlinkDoors. A door you
+--- declared is in the set you declared it in: `{ id = 'doors' }` for EnsureDoors with no `opts.id`, `{ id = opts.id }`
+--- with one, and `{ id = 'door:<key>' }` for one from EnsureDoor.
 ---@class WhipDoorManager
----@field id any          which of your things holds the door (a property id, a business id)
+---@field id any          the set: 'doors', your EnsureDoors opts.id, or 'door:<key>' (EnsureDoor)
 ---@field key? string     the door's name within it ('entrance', 'garage')
 ---@field label? string   what the Door Manager shows ("Business #4 · Bean Machine")
 

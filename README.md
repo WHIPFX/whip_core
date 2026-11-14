@@ -96,8 +96,9 @@ there overrides `config.lua` until you reset it. See **Configuration** in `docs.
 ## For developers
 
 Resources built on WHIP (satellites) declare `dependency 'whip_core'`, load
-`shared_script '@whip_core/lib/satellite.lua'`, and call whip_core through its exports:
-`exports.whip_core:AddItem(...)`. Start with these sections of `docs.html`:
+`shared_script '@whip_core/lib/satellite.lua'`, and call whip_core through its exports. Declarations (items, events,
+actions) go in `Whip.register`, through `Whip.core:RegisterItem(...)`, so they come back after a whip_core restart and
+a refusal is printed; anywhere else, `exports.whip_core:AddItem(...)`. Start with these sections of `docs.html`:
 
 | Section | Covers |
 | --- | --- |

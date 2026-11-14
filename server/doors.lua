@@ -2293,7 +2293,7 @@ exports('__ReleaseManagedDoor', function(doorId, manager)
     if not mgr then
         if type(doorId) == 'table' then
             -- One EnsureDoor made sits in its own set, 'door:<key>'.
-            return false, "A declared door is released by taking it off your EnsureDoors list; one from EnsureDoor with __ReleaseManagedDoor(door, { id = 'door:<key>' })"
+            return false, "A declared door is released by declaring its set without it: EnsureDoors(list, { id = setId }); one from EnsureDoor with EnsureDoors({}, { id = 'door:<key>' })"
         end
         return false, '__ReleaseManagedDoor needs the manager that holds the door'
     end
