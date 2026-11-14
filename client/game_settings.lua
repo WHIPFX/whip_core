@@ -68,7 +68,16 @@ local asked = nil             -- the hash of the question GTA is asking now, or 
 local tabs = nil              -- GTA's tabs as read: { index, id, label }
 local labels = {}             -- [tab id] = { [row id] = name }: they do not change while the menu is up
 local options = {}            -- [tab id] = { [row id] = { count, texts } }: a list's options, kept while their count holds
-local unapplied = {}          -- [graphics tab id] = true while it has a change waiting for Apply
+--- [graphics tab id] = { [row id] = true }: graphics changes made here and waiting for Apply. Kept here, not read from
+--- GTA: the "changed" mark GTA shows on such a row is on the row drawn, not on the row's data the page reads.
+local pending = {}
+
+local function anyPending()
+    for _, rows in pairs(pending) do
+        if next(rows) then return true end
+    end
+    return false
+end
 
 -- ============================================
 -- Asking the page
@@ -220,18 +229,19 @@ function close()
     active = false
     gen = gen + 1
     drawn, pressing, asked, tabs = false, nil, nil, nil
-    labels, options, unapplied = {}, {}, {}
+    labels, options, pending = {}, {}, {}
     ControlBlocks.release('gameSettings')
     if IsPauseMenuActive() then SetFrontendActive(false) end
     SendNUIMessage({ action = 'gameSettingsQuestion' })
 end
 
---- A control pressed and let go, with the menu drawn around it: GTA takes some presses as they are let go.
-local function press(control, g)
+--- A control pressed for `holdMs` (100) and let go, with the menu drawn around it: GTA takes some presses as they are
+--- let go.
+local function press(control, g, holdMs)
     drawn = true
     Wait(150)
     pressing = control
-    Wait(100)
+    Wait(holdMs or 100)
     pressing = nil
     Wait(100)
     if stillOpen(g) then drawn = false end
@@ -342,31 +352,30 @@ local function readTab(id, g)
         if what == 'name' then names[r.id] = texts[i] else known[r.id].texts[what] = texts[i] end
     end
 
-    local rows, changed = {}, false
+    local waiting = pending[id] or {}
+    local rows = {}
     for _, r in ipairs(data) do
         local name = names[r.id] or ''
         if name ~= '' then
             local kind = KINDS[r.type] or 'info'
             local opts = known[r.id] and known[r.id].texts or {}
             local row = { id = r.id, label = name, kind = kind, value = r.value,
-                locked = r.state == 0, changed = r.state == 2 }
+                locked = r.state == 0, changed = waiting[r.id] == true }
             if kind == 'slider' then
                 row.max = math.max(1, tonumber(opts[1]) or 10)
             elseif kind == 'list' then
                 row.text = (#opts > 1 and opts[r.value + 1]) or opts[1] or ''
                 if #opts > 1 then row.options = opts end
             end
-            if row.changed then changed = true end
             rows[#rows + 1] = row
         end
     end
-    if GRAPHICS_TABS[id] then unapplied[id] = changed or nil end
     return { id = id, label = tabOf(id).label, graphics = GRAPHICS_TABS[id] == true, rows = rows }
 end
 
 --- What every answer to the page carries: the tab as it is now, and whether graphics changes wait for Apply.
 local function answer(id, g, extra)
-    local st = { tab = readTab(id, g), unapplied = next(unapplied) ~= nil }
+    local st = { tab = readTab(id, g), unapplied = anyPending() }
     if extra then for k, v in pairs(extra) do st[k] = v end end
     return st
 end
@@ -393,21 +402,29 @@ local function focusRow(row, g)
     Wait(100)
 end
 
---- One step left (-1) or right (1) on a row, pressed again if GTA dropped it. Answers whether it moved.
+--- One step left (-1) or right (1) on a row, pressed again if GTA dropped it. Answers whether it moved. A graphics
+--- row that moved waits for Apply.
 local function stepRow(id, rowId, dir, g)
     local row = assert(rowNow(id, rowId, g), 'that setting is gone')
     assert(row.state ~= 0, 'GTA does not let that one change here')
     local max = tonumber((options[id] and options[id][rowId] and options[id][rowId].texts[1]) or '') or 10
     if row.type == 2 and ((dir > 0 and row.value >= max) or (dir < 0 and row.value <= 0)) then return false end
     focusRow(row, g)
+    local function moved()
+        if GRAPHICS_TABS[id] then
+            pending[id] = pending[id] or {}
+            pending[id][rowId] = true
+        end
+        return true
+    end
     for _ = 1, STEP_TRIES do
         press(dir > 0 and KEY.right or KEY.left, g)
         local now = rowNow(id, rowId, g)
-        if not now then return true end
-        if now.value ~= row.value or now.text ~= row.text then return true end
+        if not now then return moved() end
+        if now.value ~= row.value or now.text ~= row.text then return moved() end
         Wait(100)
         now = rowNow(id, rowId, g)
-        if now and (now.value ~= row.value or now.text ~= row.text) then return true end
+        if now and (now.value ~= row.value or now.text ~= row.text) then return moved() end
     end
     return false
 end
@@ -509,39 +526,50 @@ RegisterNUICallback('gameSettingsPress', function(data, cb)
         local row = assert(rowNow(id, assert(rowArg(data), 'no such setting'), g), 'that setting is gone')
         assert(row.state ~= 0, 'GTA does not let that one be used here')
         focusRow(row, g)
-        press(KEY.accept, g)
+        press(KEY.accept, g, 150)
         Wait(200)
         return answer(id, g)
     end))
 end)
 
---- The graphics changes applied, as GTA's Apply does; GTA asks first.
+--- The graphics changes applied, as GTA's Apply (Space) does, on a row that changed. GTA may ask first: its answer
+--- (gameSettingsAnswer) decides; with no question they are applied.
 RegisterNUICallback('gameSettingsApply', function(data, cb)
     cb(job(function(g)
         ensureOpen(g)
         local id = tabArg(data)
-        if not id or not GRAPHICS_TABS[id] then id = next(unapplied) end
+        if not (id and pending[id] and next(pending[id])) then
+            id = nil
+            for tab, rows in pairs(pending) do
+                if next(rows) then id = tab break end
+            end
+        end
         assert(id, 'there is nothing to apply')
         local h = showTab(id, g)
         local row
         for _, r in ipairs(readRows(2, h.rows, g)) do
-            if r.state ~= 0 then row = r break end
+            if pending[id][r.id] then row = r break end
         end
         assert(row, 'there is nothing to apply')
         focusRow(row, g)
-        press(KEY.x, g)
-        Wait(200)
+        press(KEY.x, g, 150)
+        local deadline = GetGameTimer() + 1500
+        while not asked and GetGameTimer() < deadline do Wait(50) end
+        if not asked then pending = {} end
         return answer(id, g)
     end))
 end)
 
---- GTA's question answered: button `index` (1 the first) pressed. Not a job: a job waits for the answer.
+--- GTA's question answered: button `index` (1 the first) pressed. Not a job: a job waits for the answer. Going ahead
+--- (Apply, Keep, OK) or Discard ends the graphics changes waiting; Cancel keeps them waiting.
 RegisterNUICallback('gameSettingsAnswer', function(data, cb)
     cb({})
     if not active or not asked then return end
     local q = QUESTIONS[asked] or UNKNOWN_QUESTION
     local b = q.buttons[math.tointeger(tonumber(type(data) == 'table' and data.index or nil)) or 0]
-    if b then press(b[2], gen) end
+    if not b then return end
+    if b[2] ~= KEY.cancel then pending = {} end
+    press(b[2], gen, 150)
 end)
 
 --- Back to whip's menu, or the pause menu shut: GTA's menu shut with it. A change waiting for Apply is dropped.
