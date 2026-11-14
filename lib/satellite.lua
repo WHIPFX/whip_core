@@ -3,15 +3,19 @@
 --     dependency 'whip_core'
 --     shared_script '@whip_core/lib/satellite.lua'
 --
--- Then, on either side (server or client):
+-- Then, on either side (server or client), declare what your resource adds:
+--
+--     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+--     Whip.declare:RegisterUseHandler('lemonade', drinkLemonade)
+--
+-- or, for more than one call (a loop over your Config, an answer you keep), a function:
 --
 --     Whip.register(function()
---         exports.whip_core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
---         exports.whip_core:RegisterUseHandler('lemonade', drinkLemonade)
+--         for key, def in pairs(Config.Drinks) do exports.whip_core:RegisterItem(key, def) end
 --     end)
 --
--- Your function runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what
--- you registered). It is a file you include, not an export, because the registration list has to live in your
+-- Each runs once whip_core is ready, and again every time whip_core restarts (when it has forgotten what you
+-- registered). It is a file you include, not an export, because the registration list has to live in your
 -- resource's Lua state.
 
 Whip = Whip or {}
@@ -326,8 +330,8 @@ local function runAll(list, what)
 end
 
 --- Run `fn` whenever your registrations are needed: when whip_core becomes ready, and every time
---- it restarts. Put everything you register with whip in here. Safe to run more than once: the
---- same registration again changes nothing.
+--- it restarts. Put everything you register with whip in here (or, one call at a time, through
+--- Whip.declare, below). Safe to run more than once: the same registration again changes nothing.
 ---
 --- Called late — from a thread, after the announcement already went by — `fn` runs straight
 --- away as well, instead of waiting for a whip_core restart that may never come.
@@ -344,6 +348,63 @@ function Whip.register(fn)
     _registerFns[#_registerFns + 1] = fn
     if _heard then runAll({ fn }, 'Whip.register') end
 end
+
+-- ============================================
+-- One declaration at a time: Whip.declare
+-- ============================================
+--
+-- A whip_core export that declares something, called through here, is remembered and made again whenever
+-- whip_core needs it, with no function around it:
+--
+--     Whip.declare:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+--
+-- is the same as
+--
+--     Whip.register(function()
+--         local ok, why = exports.whip_core:RegisterItem('lemonade', { name = 'Lemonade', weight = 0.3 })
+--         if ok == false then print(why) end
+--     end)
+--
+-- Only declarations: whip_core's Register…, Ensure…, On… and Watch… exports, SecureEvent, SecureCallback, AddAction,
+-- AddItemOption, AddPoint and AddWeapons. Anything else (AddItem, CreateShop) would happen again at every whip_core
+-- start, so it is refused, with a line in this console.
+--
+-- THE ARGUMENTS ARE TAKEN ONCE, AS YOU CALL IT, so a function you hand it must be defined above the call. A value
+-- that can change before whip_core is ready or after (a Config value on your settings page, which Whip.configPage
+-- writes in when whip_core is ready) goes in Whip.register, which builds its calls each time it runs. So does a call
+-- whose answer you keep (an AddAction id, a WatchVehicleStat handle): this answers only whether it took the call.
+
+--- Is `name` an export Whip.declare takes? See above.
+---@param name string
+---@return boolean
+local function declares(name)
+    return name:find('^Register') ~= nil or name:find('^Ensure') ~= nil or name:find('^On%u') ~= nil
+        or name:find('^Watch') ~= nil or name == 'SecureEvent' or name == 'SecureCallback' or name == 'AddAction'
+        or name == 'AddItemOption' or name == 'AddPoint' or name == 'AddWeapons'
+end
+
+--- whip_core's declaring exports, each remembered and made again whenever whip_core needs it (see above).
+--- Written with a colon like an export; a dot works too. Answers true when it took the call.
+Whip.declare = setmetatable({}, {
+    __index = function(proxy, name)
+        local fn = function(first, ...)
+            local args = rawequal(first, proxy) and table.pack(...) or table.pack(first, ...)
+            if type(name) ~= 'string' or not declares(name) then
+                print(('[%s] Whip.declare:%s is not a declaration (Register…, Ensure…, On…, Watch…, SecureEvent, '
+                    .. 'SecureCallback, AddAction, AddItemOption, AddPoint, AddWeapons); call it in Whip.register or '
+                    .. 'where it belongs'):format(SELF, tostring(name)))
+                return false
+            end
+            Whip.register(function()
+                local ok, why = Whip.call(name, table.unpack(args, 1, args.n))
+                if ok == false then print(('[%s] Whip.declare:%s: %s'):format(SELF, name, tostring(why))) end
+            end)
+            return true
+        end
+        rawset(proxy, name, fn)
+        return fn
+    end,
+})
 
 --- Run `fn` when whip_core stops. ONLY FOR A RESOURCE WITHOUT `dependency 'whip_core'`: with it (every
 --- whip resource), FiveM stops your resource first when whip_core stops, so this never runs, and your

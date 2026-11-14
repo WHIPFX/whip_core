@@ -13,7 +13,7 @@ version '1.0.0'
 dependency 'whip_core'
 
 shared_scripts {
-    '@whip_core/lib/satellite.lua',   -- whip's helper: gives you Whip.register
+    '@whip_core/lib/satellite.lua',   -- whip's helper: gives you Whip.declare
     'shared.lua',
 }
 server_script 'server.lua'
