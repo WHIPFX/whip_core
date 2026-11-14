@@ -541,6 +541,18 @@ SecureEvent('whip_core:server:pmBan', {
     local user = MySQL.single.await('SELECT * FROM `users` WHERE `userId` = ?', { userId })
     if not user then return end
 
+    -- Nobody bans someone who outranks them. An admin from server.cfg is never banned from the panel: the ban
+    -- would lock the owner out, and only the database would let them back in. Their server.cfg line comes out
+    -- first. Someone given dev tools from the panel is banned only by an admin from server.cfg, never by another
+    -- admin given them the same way.
+    local rank = devtoolsStatus(user, sessionsOf(userId)[1])
+    if rank == 'permanent' then
+        return false, 'They are an admin in server.cfg: take them out of it before banning them'
+    end
+    if rank == 'temporary' and not isPermanentAdmin(source) then
+        return false, 'Only an admin from server.cfg can ban someone who has dev tools'
+    end
+
     local expiresAt = nil
     if durationSeconds > 0 then
         expiresAt = os.date('%Y-%m-%d %H:%M:%S', os.time() + durationSeconds)
