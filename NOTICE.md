@@ -38,8 +38,8 @@ Rockstar's terms for the platform apply (fivem.net/terms).
 - the map files in whip_autos_shop, and the map packs shipped beside WHIP (whip_homes_mirrorpark,
   whip_graphics).
 
-The emote preview videos in whip_media_previews were recorded in the game for WHIP and carry WHIP's logo: what
-they show is still Rockstar's.
+The emote preview videos in whip_media_previews were recorded in the game for WHIP: what they show is still
+Rockstar's.
 
 WHIP is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive.
 
