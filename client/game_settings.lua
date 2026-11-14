@@ -36,22 +36,26 @@ local GRAPHICS_TABS = { [1137] = true, [1138] = true }
 --- A row's kind by GTA's type: 0 something to do (Restore Defaults), 1 a list, 2 a slider. Others are shown only.
 local KINDS = { [0] = 'button', [1] = 'list', [2] = 'slider' }
 
---- GTA's questions whip knows, by the hash of their text's label: a title and buttons, each the key GTA takes for it.
---- Any other is shown as GTA's question with OK and Back.
+--- GTA's questions whip knows, by the hash of their text's label: a title and buttons, each the key GTA takes for it
+--- and `ends` when it ends the graphics changes waiting (applied, discarded or put back). `lapses`: GTA answers it
+--- itself when its time runs out, putting the old settings back. Any other is shown as GTA's question with OK and Back.
 local QUESTIONS = {}
 for _, q in ipairs({
-    { label = 'GFX_WARNING_MP', title = 'Apply graphics changes?', buttons = { { 'Apply', KEY.accept }, { 'Cancel', KEY.cancel } } },
+    { label = 'GFX_WARNING_MP', title = 'Apply graphics changes?',
+      buttons = { { 'Apply', KEY.accept, ends = true }, { 'Cancel', KEY.cancel } } },
     { label = 'GFX_BACK_OUT_BODY', title = 'Graphics changes not applied',
-      buttons = { { 'Apply', KEY.accept }, { 'Discard', KEY.x }, { 'Cancel', KEY.cancel } } },
-    { label = 'GFX_WARNING_BODY', title = 'Keep these display settings?', buttons = { { 'Keep', KEY.accept }, { 'Revert', KEY.cancel } },
+      buttons = { { 'Apply', KEY.accept, ends = true }, { 'Discard', KEY.x, ends = true }, { 'Cancel', KEY.cancel } } },
+    { label = 'GFX_WARNING_BODY', title = 'Keep these display settings?', lapses = true,
+      buttons = { { 'Keep', KEY.accept, ends = true }, { 'Revert', KEY.cancel, ends = true } },
       body = 'GTA goes back to the old display settings by itself in a few seconds unless you keep these.' },
-    { label = 'GFX_RESTART_BODY', title = 'Restart needed', buttons = { { 'Restart the game', KEY.accept }, { 'Not now', KEY.cancel } } },
-    { label = 'GFX_WRITE_FAILED', title = 'Settings not saved', buttons = { { 'OK', KEY.accept } } },
-    { label = 'GFX_NO_APPLY_BODY', title = 'Graphics changes not applied', buttons = { { 'OK', KEY.accept } } },
+    { label = 'GFX_RESTART_BODY', title = 'Restart needed',
+      buttons = { { 'Restart the game', KEY.accept, ends = true }, { 'Not now', KEY.cancel, ends = true } } },
+    { label = 'GFX_WRITE_FAILED', title = 'Settings not saved', buttons = { { 'OK', KEY.accept, ends = true } } },
+    { label = 'GFX_NO_APPLY_BODY', title = 'Graphics changes not applied', buttons = { { 'OK', KEY.accept, ends = true } } },
 }) do
     QUESTIONS[GetHashKey(q.label) & 0xffffffff] = q
 end
-local UNKNOWN_QUESTION = { title = 'GTA is asking', buttons = { { 'OK', KEY.accept }, { 'Back', KEY.cancel } },
+local UNKNOWN_QUESTION = { title = 'GTA is asking', buttons = { { 'OK', KEY.accept, ends = true }, { 'Back', KEY.cancel } },
     body = 'GTA wants an answer before it goes on: OK goes ahead, Back does not.' }
 
 --- GET_WARNING_MESSAGE_TITLE_HASH, by name or, on a client whose Lua lacks it, by hash.
@@ -66,6 +70,7 @@ local drawn = false           -- GTA's menu drawn this frame (a press is on its 
 local pressing = nil          -- the control held down this frame, or nil
 local asked = nil             -- the hash of the question GTA is asking now, or nil
 local answering = false       -- an answer to GTA's question is being pressed: another waits for the next question
+local chosen = nil            -- the answer pressed to the question up: { question, ends }, until that question goes
 local tabs = nil              -- GTA's tabs as read: { index, id, label }
 local labels = {}             -- [tab id] = { [row id] = name }: they do not change while the menu is up
 --- [tab id] = { [row id] = { count, texts, list } }: a row's options (a slider's: its top). A list's are read again after
@@ -82,6 +87,13 @@ local function anyPending()
         if next(rows) then return true end
     end
     return false
+end
+
+--- The graphics changes waiting are over (applied, discarded or put back): none wait, and the graphics lists are read
+--- again, as the settings they ended on can change those lists' choices.
+local function endPending()
+    pending = {}
+    for tab in pairs(GRAPHICS_TABS) do options[tab] = nil end
 end
 
 -- ============================================
@@ -237,6 +249,16 @@ local function sendQuestion(hash)
     SendNUIMessage(msg)
 end
 
+--- GTA's question `hash` gone: answered from the page (`chosen`), or by GTA itself when its time ran out. Either way,
+--- whether the graphics changes waiting are over is the question's to say.
+local function questionGone(hash)
+    local q = QUESTIONS[hash] or UNKNOWN_QUESTION
+    local ends = q.lapses == true
+    if chosen and chosen.question == hash then ends = chosen.ends end
+    chosen = nil
+    if ends then endPending() end
+end
+
 --- One frame while the menu is up: not drawn (bar a press), its cursor hidden, the pad kept off it, the press held, and
 --- GTA's questions watched for. whip's pause menu shutting (Resume, Esc, logging out) shuts it.
 local function frame()
@@ -246,7 +268,9 @@ local function frame()
     Citizen.InvokeNative(0x98215325A695E78A, false)                   -- SET_MOUSE_CURSOR_VISIBLE: whip's page has the mouse
     DisableAllControlActions(FRONTEND)
     if pressing then
-        -- Both groups: GTA's menus read the frontend's, and some of its keys the player's too.
+        -- Both groups: GTA's menus read the frontend's, and some of its keys the player's too. The pad driver
+        -- (client/controller.lua) reads the press as well: the page takes no pad input while an answer is pressed
+        -- (until gameSettingsAnswer answers), and none that changes something while a job runs.
         for _, group in ipairs({ 0, FRONTEND }) do
             EnableControlAction(group, pressing, true)
             SetControlNormal(group, pressing, 1.0)
@@ -254,6 +278,7 @@ local function frame()
     end
     local hash = IsWarningMessageActive() and (warningHash() & 0xffffffff) or nil
     if hash ~= asked then
+        if asked then questionGone(asked) end
         asked = hash
         sendQuestion(hash)
     end
@@ -263,7 +288,7 @@ function close()
     if not active then return end
     active = false
     gen = gen + 1
-    drawn, pressing, asked, tabs, answering = false, nil, nil, nil, false
+    drawn, pressing, asked, tabs, answering, chosen = false, nil, nil, nil, false, nil
     labels, options, pending, rowIndex = {}, {}, {}, {}
     ControlBlocks.release('gameSettings')
     if IsPauseMenuActive() then SetFrontendActive(false) end
@@ -702,8 +727,7 @@ RegisterNUICallback('gameSettingsApply', function(data, cb)
             until asked or not stillOpen(g) or now == 0 or GetGameTimer() > deadline
             if asked then return answer(id, g) end
             if not canTell or now == 0 then
-                pending = {}
-                for tab in pairs(GRAPHICS_TABS) do options[tab] = nil end
+                endPending()
                 return answer(id, g)
             end
         end
@@ -713,24 +737,23 @@ end)
 
 --- GTA's question answered: button `index` (1 the first) of question `id` pressed. Not a job: a job waits for the
 --- answer. Only for the question still up, and one answer at a time: a second press of the same button (a double tap)
---- would otherwise land on GTA's next question. Going ahead (Apply, Keep, OK) or Discard ends the graphics changes
---- waiting; Cancel keeps them waiting.
+--- would otherwise land on GTA's next question. Answered once the press is over, so the page knows when the pad is the
+--- player's again. What the answer does to the graphics changes waiting is said when the question goes (questionGone).
 RegisterNUICallback('gameSettingsAnswer', function(data, cb)
-    cb({})
-    if not active or not asked or answering or type(data) ~= 'table' then return end
-    if math.tointeger(tonumber(data.id)) ~= asked then return end
+    if not active or not asked or answering or type(data) ~= 'table' then return cb({}) end
+    if math.tointeger(tonumber(data.id)) ~= asked then return cb({}) end
     local q = QUESTIONS[asked] or UNKNOWN_QUESTION
     local b = q.buttons[math.tointeger(tonumber(data.index)) or 0]
-    if not b then return end
+    if not b then return cb({}) end
     local was = asked
     answering = true
+    chosen = { question = was, ends = b.ends == true }
     press(b[2], gen, 150)
     Wait(300)
     answering = false
-    if not active then return end
     -- GTA dropped the press: the same question is still up, and the page (which put it away) is shown it again.
-    if asked == was then sendQuestion(was) return end
-    if b[2] ~= KEY.cancel then pending = {} end
+    if active and asked == was then sendQuestion(was) end
+    cb({})
 end)
 
 --- Back to whip's menu, or the pause menu shut: GTA's menu shut with it. A change waiting for Apply is dropped.

@@ -35,6 +35,9 @@ const GRAPHICS = new Set([1137, 1138]);
 const AUDIO = 1022;
 const MINIMAP_GROUP = 'Minimap';
 
+/** Pad and key intents that change something: not taken while a game change is being made (nav). */
+const CHANGES = new Set(['left', 'right', 'select', 'buttonX', 'buttonY']);
+
 /** The rail's icons: one stroke, one size. */
 const ICONS = {
     display: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/>',
@@ -148,6 +151,7 @@ export class SettingsPage {
         this.working = null;         // the game row being changed ('apply', 'undo': those)
         this.question = null;        // up over the page: GTA's question, or the page's own before leaving
         this.questionSel = 0;
+        this.answering = false;      // an answer to GTA's question being pressed: the pad's input is Lua's press, not the player's
         this.confirmReset = false;   // "Reset this tab?" in the head, for a server tab
         this.confirmSel = 1;
         this.drag = null;            // the inspector's slider being dragged: { row, track, value }
@@ -338,6 +342,7 @@ export class SettingsPage {
         this.drag = null;
         this.working = null;
         this.question = null;
+        this.answering = false;
         this.syncPreview();
         nuiCallback('gameSettingsClose', {});
     }
@@ -931,10 +936,12 @@ export class SettingsPage {
             return;
         }
         // GTA's: put away until GTA asks again or is done, so a second tap lands on nothing, never on GTA's next
-        // question. It names the question it answers; Lua shows it again if GTA did not take the press.
+        // question. It names the question it answers; Lua shows it again if GTA did not take the press. The pad reads
+        // Lua's press as well (an A or B the player did not make), so no pad input is taken until it is over.
         this.question = null;
+        this.answering = true;
         this.draw();
-        nuiCallback('gameSettingsAnswer', { index: i + 1, id: q.id });
+        nuiCallback('gameSettingsAnswer', { index: i + 1, id: q.id }).then(() => { this.answering = false; });
     }
 
     // ---- keys and the pad (pause.js hands them over in this mode) ----
@@ -957,6 +964,10 @@ export class SettingsPage {
 
     /** A pad (or key) intent. Answers false for "back" out of the page. */
     nav(n) {
+        // Lua's presses to GTA reach the pad too, as an A, B, X or direction the player did not make: none is taken
+        // while an answer is pressed, and none that changes something while a change is made (bar answering GTA's
+        // question, which the change waits on).
+        if (this.answering) return true;
         if (this.question) {
             const count = this.question.buttons.length;
             if (n === 'left' || n === 'up') { this.questionSel = (this.questionSel + count - 1) % count; this.drawQuestion(); }
@@ -965,6 +976,7 @@ export class SettingsPage {
             else if (n === 'back') this.answer(count - 1);   // the last: Cancel, Revert, Not now, Stay
             return true;
         }
+        if (this.working && CHANGES.has(n)) return true;
         if (this.confirmReset) {
             if (n === 'left' || n === 'right') { this.confirmSel = 1 - this.confirmSel; this.drawHead(); }
             else if (n === 'select') this.answerReset(this.confirmSel);
