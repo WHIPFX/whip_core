@@ -2221,9 +2221,15 @@ function Inventory.take(source, item, amount, reason, only, evenFrozen)
     end
     return ok, err
 end
-exports('RemoveItem', function(source, item, amount, reason)
+--- RemoveItem(source, item, amount?, metadata?, opts?), as AddItem: `metadata` takes only the stacks whose metadata
+--- carries every one of its values (a serial, your job's own package); `opts` is a reason or { reason }.
+exports('RemoveItem', function(source, item, amount, metadata, opts)
+    -- A reason in metadata's place is the old shape: said, not taken as a filter that matches nothing
+    if metadata ~= nil and type(metadata) ~= 'table' then
+        return false, 'metadata is a table or nil: the reason goes in opts (RemoveItem(source, item, amount, nil, { reason = ... }))'
+    end
     -- (Refused while a bank payment holds the pockets: Inventory.take asks.)
-    return Inventory.take(source, item, amount, reason)
+    return Inventory.take(source, item, amount, opts, metadata and Inventory.onlyStamped(metadata) or nil)
 end)
 
 --- Does the player have at least `amount` of this item, anywhere on them?

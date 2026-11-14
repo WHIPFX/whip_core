@@ -316,6 +316,8 @@ function whip_core:SwitchScenario(key, on, why) end
 ---@field bankName string|nil    what its payments are from (nil: its name)
 ---@field payName string         bankName, else name
 ---@field notes string|nil       its personality, for whoever writes it
+---@field picture string|nil     its profile picture's link (one of Config.LorePictureLinks), nil for none
+---@field pictureFrame { x: number, y: number, z: number }|nil  what of the picture shows in a round frame: x, y the point kept in view (0-100, % across and down), z the zoom (1-3); nil: the middle, unzoomed
 ---@field retired boolean        out of the pickers, its records kept
 ---@field accountId number|nil   its bank account (owned by no character), once it has paid someone
 
@@ -361,7 +363,7 @@ function whip_core:GetLoreCharacters(withRetired) end
 function whip_core:PayAsLore(key, who, amount, opts) end
 
 -- ---- The Director API: asking about runs and scenarios (classes in types/director.lua) ----
--- Test runs (a builder's Test) are left out of every answer unless opts.tests is true.
+-- Test runs (a builder's Test) are left out of every result unless opts.tests is true.
 
 --- A run going now, as other resources see it (a copy).
 ---@param runId number
@@ -448,7 +450,7 @@ function whip_core:CheckDirectorScenario(doc) end
 --- -> each outcome ends it), as a Test played by `opts.player`. Its real code runs, but only ever in a
 --- Test: Give hands out what the run's end takes back, Pay only says, Charge charges nothing, and no
 --- script hears of the run. A place field (kind 'world') takes { x, y, z, heading? }. WAITS until it
---- answers (or opts.seconds, 1-120; default its Give up after and 5 more; a longer Give up after is
+--- has an outcome (or opts.seconds, 1-120; default its Give up after and 5 more; a longer Give up after is
 --- shortened to fit). Refused: Check's first problem, Didn't work's reason, no answer in time.
 --- Your code sees card.test = true: keep what it does to card.player then (never page the real police).
 ---@param cardType string   'police.notify'
@@ -462,7 +464,7 @@ function whip_core:TestDirectorCard(cardType, props, opts) end
 --- A whole scenario document run once as a Test for `opts.player`, as the editor's Test runs it, and steered as
 --- the test map is: Give hands out what the run's end takes back, Pay and Charge only say, no script hears of it.
 --- Check must pass (a run that can never succeed is tested all the same). One per player at a time, three of
---- yours at a time. WAITS until it ends, unless opts.wait is false (then it answers at once: steer it with
+--- yours at a time. WAITS until it ends, unless opts.wait is false (then it returns at once: steer it with
 --- SteerDirectorTest, read it with GetDirectorTestResult).
 --- steer: done in order; take and say once their card waits, the rest once their `when` card waits (or at once):
 ---   { op = 'take', node, pin } | { op = 'say', node, option, amount? } | { op = 'event' | 'emit', name, payload?, when? }
@@ -521,21 +523,26 @@ function whip_core:RevokePermission(who, name) end
 ---@async
 function whip_core:GetPermissionHolders(name) end
 
----@param source number
----@param key string
+--- One key of a person's metadata, or all of it with no key. A character who is not playing is read from the
+--- database. nil for nobody.
+---@param who number|{ charId: number } A server id, or a character (online or not)
+---@param key? string
 ---@return any
-function whip_core:GetPlayerMetadata(source, key) end
+---@async
+function whip_core:GetPlayerMetadata(who, key) end
 
 --- Refused (false, reason) for a value the character row cannot store as JSON — a vector3, a
 --- function, NaN. Plain tables, strings, numbers and booleans are fine. Also refused: whip's own keys
 --- (appearance, outfits, creatorPending, walk, mood, whipFlags, moneyHeldOwed, pourRefundOwed, lastSeat).
---- The player's own game receives every value: keep secrets server-side.
----@param source number
+--- The player's own game receives every value: keep secrets server-side. A character who is not playing has
+--- their row written (refused, try again, while they are logging in).
+---@param who number|{ charId: number } A server id, or a character (online or not)
 ---@param key string
 ---@param value any
 ---@return boolean ok
 ---@return string|nil err
-function whip_core:SetPlayerMetadata(source, key, value) end
+---@async
+function whip_core:SetPlayerMetadata(who, key, value) end
 
 ---@param source number
 ---@return vector4|nil
@@ -592,7 +599,7 @@ function whip_core:GetRespawnHold(source) end
 --- handlers, commands and statebag handlers of whip_core and its satellites, in their SecureEvent / SecureCallback
 --- handlers, whip_core's own caught errors ('[whip_core...] ERROR / threw / errored' lines), and red (^1) warnings.
 --- Not an export's error (its caller gets it). The last 200; one repeated is counted. `since`: only those after an
---- earlier answer's `last`.
+--- earlier call's `last`.
 ---@param opts? { since?: number, max?: number }
 ---@return { entries: { seq: number, at: number, side: string, resource: string, kind: 'error'|'warning', text: string, count: number }[], last: number, side: string }
 function whip_core:GetErrorLog(opts) end
@@ -643,7 +650,7 @@ function whip_core:LogoutPlayer(source) end
 function whip_core:IsReady() end
 
 --- Which GTA V this server runs on: server.cfg's `set whip_platform enhanced` on an Enhanced server, else
---- 'legacy'. One whip runs on both: ask here where the two differ (the same answer on the client).
+--- 'legacy'. One whip runs on both: ask here where the two differ (the same result on the client).
 ---@return 'legacy'|'enhanced'
 function whip_core:GetPlatform() end
 
@@ -710,7 +717,7 @@ function whip_core:SecureEvent(eventName, schema, handler) end
 --- registered it has stopped), or 'No answer from the server'.
 ---@param name string Callback name
 ---@param schema WhipSecureSchema Validation schema
----@param handler fun(source: number, player: table, ...: any): ... Every value it returns is the client's answer, as it gave them (`false, 'why'` for a refusal; an error answers `false, 'Server error'`)
+---@param handler fun(source: number, player: table, ...: any): ... Every value it returns is the client's answer, as it gave them (`false, 'why'` for a refusal; an error returns `false, 'Server error'`)
 ---@return boolean ok
 ---@return string? reason
 function whip_core:SecureCallback(name, schema, handler) end
@@ -722,7 +729,7 @@ function whip_core:SecureCallback(name, schema, handler) end
 ---
 --- From YOUR resource, pass the event (or callback) name and the source your handler was given;
 --- without them it lands on the one handler your resource has running, and is refused if there
---- are several. Outside a handler it attaches nothing and answers false.
+--- are several. Outside a handler it attaches nothing and returns false.
 ---@param releaseFn function Called to release the lock
 ---@param eventName? string The name your handler was registered under
 ---@param src? number The source your handler was given
@@ -747,7 +754,7 @@ function whip_core:RecordEventRejection(eventName, src, reason) end
 function whip_core:GetCommandAce(name) end
 
 --- May this player use dev tools now: whip.devtools AND developer mode on (/w). Ask this rather than
---- IsPlayerAceAllowed(src, 'whip.devtools'), which answers yes with developer mode off. A
+--- IsPlayerAceAllowed(src, 'whip.devtools'), which returns true with developer mode off. A
 --- SecureEvent/SecureCallback declaring `ace = 'whip.devtools'` already gets this check.
 ---@param source number
 ---@return boolean
@@ -815,7 +822,7 @@ function whip_core:GetSentinelTruth(src, key) end
 -- ============================================
 
 -- Every bank export has "Bank" in its name. Amounts are whole numbers of 1 or more — anything else
--- answers (false, 'Amount must be a whole number of 1 or more').
+-- returns (false, 'Amount must be a whole number of 1 or more').
 
 ---@alias WhipBankRole 'view'|'deposit'|'withdraw'|'manager'|'owner'  -- each includes those before it
 
@@ -839,7 +846,7 @@ function whip_core:GetDefaultBankAccount(who) end
 
 --- A balance without the database, after the first read: a person's main account (a server id or
 --- { charId = n }), or { accountId = n } for one account. Kept true by every bank write. The first read of
---- each waits; after that it answers at once.
+--- each waits; after that it returns at once.
 ---@param who WhipPersonRef|{ accountId: integer }
 ---@return integer|false balance
 ---@return string|nil why
@@ -881,12 +888,11 @@ function whip_core:CanUseBankAccount(accountId, who, role) end
 --- accounts; their personal account and job accounts don't count.
 ---@param owner WhipPersonRef Who owns it: source, or { charId = n }
 ---@param label? string Account label (default: Config.DefaultAccountLabel)
----@param accountType? 'personal'|'savings'|'business'|'shared' Account type (default: 'personal')
----@param job? number|string The job it belongs to (for job accounts), by jobId or key; one that does not exist is refused
+---@param opts? { type?: 'personal'|'savings'|'business'|'shared', job?: number|string } type default 'personal'; job: the job it belongs to (for job accounts), by jobId or key, one that does not exist refused
 ---@return WhipBankAccount|false account The created account, or false on failure
 ---@return string|nil error Error message if creation failed
 ---@async
-function whip_core:CreateBankAccount(owner, label, accountType, job) end
+function whip_core:CreateBankAccount(owner, label, opts) end
 
 --- Close a bank account. It must be empty and not the character's default.
 ---@param accountId number Account ID
@@ -948,23 +954,23 @@ function whip_core:RevokeBankAccess(accountId, who, revokedBy) end
 ---@param accountId number Target account ID
 ---@param amount number Whole number, 1 or more
 ---@param actor WhipPersonRef Who is depositing (required — the permission is theirs): source, or { charId = n }
----@param reason? string Shown on the statement
+---@param opts? { reason?: string } reason: shown on the statement
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankDeposit(accountId, amount, actor, reason) end
+function whip_core:BankDeposit(accountId, amount, actor, opts) end
 
 --- A PLAYER withdraws: their withdraw permission is checked. BANK MONEY ONLY: no cash is given; for a cash
---- withdrawal, pay the notes with PayPlayer (method 'cash') once this answers true. To charge a player for something,
+--- withdrawal, pay the notes with PayPlayer (method 'cash') once this returns true. To charge a player for something,
 --- use ChargePlayer instead — it handles cash too, and hands back a receipt RefundPlayer can undo.
 ---@param accountId number Target account ID
 ---@param amount number Whole number, 1 or more
 ---@param actor WhipPersonRef Who is withdrawing (required)
----@param reason? string Shown on the statement
+---@param opts? { reason?: string } reason: shown on the statement
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankWithdraw(accountId, amount, actor, reason) end
+function whip_core:BankWithdraw(accountId, amount, actor, opts) end
 
 --- A PLAYER transfers: their withdraw permission on the source account is checked.
 ---@param fromId number Source account ID
@@ -981,31 +987,31 @@ function whip_core:BankTransfer(fromId, toId, amount, actor, reason) end
 --- Written to the activity log with your resource's name.
 ---@param accountId number Target account ID
 ---@param amount number Whole number, 1 or more
----@param reasonOrOpts? string|{ reason?: string, actorCharId?: number } The reason, or both
+---@param opts? { reason?: string, actorCharId?: number }
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankSystemDeposit(accountId, amount, reasonOrOpts) end
+function whip_core:BankSystemDeposit(accountId, amount, opts) end
 
 --- The SYSTEM takes out — a fine, a fee, a bill. No permission check; refused for a frozen account
 --- or one without enough in it. Written to the activity log with your resource's name.
 ---@param accountId number
 ---@param amount number Whole number, 1 or more
----@param reasonOrOpts? string|{ reason?: string, actorCharId?: number }
+---@param opts? { reason?: string, actorCharId?: number }
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankSystemWithdraw(accountId, amount, reasonOrOpts) end
+function whip_core:BankSystemWithdraw(accountId, amount, opts) end
 
 --- The SYSTEM moves money between two accounts — payroll out of a business account.
 ---@param fromId number
 ---@param toId number
 ---@param amount number Whole number, 1 or more
----@param reasonOrOpts? string|{ reason?: string, actorCharId?: number }
+---@param opts? { reason?: string, actorCharId?: number }
 ---@return boolean ok
 ---@return string|nil err
 ---@async
-function whip_core:BankSystemTransfer(fromId, toId, amount, reasonOrOpts) end
+function whip_core:BankSystemTransfer(fromId, toId, amount, opts) end
 
 -- ============================================
 -- Payments (ChargePlayer / RefundPlayer)
@@ -1028,7 +1034,7 @@ function whip_core:BankSystemTransfer(fromId, toId, amount, reasonOrOpts) end
 --- `auto` (the default) takes cash if they carry enough, otherwise the bank. A bank payment uses the
 --- player's own withdraw permission (default account unless `accountId`). `currency` makes a cash
 --- payment in another item (gold bars), refunded in that item. An amount of 0 moves nothing and still
---- answers a receipt.
+--- returns a receipt.
 ---@param source number
 ---@param amount number Whole number, 0 or more
 ---@param opts? { method?: 'cash'|'bank'|'auto', accountId?: number, currency?: string, reason?: string }
@@ -1099,8 +1105,8 @@ function whip_core:GetMoneyHold(id) end
 ---@param who number|{ charId: number } A server id (online), or a character (online or not)
 ---@param amount number Whole number, 0 or more
 ---@param opts? { method?: 'cash'|'bank'|'auto', accountId?: number, currency?: string, reason?: string }
----@return boolean ok
----@return WhipPayResult|string resultOrReason
+---@return WhipPayResult|false result
+---@return string|nil why
 ---@async
 function whip_core:PayPlayer(who, amount, opts) end
 
@@ -1112,7 +1118,7 @@ function whip_core:PayPlayer(who, amount, opts) end
 --   WhipJobRef     a jobId (number) or a key ('police')
 --   WhipPersonRef  a source (a player online), or { charId = n } — any character, online or not
 --   WhipRoleRef    a roleId (number) or a role name ('Manager', any case)
--- and answers a value, or false and a reason in words ('No such job', 'They do not work there', ...).
+-- and returns a value, or false and a reason in words ('No such job', 'They do not work there', ...).
 
 ---@alias WhipJobRef number|string
 ---@alias WhipPersonRef number|{ charId: number }
@@ -1314,7 +1320,7 @@ function whip_core:GetInventory(source) end
 --- Give a player an item, wherever it fits in their pockets.
 ---
 --- If it fits nowhere, the item is DROPPED AT THE PLAYER'S FEET and that still counts as given — the
---- answer is 'ground'. Pass `{ noDrop = true }` to refuse instead. (Config.DropOnFullInventory = false
+--- result is 'ground'. Pass `{ noDrop = true }` to refuse instead. (Config.DropOnFullInventory = false
 --- does the same server-wide.) A mistyped item or a bad amount is REFUSED — (false, 'Unknown item
 --- "x"') — never dropped.
 ---
@@ -1330,15 +1336,19 @@ function whip_core:GetInventory(source) end
 ---@async
 function whip_core:AddItem(source, item, amount, metadata, opts) end
 
---- Remove an item from any container (scans every PlayerContainers entry).
+--- Remove an item from any container (scans every PlayerContainers entry), as AddItem's shape: `metadata` takes
+--- only the stacks whose metadata carries every one of its values.
+---
+---     exports.whip_core:RemoveItem(source, 'repair_kit', 1, nil, { reason = 'repair' })
 ---@param source number Player server ID
 ---@param item string Item key
 ---@param amount? number Amount to remove (default: 1)
----@param reason? string|{ reason: string } For the activity log (see AddItem) — either shape
+---@param metadata? table Only stacks carrying these values ({ serial = 'AB12' })
+---@param opts? string|{ reason: string } For the activity log (see AddItem) — either shape
 ---@return boolean success
 ---@return string|nil error
 ---@async
-function whip_core:RemoveItem(source, item, amount, reason) end
+function whip_core:RemoveItem(source, item, amount, metadata, opts) end
 
 --- Check if player has an item across all containers.
 ---@param source number Player server ID
@@ -1357,7 +1367,7 @@ function whip_core:GetItemCount(source, item) end
 ---
 --- Pass `metadata` when checking room for a SPECIFIC instance that carries contents — a loaded
 --- magazine, a wallet with cash in it. Contents live in metadata, so without it the item is
---- weighed empty and the answer comes back optimistic.
+--- weighed empty and the result comes back optimistic.
 ---@param source number Player server ID
 ---@param item string Item key
 ---@param amount? number Amount (default: 1)
@@ -1514,13 +1524,14 @@ function whip_core:RegisterUseHandler(itemKey, handler) end
 --- into that item instance's own timeline — minting its uid on first touch). Use for
 --- anything a satellite considers admin-timeline-worthy: a Whiplash bay entered, a
 --- radial option used, a minigame won.
+---
+---     exports.whip_core:LogActivity(source, 'whiplash_enter', { detail = 'bay 3' })
 ---@param source number Player server id
 ---@param event string Short event key, e.g. 'whiplash_enter'
----@param detail string|nil Free text shown on the row (truncated to 191)
----@param slotData WhipStoreAddr|WhipInventorySlot|nil The item's ADDRESS ({ kind = 'player', id = source, sub = 'player', slot = 4 }, or any store's). A slot table from GetItemAt is also accepted, but it is a copy, so it can only use a uid the item already has
+---@param opts? { detail?: string, slotData?: WhipStoreAddr|WhipInventorySlot } detail: free text shown on the row (truncated to 191). slotData: the item's ADDRESS ({ kind = 'player', id = source, sub = 'player', slot = 4 }, or any store's); a slot table from GetItemAt is also accepted, but it is a copy, so it can only use a uid the item already has
 ---@return boolean ok, string|nil err
 ---@async
-function whip_core:LogActivity(source, event, detail, slotData) end
+function whip_core:LogActivity(source, event, opts) end
 
 --- Write every activity-log row still owed, now (tests, ops). Rows normally land with the change they
 --- describe; this waits for a write already in flight, and is false if the database refused the rows.
@@ -1615,7 +1626,7 @@ function whip_core:GetVehiclesOf(who) end
 
 --- Where is this vehicle? Three floats, and nothing else — the shape the
 --- `near` schema wants, without four lines of nil checks through GetVehicle.
---- Only a car that is in the world answers; garaged, despawned or lost is nil
+--- Only a car that is in the world has one; garaged, despawned or lost is nil
 --- (a `near` check against it fails). Last seen: GetVehicle(id).coords.
 ---@param vehicleId number|WhipVehicleRef
 ---@return number|nil x  nil when the car is not in the world
@@ -1647,17 +1658,21 @@ function whip_core:SetVehicleLocked(vehicleId, locked) end
 ---@async
 function whip_core:GiveVehicleKey(who, vehicleId) end
 
---- Check if a player has a key for a specific vehicle (scans inventory).
----@param source number Player server ID
+--- Has this person a key for a vehicle (scans their pockets)? A character who is not playing is read from the
+--- database.
+---@param who number|{ charId: number } A server id, or a character (online or not)
 ---@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
 ---@return boolean
----@return string? why  with false when the question could not be asked: 'Player not loaded', a bad reference
-function whip_core:HasVehicleKey(source, vehicleId) end
+---@return string? why  with false when the question could not be asked: no such person, a bad reference
+---@async
+function whip_core:HasVehicleKey(who, vehicleId) end
 
---- Get all vehicle keys a player currently holds.
----@param source number Player server ID
----@return table<number, string> Map of vehicleId to plate
-function whip_core:GetPlayerVehicleKeys(source) end
+--- Every vehicle key a person holds. A character who is not playing is read from the database.
+---@param who number|{ charId: number } A server id, or a character (online or not)
+---@return table<number, string> keys Map of vehicleId to plate
+---@return string|nil why with {} when it could not be read
+---@async
+function whip_core:GetPlayerVehicleKeys(who) end
 
 --- Take on a car already in the world, adopting it as a session vehicle if whip has never seen it.
 --- It never creates a car.
@@ -1751,7 +1766,7 @@ function whip_core:RemoveVehicleKey(who, vehicleId) end
 ---     local plate = exports.whip_core:GetVehicle(vehicleId).plate
 ---
 --- A WHOLE SALE IN ONE CALL: `opts = { giveKey = true, spawnAt = vector4(...) }` also brings the car
---- out there and hands over the key. If either fails the car is deleted again and the answer is
+--- out there and hands over the key. If either fails the car is deleted again and the result is
 --- `(false, reason)`. `vehType` comes from the vehicle catalog when not given. `garage` must name a
 --- garage that exists; left out, the car goes in the default garage. Only spawnAt puts it in the
 --- world: `state = 'out'` without spawnAt is refused, and data.x/y/z are not read. spawnAt is also
@@ -1779,7 +1794,7 @@ function whip_core:CanBringOutVehicleFor(source) end
 --- (20,000 names) and the model is not on it; nothing is refused then.
 --- CreateOwnedVehicle, SpawnTempVehicle and the garages refuse a model the game does not have
 --- (`'There is no vehicle called "x" in this game'`); a seller asks this to leave such cars out of its
---- stock. GetVehicleCatalog's rows carry the same answer as `inGame`.
+--- stock. GetVehicleCatalog's rows carry the same result as `inGame`.
 ---@param model string
 ---@return boolean|nil
 function whip_core:VehicleModelExists(model) end
@@ -1791,7 +1806,7 @@ function whip_core:VehicleModelExists(model) end
 --- runs out (even with somebody driving it), after ten minutes with nobody near it (unless
 --- `idleDespawn = false`), or by DespawnVehicle. Each fires `whip_core:vehicle:released` with a
 --- `reason`. The key it gave is taken back when it goes. If the key cannot be given the car is
---- removed again and the answer is `(false, reason)`.
+--- removed again and the result is `(false, reason)`.
 ---
 --- It spawns locked (`locked = false` for one that stands open). `keyInIgnition = true` puts a key
 --- in its ignition, so anyone in the driver's seat can start it. GetVehicle shows `temp = true`.
@@ -2071,7 +2086,7 @@ function whip_core:DeleteGarage(key) end
 
 --- May this person use this garage? Always true for a public one. A PRIVATE garage — a
 --- property's, keyed 'property:<id>' — is for its owner and keyholders only: its bays are hidden
---- from everyone else, it has no blip, and GetNearestGarage never answers it.
+--- from everyone else, it has no blip, and GetNearestGarage never returns it.
 ---
 ---     if exports.whip_core:CanUseGarage(key, source) then ... end
 ---@param key string
@@ -2274,8 +2289,8 @@ function whip_core:PurgeVehicleStat(name) end
 
 --- Is this player in the DRIVER'S seat of this vehicle?
 ---
---- Three natives, no allocation, no player scan — the cheap answer to the question
---- a hot path actually asks. GetVehicleContext answers it too, but it builds a whole
+--- Three natives, no allocation, no player scan — the cheap way to ask the question
+--- a hot path actually asks. GetVehicleContext returns it too, but it builds a whole
 --- snapshot of the vehicle and walks every player on the server to do it, which is
 --- the right shape for a panel and the wrong shape for something called twice a second.
 ---@param source number
@@ -2331,7 +2346,7 @@ function whip_core:AddVehicleStat(vehicleId, name, delta, changeSource) end
 -- ============================================
 
 --- The whole vehicle catalog, as a copy: model -> { model, displayName, class, hasImage (boolean),
---- image (its URL for a NUI, or false), inGame (VehicleModelExists' answer) }. Filled from
+--- image (its URL for a NUI, or false), inGame (what VehicleModelExists returns) }. Filled from
 --- server/vehicle_catalog_list.lua; a model has a picture when its img/vehicles/<model>.webp is in a media pack.
 ---@return table catalog
 function whip_core:GetVehicleCatalog() end
@@ -2562,7 +2577,7 @@ function whip_core:GetItemAt(addr) end
 ---@async
 function whip_core:SetHeldItem(source, addr) end
 
---- What the player holds: GetItemAt's answer plus `addr`, or nil (nothing held, or it left its slot).
+--- What the player holds: what GetItemAt returns, plus `addr`, or nil (nothing held, or it left its slot).
 ---@param source number
 ---@return { addr: WhipStoreAddr, item: string, amount: number, metadata: table|nil }|nil
 function whip_core:GetHeldItem(source) end
@@ -2877,7 +2892,7 @@ function whip_core:RegisterZone(id, data) end
 function whip_core:RemoveZone(id) end
 
 --- Check if a point is inside a zone (server zone or saved zone, by id or key). A client-made zone
---- answers as its players report it; `trusted = true` answers only from the server's own zones
+--- counts as its players report it; `trusted = true` reads only the server's own zones
 --- (saved, or RegisterZone) — the one to use for anti-cheat.
 ---@param id string Zone id, or a saved zone's key
 ---@param point vector3 Point to test
@@ -2943,11 +2958,11 @@ function whip_core:CommitWithAction(queries, opts) end
 ---@param item string
 ---@param amount integer|nil  default 1
 ---@param metadata table|nil
----@param reason string|nil  for the item log
+---@param opts? string|{ reason?: string }  the reason, for the item log
 ---@return 'now'|'login'|false given
 ---@return string|nil why
 ---@async
-function whip_core:GiveOnLogin(who, item, amount, metadata, reason) end
+function whip_core:GiveOnLogin(who, item, amount, metadata, opts) end
 
 --- Delete a saved zone by key or id. Not one another running resource declares (it would be made
 --- again), and not a server zone (RemoveZone removes your own).
@@ -2974,7 +2989,7 @@ function whip_core:DeleteZone(keyOrId) end
 ---@field doorId number
 ---@field label string
 ---@field folder string|nil
----@field model number         signed, as GetEntityModel answers
+---@field model number         signed, as GetEntityModel returns it
 ---@field x number
 ---@field y number
 ---@field z number
@@ -3043,7 +3058,7 @@ function whip_core:GetDoors() end
 
 --- Create a new door. Always created LOCKED — `data.locked` is not consulted.
 ---
---- `model` is stored SIGNED, the way GetEntityModel answers: an unsigned number (as map packs
+--- `model` is stored SIGNED, the way GetEntityModel returns it: an unsigned number (as map packs
 --- write them) or a model name is converted.
 ---@param data table Door data (model, x, y, z, heading, label, folder, requirements, metadata)
 ---@return WhipDoorDef|false created  false on failure, never nil
@@ -3243,7 +3258,7 @@ function whip_core:RegisterPanelItem(itemKey, config) end
 
 --- Open another player's inventory for inspection/editing (an admin tool, a robbery).
 ---
---- Answers `false, 'why'` and shows nothing itself: tell the admin if you want to.
+--- Returns `false, 'why'` and shows nothing itself: tell the admin if you want to.
 --- Held to the target by default: the viewer must stay within `opts.range` metres (5) of an online
 --- target, and the session closes itself when they leave it, the target goes, or after five
 --- minutes. `{ range = false }` is no limit, for an admin tool.
@@ -3279,7 +3294,7 @@ function whip_core:IsCharacterBeingInspected(charId) end
 ---
 --- `opts.game`: another resource's game instead of the ring (GetSkillCheckGames names them; `difficulty` is then one
 --- of that game's levels). One the player cannot start (whip_phone's: no phone) shows nothing, tells them why
---- (`opts.quiet`: not told), and answers false, 'not started': never a fail.
+--- (`opts.quiet`: not told), and returns false, 'not started': never a fail.
 ---@param source number Player server ID
 ---@param difficulty? WhipSkillDifficulty|string|{ difficulty?: WhipSkillDifficulty|string, game?: string, level?: WhipSkillLevel } Default 'medium'; `{ level }`: the ring with your own numbers, timed from them
 ---@param opts? { timeoutMs?: number, minMs?: number, tag?: string, game?: string, quiet?: boolean }  timeout default: the check's clock + 2 s (run medium/hard from an event, not a callback); minMs must be shorter than the timeout, or the call is refused; `tag` (your run tag): ReleaseTag(tag) ends the check at once ('cancelled') and takes it off their screen, and a released tag is refused ('run ended')
@@ -3325,8 +3340,8 @@ function whip_core:GetSkillCheckSettings() end
 --- `cancelOnExit = true`: work done from a seat. They must be in a vehicle to start ('not in a vehicle'),
 --- getting out of it ends the bar, and a finish from outside it is 'left the vehicle'.
 ---
---- If whip_core restarts mid-bar this export never answers. `Whip.call('Progress', source, opts)`
---- answers `false, 'whip_core stopped'` instead (SkillCheck too).
+--- If whip_core restarts mid-bar this export never returns. `Whip.call('Progress', source, opts)`
+--- returns `false, 'whip_core stopped'` instead (SkillCheck too).
 ---@param source number Player server ID
 ---@param opts WhipProgressOptions|{ near: { coords: vector3|nil, vehicle: number|WhipVehicleRef|nil, range: number }|nil, tag: string|nil } `duration` is required
 ---@return boolean completed
@@ -3335,7 +3350,7 @@ function whip_core:GetSkillCheckSettings() end
 function whip_core:Progress(source, opts) end
 
 --- Somewhere else to ask whip_core's server Yes / No questions (whip_phone registers 'phone'): a question asked for
---- this channel (the Director's job invite) is offered to `deliver` first, which answers true when it showed it;
+--- this channel (the Director's job invite) is offered to `deliver` first, which returns true when it showed it;
 --- otherwise whip_core asks on screen. Answer with AnswerAsk; take the screen down on the local client event
 --- whip_core:ask:cancelled ({ token }). Yours until your resource stops (questions you were still showing are then
 --- asked on screen, the same question); another running resource's name is refused.
@@ -3709,7 +3724,7 @@ function whip_core:IsPlaceableProp(model) end
 --- Add an interaction point from the server: a Talk prompt on an NPC, a hand-in spot. Yours: gone
 --- when your resource stops, removed by ReleaseTag(def.tag). Not saved: add it again when your resource
 --- starts. A field a point does not have (AddAction's onSelect, a misspelt lable) is
---- warned about in the server console and in the third answer; a wrong value is refused.
+--- warned about in the server console and in the third return value; a wrong value is refused.
 ---@param def WhipPointDef
 ---@return number|false pointId
 ---@return string|false reason Why it was refused; false when it went in (not nil: that would cut off the warnings across the export)
@@ -3901,7 +3916,7 @@ function whip_core:GetNpcs(filter) end
 --
 -- One voice resource runs: whip_voice (its own voice server), or another that registers with RegisterVoiceSystem.
 -- A resource that uses voice calls whichever it is through Whip.voice (lib/satellite.lua), never by name.
--- WhipVoiceSystem, what GetVoiceSystem answers, is declared in types/satellite.lua.
+-- WhipVoiceSystem, what GetVoiceSystem returns, is declared in types/satellite.lua.
 
 --- For a VOICE RESOURCE: make yourself the voice system. One at a time: refused while another one runs.
 --- Call it in Whip.register; you are let go when your resource stops.

@@ -6,8 +6,8 @@
 -- '@oxmysql/lib/MySQL.lua' (fxmanifest.lua's server_scripts) makes the MySQL global at run time, and it carries no
 -- annotations of its own; without these the editor took MySQL's shape from dev/director/harness.lua's stand-in, whose
 -- functions take no arguments. Only the calls whip makes are typed in full. The .await forms wait, so call them from a
--- thread or a handler; a failed query raises an error instead of answering nil, and a transaction that fails is rolled
--- back and answers false.
+-- thread or a handler; a failed query raises an error instead of returning nil, and a transaction that fails is rolled
+-- back and returns false.
 
 ---@alias WhipSqlParams table|nil Positional (`?`) values in order, or named (`@name`, `:name`) values by name
 

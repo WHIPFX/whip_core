@@ -796,8 +796,10 @@ end
 --- A slot TABLE (a copy, `{ item, amount, metadata }`) is still accepted. Its uid is used if it has
 --- one, which is correct — that is the real item's uid. If it has none, nothing is minted: a uid put
 --- into a copy belongs to nothing.
-exports('LogActivity', function(source, event, detail, slotData)
+exports('LogActivity', function(source, event, opts)
     if type(event) ~= 'string' or event == '' then return false, 'event name required' end
+    if opts ~= nil and type(opts) ~= 'table' then return false, 'opts is { detail?, slotData? }' end
+    local detail, slotData = opts and opts.detail, opts and opts.slotData
     local player = Players and Players[source]
     local charId = player and player.charId or nil
 

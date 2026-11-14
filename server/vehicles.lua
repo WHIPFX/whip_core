@@ -4484,19 +4484,47 @@ exports('GiveVehicleKey', function(who, vehicleId)
     return true
 end)
 
-exports('HasVehicleKey', function(source, vehicleId)
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end   -- a yes/no read: false, and why
+--- The pockets a person's keys are in: an online player's live ones, or an offline character's keys read from the
+--- database (their pockets are in memory only while they play; only the key items, read and never written).
+--- A table with `inventory`, as Vehicles.playerHasKey takes it, or nil and why.
+---@param who any  a server id, or { charId = n }
+---@return table|nil holder
+---@return string|nil why
+local function keyPockets(who)
+    local charId, src = WhoIs(who)
+    if not charId then return nil, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if player then return player end
+    local ok, rows = pcall(MySQL.query.await,
+        'SELECT `container`, `slot`, `item`, `metadata` FROM `character_inventory` WHERE `charId` = ?', { charId })
+    if not ok then return nil, 'The database could not be reached — try again' end
+    local inventory = {}
+    for _, row in ipairs(rows or {}) do
+        if Inventory.isIgnitionKey(row.item) then
+            inventory[row.container] = inventory[row.container] or {}
+            inventory[row.container][row.slot] = { item = row.item, amount = 1, metadata = Inventory.readMetadata(row.metadata,
+                ('character %s %s slot %s'):format(tostring(charId), tostring(row.container), tostring(row.slot))) }
+        end
+    end
+    return { inventory = inventory }
+end
+
+--- Has this person a key for this car? A server id, or `{ charId = n }` for a character online or not.
+exports('HasVehicleKey', function(who, vehicleId)
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
-    return Vehicles.playerHasKey(player, vehicleId)
+    local holder, why = keyPockets(who)
+    if not holder then return false, why end   -- a yes/no read: false, and why
+    return Vehicles.playerHasKey(holder, vehicleId)
 end)
 
-exports('GetPlayerVehicleKeys', function(source)
-    local player = Players[source]
-    if not player then return {}, 'Player not loaded' end   -- a list read: empty, and why
-    return Vehicles.getPlayerKeys(player)
+--- The cars a person's keys fit: { [vehicleId] = plate }. A server id, or `{ charId = n }`, online or not.
+exports('GetPlayerVehicleKeys', function(who)
+    local holder, why = keyPockets(who)
+    if not holder then return {}, why end   -- a list read: empty, and why
+    return Vehicles.getPlayerKeys(holder)
 end)
 
 --- Find the vehicle wearing this plate, adopting it as a session vehicle if whip has never seen it, for a caller

@@ -122,7 +122,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field player table<number, WhipInventorySlot> Player container slots (1-30)
 ---@field accessory table<number, WhipInventorySlot> Accessory container slots (1-5)
 
---- What FindItem / FindAllItems answer: the item (a copy) and where it is.
+--- What FindItem / FindAllItems return: the item (a copy) and where it is.
 ---@class WhipFoundItem
 ---@field item string Item key
 ---@field amount number Stack count
@@ -459,7 +459,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---
 ---     { id = vehicleId }   { entity = entity }   { plate = 'ABC123' }   { netId = netId }
 ---
---- A vehicle as GetVehicle answers it is a reference too: its `vehicleId` names it.
+--- A vehicle as GetVehicle returns it is a reference too: its `vehicleId` names it.
 ---@class WhipVehicleRef
 ---@field id number|nil The vehicle's whip id
 ---@field vehicleId number|nil The same, as a GetVehicle snapshot carries it
@@ -553,8 +553,8 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field params WhipSecureParam[]|nil Parameter validation rules
 
 ---@class WhipSecureNear
----@field at (fun(source: number, player: table, ...: any): number|vector3|table|nil, number?, number?)|vector3|table|'vehicle' A function answering x, y, z (or a vector3 / {x,y,z}); a fixed vector3 or {x,y,z}; or 'vehicle' — the car named by the schema's 'vehicle' param (seated in it counts as near). NO position REFUSES the call
----@field range number|(fun(): number)|nil Metres (default 5.0), or a function answering them at each call (a range that follows a setting)
+---@field at (fun(source: number, player: table, ...: any): number|vector3|table|nil, number?, number?)|vector3|table|'vehicle' A function returning x, y, z (or a vector3 / {x,y,z}); a fixed vector3 or {x,y,z}; or 'vehicle' — the car named by the schema's 'vehicle' param (seated in it counts as near). NO position REFUSES the call
+---@field range number|(fun(): number)|nil Metres (default 5.0), or a function returning them at each call (a range that follows a setting)
 ---@field message string|false|nil What the player is told when too far (default 'Too far away'); false says nothing
 ---@field allowUnknown boolean|nil Let a call through when `at` finds no position — for a handler that reports an unknown id itself
 
@@ -659,7 +659,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 
 --- RegisterUseHandler(item, THIS) — a timed use whip runs from start to finish: canUse → the bar,
 --- timed by the server → the same item still at addr → the item is taken → onComplete. onComplete
---- answering `false, 'why'` (or erroring) gives it back and shows `why`. A bare `false` ALSO gives it
+--- returning `false, 'why'` (or erroring) gives it back and shows `why`. A bare `false` ALSO gives it
 --- back (a silent refusal, no cooldown) — unlike the function form, where bare `false` is a use that
 --- keeps the item. To keep a tool here, set `consume = false`.
 ---@class WhipTimedUse : WhipProgressOptions
@@ -802,7 +802,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field destroyed boolean|nil true when the player is destroying the item (direction 'out', no other end)
 ---@field items table<number, WhipInventorySlot>|nil onChange: what the panel holds now (a copy)
 
---- What StoreRead answers with. A copy.
+--- What StoreRead returns. A copy.
 ---@class WhipStoreContents
 ---@field kind string
 ---@field id number|string|nil

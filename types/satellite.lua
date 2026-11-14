@@ -31,8 +31,8 @@ function WhipSatellite.register(fn) end
 
 --- Only for a resource WITHOUT `dependency 'whip_core'` (with it, your resource is stopped first and this
 --- never runs). Run `fn` when whip_core stops — to let go of something that only made sense while it ran.
---- Registrations need no cleanup. A handler still waiting in `exports.whip_core:Progress` is never
---- answered, so clear what it holds here — or make that call through Whip.call.
+--- Registrations need no cleanup. A handler still waiting in `exports.whip_core:Progress` never
+--- returns, so clear what it holds here — or make that call through Whip.call.
 ---@param fn fun()
 function WhipSatellite.onCoreLost(fn) end
 
@@ -82,10 +82,10 @@ function WhipSatellite.has(name) end
 ---@return boolean
 function WhipSatellite.versionAtLeast(have, want) end
 
---- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
+--- Call a whip_core export safely. Returns what the export returns, or (false, reason) when
 --- whip_core is not running or the call threw. An export that waits (Progress, SkillCheck, a
---- database read) answers `false, 'whip_core stopped'` if whip_core stops mid-wait; called
---- straight through `exports.whip_core`, it would never answer. `Whip.core:Name(...)` is the same
+--- database read) returns `false, 'whip_core stopped'` if whip_core stops mid-wait; called
+--- straight through `exports.whip_core`, it would never return. `Whip.core:Name(...)` is the same
 --- call with the export's own types.
 ---@param name string The export's name, e.g. 'AddItem'
 ---@param ... any
@@ -93,10 +93,11 @@ function WhipSatellite.versionAtLeast(have, want) end
 function WhipSatellite.call(name, ...) end
 
 --- whip_core's exports, each through Whip.call: `Whip.core:AddItem(source, 'cookie', 1)`. The same params and
---- answers as `exports.whip_core:AddItem`, plus `false, why` when whip_core is not running, the call threw, or
+--- return values as `exports.whip_core:AddItem`, plus `false, why` when whip_core is not running, the call threw, or
 --- whip_core stopped while it waited. Use it everywhere outside a handler whip_core runs (your own threads,
 --- commands, timers, NUI callbacks); inside one (SecureEvent, SecureCallback, a use handler, a right-click
---- action) call exports.whip_core straight. Not for per-frame code: each call is a thread of its own.
+--- action) call exports.whip_core straight. Only an export that can wait (---@async) gets a thread of its own; any
+--- other call goes straight through. Not for per-frame code: every call checks whip_core and is guarded.
 ---@type WhipCoreServerExports|WhipCoreClientExports
 WhipSatellite.core = {}
 
@@ -142,11 +143,11 @@ function WhipSatellite.playerSetting(def) end
 function WhipSatellite.voiceSystem() end
 
 --- Call one of the voice system's exports ('OpenLine', 'CloseLine', 'SetLineSpeaker', 'IsVoiceReady', ...).
---- Answers what the export answers, or false and why: no voice system, or the call threw. A line is yours
+--- Returns what the export returns, or false and why: no voice system, or the call threw. A line is yours
 --- and goes when your resource stops.
 ---@param name string
 ---@param ... any
----@return any answer
+---@return any result
 ---@return string|nil why
 function WhipSatellite.voice(name, ...) end
 
@@ -213,7 +214,7 @@ function WhipDirectorCard:log(fmt, ...) end
 ---@field props? table[]             { key, kind, label, default?, required?, options?, min?, max?, maxLength?, hint?, unit?, lines?, worldKind?, group?, showIf?, button?, add? } (worldKind: a 'world' field's kind of placed thing: 'spot', 'npc', 'vehicle'...; showIf: a bool field's key, shown only while it is on; kind 'entries': a list your Director button `button` (kinds { 'card' }) fills, `add` its words, max 1-12)
 ---@field testSays? string           What a builder's Test says it would do ("{message}" fills in)
 ---@field test? 'run'                It runs in a Test too (card.test: sandbox yourself)
----@field instant? boolean           Answers at once, never waits
+---@field instant? boolean           Returns at once, never waits
 ---@field timeout? number            Seconds before Took Too Long (30)
 ---@field v? number                  Bumped when its fields change
 ---@field permission? string
@@ -429,7 +430,7 @@ function WhipSatellite.removeObjectViewerOption(id) end
 --- BOTH SIDES. A skill check game of yours: what SkillCheck's `{ game = id }` (either side's) and the Director's Skill
 --- Check card play instead of the ring. id '<yours>.<name>'; one call in a file both sides load (each reads its own
 --- fields), or one on each side with the same id. Sent again whenever whip_core restarts; it goes when your resource
---- stops. Someone canStart refuses is told its words, nothing starts, and the check answers false, 'not started'.
+--- stops. Someone canStart refuses is told its words, nothing starts, and the check returns false, 'not started'.
 ---@param id string
 ---@param def WhipSkillCheckGameDef
 ---@return boolean ok  false when it is not a game (printed)
@@ -441,7 +442,7 @@ function WhipSatellite.skillCheckGame(id, def) end
 function WhipSatellite.removeSkillCheckGame(id) end
 
 --- CLIENT. This game's player index for a server id, or nil when that player is not in this game. Never
---- GetPlayerFromServerId's answer alone: it is -1 on Legacy but 0 on Enhanced for a player this game lacks, and 0 can
+--- what GetPlayerFromServerId returns, alone: it is -1 on Legacy but 0 on Enhanced for a player this game lacks, and 0 can
 --- be a real player (often you).
 ---@param serverId number
 ---@return number|nil
@@ -449,7 +450,7 @@ function WhipSatellite.playerIndex(serverId) end
 
 ---@class WhipPadScreen
 local WhipPadScreen = {}
---- Take your NUI focus (no cursor on a pad) and start reading the pad. Answers whether a pad is in the
+--- Take your NUI focus (no cursor on a pad) and start reading the pad. Returns whether a pad is in the
 --- player's hands, for your page's hints.
 ---@return boolean pad
 function WhipPadScreen:open() end

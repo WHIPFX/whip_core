@@ -26,7 +26,7 @@ end
 -- Packages still in their pockets go back when the run ends
 local function takeBackPackages(source)
     local left = exports.whip_core:GetItemCount(source, PACKAGE) or 0
-    if left > 0 then exports.whip_core:RemoveItem(source, PACKAGE, left, 'delivery run ended') end
+    if left > 0 then exports.whip_core:RemoveItem(source, PACKAGE, left, nil, { reason = 'delivery run ended' }) end
 end
 
 local function pickStops(n)
@@ -138,7 +138,7 @@ Whip.register(function()
         if not done then return false, reason end
         if runs[source] ~= run or not exports.whip_core:IsSessionCurrent(source, player.session) then return end
 
-        local taken, terr = exports.whip_core:RemoveItem(source, PACKAGE, 1, 'delivered')
+        local taken, terr = exports.whip_core:RemoveItem(source, PACKAGE, 1, nil, { reason = 'delivered' })
         if not taken then return false, terr end
         run.done = run.done + 1
         exports.whip_core:PayPlayer(source, Config.Pay, { reason = 'Delivery: ' .. stop.label })

@@ -1045,10 +1045,31 @@ function ShowSuccess(source, text, duration)
     return NotifyPlayer(source, text, 'success', duration)
 end
 
-exports('GetPlayerMetadata', function(source, key)
-    local player = Players[source]
-    if not player then return nil end
-    return player:getMetadata(key)
+--- An offline character's metadata, read from their row (it is in memory only while they play), or nil and why.
+---@param charId number
+---@return table|nil metadata
+---@return string|nil why
+local function offlineMetadata(charId)
+    -- The row, not the column alone: a character whose metadata is NULL is still a character.
+    local ok, row = pcall(MySQL.single.await,
+        'SELECT `metadata` FROM `characters` WHERE `charId` = ? AND `deleted` IS NULL', { charId })
+    if not ok then return nil, 'The database could not be reached — try again' end
+    if type(row) ~= 'table' then return nil, 'No such character' end
+    return Character.readJson(row.metadata, ('charId %s metadata'):format(tostring(charId)))
+end
+
+--- A person's metadata, one key or all of it: a server id, or `{ charId = n }` for a character online or not (an
+--- offline one's is read from the database, so this waits). nil for nobody.
+exports('GetPlayerMetadata', function(who, key)
+    local charId, src = WhoIs(who)
+    if not charId then return nil end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if player then return player:getMetadata(key) end
+    local metadata = offlineMetadata(charId)
+    if not metadata then return nil end
+    if key then return metadata[key] end
+    return metadata
 end)
 
 -- whip_core's own keys in a character's metadata, written only by the calls that own them (the creator and
@@ -1060,15 +1081,58 @@ local CORE_METADATA_KEYS = {
     whipFlags = true, moneyHeldOwed = true, pourRefundOwed = true, lastSeat = true,
 }
 
-exports('SetPlayerMetadata', function(source, key, value)
+--- [charId] = true while an offline character's metadata is being written: one write at a time, or the second
+--- would read before the first lands and put the old value back.
+local _offlineMetadataWrite = {}
+
+--- Set one key on a character who is not playing: their row, read and written back. Refused while they are logging
+--- in (the login reads the row, and would keep the old one).
+---@return boolean ok
+---@return string|nil why
+local function setOfflineMetadata(charId, key, value)
+    if value ~= nil and not pcall(json.encode, { v = value }) then
+        return false, ('metadata "%s" cannot be saved (not JSON-encodable — store plain numbers, strings and tables)')
+            :format(key)
+    end
+    if (LoadingCharIds and LoadingCharIds[charId]) or _offlineMetadataWrite[charId] then
+        return false, 'That character is busy right now — try again in a moment'
+    end
+    _offlineMetadataWrite[charId] = true
+    local ok, done, why = pcall(function()
+        local metadata, readWhy = offlineMetadata(charId)
+        if not metadata then return false, readWhy end
+        -- Logged in while it was read: the live sheet is the one to change now.
+        if PlayersByCharId[charId] or (LoadingCharIds and LoadingCharIds[charId]) then
+            return false, 'That character is busy right now — try again in a moment'
+        end
+        metadata[key] = value
+        -- (No count check: a write that changes nothing may count 0 rows.)
+        local wrote = pcall(MySQL.update.await,
+            'UPDATE `characters` SET `metadata` = ? WHERE `charId` = ? AND `deleted` IS NULL',
+            { json.encode(metadata), charId })
+        if not wrote then return false, 'Could not save that (database error)' end
+        return true
+    end)
+    _offlineMetadataWrite[charId] = nil
+    if not ok then return false, tostring(done) end
+    if not done then return false, why end
+    return true
+end
+
+--- Set one key of a person's metadata: a server id, or `{ charId = n }` for a character online or not (an
+--- offline one's row is written, so this waits). Not whip_core's own keys.
+exports('SetPlayerMetadata', function(who, key, value)
     if type(key) ~= 'string' or key == '' then return false, 'a metadata key is a string, such as "myresource_licences"' end
     if CORE_METADATA_KEYS[key] then
         local res = GetInvokingResource() or 'myresource'
         return false, ("metadata '%s' is whip_core's own (it has its own calls): give yours another name, such as '%s_%s'")
             :format(key, res, key)
     end
-    local player = Players[source]
-    if not player then return false, 'Player not loaded' end
+    local charId, src = WhoIs(who)
+    if not charId then return false, src --[[@as string]] end
+    ---@cast src number|nil   -- with a charId, WhoIs's second answer is their source
+    local player = src and Players[src]
+    if not player then return setOfflineMetadata(charId, key, value) end
     local ok, err = player:setMetadata(key, value)
     if not ok then return false, err end
     return true

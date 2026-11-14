@@ -1733,7 +1733,7 @@ end)</code></pre>
 <h3>What will surprise you</h3>
 <ul>
   <li><strong>Declarations go in <code>Whip.register</code></strong>, not straight to whip_core at the top of a file (<a href="#quickstart-satellite">the one rule</a>).</li>
-  <li><strong>"Their job" means on duty.</strong> <code>GetPlayerJob</code> is <code>nil</code> off duty; <code>GetPlayerRole</code> answers "works there at all". Players clock on in the phone's Business app, or your resource calls <code>ClockOn</code>.</li>
+  <li><strong>"Their job" means on duty.</strong> <code>GetPlayerJob</code> is <code>nil</code> off duty; <code>GetPlayerRole</code> is for "works there at all". Players clock on in the phone's Business app, or your resource calls <code>ClockOn</code>.</li>
   <li><strong>Pay with <code>PayPlayer</code>, charge with <code>ChargePlayer</code>.</strong> There is no lower-level cash call.</li>
   <li><strong>A receipt lasts 30 minutes.</strong> After that, give money back with <code>PayPlayer</code>.</li>
   <li><strong>A bar on the player's game is their word.</strong> For anything handed out at the end, use the server's <code>Progress</code> or a timed use.</li>
@@ -1787,7 +1787,7 @@ end)</code></pre>
 <tr><th>Your data</th><th>Put it in</th><th>Saved by</th><th>Visible to</th></tr>
 <tr><td>Items and cash a player carries</td><td>Their pockets: <code>AddItem</code>, <code>PayPlayer</code></td><td>WHIP, with the action</td><td>The player; admins</td></tr>
 <tr><td>Something about one item: a serial, rounds, wear</td><td>Its metadata: <code>SetItemMetadata</code></td><td>WHIP, with the item</td><td>The holder's game too: never a secret</td></tr>
-<tr><td>A fact about a character: a licence, quest progress</td><td><code>SetPlayerFlag</code> or <code>SetPlayerMetadata</code> while they're online; <code>GiveOnLogin</code> or the bank for someone offline</td><td>WHIP, with the character</td><td>Their game too: never a secret</td></tr>
+<tr><td>A fact about a character: a licence, quest progress</td><td><code>SetPlayerFlag</code> while they're online; <code>SetPlayerMetadata</code>, <code>GiveOnLogin</code> or the bank for someone offline too</td><td>WHIP, with the character</td><td>Their game too: never a secret</td></tr>
 <tr><td>Something about a car: a fitted part, a finance flag</td><td><code>SetVehicleData</code>; a gauge (fuel, boost) is a <a href="#registervehiclestat">vehicle stat</a></td><td>WHIP, with the car</td><td>Games near the car, for a stat</td></tr>
 <tr><td>Items kept somewhere new: a mailbox, a vault</td><td>A container (<code>EnsureContainer</code>) or a <a href="#store-kinds">store kind</a> of your own</td><td>WHIP</td><td>Whoever its rules let open it</td></tr>
 <tr><td>Your resource's settings</td><td>A settings page: <code>Whip.configPage</code> (<a href="#resource-settings">Settings pages</a>)</td><td>WHIP, in the database</td><td>Admins edit it in <code>/whip</code>; every game reads it unless the setting says <code>sides = 'server'</code></td></tr>
@@ -1838,15 +1838,15 @@ ok, why = exports.whip_core:CommitWithAction({
 </div></div>
 
 <div class="export-card" id="giveonlogin" data-search="giveonlogin offline give item away login reward owed refund later">
-<div class="export-header"><span class="export-name">GiveOnLogin(who, item, amount?, metadata?, reason?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">GiveOnLogin(who, item, amount?, metadata?, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
   <p>Gives an item to someone who may not be playing: a prize, a refund owed. Online, they get it now, like <code>AddItem</code>. Offline, it's kept in the database and handed over at their next login (at their feet if their pockets are full), logged with your reason.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>who</td><td>number|table</td><td>A server id or <code>{ charId = n }</code></td></tr>
   <tr><td>item</td><td>string</td><td>Item key</td></tr>
-  <tr><td>amount, metadata, reason</td><td>number?, table?, string?</td><td>As for <code>AddItem</code>; the reason goes in the log</td></tr></table>
+  <tr><td>amount, metadata, opts</td><td>number?, table?, table?</td><td>As for <code>AddItem</code>; <code>opts.reason</code> goes in the log</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>'now'</code> or <code>'login'</code>, or <code>false, why</code> (unknown item, bad amount, no such charId)</div>
-<pre><code class="lang-lua">exports.whip_core:GiveOnLogin({ charId = winner }, 'mycafe_voucher', 1, nil, 'raffle prize')</code></pre>
+<pre><code class="lang-lua">exports.whip_core:GiveOnLogin({ charId = winner }, 'mycafe_voucher', 1, nil, { reason = 'raffle prize' })</code></pre>
 </div></div>
 <h2 id="patterns">Return values</h2>
 <p class="lede">Every export follows one rule: <strong>the first value is the result or <code>false</code>; the second is why.</strong> Exports don't throw, and never return <code>nil, 'reason'</code>, because an export's return values are cut off at the first <code>nil</code>.</p>
@@ -1995,7 +1995,7 @@ end)</code></pre>
 <tr><th>Where the call is</th><th>Call</th><th>Why</th></tr>
 <tr><td>Inside a handler whip_core runs: <code>SecureEvent</code>, <code>SecureCallback</code>, a use handler, a right-click action, a hook</td><td><code>exports.whip_core:Name(…)</code></td><td>whip_core is up while it runs, and a payment and what it pays for are written together</td></tr>
 <tr><td>Your own code: <code>Whip.register</code>, a thread, a command, a timer, an NUI callback, your own net event, a key press</td><td><code>Whip.core:Name(…)</code></td><td>whip_core may not be ready yet (early in a start, or while a player's game loads); this returns <code>false, why</code> where a direct call would throw. In <code>Whip.register</code>, a refused declaration is printed</td></tr>
-<tr><td>Code that runs every frame</td><td><code>exports.whip_core:Name(…)</code> behind <code>Whip.isReady()</code>, quick exports only</td><td><code>Whip.core</code> starts a thread per call: too much at 60 a second</td></tr>
+<tr><td>Code that runs every frame</td><td><code>exports.whip_core:Name(…)</code> behind <code>Whip.isReady()</code>, quick exports only</td><td><code>Whip.core</code> checks whip_core and guards every call, and an export that waits (<span class="export-side side-waits">WAITS</span>) gets a thread of its own: too much at 60 a second</td></tr>
 </table>
 <p>A card marked <span class="export-side side-waits">WAITS</span> can wait on the database or the player. Call it from a thread or handler, never at file scope, and afterwards re-read anything that may have changed meanwhile. Your editor shows these as <code>async</code>.</p>
 <h2 id="whip-way">The WHIP way</h2>
@@ -2849,17 +2849,17 @@ end</code></pre>
 
 <h3>Metadata</h3>
 <div class="export-card" data-search="getplayermetadata metadata custom data">
-<div class="export-header"><span class="export-name">GetPlayerMetadata(source, key?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">GetPlayerMetadata(who, key?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>One metadata key, or the whole table.</p>
-  <div class="return-info"><strong>Returns: </strong><code>any</code></div>
+  <p>One metadata key, or the whole table. <code>who</code> is a <a href="#person-refs">person</a>: a character who isn't playing is read from the database.</p>
+  <div class="return-info"><strong>Returns: </strong><code>any</code>; <code>nil</code> for nobody</div>
 </div></div>
 
 <div class="export-card" data-search="setplayermetadata metadata custom data persist">
-<div class="export-header"><span class="export-name">SetPlayerMetadata(source, key, value)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">SetPlayerMetadata(who, key, value)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Writes one key, saved with the character. Prefix yours (<code>'myjob_licences'</code>): the table is shared. WHIP's keys are refused: <code>appearance</code>, <code>outfits</code>, <code>creatorPending</code>, <code>walk</code>, <code>mood</code>, <code>whipFlags</code>, <code>moneyHeldOwed</code>, <code>pourRefundOwed</code>, <code>lastSeat</code>.</p>
-  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code>: a WHIP key, not loaded, or unsaveable (a function, NaN)</div>
+  <p>Writes one key, saved with the character. <code>who</code> is a <a href="#person-refs">person</a>: a character who isn't playing has their row written. Prefix yours (<code>'myjob_licences'</code>): the table is shared. WHIP's keys are refused: <code>appearance</code>, <code>outfits</code>, <code>creatorPending</code>, <code>walk</code>, <code>mood</code>, <code>whipFlags</code>, <code>moneyHeldOwed</code>, <code>pourRefundOwed</code>, <code>lastSeat</code>.</p>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code>: a WHIP key, no such person, unsaveable (a function, NaN), or a character logging in right now (try again)</div>
   <div class="info-box warn"><strong>Metadata isn't secret.</strong> The player's game gets every value: keep codes and cheat flags server-side.</div>
 </div></div>
 
@@ -3470,7 +3470,7 @@ local escortedBy = Player(serverId).state.whipEscortedBy   -- server id of the h
 <pre><code class="lang-lua">-- A fine out of a player's default account
 local account = exports.whip_core:GetDefaultBankAccount(source)
 if account then
-    local ok, why = exports.whip_core:BankSystemWithdraw(account.accountId, 250, 'Speeding fine')
+    local ok, why = exports.whip_core:BankSystemWithdraw(account.accountId, 250, { reason = 'Speeding fine' })
 end</code></pre>
 
 <h3>Good to know</h3>
@@ -3554,7 +3554,7 @@ exports.whip_core:PayPlayer({ charId = 12 }, 250, { method = 'bank', reason = 'W
 <tr><td>opts.accountId</td><td>number?</td><td>Bank: which account (default their default one)</td></tr>
 <tr><td>opts.currency</td><td>string?</td><td>Cash: the item paid (default <code>'cash'</code>)</td></tr>
 <tr><td>opts.reason</td><td>string?</td><td>On the statement and the activity log</td></tr></table>
-<div class="return-info"><strong>Returns: </strong><code>true, { method, amount, currency?, placement?, accountId? }</code> (<code>placement</code>: <code>'inventory'</code> or <code>'ground'</code>), or <code>false, reason</code></div>
+<div class="return-info"><strong>Returns: </strong><code>{ method, amount, currency?, placement?, accountId? }</code> (<code>placement</code>: <code>'inventory'</code> or <code>'ground'</code>), or <code>false, reason</code>: as <code>ChargePlayer</code> returns its receipt</div>
 </div></div>
 
 <h3 id="money-holds">Money holds</h3>
@@ -3672,27 +3672,27 @@ if not holdId then return false, why end
 </div></div>
 
 <div class="export-card" id="bankdeposit" data-search="bankdeposit deposit bank money">
-<div class="export-header"><span class="export-name">BankDeposit(accountId, amount, actor, reason?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">BankDeposit(accountId, amount, actor, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>A player pays into an account. For the system paying in, use <code>BankSystemDeposit</code>.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>accountId</td><td>number</td><td>Bank account ID</td></tr>
 <tr><td>amount</td><td>number</td><td>A whole number, 1 or more</td></tr>
 <tr><td>actor</td><td>number|table</td><td>The <a href="#person-refs">person</a> depositing (required): <code>deposit</code> or higher</td></tr>
-<tr><td>reason</td><td>string?</td><td>Shown on the statement</td></tr></table>
+<tr><td>opts.reason</td><td>string?</td><td>Shown on the statement</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code>; fires <code>whip_core:bank:balanceChanged</code></div>
 <div class="info-box warn"><strong>No cash is taken.</strong> For a cash deposit, first take the notes with <code>ChargePlayer(source, n, { method = 'cash' })</code>, and refund that receipt if the deposit is refused. Otherwise a deposit makes money from nothing.</div>
 </div></div>
 
 <div class="export-card" id="bankwithdraw" data-search="bankwithdraw withdraw bank money">
-<div class="export-header"><span class="export-name">BankWithdraw(accountId, amount, actor, reason?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">BankWithdraw(accountId, amount, actor, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>A player takes money out of an account. To charge for something, use <a href="#chargeplayer"><code>ChargePlayer</code></a> instead.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>accountId</td><td>number</td><td>Bank account ID</td></tr>
 <tr><td>amount</td><td>number</td><td>A whole number, 1 or more</td></tr>
 <tr><td>actor</td><td>number|table</td><td>The <a href="#person-refs">person</a> withdrawing (required): <code>withdraw</code> or higher</td></tr>
-<tr><td>reason</td><td>string?</td><td>Shown on the statement</td></tr></table>
+<tr><td>opts.reason</td><td>string?</td><td>Shown on the statement</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code></div>
 <div class="info-box warn"><strong>No cash is given.</strong> For a cash withdrawal, give the notes with <code>PayPlayer(source, amount, { method = 'cash' })</code> once this returns <code>true</code>. Otherwise the money leaves the account and they get nothing.</div>
 </div></div>
@@ -3714,50 +3714,50 @@ if not holdId then return false, why end
 <p>Your resource decides: no permission check, and the activity log records your resource's name.</p>
 
 <div class="export-card" id="banksystemdeposit" data-search="banksystemdeposit systemdeposit bank deposit system npc shop wage paycheck">
-<div class="export-header"><span class="export-name">BankSystemDeposit(accountId, amount, reasonOrOpts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">BankSystemDeposit(accountId, amount, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Pays into an account: a wage, a sale's takings, a reward.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>accountId</td><td>number</td><td>Target bank account ID</td></tr>
 <tr><td>amount</td><td>number</td><td>A whole number, 1 or more</td></tr>
-<tr><td>reasonOrOpts</td><td>string|table?</td><td>The reason (on the statement), or <code>{ reason, actorCharId }</code> to also record who caused it</td></tr></table>
+<tr><td>opts</td><td>table?</td><td><code>{ reason, actorCharId }</code>: the reason (on the statement), and who caused it</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code></div>
 </div></div>
 
 <div class="export-card" id="banksystemwithdraw" data-search="banksystemwithdraw system withdraw fine fee bill impound">
-<div class="export-header"><span class="export-name">BankSystemWithdraw(accountId, amount, reasonOrOpts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">BankSystemWithdraw(accountId, amount, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Takes money out of an account: a fine, a fee, a bill.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>accountId</td><td>number</td><td>Bank account ID</td></tr>
 <tr><td>amount</td><td>number</td><td>A whole number, 1 or more</td></tr>
-<tr><td>reasonOrOpts</td><td>string|table?</td><td>A reason, or <code>{ reason, actorCharId }</code></td></tr></table>
+<tr><td>opts</td><td>table?</td><td><code>{ reason, actorCharId }</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code>: <code>'Insufficient funds'</code>, <code>'Account is frozen'</code></div>
 </div></div>
 
 <div class="export-card" id="banksystemtransfer" data-search="banksystemtransfer system transfer payroll business">
-<div class="export-header"><span class="export-name">BankSystemTransfer(fromId, toId, amount, reasonOrOpts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">BankSystemTransfer(fromId, toId, amount, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Moves money between two accounts, such as payroll from a job's account (<code>GetJobBankAccounts</code>) to an employee's default one. Otherwise refused as a transfer would be.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>fromId</td><td>number</td><td>Source account</td></tr>
 <tr><td>toId</td><td>number</td><td>Destination account</td></tr>
 <tr><td>amount</td><td>number</td><td>A whole number, 1 or more</td></tr>
-<tr><td>reasonOrOpts</td><td>string|table?</td><td>A reason, or <code>{ reason, actorCharId }</code></td></tr></table>
+<tr><td>opts</td><td>table?</td><td><code>{ reason, actorCharId }</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code></div>
 </div></div>
 
 <h3>Opening, sharing and closing</h3>
 
 <div class="export-card" id="createbankaccount" data-search="createbankaccount createaccount bank account create new">
-<div class="export-header"><span class="export-name">CreateBankAccount(owner, label?, accountType?, job?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">CreateBankAccount(owner, label?, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
 <p>Opens an account at $0. A character may own at most <code>Config.MaxExtraAccounts</code> savings and shared accounts (default 5); personal and job accounts don't count.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>owner</td><td>number|table</td><td>The <a href="#person-refs">person</a> who owns it</td></tr>
 <tr><td>label</td><td>string?</td><td>Display name, 1-50 characters (default <code>Config.DefaultAccountLabel</code>)</td></tr>
-<tr><td>accountType</td><td>string?</td><td><code>'personal'</code> (default), <code>'savings'</code>, <code>'business'</code> or <code>'shared'</code></td></tr>
-<tr><td>job</td><td>number|string?</td><td>A business account's job, by jobId or key; a missing job returns <code>false, 'No such job'</code></td></tr></table>
+<tr><td>opts.type</td><td>string?</td><td><code>'personal'</code> (default), <code>'savings'</code>, <code>'business'</code> or <code>'shared'</code></td></tr>
+<tr><td>opts.job</td><td>number|string?</td><td>A business account's job, by jobId or key; a missing job returns <code>false, 'No such job'</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>table|false, string|nil</code>: the account, or <code>false</code> and why (<code>'A character may have at most 5 savings and shared accounts'</code>...)</div>
 </div></div>
 
@@ -3847,7 +3847,7 @@ if not holdId then return false, why end
 <tr><td><a href="#getitemcount"><code>GetItemCount</code></a></td><td>How many they carry in total</td></tr>
 </table>
 <pre><code class="lang-lua">if not exports.whip_core:HasItem(source, 'lockpick') then return false, 'You need a lockpick' end
-exports.whip_core:RemoveItem(source, 'lockpick', 1, 'snapped')</code></pre>
+exports.whip_core:RemoveItem(source, 'lockpick', 1, nil, { reason = 'snapped' })</code></pre>
 <p>To act on one slot, name it with an <a href="#store-addresses">address</a> and use the <a href="#guide-stores">store calls</a>. You rarely build one: a use handler and <code>FindItem</code> hand you the address of their item.</p>
 
 <h3 id="full-inventory">When an inventory is full</h3>
@@ -4052,14 +4052,15 @@ exports.whip_core:AddItem(source, 'id_card', 1, nil, { pocket = 'accessory', noD
 </div></div>
 
 <div class="export-card" id="removeitem" data-search="removeitem remove item take consume reason log">
-<div class="export-header"><span class="export-name">RemoveItem(source, item, amount, reason)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">RemoveItem(source, item, amount?, metadata?, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Takes an item from the pockets, then the accessory strip. Nothing is taken unless they have the full amount.</p>
+<p>Takes an item from the pockets, then the accessory strip, in <code>AddItem</code>'s shape. Nothing is taken unless they have the full amount.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr>
 <tr><td>amount</td><td>number?</td><td>A whole number, 1 or more (default 1)</td></tr>
-<tr><td>reason</td><td>string|table?</td><td>For the activity log, or <code>{ reason = '...' }</code></td></tr></table>
+<tr><td>metadata</td><td>table?</td><td>Only the stacks whose metadata carries every one of these values (<code>{ serial = 'AB12' }</code>)</td></tr>
+<tr><td>opts</td><td>table?</td><td><code>{ reason = '...' }</code>, for the activity log (a plain reason string works too)</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code>: <code>false, 'Not enough items (have 0, need 1)'</code></div>
 <div class="info-box tip" id="mission-items"><strong>A test's items.</strong> What a Director or Systems test hands out is marked (<code>director</code> or <code>systest</code> in its metadata), may only move within its players' pockets and the test's own cars and containers, and is taken back when the test ends (or at next login). A live Director run marks nothing: <a href="#director-items">its items are real</a>.</div>
 </div></div>
@@ -5431,22 +5432,22 @@ print(v.plate, v.model, v.owner.charId, v.state, v.locked)</code></pre>
 </div></div>
 
 <div class="export-card" data-search="hasvehiclekey playerhasvehiclekey has key vehicle check">
-<div class="export-header"><span class="export-name">HasVehicleKey(source, vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">HasVehicleKey(who, vehicleId)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Whether a player has a key for the vehicle in their inventory.</p>
+  <p>Whether a person has a key for the vehicle in their pockets. A character who isn't playing is read from the database.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
-  <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>bool, string?</code>: <code>false, 'Player not loaded'</code> for someone not in a character</div>
+  <tr><td>who</td><td>number|table</td><td>A <a href="#person-refs">person</a>: a server id, or <code>{ charId = n }</code></td></tr>
+  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>bool, string?</code>: <code>false</code> and why when it couldn't ask (no such person, a bad reference)</div>
 </div></div>
 
 <div class="export-card" data-search="getplayervehiclekeys all keys vehicle">
-<div class="export-header"><span class="export-name">GetPlayerVehicleKeys(source)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">GetPlayerVehicleKeys(who)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Every vehicle key in a player's inventory.</p>
+  <p>Every vehicle key in a person's pockets. A character who isn't playing is read from the database.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
-  <tr><td>source</td><td>number</td><td>Server player ID</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>{ [vehicleId] = plateText }</code>; <code>{}, 'Player not loaded'</code> before they load</div>
+  <tr><td>who</td><td>number|table</td><td>A <a href="#person-refs">person</a>: a server id, or <code>{ charId = n }</code></td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>{ [vehicleId] = plateText }</code>; <code>{}, why</code> for no such person</div>
 </div></div>
 
 <h3>Engine holds</h3>
@@ -9450,20 +9451,20 @@ Whip.playerSetting({
 <h3>Exports</h3>
 
 <div class="export-card" data-search="logactivity activity log timeline history audit item uid">
-<div class="export-header"><span class="export-name">LogActivity(source, event, detail, slotData)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-header"><span class="export-name">LogActivity(source, event, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Writes a row to a player's timeline. Pass an item's <a href="#store-addresses">address</a> as <code>slotData</code> to add the row to that item's own history too, which also gives the item its uid if it has none.</p>
+  <p>Writes a row to a player's timeline. Pass an item's <a href="#store-addresses">address</a> as <code>opts.slotData</code> to add the row to that item's own history too, which also gives the item its uid if it has none.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>source</td><td>number</td><td>Whose timeline</td></tr>
   <tr><td>event</td><td>string</td><td>Short event name. Required</td></tr>
-  <tr><td>detail</td><td>string?</td><td>Free text shown alongside it</td></tr>
-  <tr><td>slotData</td><td>table?</td><td>An address with a slot: <code>{ kind = 'player', id = source, sub = 'player', slot = 4 }</code>, the <code>addr</code> a use handler or <code>FindItem</code> gives you, or any store's (a gun in a stash)</td></tr></table>
+  <tr><td>opts.detail</td><td>string?</td><td>Free text shown alongside it</td></tr>
+  <tr><td>opts.slotData</td><td>table?</td><td>An address with a slot: <code>{ kind = 'player', id = source, sub = 'player', slot = 4 }</code>, the <code>addr</code> a use handler or <code>FindItem</code> gives you, or any store's (a gun in a stash)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (no event name, a wrong address, an empty slot)</div>
 <pre><code class="lang-lua">-- On the player's timeline only
-exports.whip_core:LogActivity(source, 'whiplash_entered', 'Bay 3')
+exports.whip_core:LogActivity(source, 'whiplash_entered', { detail = 'Bay 3' })
 
 -- Inside a use handler: on the player's timeline and the used item's own history
-exports.whip_core:LogActivity(source, 'lockpick_used', 'garage door', addr)</code></pre>
+exports.whip_core:LogActivity(source, 'lockpick_used', { detail = 'garage door', slotData = addr })</code></pre>
   <div class="info-box warn"><strong>Pass the address, not the item.</strong> The table <code>GetItemAt</code> returns is a copy, so a uid given to it belongs to nothing (a copy works only if the item already has a uid). A <code>{ container, slot }</code> table is refused with a reason.</div>
 </div></div>
 
@@ -10694,7 +10695,7 @@ end)</code></pre>
   <tr><td>props[n].kind</td><td>string</td><td><code>text</code> (<code>maxLength</code>, <code>lines</code> 1–6), <code>number</code> or <code>duration</code> (<code>min</code>, <code>max</code>), <code>bool</code>, <code>select</code> (up to 200 <code>options</code>: text, or <code>{ value, label }</code>), <code>world</code> (a placed thing; <code>worldKind</code>: <code>'spot'</code>, <code>'npc'</code>…), <code>item</code>, <code>var</code>, <code>job</code>, <code>players</code>, <code>lore</code>, <code>entries</code></td></tr>
   <tr><td>props[n] of kind entries: button, add, max</td><td>string, string, number</td><td>A list one of your <a href="#director-tasks-buttons">Director buttons</a> fills: <code>button</code> its id (kind <code>'card'</code>), <code>add</code> the words to add one, <code>max</code> 1–12. Each entry is plain data, its <code>text</code> shown on its row</td></tr>
   <tr><td>run</td><td>function(card)?</td><td>Its code; it may wait. Return an outcome, or nothing and answer later with <code>Whip.answerCard</code></td></tr>
-  <tr><td>instant</td><td>boolean?</td><td>It answers at once and never waits</td></tr>
+  <tr><td>instant</td><td>boolean?</td><td>It returns at once and never waits</td></tr>
   <tr><td>timeout</td><td>number?</td><td>Seconds before Took Too Long (30; the builder can change it)</td></tr>
   <tr><td>event</td><td>table?</td><td><code>{ name, match = 'player' | 'run' | 'any', once?, filter? }</code> in place of <code>run</code>: it goes on when you send that event</td></tr>
   <tr><td>fail</td><td>table?</td><td>A Fail Condition, in place of <code>run</code> and <code>outputs</code>: <code>{ event, match?, ends?, reason?, filter? }</code>. It watches the whole run; when you send <code>event</code> about one of its players, the run fails for everyone or that player is taken out. <code>ends</code> (<code>'everyone'</code> or <code>'them'</code>) and <code>reason</code> are the defaults of its When it is broken and Why fields; <code>match</code> defaults to <code>'player'</code>. <code>filter(card, event)</code>: <code>true</code> or the words to tell them breaks it</td></tr>
@@ -10729,7 +10730,7 @@ end)</code></pre>
 <div class="export-body">
   <p>A copy of what the card is doing, with methods into whip_core, refused once the card has finished. Give <code>card.tag</code> to what you make for the run: it goes when the run ends.</p>
   <table class="param-table"><tr><th>Field or method</th><th>Description</th></tr>
-  <tr><td>callId, runId, cardId</td><td>This call, its run, the card. <code>callId</code> answers it later: never send it to a player's game</td></tr>
+  <tr><td>callId, runId, cardId</td><td>This call, its run, the card. <code>Whip.answerCard</code> takes <code>callId</code> to settle it later: never send it to a player's game</td></tr>
   <tr><td>scenario, name, rev, tag, test</td><td>The scenario's key, name and revision; the run's tag; <code>true</code> in a Test</td></tr>
   <tr><td>player, starter, players, trigger</td><td>Who the run acts for now, who started it, its players (server ids), what started it</td></tr>
   <tr><td>props</td><td>The fields as the builder set them. A <code>world</code> field is the placed thing, <code>{ id, kind, label, coords = { x, y, z }, heading }</code> (<code>nil</code> when not placed); a <code>players</code> field a list of server ids</td></tr>
@@ -10767,7 +10768,7 @@ end)</code></pre>
 <div class="export-card" data-search="testdirectorcard test card without editor author">
 <div class="export-header"><span class="export-name">TestDirectorCard(type, props?, opts)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Runs one of your cards once for a player, until it answers, with <code>card.test</code> true.</p>
+  <p>Runs one of your cards once for a player, until it has an outcome, with <code>card.test</code> true.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>type</td><td>string</td><td>One of your own cards</td></tr>
   <tr><td>props</td><td>table?</td><td>Its fields; a place field takes <code>{ x, y, z, heading? }</code></td></tr>
@@ -12002,7 +12003,7 @@ Whip.register(function()
             range = 6.0,
         },
     }, function(source, player, netId)
-        if not exports.whip_core:RemoveItem(source, 'repair_kit', 1, 'repair') then
+        if not exports.whip_core:RemoveItem(source, 'repair_kit', 1, nil, { reason = 'repair' }) then
             return false, 'No repair kit!'          -- shown to the player, logged as refused
         end
         TriggerClientEvent('mechanic:client:repair', source, netId)
@@ -12369,7 +12370,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetPlayerMetadata","GetPlayerVehicleKeys","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HasVehicleKey","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPlayerMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

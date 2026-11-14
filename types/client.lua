@@ -24,7 +24,7 @@ local whip_core = {}
 -- ============================================
 
 --- Call a registered server callback and wait for the result (blocking).
---- Answers the handler's return values — or, when there is none to give, `false, reason`:
+--- Returns the handler's return values — or, when there is none to give, `false, reason`:
 --- refused by whip's checks ('Rate limited', 'Player is dead', 'Too far away', a param's reason),
 --- 'Server error', 'Unknown callback', 'That is no longer available' (its resource has stopped),
 --- or 'No answer from the server' after 10 seconds.
@@ -98,14 +98,14 @@ function whip_core:SetGiveModeStyle(style) end
 
 --- Something is about to go in the player's hands (a phone, a tool): whatever holds them puts it away first — the
 --- 'freeHands' moment, which whip_gunny answers by holstering — and this waits for it. Call from a thread (Whip.call).
---- While the hands are blocked (BlockHands) it answers false and the block's words.
+--- While the hands are blocked (BlockHands) it returns false and the block's words.
 ---@return boolean free  true when no weapon is in the hands after it
 ---@return string? why  the block's words, while blocked
 ---@async
 function whip_core:FreeHands() end
 
 --- Block the player's hands until UnblockHands(id) or your resource stops: everything (the hands emptied at once,
---- FreeHands answering false), or weapons only (`only = 'weapons'`). Every block stops a draw and puts a gun away.
+--- FreeHands returning false), or weapons only (`only = 'weapons'`). Every block stops a draw and puts a gun away.
 --- whip_core:hands:blocked / :unblocked tell everyone.
 ---@param id string
 ---@param opts {label?: string, only?: 'weapons'}|nil
@@ -193,9 +193,9 @@ function whip_core:EnterCharacter(opts) end
 ---@return number|nil charId Nil if not loaded
 function whip_core:GetCharId() end
 
---- Another player's character name, by server id — asked of the server, which answers under
+--- Another player's character name, by server id — asked of the server, which replies under
 --- Config.ShowPlayerNames ('nearby' by default). Names are not on the shared player statebags.
---- From a cache: the first ask for someone answers nil and fetches; `wait = true` waits for it.
+--- From a cache: the first ask for someone returns nil and fetches; `wait = true` waits for it.
 ---@param serverId number
 ---@param wait boolean|nil
 ---@return string|nil name  nil while fetching, too far away, names 'never', or nobody there
@@ -373,7 +373,7 @@ function whip_core:PermitNativeWeapon(weapon, on) end
 
 --- Declare that this resource's own NUI is open or closed. whip then treats your
 --- screen exactly like one of its own: the HUD hides, prompts stop, nothing opens
---- on top — including ANOTHER resource's Input/Confirm/Alert/SkillCheck/Progress, which answer
+--- on top — including ANOTHER resource's Input/Confirm/Alert/SkillCheck/Progress, which return
 --- `false, 'busy'` (your own still open over your own screen). Cleared automatically when your
 --- resource stops.
 ---
@@ -417,7 +417,7 @@ function whip_core:ReleaseCleanScreen(id) end
 --- sprint), with the sprint key left on: holding it is how a player jogs; the cap stops the sprint. The slower of
 --- two blocks wins. `mode = true`: a mode of your own (placing,
 --- aiming, a minigame) — whip's E prompts, hotbar and wheels stand down while it is held (IsGameInputFree
---- answers false), the HUD stays. A block holds from the frame it is made.
+--- returns false), the HUD stays. A block holds from the frame it is made.
 ---
 ---     exports.whip_core:BlockControls('shop', { groups = { 'move', 'combat', 'radio' }, controls = { 75 } })
 ---     exports.whip_core:BlockControls('cursor', { all = true, except = { 30, 31 } })   -- only move the stick
@@ -430,7 +430,7 @@ function whip_core:ReleaseCleanScreen(id) end
 ---@return string? why An unknown group, a bad control id, except without all, or nothing named
 function whip_core:BlockControls(id, spec) end
 
---- Let go of one of your blocks (BlockControls). Answers true when it was not held, too.
+--- Let go of one of your blocks (BlockControls). Returns true when it was not held, too.
 ---@param id string|number
 ---@return boolean ok
 ---@return string? why
@@ -449,7 +449,7 @@ function whip_core:UnblockControls(id) end
 ---@return string? why
 function whip_core:HoldPlayerPed(id, flags) end
 
---- Let go of one of your holds (HoldPlayerPed). Answers true when it was not held, too.
+--- Let go of one of your holds (HoldPlayerPed). Returns true when it was not held, too.
 ---@param id string|number
 ---@return boolean ok
 ---@return string? why
@@ -535,8 +535,8 @@ function whip_core:IsComposerOpen() end
 
 -- ---- The blocking components: the rules they share ----
 --
--- One at a time; a call while another is up answers `false, 'busy'` without showing anything.
--- Every one answers a second value when there is no answer: 'busy' | 'cancelled' | 'timeout', and
+-- One at a time; a call while another is up returns `false, 'busy'` without showing anything.
+-- Every one returns a second value when there is no answer: 'busy' | 'cancelled' | 'timeout', and
 -- 'failed' for a SkillCheck the player missed. They close the inventory first, will not open over
 -- another resource's SetScreenOpen screen ('busy'), and are cancelled when the resource that opened
 -- them stops. Each takes its arguments positionally or as one table.
@@ -558,7 +558,7 @@ function whip_core:IsComposerOpen() end
 ---@async
 function whip_core:Progress(label, duration, opts) end
 
---- Load a model and wait for it — at most `timeoutMs` (default 5000). Answers the hash once loaded,
+--- Load a model and wait for it — at most `timeoutMs` (default 5000). Returns the hash once loaded,
 --- or nil (not a model the game has, or too slow). Release it with SetModelAsNoLongerNeeded. Waits:
 --- call it from a thread.
 ---@param model string|number A name or a hash
@@ -640,7 +640,7 @@ function whip_core:Input(title, fields) end
 ---
 --- Three forms: `SkillCheck(difficulty)`, `SkillCheck({ difficulty })`, and `SkillCheck({ difficulty, game })`, which
 --- plays another resource's game instead (the phone's: 'phone.reroute'; `difficulty` one of its levels). A game whose
---- own canStart says they cannot play it (the phone's: no phone) shows nothing, tells them why, and answers
+--- own canStart says they cannot play it (the phone's: no phone) shows nothing, tells them why, and returns
 --- false, 'not started': never a fail. `SkillCheck({ level = { ... } })` plays the ring with your own numbers instead
 --- of a named difficulty (WhipSkillLevel).
 ---@param difficulty? WhipSkillDifficulty|{ difficulty?: WhipSkillDifficulty|string, game?: string, level?: WhipSkillLevel } Default 'medium'
@@ -897,7 +897,7 @@ function whip_core:IsRadialOpen() end
 ---     })
 ---
 --- A field it does not have, a value of the wrong kind or a number out of range is WARNED about
---- (F8, and the third answer), not refused; `require` is still refused on an unknown word.
+--- (F8, and the third return value), not refused; `require` is still refused on an unknown word.
 ---@param def WhipAction
 ---@return string|false id The id, or false when refused
 ---@return string|false why Why it was refused; false when added (so the warnings get through the export)
@@ -942,7 +942,7 @@ function whip_core:RemoveActionGroup(group) end
 function whip_core:GetAction(id) end
 
 --- The hand goes out towards a point (3D Clanker's press clips), from where the player stands, and straight back as
---- it gets there: only how it looks. Answers AT ONCE (it plays in its own thread), so do the thing itself before or
+--- it gets there: only how it looks. Returns AT ONCE (it plays in its own thread), so do the thing itself before or
 --- right after, never waiting on it; safe inside any callback. It never moves or turns the player or takes control
 --- (every press is a standing one). For a prompt, AddAction's `press = true` does this alongside onSelect.
 ---
@@ -952,7 +952,7 @@ function whip_core:GetAction(id) end
 --- `target`: a point, or { entity, offset?, bone? } (offset in the entity's frame). `opts.normal`: the way the
 --- surface faces (either way round): a press pushing into it is preferred, and the hand comes back where it meets
 --- it. `opts.onContact`: run exactly once for a press that went out, as the hand gets there (or as it ends, if it
---- is cut short on the way); never for false. Answers true (a press is going out), or false, why: 'off' (none:
+--- is cut short on the way); never for false. Returns true (a press is going out), or false, why: 'off' (none:
 --- off, not installed, too far, seated, already against the surface), 'busy' (one is going out), 'dead'.
 ---@param target vector3|table
 ---@param opts? { normal?: vector3, onContact?: function }
@@ -1004,7 +1004,7 @@ function whip_core:HasVehicleKey(vehicleId) end
 ---
 --- Client view: live damage, colours, lock and engine state, and EVERY occupant including ambient
 --- peds — which the server cannot see. It cannot see ownership or the garage. Returns nil when the
---- vehicle is not streamed in here, which is a real answer rather than an error.
+--- vehicle is not streamed in here, which is a real result rather than an error.
 ---
 --- Named to match the server's GetVehicle, so one word means one thing on both sides. Takes a
 --- vehicleId or a vehicle reference (`{ entity = }`, `{ plate = }`, `{ netId = }`, `{ id = }`). Only
@@ -1391,7 +1391,7 @@ exports.whip_core = whip_core
 --- Never a guess: the two ranges overlap, so a despawned car's handle could answer for another car.
 ---
 --- Falls back to the stat's REGISTERED DEFAULT when the vehicle carries no value of
---- its own, so this answers the same number the server's GetVehicleStat answers.
+--- its own, so this returns the same number the server's GetVehicleStat returns.
 ---
 --- "Is one fitted?" is NOT `> 0`: an absent stat reads as its default, so with a default
 --- above zero every car says yes. Ask HasVehicleStat, just below.
@@ -1658,7 +1658,7 @@ function whip_core:SetVehicleStatDisplay(name, fn) end
 ---@return string? reason
 function whip_core:ClearVehicleStatDisplay(name) end
 
---- Whether a stat's gauge is drawn on a car at all: `fn(entity)` answers false to hide it there (whip_fuel: no
+--- Whether a stat's gauge is drawn on a car at all: `fn(entity)` returns false to hide it there (whip_fuel: no
 --- fuel gauge on an electric car). Asked as the capsule repaints, for the car this player sits in; the stat itself
 --- is untouched. One rule a stat, its setter's; dropped when that resource stops.
 ---@param name string Stat name
@@ -1667,7 +1667,7 @@ function whip_core:ClearVehicleStatDisplay(name) end
 ---@return string? reason
 function whip_core:SetVehicleStatShown(name, fn) end
 
---- A stat's gauge icon by the car: `fn(entity)` answers the icon to draw on that car, or nil for the stat's own
+--- A stat's gauge icon by the car: `fn(entity)` returns the icon to draw on that car, or nil for the stat's own
 --- (whip_fuel: the pump with an arrow to the side the filler is on). An icon is a dial glyph ('fuel', 'fuel_left',
 --- 'fuel_right', 'turbo', 'nitro', 'coolant', 'hack', 'weapon') or an SVG path in a 24x24 viewBox. Asked for the car
 --- this player sits in, at most once a second. One rule a stat, its setter's; dropped when that resource stops.
@@ -1886,7 +1886,7 @@ function whip_core:KeyHint(keyText, button) end
 -- The list of emotes, walk styles and moods is whip_core/shared/emote_list.lua. Players use /e,
 -- /walk, /mood and the F3 menu; these are for a resource that wants to do the same from code.
 
---- Play an emote on the player by its /e name (e.g. 'drink'). Answers true, or false and why
+--- Play an emote on the player by its /e name (e.g. 'drink'). Returns true, or false and why
 --- (no such emote, dead, in a vehicle, a progress bar running, a weapon out...). Returns at once;
 --- the emote starts a moment later, once its animation has loaded.
 ---@param cmd string
@@ -1894,7 +1894,7 @@ function whip_core:KeyHint(keyText, button) end
 ---@return string? why
 function whip_core:PlayEmote(cmd) end
 
---- Stop the emote the player is doing, and put away its props. Answers whether there was one.
+--- Stop the emote the player is doing, and put away its props. Returns whether there was one.
 ---@return boolean stopped
 function whip_core:CancelEmote() end
 
@@ -1942,7 +1942,7 @@ function whip_core:ReadScreen(opts) end
 --- Press one control on whip_core's screens the way a mouse would, at its middle, so the screen's own
 --- handlers run (developer mode only). `target`: an id from the last ReadScreen, or its words (exact, then
 --- starts with, then contains), narrowed by `near` (the heading above it or its row's words), `kind`, or
---- `index` (the nth match). Several matches and no index: answers `{ ambiguous = { {id, label, near, row} } }`
+--- `index` (the nth match). Several matches and no index: returns `{ ambiguous = { {id, label, near, row} } }`
 --- instead of guessing. `opts.text` types into a field instead (`enter` presses Enter after); `opts.choose`
 --- picks a list's choice by its words. A screen that changed since the read: its ids are gone, read again.
 --- `target.page`: another resource's page (a key of ReadScreen's `pages`), its ids from that page's read.
@@ -1962,11 +1962,11 @@ function whip_core:PressScreen(target, opts) end
 --- as it looks at that moment (not other resources' pages, such as the phone). Yields until the shot is made (up to
 --- 15 s). `frames` (2-24) + `every` (ms, 33-1000): a burst, that many frames one after another in one picture (a
 --- grid, each frame numbered with when it was read; 640 wide a frame unless asked; no ui). `upload`: posted to that
---- address (a helper on this PC) as a file in a form instead, and its answer's text comes back in place of the data.
+--- address (a helper on this PC) as a file in a form instead, and its reply's text comes back in place of the data.
 ---
 ---     local png = exports.whip_core:TakeScreenshot({ format = 'png', ui = true })
 ---@param opts? { format?: 'jpg'|'png'|'webp', quality?: number, width?: number, height?: number, ui?: boolean, frames?: number, every?: number, upload?: { url: string, field?: string } }
----@return string|false data  a data URL (or the upload's answer)
+---@return string|false data  a data URL (or the upload's reply)
 ---@return string|nil why
 ---@async
 function whip_core:TakeScreenshot(opts) end
@@ -1981,7 +1981,7 @@ function whip_core:MeasureFrames(opts) end
 --- handlers, NUI callbacks, commands and statebag handlers of whip_core and its satellites, whip_core's own caught
 --- errors ('[whip_core...] ERROR / threw / errored' lines), red (^1) warnings, and the errors of whip_core's page and
 --- of satellite pages that load js/page-tools.js, which otherwise reach only F8. Not an export's error (its caller
---- gets it). The last 200; one repeated is counted. `since`: only those after an earlier answer's `last`.
+--- gets it). The last 200; one repeated is counted. `since`: only those after an earlier call's `last`.
 ---@param opts? { since?: number, max?: number }
 ---@return { entries: { seq: number, at: number, side: string, resource: string, kind: 'error'|'warning'|'page', text: string, count: number }[], last: number, side: string }
 function whip_core:GetErrorLog(opts) end

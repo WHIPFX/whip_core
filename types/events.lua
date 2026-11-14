@@ -345,7 +345,7 @@
 ---@field interiorId number|nil the interior copy it was made on
 ---@field count number|nil furnished only
 
---- C  whip_core:property:furnishStateChanged — its GetInteriorFurnishState answer changed. New.
+--- C  whip_core:property:furnishStateChanged — what its GetInteriorFurnishState returns changed. New.
 ---@class WhipEvtPropertyFurnishState
 ---@field propertyId number
 ---@field interiorId number|nil the copy whip last found ready; nil before that
@@ -380,7 +380,7 @@
 
 --- C  whip_core:job:listChanged — the local player's job list changed (hired, fired, promoted, renamed).
 ---@class WhipEvtJobList
----@field jobs table<number, WhipPlayerJobInfo> What GetPlayerJobs answers
+---@field jobs table<number, WhipPlayerJobInfo> What GetPlayerJobs returns
 
 -- ============================================
 -- NPCs (server/npcs.lua)
@@ -491,7 +491,7 @@
 --- A phone resource gives each one a number on it. New.
 ---@class WhipEvtLoreChanged
 ---@field key string
----@field character table|nil  GetLoreCharacter's answer: { key, name, model, bankName, payName, notes, retired, accountId }
+---@field character table|nil  what GetLoreCharacter returns: { key, name, model, bankName, payName, notes, retired, accountId }
 ---@field retired boolean      retired (out of the pickers, records kept), or gone
 
 -- ============================================
