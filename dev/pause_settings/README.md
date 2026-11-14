@@ -2,9 +2,10 @@
 
 `stream/scaleform/pause_menu_pages_settings.gfx` (and the same file in `stream_enhanced/scaleform/`) is GTA V's own
 settings page with whip's questions added, so the pause menu's Settings page (`client/game_settings.lua`,
-`html/js/game-settings.js`) can read GTA's settings and change them through GTA. The source of the change is
+`html/js/settings-page.js`) can read GTA's settings and change them through GTA. The source of the change is
 `PAUSE_MENU_PAGES_SETTINGS.as` here: GTA's class for that page, decompiled, with `getColumn` and the `whip*`
-functions added. Nothing else in the file is changed, and GTA's own settings menu works as before.
+functions added, and one line at the end of `setupPage` that keeps GTA's video memory bar for whip. Nothing else in the
+file is changed, and GTA's own settings menu works as before.
 
 Legacy and Enhanced have the same file, byte for byte (game build 3889), so one build serves both.
 
