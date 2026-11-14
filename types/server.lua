@@ -4213,6 +4213,31 @@ function whip_core:RegisterVoiceSystem(info) end
 function whip_core:GetVoiceSystem() end
 
 -- ============================================
+-- Update checks (server/updates.lua)
+-- ============================================
+-- A resource takes part by naming its GitHub repository in its fxmanifest.lua: whip_updates 'owner/repo'.
+
+---@class WhipUpdateStatus
+---@field resource string
+---@field repository string 'owner/repo'
+---@field current string|nil The resource's own `version`
+---@field latest string|nil The latest release's tag, once GitHub has answered
+---@field url string|nil That release's page
+---@field newer boolean Whether `latest` is newer than `current`
+---@field checkedAt integer|nil When GitHub last answered (os.time())
+---@field problem string|nil Why there is no answer: a private repository, no release, GitHub's limit...
+
+--- A resource's update status: its own when `resource` is left out. From whip_core's last check (every 12 hours),
+--- so it costs nothing to call. nil when the resource names no repository.
+---@param resource string|nil
+---@return WhipUpdateStatus|nil
+function whip_core:GetUpdate(resource) end
+
+--- Every running resource that names a repository, with its update status.
+---@return WhipUpdateStatus[]
+function whip_core:GetUpdates() end
+
+-- ============================================
 -- Export binding
 -- ============================================
 

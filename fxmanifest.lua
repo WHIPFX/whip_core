@@ -5,6 +5,8 @@ name 'whip_core'
 author 'Whippy'
 description 'Custom FiveM framework — Beta 1.1.0 public release'
 version '1.1.0'   -- the start-up banner reads it
+-- Where its releases are: the update check (server/updates.lua) compares the latest one with `version`.
+whip_updates 'WHIPFX/whip_core'
 
 -- First on both sides: while whip_core loads, GetInvokingResource() names no caller.
 shared_script 'shared/invoker.lua'
@@ -240,6 +242,8 @@ server_scripts {
     -- After devtools_base.lua: it shares DevTools.viewers.
     'server/vehicle_manager.lua',
     'server/object_viewer.lua',
+    -- After devtools_base.lua (DevTools.onModeChange), before setup_report.lua (its lines).
+    'server/updates.lua',
     'server/setup_report.lua',
     'lib/cost.lua',
     'server/whipcost.lua',

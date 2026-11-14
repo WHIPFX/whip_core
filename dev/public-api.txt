@@ -47,6 +47,7 @@ client:GetEffects
 client:GetErrorLog
 client:GetEscortTarget
 client:GetGarageHelperStatus
+client:GetHeldItem
 client:GetInteriorFurnishState
 client:GetInventory
 client:GetItemCount
@@ -517,6 +518,8 @@ server:GetStat
 server:GetStoredVehicleStats
 server:GetTime
 server:GetTimeScale
+server:GetUpdate
+server:GetUpdates
 server:GetVehicle
 server:GetVehicleBy
 server:GetVehicleCatalog

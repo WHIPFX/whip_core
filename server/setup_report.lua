@@ -171,6 +171,9 @@ local function gather()
     if #homes > 0 then add('ok', 'Property packs: %s', table.concat(homes, ', ')) end
     if #idle > 0 then add('note', 'In the resources folder, not started: %s', table.concat(idle, ', ')) end
 
+    -- Newer releases on GitHub (server/updates.lua), from its last answers: the first check runs after this report.
+    if Updates then Updates.reportLines(add) end
+
     -- What whip each resource says it needs (whip_requires '1.2' in its fxmanifest.lua).
     local coreVersion = versionOf(GetCurrentResourceName()) or '0'
     for _, res in ipairs(allResources()) do
