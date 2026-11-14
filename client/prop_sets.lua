@@ -146,6 +146,7 @@ end
 
 local placeMoving   -- defined below
 local watchAttached -- defined below
+local parentOf, ride -- defined below, with the attached props
 
 local function spawn(p)
     local key = p.key
@@ -168,7 +169,13 @@ local function spawn(p)
     if p.dd then SetEntityLodDist(obj, p.dd) end
     SetEntityAsMissionEntity(obj, true, true)
     ents[key] = obj
-    if p.att then watchAttached() end
+    if p.att then
+        -- On its parent at once, as it is made: left for the watch's next look (up to 250 ms), it stood frozen and solid
+        -- where it was made, in a moving car's way (WLVF's second review).
+        local parent = parentOf(p.att)
+        if parent and parent ~= obj then ride(obj, parent, p.att) end
+        watchAttached()
+    end
     placeMoving(key)
     if p.interior then
         local f = { made = interiorAt(p), tries = 0, next = 0 }
@@ -581,7 +588,7 @@ end
 
 local attachOn = false
 
-local function parentOf(att)
+parentOf = function(att)
     if att.net then
         if not NetworkDoesNetworkIdExist(att.net) then return nil end
         local e = NetworkGetEntityFromNetworkId(att.net)
@@ -591,18 +598,32 @@ local function parentOf(att)
     return e and DoesEntityExist(e) and e or nil
 end
 
+--- A made piece on its parent, riding it (not frozen: it moves with it).
+ride = function(obj, parent, a)
+    FreezeEntityPosition(obj, false)
+    AttachEntityToEntity(obj, parent, 0, a.x + 0.0, a.y + 0.0, a.z + 0.0, a.rx + 0.0, a.ry + 0.0, a.rz + 0.0,
+        false, false, false, false, 2, true)
+end
+
+--- Where a piece riding `parent` is in the world now: its own spot on it (never the parent's middle, inside it).
+local function spotOn(parent, a)
+    return GetOffsetFromEntityInWorldCoords(parent, a.x + 0.0, a.y + 0.0, a.z + 0.0)
+end
+
 --- Before each streaming pass: a piece riding a networked car or NPC is measured from where its parent is NOW,
 --- whether or not this game has made it. (Its spot followed the parent only while made — watchAttached below — so a
 --- speaker on a car that drove more than RANGE away was taken away and kept the spot where it was left: when the car
 --- came back it was never made again, and a game never near where it was put down never made it at all. 14 Nov 2026.)
---- A parent this game does not have (out of its scope) leaves the spot where it was last seen.
+--- A parent this game does not have (gone, or out of its scope) puts it back where it was placed, as a made one is.
 followParents = function()
     for key, p in pairs(pieces) do
         if p.att and p.att.net and not ents[key] then
             local parent = parentOf(p.att)
             if parent then
-                local c = GetEntityCoords(parent)
+                local c = spotOn(parent, p.att)
                 p.x, p.y, p.z = c.x, c.y, c.z
+            else
+                p.x, p.y, p.z = p.hx, p.hy, p.hz
             end
         end
     end
@@ -620,14 +641,9 @@ watchAttached = function()
                     any = true
                     local parent = parentOf(p.att)
                     if parent and parent ~= obj then
-                        if not IsEntityAttachedToEntity(obj, parent) then
-                            FreezeEntityPosition(obj, false)
-                            local a = p.att
-                            AttachEntityToEntity(obj, parent, 0, a.x + 0.0, a.y + 0.0, a.z + 0.0, a.rx + 0.0, a.ry + 0.0, a.rz + 0.0,
-                                false, false, false, false, 2, true)
-                        end
+                        if not IsEntityAttachedToEntity(obj, parent) then ride(obj, parent, p.att) end
                         if p.att.net then
-                            local c = GetEntityCoords(parent)
+                            local c = spotOn(parent, p.att)
                             p.x, p.y, p.z = c.x, c.y, c.z
                         end
                     elseif IsEntityAttached(obj) then
