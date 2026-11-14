@@ -1,6 +1,6 @@
 // GTA V's settings page (pause_menu_pages_settings.gfx), decompiled, with whip's questions added: getColumn and the
-// whip* functions after stateChanged. Everything above them is Rockstar's, as the game has it. How to build the .gfx
-// from this: README.md beside it.
+// whip* functions after stateChanged, and setupPage's last line (whipWatchMemory). Everything else is Rockstar's, as
+// the game has it. How to build the .gfx from this: README.md beside it.
 class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends com.rockstargames.gtav.pauseMenuPages.PauseMenuBasePage
 {
    var addColumn;
@@ -13,6 +13,7 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
    var showColumns;
    var timelineMC;
    var whipColumn;
+   var whipMemory;
    function PAUSE_MENU_PAGES_SETTINGS()
    {
       super();
@@ -25,6 +26,7 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
       this.setupColumns(this.column1,this.column2);
       this.setupColScroll([this.column1,this.column2],[true,true]);
       this.setupColMouseNav([this.column1,this.column2],[true,true]);
+      this.whipWatchMemory();
    }
    function stateChanged(id)
    {
@@ -78,6 +80,29 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
       }
       return super.getColumn(i);
    }
+   // GTA's video memory bar (the Graphics tabs): what GTA hands the settings column, kept for whip|vidmem as it passes
+   // on to the column's own drawing. [label, percent, second percent or -1].
+   function whipWatchMemory()
+   {
+      var c = this.column2;
+      if(c == undefined || c.whipPage != undefined)
+      {
+         return undefined;
+      }
+      c.whipPage = this;
+      c.whipBar = c.SET_VIDEO_MEMORY_BAR;
+      c.whipBar2 = c.SET_VIDEO_MEMORY_BAR_2;
+      c.SET_VIDEO_MEMORY_BAR = function(initialise, textlabel, percent, colour)
+      {
+         this.whipPage.whipMemory = [textlabel,percent,-1];
+         return this.whipBar.apply(this,arguments);
+      };
+      c.SET_VIDEO_MEMORY_BAR_2 = function(initialise, textlabel, percent, colour, percent2, colour2)
+      {
+         this.whipPage.whipMemory = [textlabel,percent,percent2];
+         return this.whipBar2.apply(this,arguments);
+      };
+   }
    // The pause menu's content movie, which mouse presses go through.
    function whipContent()
    {
@@ -98,6 +123,8 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
    //   whip|row|<col>|<i>              menuID, uniqueID, type, value, state, how many options
    //   whip|text|<col>|<i>|<n>|<from>|<len>   field n's text, len characters from `from`
    //   whip|click|<col>|<i>            the row clicked, as the mouse does
+   //   whip|vidmem                     the video memory bar's percent and second percent (-1: none); W0 before GTA set it
+   //   whip|vidtext|<from>|<len>       its label, len characters from `from`
    // ("If ... else": FFDec's compiler misreads (a ? b : c)[i].)
    function whipAnswer(q)
    {
@@ -111,6 +138,19 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
          view = this.column1.model.getCurrentView();
          d = rows.length > 0 ? rows[0][2] + "." + rows[rows.length - 1][2] : "";
          return ["W1",cats.length,rows.length,view == undefined ? -1 : view.index,this.whipContent().menuState,d].join("|");
+      }
+      if(what == "vidmem" || what == "vidtext")
+      {
+         d = this.whipMemory;
+         if(d == undefined)
+         {
+            return "W0";
+         }
+         if(what == "vidmem")
+         {
+            return ["W1",d[1],d[2]].join("|");
+         }
+         return "W1|" + String(d[0]).substr(Number(q[2]),Number(q[3]));
       }
       if(q[2] == "1")
       {

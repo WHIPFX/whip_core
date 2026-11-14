@@ -68,8 +68,9 @@ local asked = nil             -- the hash of the question GTA is asking now, or 
 local tabs = nil              -- GTA's tabs as read: { index, id, label }
 local labels = {}             -- [tab id] = { [row id] = name }: they do not change while the menu is up
 local options = {}            -- [tab id] = { [row id] = { count, texts } }: a list's options, kept while their count holds
---- [graphics tab id] = { [row id] = true }: graphics changes made here and waiting for Apply. Kept here, not read from
---- GTA: the "changed" mark GTA shows on such a row is on the row drawn, not on the row's data the page reads.
+--- [graphics tab id] = { [row id] = { from = { value, text }, steps } }: graphics changes made here and waiting for
+--- Apply, each with what it was and how many steps it has moved (right +, left -), which is how Undo takes it back. Kept
+--- here, not read from GTA: the "changed" mark GTA shows on such a row is on the row drawn, not on the data the page reads.
 local pending = {}
 
 local function anyPending()
@@ -314,6 +315,21 @@ end
 -- A tab as the page draws it
 -- ============================================
 
+--- GTA's video memory bar, as GTA last set it on a Graphics tab: { label, percent, percent2 } (percent2 -1: one bar),
+--- or nil before GTA has.
+local function readMemory(g)
+    local f = fields(ask('whip|vidmem', g))
+    if f[1] ~= 'W1' then return nil end
+    local label, from = '', 0
+    repeat
+        local a = ask(('whip|vidtext|%d|%d'):format(from, CHUNK), g)
+        local piece = a:sub(1, 3) == 'W1|' and a:sub(4) or ''
+        label = label .. piece
+        from = from + CHUNK
+    until #piece < CHUNK or from > 600
+    return { label = plain(label), percent = tonumber(f[2]) or 0, percent2 = tonumber(f[3]) or -1 }
+end
+
 --- Every row of the tab GTA shows: { id, label, kind, value, max, text, options, locked, changed }.
 local function readTab(id, g)
     local h = showTab(id, g)
@@ -359,8 +375,9 @@ local function readTab(id, g)
         if name ~= '' then
             local kind = KINDS[r.type] or 'info'
             local opts = known[r.id] and known[r.id].texts or {}
+            local was = waiting[r.id] and waiting[r.id].from
             local row = { id = r.id, label = name, kind = kind, value = r.value,
-                locked = r.state == 0, changed = waiting[r.id] == true }
+                locked = r.state == 0, changed = was ~= nil, was = was and (was.text or was.value) or nil }
             if kind == 'slider' then
                 row.max = math.max(1, tonumber(opts[1]) or 10)
             elseif kind == 'list' then
@@ -370,12 +387,26 @@ local function readTab(id, g)
             rows[#rows + 1] = row
         end
     end
-    return { id = id, label = tabOf(id).label, graphics = GRAPHICS_TABS[id] == true, rows = rows }
+    return { id = id, label = tabOf(id).label, graphics = GRAPHICS_TABS[id] == true, rows = rows,
+        vram = GRAPHICS_TABS[id] and readMemory(g) or nil }
 end
 
---- What every answer to the page carries: the tab as it is now, and whether graphics changes wait for Apply.
+--- Every change waiting for Apply, on any graphics tab: { tab, id, label, was }.
+local function pendingList()
+    local list = {}
+    for tab, rows in pairs(pending) do
+        for rowId, p in pairs(rows) do
+            list[#list + 1] = { tab = tab, id = rowId, label = labels[tab] and labels[tab][rowId] or '',
+                was = p.from.text or p.from.value }
+        end
+    end
+    table.sort(list, function(a, b) return a.tab == b.tab and a.label < b.label or a.tab < b.tab end)
+    return list
+end
+
+--- What every answer to the page carries: the tab as it is now, and the changes waiting for Apply.
 local function answer(id, g, extra)
-    local st = { tab = readTab(id, g), unapplied = anyPending() }
+    local st = { tab = readTab(id, g), unapplied = anyPending(), pending = pendingList() }
     if extra then for k, v in pairs(extra) do st[k] = v end end
     return st
 end
@@ -410,10 +441,17 @@ local function stepRow(id, rowId, dir, g)
     local max = tonumber((options[id] and options[id][rowId] and options[id][rowId].texts[1]) or '') or 10
     if row.type == 2 and ((dir > 0 and row.value >= max) or (dir < 0 and row.value <= 0)) then return false end
     focusRow(row, g)
+    -- A graphics row waits for Apply, keeping what it was; stepped back to it, it waits no more.
     local function moved()
         if GRAPHICS_TABS[id] then
             pending[id] = pending[id] or {}
-            pending[id][rowId] = true
+            local p = pending[id][rowId]
+            if not p then
+                p = { from = { value = row.value, text = row.text }, steps = 0 }
+                pending[id][rowId] = p
+            end
+            p.steps = p.steps + dir
+            if p.steps == 0 then pending[id][rowId] = nil end
         end
         return true
     end
@@ -529,6 +567,35 @@ RegisterNUICallback('gameSettingsPress', function(data, cb)
         press(KEY.accept, g, 150)
         Wait(200)
         return answer(id, g)
+    end))
+end)
+
+--- A graphics row waiting for Apply stepped back to what it was.
+local function undoRow(id, rowId, g)
+    local p = pending[id] and pending[id][rowId]
+    if not p then return end
+    local back = p.steps > 0 and -1 or 1
+    for _ = 1, math.min(math.abs(p.steps), MAX_STEPS) do
+        if not (pending[id] and pending[id][rowId]) then break end
+        if not stepRow(id, rowId, back, g) then break end
+    end
+end
+
+--- Undo on one change waiting for Apply (`id`), or every one (`all`).
+RegisterNUICallback('gameSettingsUndo', function(data, cb)
+    cb(job(function(g)
+        ensureOpen(g)
+        local shown = tabArg(data)
+        if type(data) == 'table' and data.all == true then
+            for tab, rows in pairs(pending) do
+                local ids = {}
+                for rowId in pairs(rows) do ids[#ids + 1] = rowId end
+                for _, rowId in ipairs(ids) do undoRow(tab, rowId, g) end
+            end
+        else
+            undoRow(assert(shown, 'GTA has no such settings tab'), assert(rowArg(data), 'no such setting'), g)
+        end
+        return answer(shown or next(pending) or tabs[1].id, g)
     end))
 end)
 

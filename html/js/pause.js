@@ -2,9 +2,8 @@
 // PAUSE MENU — whip's, in place of GTA's (client/pause.lua)
 //
 // Left: the whip logo with its loading light, then Resume / Map / Controller / Swap Character /
-// Settings / Server Settings / Quit, and where the player is. Settings slides the menu away for GTA's own settings in
-// whip's look (game-settings.js), Server Settings for the page of the player's own choices (prefs-page.js), as
-// Controller does. Behind it, filling the screen, the map — centred on the
+// Settings / Quit, and where the player is. Settings slides the menu away for the one Settings page (settings-page.js):
+// GTA's own settings and this server's, as Controller does. Behind it, filling the screen, the map — centred on the
 // player in the middle of the screen. Map slides the menu away and makes the map live: drag, zoom,
 // double-click for a waypoint, a legend. Controller slides it away too and hides the map for the
 // controller screen (pad-layout.js). Swap Character and Quit
@@ -22,17 +21,15 @@ import { PauseMap } from './pause-map.js';
 import { BLIP_NAMES } from './blip-names.js';
 import { logoMarkup, logoLight } from './logo-light.js';
 import { PadLayout } from './pad-layout.js';
-import { PrefsPage } from './prefs-page.js';
-import { GameSettingsPage } from './game-settings.js';
+import { SettingsPage } from './settings-page.js';
 
-// Settings: GTA's own (game-settings.js). Server Settings: each player's own choices, under it (prefs-page.js).
+// Settings: GTA's own settings and each player's own choices for this server, one page (settings-page.js).
 const ITEMS = [
     { id: 'resume', label: 'Resume' },
     { id: 'map', label: 'Map' },
     { id: 'controller', label: 'Controller' },
     { id: 'swap', label: 'Swap Character' },
     { id: 'settings', label: 'Settings' },
-    { id: 'prefs', label: 'Server Settings' },
     { id: 'quit', label: 'Quit' },
 ];
 
@@ -100,12 +97,10 @@ const map = new PauseMap(root.querySelector('.pm-map'));
 map.turnable = true;      // this one turns and tilts (V, a right-drag, LB and the right stick)
 const light = logoLight(root.querySelector('.pm-logo'));
 const padScreen = new PadLayout(root, () => setMode('menu'));
-const prefsScreen = new PrefsPage(root, () => setMode('menu'));
-const settingsScreen = new GameSettingsPage(root, () => setMode('menu'));
+const settingsScreen = new SettingsPage(root, () => setMode('menu'));
 
 let open = false;
-// 'menu' | 'confirm' | 'map' | 'pad' (the controller screen) | 'settings' (GTA's) | 'prefs' (Server Settings)
-let mode = 'menu';
+let mode = 'menu';        // 'menu' | 'confirm' | 'map' | 'pad' (the controller screen) | 'settings'
 let sel = 0;              // the menu's highlighted item
 let asking = null;        // which CONFIRMS entry the question is
 let confirmSel = 1;       // Stay, by default
@@ -129,7 +124,7 @@ function setMode(m, instant) {
     root.dataset.mode = m;
     map.setInteractive(m === 'map');
     map.setFollow(m !== 'map');   // the menu's map rides with the player; the live map is the player's to move
-    map.setHidden(m === 'pad' || m === 'prefs' || m === 'settings');   // out of sight there: the 3D map is the minimap preview's (prefs-page.js)
+    map.setHidden(m === 'pad' || m === 'settings');   // out of sight there: the 3D map is the minimap preview's (settings-page.js)
     if (m === 'map') {
         setLegend(false, false);  // hidden until asked for: L or a pad's Y
         map.glide(mapOffset(), MAP_ZOOM, GLIDE_MS);
@@ -147,8 +142,6 @@ function setMode(m, instant) {
     if (m === 'confirm') drawConfirm();
     if (m === 'pad') padScreen.open();
     else if (was === 'pad') padScreen.close();
-    if (m === 'prefs') prefsScreen.open();
-    else if (was === 'prefs') prefsScreen.close();
     if (m === 'settings') settingsScreen.open();
     else if (was === 'settings') settingsScreen.close();
     drawMenu();
@@ -179,7 +172,6 @@ function choose(i) {
     else if (id === 'map') setMode('map');
     else if (id === 'controller') setMode('pad');
     else if (id === 'settings') setMode('settings');
-    else if (id === 'prefs') setMode('prefs');
     else if (CONFIRMS[id]) ask(id);
 }
 
@@ -349,7 +341,6 @@ NuiRouter.registerKeyScope({
         if (e.type && e.type !== 'keydown') return;
         if (mode === 'map') { mapKey(e); return; }
         if (mode === 'pad') { if (!padScreen.onKey(e)) setMode('menu'); return; }
-        if (mode === 'prefs') { if (!prefsScreen.onKey(e)) setMode('menu'); return; }
         if (mode === 'settings') { if (!settingsScreen.onKey(e)) setMode('menu'); return; }
         const k = e.key.toLowerCase();
         if (mode === 'confirm') {
@@ -366,7 +357,6 @@ NuiRouter.registerKeyScope({
     },
     onNav: (nav) => {
         if (mode === 'pad') { if (!padScreen.nav(nav)) setMode('menu'); return; }
-        if (mode === 'prefs') { if (!prefsScreen.nav(nav)) setMode('menu'); return; }
         if (mode === 'settings') { if (!settingsScreen.nav(nav)) setMode('menu'); return; }
         if (mode === 'map') {
             if (nav === 'back') setMode('menu');
@@ -410,7 +400,6 @@ NuiRouter.registerKeyScope({
     // The hint strip on a pad (controller.js).
     padHints: () => {
         if (mode === 'pad') return padScreen.hints();
-        if (mode === 'prefs') return prefsScreen.hints();
         if (mode === 'settings') return settingsScreen.hints();
         if (mode === 'map') {
             return [['ls', 'Move'], ['lt', 'Zoom out'], ['rt', 'Zoom in'], ['rs', 'Turn'], ['lb', '3D'], ['a', 'Waypoint'],
@@ -440,7 +429,6 @@ NuiRouter.register('pauseClose', () => {
     map.drive(0, 0, 0);
     PauseMap.release();   // the 3D map's full-screen buffers go until it is opened again
     padScreen.close();
-    prefsScreen.close();
     settingsScreen.close();
     pick(null);
     setLegend(false);

@@ -449,7 +449,7 @@ NuiRouter.register('pauseData', (d) => {
 // A setting changed: the minimaps up are drawn again with it.
 onPrefs(() => { for (const m of maps) m.kick(); });
 
-// ---- the preview (the Server Settings page's Minimap tab) ----
+// ---- the preview (the Settings page's Minimap tab, under Server) ----
 
 /** The circle the preview goes round (m): the map turns as it goes. */
 const DRIVE_R = 350;
@@ -460,19 +460,19 @@ const PREVIEW_START = { x: 195, y: -934, heading: 0 };
 
 let preview = null;
 
-/** The HUD minimap's shape, width over height: the preview's place on the Server Settings page is made this shape. */
+/** The HUD minimap's shape, width over height: the preview's place on the Settings page is made this shape. */
 export function minimapAspect() {
     return hud.box.w / Math.max(1, hud.box.h);
 }
 
-/** The preview's car speed control, in the dial's unit (Server Settings shows it as a row): the unit's name, the top
- *  of the range and its step. */
+/** The preview's car speed control, in the dial's unit (the Settings page shows it beside the preview): the unit's
+ *  name, the top of the range and its step. */
 export function previewSpeedRange() {
     return speedUnit === 'kmh' ? { unit: 'km/h', max: 320, step: 5 } : { unit: 'mph', max: 200, step: 5 };
 }
 
 export class MinimapPreview {
-    /** @param {HTMLElement} host  where it goes (prefs-page.js lays it over its place beside the list)
+    /** @param {HTMLElement} host  where it goes (settings-page.js lays it over its place in the inspector)
      *  @param {HTMLElement} caption  where it says what it shows: on foot or the car's speed, and its frames a second */
     constructor(host, caption) {
         this.el = document.createElement('div');

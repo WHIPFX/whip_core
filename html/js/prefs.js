@@ -1,8 +1,8 @@
 // ========================================
 // PLAYER PREFERENCES THE PAGE READS ITSELF (client/player_prefs.lua)
 //
-// Each player's own choices live in Lua and are changed on the pause menu's Server Settings page
-// (prefs-page.js). The few the page itself acts on — those declared with `page = true`, such as the menu
+// Each player's own choices live in Lua and are changed on the pause menu's Settings page, under Server
+// (settings-page.js). The few the page itself acts on — those declared with `page = true`, such as the menu
 // cursor's speed — arrive here ('playerPrefs': at start, at playerLoaded, and whenever one changes).
 //
 //     import { pref } from './prefs.js';

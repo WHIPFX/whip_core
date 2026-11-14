@@ -98,8 +98,8 @@ for (const type of MOUSE_EVENTS) {
     }, true);
 }
 
-/** A node's box in screen pixels, whatever CEF 103 measured it in. Shared: the Server Settings page's sliders
- *  (prefs-page.js) are inside a zoomed box too. */
+/** A node's box in screen pixels, whatever CEF 103 measured it in. Shared: the Settings page's sliders
+ *  (settings-page.js) are inside a zoomed box too. */
 export function screenRect(node) {
     const r = node.getBoundingClientRect(), k = rectScale(node);
     return { left: r.left * k, right: r.right * k, top: r.top * k, bottom: r.bottom * k,
