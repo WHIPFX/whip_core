@@ -206,13 +206,56 @@ local function gesturable(netId)
     return ped
 end
 
-RegisterNetEvent('whip_core:client:loreTalk', function(netId, line, ms)
+-- WHAT IT TALKS INTO (a line said through a megaphone, or on the radio): it holds that up for the line instead, as a
+-- player does, with the player's own emote (shared/emote_list.lua: 'megaphone', 'walkie'): its clip, upper body, and
+-- its prop in the hand. The prop is one networked object this game makes, so every game sees it, gone with the line.
+local HOLD_EMOTE = { megaphone = 'megaphone', radio = 'walkie' }
+
+local function emoteByCmd(cmd)
+    for _, e in ipairs(EmoteList and EmoteList.emotes or {}) do
+        if e.cmd == cmd then return e end
+    end
+    return nil
+end
+
+--- Hold it up for `ms` (or until a newer line): its clip looped on the upper body and its prop in the hand.
+local function holdUp(netId, ped, gen, hold, ms)
+    local e = emoteByCmd(HOLD_EMOTE[hold] or '')
+    if not e or not LoadAnimDict(e.dict) then return end
+    local p = type(e.props) == 'table' and e.props[1] or nil
+    local obj
+    if p and LoadModel(p.model) then
+        local c = GetEntityCoords(ped)
+        obj = CreateObject(GetHashKey(p.model), c.x, c.y, c.z + 0.2, true, true, false)
+        local o, r = p.offset or { 0.0, 0.0, 0.0 }, p.rot or { 0.0, 0.0, 0.0 }
+        AttachEntityToEntity(obj, ped, GetPedBoneIndex(ped, p.bone), o[1] + 0.0, o[2] + 0.0, o[3] + 0.0,
+            r[1] + 0.0, r[2] + 0.0, r[3] + 0.0, true, true, false, true, 1, true)
+        SetModelAsNoLongerNeeded(GetHashKey(p.model))
+    end
+    TaskPlayAnim(ped, e.dict, e.anim, 3.0, 3.0, -1, 1 + UPPER_ONLY, 0.0, false, false, false)
+    local ends = GetGameTimer() + math.min(ms, 60000)
+    while talkGen[netId] == gen and GetGameTimer() < ends and DoesEntityExist(ped) and not IsPedDeadOrDying(ped, true) do
+        Wait(200)
+    end
+    if DoesEntityExist(ped) then StopAnimTask(ped, e.dict, e.anim, 2.0) end
+    if obj and DoesEntityExist(obj) then DetachEntity(obj, true, false); DeleteObject(obj) end
+    RemoveAnimDict(e.dict)
+end
+
+RegisterNetEvent('whip_core:client:loreTalk', function(netId, line, ms, hold)
     netId, ms = tonumber(netId), tonumber(ms)
     if not netId or not ms or ms <= 0 then return end
     local gen = (talkGen[netId] or 0) + 1
     talkGen[netId] = gen
     local ped = gesturable(netId)
     if not ped then return end
+    if hold == 'megaphone' or hold == 'radio' then
+        CreateThread(function()
+            holdUp(netId, ped, gen, hold, ms)
+            if talkGen[netId] == gen then talkGen[netId] = nil end
+        end)
+        return
+    end
     CreateThread(function()
         local ends = GetGameTimer() + math.min(ms, 60000)
         local dict = IsPedMale(ped) and GESTURES.m or GESTURES.f
