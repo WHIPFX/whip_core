@@ -765,14 +765,16 @@ export class SettingsPage {
 
     // ---- doing ----
 
-    /** A game change: to GTA, the row marked as changing until GTA answers. One at a time. */
+    /** A game change: to GTA, the row marked as changing until GTA answers. One at a time. Apply and Discard work
+     *  from any tab (Lua finds the changes); only a Game tab GTA can read is named, never Key Bindings (its own screen). */
     async gameChange(row, callback, args, working) {
         const cur = this.current();
-        if (this.working || !cur || cur.section !== 'game') return;
+        const tab = cur?.section === 'game' && !cur.keys ? cur.id : undefined;
+        if (this.working || (row && tab === undefined)) return;
         this.note = '';
         this.working = working || row?.id || 'change';
         this.draw();
-        const st = await nuiCallback(callback, { tab: cur.id, id: row?.id, ...args });
+        const st = await nuiCallback(callback, { tab, id: row?.id, ...args });
         this.working = null;
         if (!this.isOpen) return;
         this.setGame(st);
