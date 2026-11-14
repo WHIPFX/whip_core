@@ -22,11 +22,14 @@ local MAX_SPEAKERS = 32
 
 local function say(fmt, ...) print(('[whip_core:director] speakers: ' .. fmt):format(...)) end
 
--- Songs playing: [runId] = { [n] = { key = world voice (nil while it is being made), things = { [worldId] = true } } }
+-- Songs playing: [runId] = { [n] = { key = world voice (nil while it is being made), things = { [worldId] = true },
+-- wait = the promise a card waits on to its end (Wait until it has played) } }
 local plays = {}
 local playN = 0
--- Runs over: no song starts for one (a card still waiting as it ended), and one being made as it ended is let go.
-local over = {}
+
+--- A run that is over (runtime.lua's endRun): no song starts for it (a card still waiting as it ended), and one being
+--- made as it ended is let go.
+local function ended(run) return run.status ~= 'running' end
 
 -- ============================================
 -- How it sounds
@@ -119,10 +122,18 @@ end
 --- out over fadeMs, then let go of. WAITS (it asks the voice bot). The number stopped.
 local function stopOn(run, things, fadeMs)
     local stopped = 0
+    -- (The songs as they are now, picked first: a fade waits on the voice bot, and meanwhile a song can start, or the
+    -- last one go and its run's table with it, which a walk of the table itself would skip past.)
+    local hits = {}
     for n, p in pairs(plays[run.id] or {}) do
         local hit = things == nil
         if not hit then for id in pairs(p.things) do if things[id] then hit = true break end end end
-        if hit then
+        if hit then hits[#hits + 1] = { n = n, p = p } end
+    end
+    table.sort(hits, function(a, b) return a.n < b.n end)
+    for _, h in ipairs(hits) do
+        local n, p = h.n, h.p
+        if plays[run.id] and plays[run.id][n] == p then
             stopped = stopped + 1
             local ok, done = false, false
             if p.key and fadeMs > 0 and GetResourceState(VOICE) == 'started' then
@@ -144,7 +155,7 @@ end
 --- song's length (ms), or false and why. `opts.wait`: answers once a song that does not loop has played to its end.
 function DirectorSpeakers.play(run, worldIds, url, o)
     if GetResourceState(VOICE) ~= 'started' then return false, 'whip_voice is not running' end
-    if over[run.id] then return false, 'the scenario has ended' end
+    if ended(run) then return false, 'the scenario has ended' end
     local places, things = {}, {}
     for _, id in ipairs(worldIds) do
         local p, why = placeOf(run, id)
@@ -174,9 +185,11 @@ function DirectorSpeakers.play(run, worldIds, url, o)
         release(run.id, n)
         return false, tostring(okC and cwhy or key)
     end
-    if over[run.id] or not (plays[run.id] and plays[run.id][n] == entry) then
+    if ended(run) or not (plays[run.id] and plays[run.id][n] == entry) then
         CreateThread(function() pcall(function() exports[VOICE]:RemoveWorldVoice(key) end) end)
-        return false, over[run.id] and 'the scenario has ended' or 'another song took these speakers'
+        if ended(run) then return false, 'the scenario has ended' end
+        if GetResourceState(VOICE) ~= 'started' then return false, 'whip_voice stopped' end
+        return false, 'another song took these speakers'
     end
     entry.key = key
     local full = math.max(0, math.min(range, tonumber(o.full) or 0))
@@ -185,6 +198,8 @@ function DirectorSpeakers.play(run, worldIds, url, o)
     local okS, sset, swhy = pcall(function() return exports[VOICE]:SetWorldVoiceSound(key, #recipe > 0 and recipe or false) end)
     if not (okS and sset) then say('its sound could not be set: %s', tostring(okS and swhy or sset)) end
     local p = o.wait and promise.new() or nil
+    -- (Kept with it, so whip_voice stopping answers it: its song's end never would, onResourceStop below.)
+    entry.wait = p
     local runId = run.id
     local okP, d, pwhy = pcall(function()
         return exports[VOICE]:PlayWorldVoice(key, url, function(_, how)
@@ -205,14 +220,23 @@ end
 
 --- Every song a run plays stops with it (main.lua's runEnded).
 function DirectorSpeakers.runEnded(run)
-    over[run.id] = true
-    for n in pairs(plays[run.id] or {}) do release(run.id, n) end
+    local ns = {}
+    for n in pairs(plays[run.id] or {}) do ns[#ns + 1] = n end
+    for _, n in ipairs(ns) do release(run.id, n) end
     plays[run.id] = nil
 end
 
--- whip_voice going: its world voices went with it.
+-- whip_voice going: its world voices went with it, and no song's end will come. A card waiting for one is answered
+-- (Could not: whip_voice stopped), not left to Took too long.
 AddEventHandler('onResourceStop', function(res)
-    if res == VOICE then plays = {} end
+    if res ~= VOICE then return end
+    local was = plays
+    plays = {}
+    for _, list in pairs(was) do
+        for _, e in pairs(list) do
+            if e.wait and e.wait.state == 0 then e.wait:resolve('whip_voice stopped') end
+        end
+    end
 end)
 
 -- ============================================
