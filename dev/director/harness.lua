@@ -71,21 +71,35 @@ rawset(Citizen, 'Await', function(p)
     if p.state == 2 then error(p.value, 2) end
     return p.value
 end)
+--- Where `t` is in the list now, or nil.
+local function placeOf(t)
+    for j = 1, #threads do if threads[j] == t then return j end end
+    return nil
+end
+
+-- A test calls HarnessTick from its own thread, so this runs inside a thread it is stepping through: that one is
+-- running (or 'normal', having resumed another), so it is skipped, and the list may have changed under the outer pass
+-- by the time a resume returns, so a thread is found again before it is dropped.
 local function resumeDue()
     local i = 1
     while i <= #threads do
         local t = threads[i]
-        if t.at <= now then
+        if t.at <= now and coroutine.status(t.co) == 'suspended' then
             local ok, ms = coroutine.resume(t.co)
+            local at = placeOf(t) or i
             if not ok then
-                ---@diagnostic disable-next-line: undefined-global -- a module's own hook, when it sets one
-                if HARNESS_ON_ERROR then HARNESS_ON_ERROR(t, ms) else print('THREAD ERROR: ' .. tostring(ms)) end
-                table.remove(threads, i)
+                -- A module's own hook, when it sets one. Read raw: through _G's catch-all a missing hook would be a stub,
+                -- and calling it would swallow the error.
+                local onError = rawget(_G, 'HARNESS_ON_ERROR')
+                if onError then onError(t, ms) else print('THREAD ERROR: ' .. tostring(ms)) end
+                if threads[at] == t then table.remove(threads, at) end
+                i = at
             elseif coroutine.status(t.co) == 'dead' then
-                table.remove(threads, i)
+                if threads[at] == t then table.remove(threads, at) end
+                i = at
             else
                 t.at = now + (ms or 0)
-                i = i + 1
+                i = at + 1
             end
         else
             i = i + 1
