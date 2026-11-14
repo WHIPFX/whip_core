@@ -36,7 +36,7 @@ local function versionOf(res)
     return v and v ~= '' and v or nil
 end
 
---- Is version `have` at least `want`? ('1.2' is 1.2.0; lib/satellite.lua's Whip.versionAtLeast is the same.)
+--- Is version `have` at least `want`? ('1.0' is 1.0.0; lib/satellite.lua's Whip.versionAtLeast is the same.)
 local function versionAtLeast(have, want)
     local a, b = {}, {}
     for n in tostring(have):gmatch('%d+') do a[#a + 1] = tonumber(n) end
@@ -174,7 +174,7 @@ local function gather()
     -- Newer releases on GitHub (server/updates.lua), from its last answers: the first check runs after this report.
     if Updates then Updates.reportLines(add) end
 
-    -- What whip each resource says it needs (whip_requires '1.2' in its fxmanifest.lua).
+    -- What whip each resource says it needs (whip_requires '1.0' in its fxmanifest.lua).
     local coreVersion = versionOf(GetCurrentResourceName()) or '0'
     for _, res in ipairs(allResources()) do
         local need = GetResourceMetadata(res, 'whip_requires', 0)

@@ -469,7 +469,7 @@ end
 -- The version a resource needs goes in its fxmanifest.lua, where the setup report reads it and prints a FIX line
 -- when this server's whip_core is older:
 --
---     whip_requires '1.2'
+--     whip_requires '1.0'
 --
 -- Whip.requires says the same from your code (once, in this console); Whip.has asks about one call, for a feature
 -- newer than the oldest whip you support.
@@ -481,7 +481,7 @@ local function versionNumbers(v)
     return out
 end
 
---- Is version `have` at least `want`? ('1.2' is 1.2.0.)
+--- Is version `have` at least `want`? ('1.0' is 1.0.0.)
 ---@param have string
 ---@param want string
 ---@return boolean
@@ -496,7 +496,7 @@ end
 
 local _saidRequires = false
 --- Is this server's whip_core at least `min`? Says so once in this console when it is not, naming your resource.
----@param min string  '1.2' or '1.2.0'
+---@param min string  '1.0' or '1.0.0'
 ---@return boolean
 function Whip.requires(min)
     local have = GetResourceMetadata('whip_core', 'version', 0) or '0'

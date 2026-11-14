@@ -65,8 +65,8 @@ function WhipSatellite.registerWith(resource, fn) end
 ---@param fn fun(source: number, args: string[], raw: string)
 function WhipSatellite.command(name, opts, fn) end
 
---- Is this server's whip_core at least `min` ('1.2' or '1.2.0')? Says so once in the console when it is not.
---- Put the same in your fxmanifest.lua (`whip_requires '1.2'`) and the setup report checks it too.
+--- Is this server's whip_core at least `min` ('1.0' or '1.0.0')? Says so once in the console when it is not.
+--- Put the same in your fxmanifest.lua (`whip_requires '1.0'`) and the setup report checks it too.
 ---@param min string
 ---@return boolean
 function WhipSatellite.requires(min) end
@@ -76,7 +76,7 @@ function WhipSatellite.requires(min) end
 ---@return boolean
 function WhipSatellite.has(name) end
 
---- Is version `have` at least `want`? ('1.2' is 1.2.0.)
+--- Is version `have` at least `want`? ('1.0' is 1.0.0.)
 ---@param have string
 ---@param want string
 ---@return boolean
