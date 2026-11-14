@@ -125,6 +125,8 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
    //   whip|click|<col>|<i>            the row clicked, as the mouse does
    //   whip|vidmem                     the video memory bar's percent and second percent (-1: none); W0 before GTA set it
    //   whip|vidtext|<from>|<len>       its label, len characters from `from`
+   //   whip|changed                    how many settings rows GTA marks as changed and not applied (on a row drawn, or
+   //                                   in a row's data)
    // ("If ... else": FFDec's compiler misreads (a ? b : c)[i].)
    function whipAnswer(q)
    {
@@ -133,6 +135,32 @@ class com.rockstargames.gtav.pauseMenuPages.PAUSE_MENU_PAGES_SETTINGS extends co
       var rows = this.whipRows(this.column2);
       var d;
       var view;
+      var n;
+      var i;
+      if(what == "changed")
+      {
+         n = 0;
+         i = 0;
+         while(i < rows.length)
+         {
+            if(rows[i][5] == 2)
+            {
+               n++;
+            }
+            i++;
+         }
+         view = this.column2.model.getCurrentView();
+         i = 0;
+         while(view != undefined && i < view.itemList.length)
+         {
+            if(view.itemList[i].isChanged == true)
+            {
+               n++;
+            }
+            i++;
+         }
+         return "W1|" + n;
+      }
       if(what == "head")
       {
          view = this.column1.model.getCurrentView();
