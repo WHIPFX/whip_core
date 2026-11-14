@@ -25,6 +25,7 @@ local FRONTEND = 2                            -- the control group GTA's menus r
 local KEY = { left = 189, right = 190, accept = 201, cancel = 202, x = 203 }
 local MAX_PENDING = 8         -- questions waiting at once; GTA's own limit is unknown
 local CHUNK = 60              -- text one answer carries ("W1|" and 60 characters come back whole)
+local PAGE_WAIT_MS = 10000    -- GTA's settings page answering after it opens: about 3 s the first time
 local STEP_TRIES = 3          -- GTA now and then drops a press on quick repeats: a step is pressed again if it did not land
 local MAX_STEPS = 40          -- a slider set by dragging: presses toward the value, at most
 
@@ -81,17 +82,21 @@ end
 
 local function stillOpen(g) return active and gen == g end
 
---- Every question's answer, in order. A question GTA asks drops the answers on their way: the batch goes again once it
---- has been answered.
-local function askAll(cmds, g)
+--- Every question's answer, in order. GTA drops questions now and then: sent while its page is still loading (the
+--- first open takes about 3 s), or on their way when GTA asks a question of its own. A batch not answered within
+--- RESEND_MS goes again, until `patience` ms (3000) have gone by without an answer; after a question of GTA's, once
+--- it has been answered.
+local RESEND_MS = 500
+local function askAll(cmds, g, patience)
     local out = {}
     local first = 1
+    local giveUp = GetGameTimer() + (patience or 3000)
     while first <= #cmds do
         while asked and stillOpen(g) do Wait(0) end
         assert(stillOpen(g), 'closed')
         local handles = {}
         for i = first, math.min(first + MAX_PENDING - 1, #cmds) do handles[#handles + 1] = send(cmds[i]) end
-        local deadline = GetGameTimer() + 3000
+        local resend = GetGameTimer() + RESEND_MS
         local ready = false
         repeat
             Wait(0)
@@ -99,19 +104,21 @@ local function askAll(cmds, g)
             for _, h in ipairs(handles) do
                 if h ~= 0 and not IsScaleformMovieMethodReturnValueReady(h) then ready = false break end
             end
-        until ready or asked or not stillOpen(g) or GetGameTimer() > deadline
-        if not asked then
-            assert(ready, 'GTA\'s settings did not answer')
+        until ready or asked or not stillOpen(g) or GetGameTimer() > resend
+        if ready and not asked then
             for _, h in ipairs(handles) do
                 out[#out + 1] = h ~= 0 and (GetScaleformMovieMethodReturnValueString(h) or '') or ''
             end
             first = first + #handles
+            giveUp = GetGameTimer() + (patience or 3000)
+        elseif not asked then
+            assert(GetGameTimer() < giveUp, 'GTA\'s settings did not answer')
         end
     end
     return out
 end
 
-local function ask(cmd, g) return askAll({ cmd }, g)[1] end
+local function ask(cmd, g, patience) return askAll({ cmd }, g, patience)[1] end
 
 local function fields(answer)
     local t = {}
@@ -165,8 +172,8 @@ local function readRows(col, count, g)
 end
 
 --- What GTA shows: { tabs, rows, tab (the tab row chosen), menuState }.
-local function head(g)
-    local f = fields(ask('whip|head', g))
+local function head(g, patience)
+    local f = fields(ask('whip|head', g, patience))
     if f[1] ~= 'W1' then return nil end
     return { tabs = tonumber(f[2]) or 0, rows = tonumber(f[3]) or 0, tab = tonumber(f[4]) or -1,
         menuState = tonumber(f[5]), sig = f[6] or '' }
@@ -247,10 +254,13 @@ local function ensureOpen(g)
     end
     -- GTA's menu coming up can take the keyboard and mouse from whip's page: given back.
     Focus.reassert()
+    -- Its settings page loads after the menu says it is ready: GTA answers once it has (about 3 s the first time).
     local h
-    deadline = GetGameTimer() + 6000
+    deadline = GetGameTimer() + PAGE_WAIT_MS
     repeat
-        h = head(g)
+        local ok, got = pcall(head, g, math.max(1, deadline - GetGameTimer()))
+        assert(stillOpen(g), 'closed')
+        h = ok and got or nil
         if h and h.tabs > 0 then break end
         Wait(100)
     until GetGameTimer() > deadline
