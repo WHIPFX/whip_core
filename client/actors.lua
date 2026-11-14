@@ -149,8 +149,14 @@ STEP.indicators = function(veh, _, s)
     SetVehicleIndicatorLights(veh, 0, side == 'right' or side == 'hazards')
 end
 
-STEP.horn = function(veh, _, _, left)
-    StartVehicleHorn(veh, math.floor(left), GetHashKey('HELDDOWN'), false)
+-- THE HORN FOR ITS TIME, SOUNDED AGAIN AT EACH LOOK (lookAt), a little at a time: given its whole time at once, GTA
+-- sounded it on after its list was stopped (WLVF's review). Its job ending stops it (endTimed).
+local HORN = GetHashKey('HELDDOWN')
+local HORN_MS = 400   -- each time it is sounded: longer than a look's gap, so it never drops between them
+
+STEP.horn = function(veh, w, _, left)
+    w.horn = { untilAt = GetGameTimer() + left }
+    StartVehicleHorn(veh, math.floor(math.min(HORN_MS, left)), HORN, false)
 end
 
 STEP.alarm = function(veh)
@@ -487,9 +493,24 @@ end
 
 local function satStep(veh, _, s, left) return DirectorTaskSteps.run(veh, 'vehicle', s, left) end
 
+--- What the last job's timed steps left going (a brake, flashing lights, the horn), ended: a new job means their slot is
+--- over, and no job means their list was stopped (a Stop Tasks), which they must not outlast.
+local function endTimed(veh, w)
+    if w.brakeUntil then
+        w.brakeUntil = nil
+        if veh then SetVehicleHandbrake(veh, false) end
+    end
+    if w.flash then
+        w.flash = nil
+        if veh then SetVehicleLights(veh, 0) end
+    end
+    w.horn = nil   -- (it stops by itself, sounded no more)
+end
+
 local function runJob(veh, w)
     local job = w.data.job
     if not job or w.ran == job.id then return end
+    endTimed(veh, w)
     w.ran, w.look, w.saidAt, w.speed, w.play = job.id, nil, nil, nil, nil
     local since = tonumber(job.since) or 0
     local list = job.list or {}
@@ -548,6 +569,11 @@ local function lookAt(netId, w, now)
             w.flash.on = not w.flash.on
             SetVehicleLights(veh, w.flash.on and 2 or 1)
         end
+    end
+    -- Sound the Horn: sounded again at each look for its time.
+    if w.horn then
+        if now >= w.horn.untilAt then w.horn = nil
+        else StartVehicleHorn(veh, math.floor(math.min(HORN_MS, w.horn.untilAt - now)), HORN, false) end
     end
     local job = w.data.job
     local look = w.look
@@ -617,7 +643,10 @@ local function applyVersion(id, netId, ver, data)
     if was and was.held then w.held = true end
     -- (A trailer to hitch: tried for a while after the car is new to this game.)
     if data.tow ~= w.towNet or fresh then w.towNet, w.towUntil = data.tow, GetGameTimer() + TOW_TRY_MS end
-    if not data.job then w.ran, w.look, w.speed, w.play = nil, nil, nil, nil end
+    if not data.job then
+        endTimed(veh, w)
+        w.ran, w.look, w.speed, w.play = nil, nil, nil, nil
+    end
     -- A car new to this game: what its earlier steps left set (lights, siren: server/actors.lua's state) is
     -- set again first, then its job's own steps.
     if fresh and type(data.state) == 'table' then
