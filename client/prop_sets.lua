@@ -164,6 +164,8 @@ local function spawn(p)
     SetEntityRotation(obj, p.rx + 0.0, p.ry + 0.0, p.rz + 0.0, 2, false)
     FreezeEntityPosition(obj, true)
     if p.nocol then SetEntityCollision(obj, false, false) end
+    -- Drawn as far as it is made (drawDistance), past its model's own draw distance.
+    if p.dd then SetEntityLodDist(obj, p.dd) end
     SetEntityAsMissionEntity(obj, true, true)
     ents[key] = obj
     if p.att then watchAttached() end
@@ -217,7 +219,7 @@ local sweeping = false
 local function samePiece(a, b)
     return a.m == b.m and math.abs(a.x - b.x) < 0.01 and math.abs(a.y - b.y) < 0.01 and math.abs(a.z - b.z) < 0.01
         and math.abs(a.rx - b.rx) < 0.1 and math.abs(a.ry - b.ry) < 0.1 and math.abs(a.rz - b.rz) < 0.1
-        and a.interior == b.interior and a.light == b.light and a.nocol == b.nocol
+        and a.interior == b.interior and a.light == b.light and a.nocol == b.nocol and a.dd == b.dd
 end
 
 local function nearPiece(a, b)
@@ -390,6 +392,13 @@ local function add(wireId, w)
                                 interior = p.interior == true, light = p.light == true, nocol = p.nocol == true,
                                 wpn = type(p.wpn) == 'string' and p.wpn or nil, att = type(p.att) == 'table' and p.att or nil,
                                 hx = p.x + 0.0, hy = p.y + 0.0, hz = p.z + 0.0 }
+            -- Seen from further (drawDistance): made out to it (the streamer adds `reach` to the range) and drawn
+            -- that far (spawn).
+            local dd = math.tointeger(tonumber(p.dd))
+            if dd and dd > 0 then
+                nextPieces[key].dd = dd
+                nextPieces[key].reach = math.max(0.0, dd - RANGE)
+            end
             s.keys[#s.keys + 1] = key
         end
     end

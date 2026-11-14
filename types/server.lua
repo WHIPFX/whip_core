@@ -200,6 +200,7 @@ function whip_core:SetPlayerWaypoint(source, coords) end
 ---@field interior boolean|nil Inside an MLO: each game waits for the interior, then files it in its room
 ---@field light boolean|nil A lamp: filed in the interior's limbo so it lights the room
 ---@field collision boolean|nil false: players walk through it
+---@field drawDistance number|nil Metres (1-500): made out to this and drawn this far, past its model's own draw distance
 
 --- Props made by each player's own game near them (never networked): ShowPropSet(id, spec). The same
 --- id again replaces the set; yours go when you stop or your run's tag is released. At most

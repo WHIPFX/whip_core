@@ -43,6 +43,9 @@
 --     `attachOffset = { x, y, z }`, `attachRot =
 --     { x, y, z }`): on a networked car or NPC, or on a prop of one of your sets up now, at that offset and turn from it.
 --     Each game attaches its own copy once it has both, and puts it back where it was placed when the parent goes.
+--   * SEEN FROM FURTHER (`drawDistance = metres`, up to MAX_DRAW): each game makes it out to that distance (not just
+--     the usual 150 m) and draws it that far (SetEntityLodDist), past its model's own draw distance. For a thing that
+--     must be seen from afar (a speaker heard from 300 m); a little more drawing per prop, nothing on the network.
 
 PropSets = {}
 
@@ -56,6 +59,7 @@ PropSets.maxProps = maxProps   -- the Director's run readying keeps to it too (n
 
 local nextWire = 0
 local live = {}   -- [wireId] = the record up now
+local MAX_DRAW = 500   -- metres: the furthest a prop's drawDistance may be
 
 local function num(v) return type(v) == 'number' and v == v and v ~= math.huge and v ~= -math.huge end
 
@@ -90,6 +94,13 @@ local function readProp(p, i, owner)
     w.interior = p.interior == true or nil
     w.light = p.light == true or nil
     w.nocol = p.collision == false or nil
+    if p.drawDistance ~= nil then
+        local d = tonumber(p.drawDistance)
+        if not num(d) or d < 1 or d > MAX_DRAW then
+            return nil, ('prop %d: drawDistance is metres, 1 to %d'):format(i, MAX_DRAW)
+        end
+        w.dd = math.floor(d)
+    end
     if p.weapon ~= nil then
         if not WeaponCatalog.modelOf(p.weapon) then
             return nil, ('prop %d: weapon is a firearm with a world model (GTA\'s, like WEAPON_RPG, or one a running resource adds)'):format(i)
@@ -379,7 +390,7 @@ end)
 -- ============================================
 
 --- Props made by each player's game: ShowPropSet(id, { props = { { model, coords, rot | heading,
---- interior, light, collision } }, audience, tag }) -> true | false, why. The same id again replaces it.
+--- interior, light, collision, drawDistance } }, audience, tag }) -> true | false, why. The same id again replaces it.
 exports('ShowPropSet', function(id, spec)
     local owner = Registry.caller()
     return PropSets.show(owner, id, spec)
