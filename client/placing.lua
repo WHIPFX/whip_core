@@ -22,6 +22,12 @@
 -- nearby door, or pick the item back up).
 PlacingModeActive = false
 
+-- ONE START AT A TIME. A start waits while its ghost's model loads, and PlacingModeActive comes on only after: a second
+-- start in that time got past the busy check, its ghost took the first's place, the first's was left in the world and
+-- its PlaceObject call was never answered (WLVF's review). While one loads, PlaceObject answers 'busy' and a Place from
+-- the inventory is let go.
+local placeLoading = false
+
 local startModeLoop   -- the mode's frame loop, started on entry; defined with the loop below
 
 local placeContainer  = nil
@@ -151,6 +157,9 @@ end
 RegisterNUICallback('placeItem', function(data, cb)
     cb('ok')
 
+    -- (One whose ghost is still loading: this Place is let go.)
+    if placeLoading then return end
+
     -- Rapid re-entry: a second Place while a ghost is already up replaces the first
     -- mode wholesale rather than leaking its ghost.
     if PlacingModeActive then
@@ -171,7 +180,12 @@ RegisterNUICallback('placeItem', function(data, cb)
 
     -- Build the ghost. A model that will not load falls back to the default prop; if
     -- even that fails, abort loudly — nothing has been sent, the item never moved.
-    if not makeGhost(GetPlaceGhostModel(placeItemKey)) and not makeGhost(Config.DefaultGroundProp) then
+    placeLoading = true
+    local okG, made = pcall(function()
+        return makeGhost(GetPlaceGhostModel(placeItemKey)) or makeGhost(Config.DefaultGroundProp)
+    end)
+    placeLoading = false
+    if not (okG and made) then
         UI.Notify('Cannot place that here', 'error')
         CancelPlaceMode()
         return
@@ -197,10 +211,16 @@ end)
 local function placeObject(model, opts)
     if type(model) ~= 'string' and type(model) ~= 'number' then return false, 'model' end
     opts = type(opts) == 'table' and opts or {}
-    if PlacingModeActive then return false, 'busy' end
+    if PlacingModeActive or placeLoading then return false, 'busy' end
     if PlayerIsDead then return false, 'dead' end
-    RunClientHook('beforePlaceMode')
-    if not makeGhost(model) then return false, 'model' end
+    placeLoading = true
+    local okG, made = pcall(function()
+        RunClientHook('beforePlaceMode')
+        return makeGhost(model)
+    end)
+    placeLoading = false
+    if not (okG and made) then return false, 'model' end
+    if PlayerIsDead then CancelPlaceMode('dead') return false, 'dead' end   -- (went down while it loaded)
     local label = type(opts.label) == 'string' and opts.label ~= '' and opts.label:sub(1, 40) or 'it'
     placeSession = { p = promise.new(), label = label, vehicles = opts.vehicles == true,
                      reach = math.max(1.0, math.min(10.0, tonumber(opts.reach) or Config.PlaceItemRange or 3.5)),
