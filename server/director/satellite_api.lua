@@ -19,7 +19,7 @@ local CORE = GetCurrentResourceName()
 
 local NAME = '^[%a][%w_]*$'
 local MAX_FIELDS = 8
-local MAX_SEC = 3600
+local MAX_SEC = DirectorSteps.MAX_SEC
 
 local callable, text, finite = DirectorKit.callable, DirectorKit.text, DirectorKit.number
 
@@ -159,13 +159,16 @@ local function buildTask(t, spec)
 
     def.timing = spec.timing == nil and 'timed' or spec.timing
     if not TIMINGS[def.timing] then return nil, t .. ': timing is instant, timed, until or either' end
+    -- (A time of 0, the default, is no end: shared/director/steps.lua THE TIMING.)
     if def.timing == 'timed' or def.timing == 'either' then
-        def.sec = finite(spec.sec) or 3
-        if def.sec < 0.1 or def.sec > MAX_SEC then return nil, ('%s: sec is 0.1 to %d'):format(t, MAX_SEC) end
+        def.sec = finite(spec.sec) or 0
+        if def.sec ~= 0 and (def.sec < 0.1 or def.sec > MAX_SEC) then return nil, ('%s: sec is 0 (no end) or 0.1 to %d'):format(t, MAX_SEC) end
     end
     if def.timing == 'until' or def.timing == 'either' then
-        def.giveUp = finite(spec.giveUp) or 30
-        if def.giveUp < 1 or def.giveUp > MAX_SEC then return nil, ('%s: giveUp is 1 to %d seconds'):format(t, MAX_SEC) end
+        def.giveUp = finite(spec.giveUp) or 0
+        if def.giveUp ~= 0 and (def.giveUp < 1 or def.giveUp > MAX_SEC) then
+            return nil, ('%s: giveUp is 0 (never) or 1 to %d seconds'):format(t, MAX_SEC)
+        end
     end
     if def.timing == 'either' then
         def.next = spec.next == nil and 'done' or spec.next

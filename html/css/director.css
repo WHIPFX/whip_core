@@ -1225,6 +1225,7 @@ textarea.dr-field { resize: vertical; line-height: 1.45; }
 /* A LENGTH OF TIME (panels.js timeField): a box a unit, its number and its letter ("8h", "42m"), typed, its chevron
    its list (dropdown.js). */
 .dr-dhms { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ui-sp-3); }
+.dr-dhms.hms { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* a task's time: hours, minutes, seconds */
 .dr-dhms-box {
     display: flex;
     align-items: center;

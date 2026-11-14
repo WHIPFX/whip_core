@@ -29,6 +29,7 @@ DirectorTasks = {}
 
 local MAX_STEPS = DirectorSteps.MAX_STEPS
 local MAX_SEC   = DirectorSteps.MAX_SEC
+local NO_END_MS = DirectorSteps.NO_END_MS
 local TYPES, ORDER, GROUPS = DirectorSteps.TYPES, DirectorSteps.ORDER, DirectorSteps.GROUPS
 local SEAT_N, STYLE_N = DirectorSteps.SEAT_N, DirectorSteps.STYLE_N
 
@@ -99,7 +100,7 @@ local function wireType(d)
     return { t = d.t, label = d.label, group = d.group, kinds = kinds, timing = d.timing,
              next = d.next, sec = d.sec, giveUp = d.giveUp, lasting = d.lasting == true,
              fields = d.fields, untilWhen = d.untilWhen, owner = d.owner, desc = d.desc,
-             doneText = d.doneText, secLabel = d.secLabel }
+             doneText = d.doneText, secLabel = d.secLabel, length = d.length == true }
 end
 
 --- The catalogue for the editor: plain data, in picker order (whip_core's, then other resources' by name, each in
@@ -128,10 +129,14 @@ end
 
 local finite, coords = DirectorKit.finite, DirectorKit.place
 
-local function clampSec(v, default)
+--- A step's time in ms, from what is saved (`v`, seconds; unset: its type's `default`, else 0). 0 is no end (NO_END_MS:
+--- it goes on until its list is stopped), or at once for a step whose time is how long its move takes (`length`).
+--- shared/director/steps.lua THE TIMING.
+local function msOf(v, default, length)
     local n = tonumber(v)
-    if not finite(n) then n = default end
-    return math.max(0.1, math.min(MAX_SEC, n + 0.0))
+    if not finite(n) then n = tonumber(default) or 0 end
+    if n <= 0 then return length and 0 or NO_END_MS end
+    return math.floor(math.max(0.1, math.min(MAX_SEC, n + 0.0)) * 1000)
 end
 
 -- whip_core's own steps: each field of a kind a step may have, each `when` one the language reads (DirectorFields), or
@@ -233,8 +238,8 @@ function DirectorTasks.compile(kind, tasks, world, owner)
                     k = type(raw.k) == 'string' and raw.k:sub(1, 16) or tostring(i), t = t, timing = timing, p = p,
                     lasting = d.lasting == true, once = d.once == true,
                 }
-                if timing == 'timed' then step.ms = math.floor(clampSec(raw.sec, d.sec or 3) * 1000) end
-                if timing == 'until' then step.giveUpMs = math.floor(clampSec(raw.giveUp, d.giveUp or 30) * 1000) end
+                if timing == 'timed' then step.ms = msOf(raw.sec, d.sec, d.length == true) end
+                if timing == 'until' then step.giveUpMs = msOf(raw.giveUp, d.giveUp) end
                 -- Seats, styles and speeds as the game takes them.
                 if p.seat then p.seatN = SEAT_N[p.seat] or -1 end
                 if p.style then p.styleN = STYLE_N[p.style] or STYLE_N.normal end
@@ -266,7 +271,8 @@ function DirectorTasks.has(w)
 end
 
 --- The longest a list takes once through, in ms, when every step has a fixed length (a prop's always
---- does: slides, turns, fades and waits). nil when a step waits on something.
+--- does: slides, turns, fades and waits). nil when a step waits on something. (A step with no end counts NO_END_MS: a
+--- list with one is not over in any run's time.)
 function DirectorTasks.length(plan)
     local ms = 0
     for _, s in ipairs(plan and plan.steps or {}) do

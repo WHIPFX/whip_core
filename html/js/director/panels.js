@@ -98,18 +98,20 @@ function numberField(t, k, value, o = {}) {
 
 /** A length of time, saved in seconds: a box a unit, its number and its letter ("8h", "42m", "5s"), typed, or picked
  *  from its list (its chevron: app.js dhms-pick, dropdown.js). writeField 'dhms' adds the boxes up. `fallback`: what an
- *  empty one runs at (shown greyed). */
+ *  empty one runs at (shown greyed). `units: 'hms'`: no days box, its hours counting them all (a task's time). */
 function timeField(t, k, value, o = {}) {
     const total = typeof value === 'number' && value >= 0 ? Math.round(value) : null;
     const shown = total === null ? (o.fallback || 0) : total;
-    const parts = [['d', 'days', Math.floor(shown / 86400)], ['h', 'hours', Math.floor(shown % 86400 / 3600)],
-        ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', shown % 60]];
+    const parts = o.units === 'hms'
+        ? [['h', 'hours', Math.floor(shown / 3600)], ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', shown % 60]]
+        : [['d', 'days', Math.floor(shown / 86400)], ['h', 'hours', Math.floor(shown % 86400 / 3600)],
+            ['m', 'minutes', Math.floor(shown % 3600 / 60)], ['s', 'seconds', shown % 60]];
     const boxes = parts.map(([p, word, n]) => `<div class="dr-dhms-box"><input class="dr-dhms-in" type="text" inputmode="numeric" maxlength="3"`
         + ` value="${total === null ? '' : n}" placeholder="${n}" data-t="${e(t)}" data-k="${e(k)}" data-f="dhms" data-part="${p}"`
         + ` aria-label="${word}" spellcheck="false"><span class="dr-dhms-u">${p}</span>`
         + `<button class="dr-dhms-dd" type="button" data-act="dhms-pick" data-part="${p}" aria-label="Pick ${word}">`
         + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>').join('');
-    return `<div class="dr-row">${label(o.label || k, o.hint)}<div class="dr-dhms">${boxes}</div></div>`;
+    return `<div class="dr-row">${label(o.label || k, o.hint)}<div class="dr-dhms${o.units === 'hms' ? ' hms' : ''}">${boxes}</div></div>`;
 }
 
 /** A time box's list (dhms-pick): its unit's usual values, the one in it among them. */
@@ -1166,6 +1168,20 @@ function placedText(c) {
     return c && typeof c.x === 'number' ? `${c.x.toFixed(1)}, ${c.y.toFixed(1)}, ${c.z.toFixed(1)}` : null;
 }
 
+/** A step's time in seconds: its own, else its type's (0 for none: no end. shared/director/steps.lua THE TIMING). */
+function stepTime(s, k, dflt) {
+    return typeof s[k] === 'number' ? s[k] : (typeof dflt === 'number' ? dflt : 0);
+}
+
+/** A step's time as the line under its name says it: "1 h 30 min", "45 s"; 0 is "no end" (a move's length: "at once"). */
+function timeText(sec, length) {
+    const n = Number(sec) || 0;
+    if (n <= 0) return length ? 'at once' : 'no end';
+    if (n < 60) return `${+n.toFixed(1)} s`;
+    const r = Math.round(n), h = Math.floor(r / 3600), m = Math.floor(r % 3600 / 60), x = r % 60;
+    return [h && `${h} h`, m && `${m} min`, x && `${x} s`].filter(Boolean).join(' ');
+}
+
 /** How a step's time works now: its type's, but `until` while its `untilWhen` holds (a Wait for a card: when.js). */
 function stepTiming(def, s) {
     return def.untilWhen && holds(def.untilWhen, s, def.fields) ? 'until' : def.timing;
@@ -1212,7 +1228,7 @@ function taskSummary(ed, w, def, s, pointN) {
     }
     let timing = stepTiming(def, s);
     if (timing === 'either') timing = (s.next || def.next) === 'time' ? 'timed' : 'until';
-    if (timing === 'timed') parts.push(`${s.sec != null ? s.sec : def.sec} s`);
+    if (timing === 'timed') parts.push(timeText(stepTime(s, 'sec', def.sec), def.length));
     if (timing === 'until' && def.doneText !== false) parts.push((def.doneText || 'until it is done').toLowerCase());
     return parts.join(' · ');
 }
@@ -1335,8 +1351,12 @@ function taskFields(ed, w, def, s, i, count, n) {
             if (cur === 'point') html += pointField(ed, w, s, 'at', 'The point', n);
         }
     }
-    const secField = () => numberField(t, 'sec', s.sec, { label: def.secLabel || 'For', hint: 'seconds', min: 0.1, max: 3600, placeholder: String(def.sec) });
-    const giveField = () => numberField(t, 'giveUp', s.giveUp, { label: 'Gives up after', hint: 'seconds: then the next one', min: 1, max: 3600, placeholder: String(def.giveUp) });
+    // Its time: hours, minutes and seconds, each typed or picked from its list, 0 for no end. Shown as it plays, never
+    // greyed (Josh, 14 Nov 2026: a greyed 3 looked like nothing set, and the step stopped after 3 seconds).
+    const secField = () => timeField(t, 'sec', stepTime(s, 'sec', def.sec), { label: def.secLabel || 'For', units: 'hms',
+        hint: def.length ? '0: at once' : '0: no end, it goes on' });
+    const giveField = () => timeField(t, 'giveUp', stepTime(s, 'giveUp', def.giveUp), { label: 'Gives up after', units: 'hms',
+        hint: 'then the next one; 0: never' });
     if (stepTiming(def, s) === 'until' && def.timing === 'timed') html += giveField();   // (a Wait for a card)
     else if (def.timing === 'timed') html += secField();
     else if (def.timing === 'until') html += giveField();
