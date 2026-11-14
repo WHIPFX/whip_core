@@ -32,7 +32,7 @@ function WhipSatellite.register(fn) end
 --- Only for a resource WITHOUT `dependency 'whip_core'` (with it, your resource is stopped first and this
 --- never runs). Run `fn` when whip_core stops — to let go of something that only made sense while it ran.
 --- Registrations need no cleanup. A handler still waiting in `exports.whip_core:Progress` never
---- returns, so clear what it holds here — or make that call through Whip.call.
+--- returns, so clear what it holds here — or make that call through Whip.core.
 ---@param fn fun()
 function WhipSatellite.onCoreLost(fn) end
 
@@ -82,7 +82,8 @@ function WhipSatellite.has(name) end
 ---@return boolean
 function WhipSatellite.versionAtLeast(have, want) end
 
---- Call a whip_core export safely. Returns what the export returns, or (false, reason) when
+--- Call a whip_core export by a name built at run time; for a name you know, Whip.core:Name(...) is the same call
+--- with the export's own types. Returns what the export returns, or (false, reason) when
 --- whip_core is not running or the call threw. An export that waits (Progress, SkillCheck, a
 --- database read) returns `false, 'whip_core stopped'` if whip_core stops mid-wait; called
 --- straight through `exports.whip_core`, it would never return. `Whip.core:Name(...)` is the same

@@ -3340,7 +3340,7 @@ function whip_core:GetSkillCheckSettings() end
 --- `cancelOnExit = true`: work done from a seat. They must be in a vehicle to start ('not in a vehicle'),
 --- getting out of it ends the bar, and a finish from outside it is 'left the vehicle'.
 ---
---- If whip_core restarts mid-bar this export never returns. `Whip.call('Progress', source, opts)`
+--- If whip_core restarts mid-bar this export never returns. `Whip.core:Progress(source, opts)`
 --- returns `false, 'whip_core stopped'` instead (SkillCheck too).
 ---@param source number Player server ID
 ---@param opts WhipProgressOptions|{ near: { coords: vector3|nil, vehicle: number|WhipVehicleRef|nil, range: number }|nil, tag: string|nil } `duration` is required

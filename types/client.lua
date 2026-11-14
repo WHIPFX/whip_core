@@ -97,7 +97,7 @@ function whip_core:RegisterClientHook(hookName, handler, id) end
 function whip_core:SetGiveModeStyle(style) end
 
 --- Something is about to go in the player's hands (a phone, a tool): whatever holds them puts it away first — the
---- 'freeHands' moment, which whip_gunny answers by holstering — and this waits for it. Call from a thread (Whip.call).
+--- 'freeHands' moment, which whip_gunny answers by holstering — and this waits for it. Call from a thread (Whip.core).
 --- While the hands are blocked (BlockHands) it returns false and the block's words.
 ---@return boolean free  true when no weapon is in the hands after it
 ---@return string? why  the block's words, while blocked
@@ -1066,7 +1066,7 @@ function whip_core:SetVehicleExtras(vehicle, extras) end
 --- Take network control of a vehicle: ask, wait, check, retry. Mod, paint and repair natives only
 --- work for the client that controls the car. True at once if you already have it. Refuses a car
 --- another player is driving (taking it makes their car rubber-band). Waits: call it from a thread,
---- through Whip.call.
+--- through Whip.core.
 ---@param vehicle number|WhipVehicleRef A vehicleId, or a vehicle reference — an entity is { entity = veh }
 ---@param opts? { attempts?: number, wait?: number } Tries (default 3) and ms per try (default 500)
 ---@return boolean ok
@@ -1788,7 +1788,7 @@ function whip_core:IsControllerActive() end
 --- stick moves it round the screen. Over the keys it suggests words to finish the one being typed (RT takes
 --- the first); `predict = false` for text that is not words (a plate, a code). While it is up the pad is the
 --- keyboard's: a Whip.padScreen leaves it alone by itself, and a resource reading the pad its own way waits for
---- whip_core:keyboard:closed. From a satellite: `Whip.call('OpenKeyboard', opts)`.
+--- whip_core:keyboard:closed. From a satellite: `Whip.core:OpenKeyboard(opts)`.
 ---@param opts? { title?: string, value?: string, placeholder?: string, numeric?: boolean, maxLength?: integer, predict?: boolean }
 ---@return string|nil text  what was typed, or nil when the player left it
 ---@async

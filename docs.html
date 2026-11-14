@@ -1961,8 +1961,8 @@ shared_script '@whip_core/lib/satellite.lua'</code></pre>
 <table class="event-table">
 <tr><th>Call</th><th>What it does</th></tr>
 <tr><td><code>Whip.register(fn)</code></td><td>Runs <code>fn</code> once whip_core is ready (whichever started first) and again after every whip_core restart. Your declarations go in it, through <code>Whip.core</code>, and a refusal is printed (<a href="#register-refusals">what it prints</a>). Server and client.</td></tr>
-<tr><td><code>Whip.core:Name(…)</code></td><td>Calls an export safely, with its types in your editor: <code>Whip.core:AddItem(source, 'cookie', 1)</code>. Returns what the export returns, or <code>false, why</code> when whip_core is down or the call errored.</td></tr>
-<tr><td><code>Whip.call(name, …)</code></td><td>The same, by name: <code>Whip.call('AddItem', source, 'cookie', 1)</code>. If whip_core stops during a wait it returns <code>false, 'whip_core stopped'</code>, meaning "no answer", not "didn't happen": a charge already sent may still land.</td></tr>
+<tr><td><code>Whip.core:Name(…)</code></td><td>Calls an export safely, with its types in your editor: <code>Whip.core:AddItem(source, 'cookie', 1)</code>. Returns what the export returns, or <code>false, why</code> when whip_core is down or the call errored. If whip_core stops during a wait it returns <code>false, 'whip_core stopped'</code>, meaning "no answer", not "didn't happen": a charge already sent may still land.</td></tr>
+<tr><td><code>Whip.call(name, …)</code></td><td>The same, for a name built at run time: <code>Whip.call(exportName, …)</code>. Otherwise use <code>Whip.core</code>, which your editor checks.</td></tr>
 <tr><td><code>Whip.ready(timeoutMs?)</code></td><td>Waits (in a thread) until whip_core is ready. <code>false</code> on timeout.</td></tr>
 <tr><td><code>Whip.isReady()</code></td><td>Is whip_core running and ready right now?</td></tr>
 <tr><td><code>Whip.command(name, opts, fn)</code> (server)</td><td>A chat command behind a SecureEvent's checks: refused while the player is down (<code>whileDead = true</code> allows it), rate limited (three at once, then one a second; <code>rateLimit = false</code> for none), <code>ace = 'my.perm'</code>, and <code>dev = true</code> for the console and <code>whip.devtools</code> with developer mode on. <code>fn(source, args, raw)</code> runs in its own thread. Use it instead of <code>RegisterCommand</code> with your own checks.</td></tr>
@@ -4454,11 +4454,11 @@ if blocked then return false, why end</code></pre>
 <div class="export-card" data-search="freehands free hands holster weapon put away phone tool unequip">
 <div class="export-header"><span class="export-name">FreeHands()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-<p>Call it before putting something in the player's hands (a phone, a tool, a box): whatever they hold is put away first, through the <code>'freeHands'</code> <a href="#registerclienthook">hook</a> (whip_gunny holsters with its animation). It waits, so call it from a thread, through <code>Whip.call</code>.</p>
+<p>Call it before putting something in the player's hands (a phone, a tool, a box): whatever they hold is put away first, through the <code>'freeHands'</code> <a href="#registerclienthook">hook</a> (whip_gunny holsters with its animation). It waits, so call it from a thread, through <code>Whip.core</code>.</p>
 <div class="return-info"><strong>Returns: </strong><code>true</code> when the hands are free, <code>false</code> while a weapon is still in them, or <code>false, words</code> while they're <a href="#blockhands">blocked</a></div>
-<pre><code class="lang-lua">local free, why = Whip.call('FreeHands')
+<pre><code class="lang-lua">local free, why = Whip.core:FreeHands()
 if not free then return end
-Whip.call('PlayEmote', 'clipboard')</code></pre>
+Whip.core:PlayEmote('clipboard')</code></pre>
 </div></div>
 
 <div class="export-card" id="blockhands" data-search="blockhands block hands no weapons zone safe zone cuffed tied cutscene unblockhands arehandsblocked">
@@ -5801,13 +5801,13 @@ exports.whip_core:SetVehicleProperties({ entity = veh }, before)          -- und
 <div class="export-card" data-search="takevehiclecontrol network control ownership request entity mods paint repair rubber band">
 <div class="export-header"><span class="export-name">TakeVehicleControl(vehicle, opts)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Take network control of a vehicle: ask, wait, retry. It waits, so call it from a thread or handler through <code>Whip.call</code>. Refused while another player drives, since the car would rubber-band: make the change on the driver's client.</p>
+  <p>Take network control of a vehicle: ask, wait, retry. It waits, so call it from a thread or handler through <code>Whip.core</code>. Refused while another player drives, since the car would rubber-band: make the change on the driver's client.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicle</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr>
   <tr><td>opts</td><td>table?</td><td><code>{ attempts = 3, wait = 500 }</code>: tries, and milliseconds per try</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code>: <code>'no such vehicle'</code>, <code>'another player is driving it'</code>, <code>'control was not granted'</code></div>
-<pre><code class="lang-lua">if Whip.call('TakeVehicleControl', { entity = veh }) then
-    Whip.call('SetVehicleExtras', { entity = veh }, { [1] = true, [2] = false })
+<pre><code class="lang-lua">if Whip.core:TakeVehicleControl({ entity = veh }) then
+    Whip.core:SetVehicleExtras({ entity = veh }, { [1] = true, [2] = false })
 end</code></pre>
 </div></div>
 
@@ -8417,7 +8417,7 @@ end</code></pre>
 <div class="export-card" id="ui-loaders" data-search="loadmodel loadanimdict loadtexturedict loadanimset loadptfxasset requestmodel hasmodelloaded load model animation dictionary clipset walk style particle ptfx stream wait timeout">
 <div class="export-header"><span class="export-name">LoadModel(model, timeoutMs?) · LoadAnimDict(dict, timeoutMs?) · LoadTextureDict(dict, timeoutMs?) · LoadAnimSet(set, timeoutMs?) · LoadPtfxAsset(asset, timeoutMs?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Loads something the game streams and waits, up to <code>timeoutMs</code> (default 5000). <code>LoadModel</code> takes a name or hash and returns the hash, or <code>nil</code> (at once for a model the game lacks); the others return a boolean. <code>LoadAnimSet</code> is a walk style's clip set, <code>LoadPtfxAsset</code> a particle asset. Call from a thread; from a satellite, <code>Whip.call('LoadModel', ...)</code> returns <code>false</code> if whip_core restarts.</p>
+  <p>Loads something the game streams and waits, up to <code>timeoutMs</code> (default 5000). <code>LoadModel</code> takes a name or hash and returns the hash, or <code>nil</code> (at once for a model the game lacks); the others return a boolean. <code>LoadAnimSet</code> is a walk style's clip set, <code>LoadPtfxAsset</code> a particle asset. Call from a thread; from a satellite, <code>Whip.core:LoadModel(...)</code> returns <code>false</code> if whip_core restarts.</p>
 <pre><code class="lang-lua">local hash = exports.whip_core:LoadModel('prop_beer_bottle')
 if not hash then return end
 local obj = CreateObject(hash, x, y, z, true, true, false)
@@ -8479,13 +8479,13 @@ SetModelAsNoLongerNeeded(hash)</code></pre>
   <tr><td>opts.tag</td><td>any?</td><td>Your run tag: <code>ReleaseTag(tag)</code> cancels it; a released tag is <code>'run ended'</code></td></tr>
   <tr><td>opts.notWhile</td><td>table?</td><td>Checked by the player's game; never started is <code>'refused'</code></td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code>: <code>'cancelled'</code>, <code>'refused'</code>, <code>'busy'</code>, <code>'timeout'</code>, <code>'too fast'</code>, <code>'too far'</code>, <code>'dead'</code> (unless <code>cancelOnDeath = false</code>), <code>'not in a vehicle'</code>, <code>'left the vehicle'</code>, <code>'player left'</code>, <code>'run ended'</code>, or a refusal (no <code>duration</code>, a bad <code>near</code>)</div>
-<pre><code class="lang-lua">local done = Whip.call('Progress', source, {
+<pre><code class="lang-lua">local done = Whip.core:Progress(source, {
     label = 'Picking the lock...', duration = 8000,
     anim = { dict = 'mini@safe_cracking', clip = 'idle_base' },
     near = { coords = doorCoords, range = 3.0 },
 })
 if not done then return end</code></pre>
-  <div class="info-box warn"><strong>Call waiting exports through <a href="#patterns-satellite"><code>Whip.call</code></a>.</strong> Without <code>dependency 'whip_core'</code>, a whip_core restart leaves <code>exports.whip_core:Progress</code> waiting forever; <code>Whip.call</code> returns <code>false, 'whip_core stopped'</code>. Do the same for <code>SkillCheck</code>, <code>ChargePlayer</code>, <code>Callback</code> and database reads when you hold a flag across the call.</div>
+  <div class="info-box warn"><strong>Call waiting exports through <a href="#patterns-satellite"><code>Whip.core</code></a>.</strong> Without <code>dependency 'whip_core'</code>, a whip_core restart leaves <code>exports.whip_core:Progress</code> waiting forever; <code>Whip.core</code> returns <code>false, 'whip_core stopped'</code>. Do the same for <code>SkillCheck</code>, <code>ChargePlayer</code>, <code>Callback</code> and database reads when you hold a flag across the call.</div>
 </div></div>
 
 <h3 id="which-text-input">Dialogs and text input</h3>
@@ -8587,7 +8587,7 @@ exports.whip_core:AnswerAsk(source, token, true)   -- later, they pressed Accept
   <tr><td>opts.game</td><td>string?</td><td>A game at one of its levels, on its own timings unless you pass yours</td></tr>
   <tr><td>opts.quiet</td><td>boolean?</td><td>Don't tell a player why a game couldn't start</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code>: <code>'failed'</code>, <code>'busy'</code>, <code>'cancelled'</code>, <code>'timeout'</code>, <code>'too fast'</code>, <code>'dead'</code>, <code>'run ended'</code>, <code>'Player not loaded'</code>, <code>'not started'</code>, <code>'unavailable'</code>, or a sentence naming a bad argument</div>
-<pre><code class="lang-lua">local passed, why = Whip.call('SkillCheck', source, 'medium')
+<pre><code class="lang-lua">local passed, why = Whip.core:SkillCheck(source, 'medium')
 if not passed then return false, why == 'busy' and 'Finish what you are doing first' or 'You slipped' end</code></pre>
   <div class="info-box warn"><strong>A patient cheater still passes</strong> by waiting the honest time. Don't gate an outcome that must be uncheatable on a minigame.</div>
 </div></div>
@@ -8850,7 +8850,7 @@ end)</code></pre>
 <div class="export-body">
   <p>Which button any action is on in this player's layout (yours, another resource's, or WHIP's <code>'radial'</code>, <code>'inventory'</code>, <code>'engine'</code>, <code>'sprint'</code>). Ask each time you show a hint.</p>
   <div class="return-info"><strong>Returns: </strong>slot (<code>'lb_y'</code>), pictures for <code>ShowText</code> (<code>'{pad:lb}{pad:y}'</code>), name (<code>'LB+Y'</code>); <code>nil</code> on no button or no such action</div>
-<pre><code class="lang-lua">local slot, pictures = Whip.call('GetPadActionButton', 'mycafe_menu')
+<pre><code class="lang-lua">local slot, pictures = Whip.core:GetPadActionButton('mycafe_menu')
 if type(slot) == 'string' then exports.whip_core:ShowText(pictures .. ' Cafe menu') end</code></pre>
 </div></div>
 
@@ -8887,7 +8887,7 @@ screen:close()                                             -- on every close</co
   <tr><td>opts.maxLength</td><td>integer?</td><td>Character limit</td></tr>
   <tr><td>opts.predict</td><td>boolean?</td><td><code>false</code>: no suggestions, nothing learned (a plate, a code)</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>string</code>, or <code>nil</code> when left (B) or replaced by another keyboard</div>
-<pre><code class="lang-lua">local text = Whip.call('OpenKeyboard', { title = 'Search', value = current, maxLength = 40 })</code></pre>
+<pre><code class="lang-lua">local text = Whip.core:OpenKeyboard({ title = 'Search', value = current, maxLength = 40 })</code></pre>
 </div></div>
 
 <h3>A mode's confirm and cancel</h3>
@@ -9150,7 +9150,7 @@ print(('theme %s, set by %s'):format(tostring(theme), owner or 'config.lua'))</c
 <div class="export-card" data-search="getnuicaps nui caps browser chromium 103 144 cef features detect gameview game view">
 <div class="export-header"><span class="export-name">GetNuiCaps()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>A copy of the flags, as whip_core's page reported them; <code>whip_core:nui:capsDetected</code> fires with them when it does. From a satellite, <code>Whip.call('GetNuiCaps')</code>. <code>/nuicaps</code> prints them in F8; <code>/nuicaps gameview</code> shows the game view live (solid blue: it didn't bind).</p>
+  <p>A copy of the flags, as whip_core's page reported them; <code>whip_core:nui:capsDetected</code> fires with them when it does. From a satellite, <code>Whip.core:GetNuiCaps()</code>. <code>/nuicaps</code> prints them in F8; <code>/nuicaps gameview</code> shows the game view live (solid blue: it didn't bind).</p>
   <div class="return-info"><strong>Returns: </strong><code>table|false caps, string|nil err</code>: <code>false, 'not_detected_yet'</code> before the page reports</div>
 <pre><code class="lang-lua">local caps = exports.whip_core:GetNuiCaps()
 if caps and caps.gameView then print('the page can have the game picture') end</code></pre>
@@ -9832,20 +9832,20 @@ meta.ammo = currentAmmo - toUnload                            -- take: the magaz
 if not exports.whip_core:SetItemMetadata(magAddr, meta) then
     return false, 'Could not unload: the magazine was not changed'
 end
-local added = Whip.call('AddItem', source, caliber.ammoItem, toUnload,   -- then give
+local added = Whip.core:AddItem(source, caliber.ammoItem, toUnload,   -- then give
     nil, { reason = 'unloaded from a magazine', noDrop = true })
 if not added then
     -- no room: the rounds go back into the magazine, if it's still the one lowered
 end</code></pre>
 
 <h3>A bar the server times</h3>
-<p>Loading a magazine runs the server <a href="#server-progress"><code>Progress</code></a> through <code>Whip.call</code> and loads only when it returns <code>true</code>; a finish sooner than the bar could fill is refused (<code>'too fast'</code>). It waits, so run it from a SecureEvent or right-click action, never a SecureCallback (the game gives up after 10 seconds), and read the item again after. To use an item at the end of a bar, give <code>RegisterUseHandler</code> a table instead (<a href="#declared-use">a use with a progress bar</a>).</p>
+<p>Loading a magazine runs the server <a href="#server-progress"><code>Progress</code></a> through <code>Whip.core</code> and loads only when it returns <code>true</code>; a finish sooner than the bar could fill is refused (<code>'too fast'</code>). It waits, so run it from a SecureEvent or right-click action, never a SecureCallback (the game gives up after 10 seconds), and read the item again after. To use an item at the end of a bar, give <code>RegisterUseHandler</code> a table instead (<a href="#declared-use">a use with a progress bar</a>).</p>
 
 <h3>Go by the server's own record</h3>
 <p>Shots, throws and holstering go by where the server saw the gun drawn and its serial (<code>GunnyDrawnWeapon</code>), never a slot the client names. Every gun and magazine gets a serial as it's made (<a href="#registeritemdefaultmetadata"><code>RegisterItemDefaultMetadata</code></a>). Give your own findable items an id the same way: WHIP's <code>uid</code> only comes the first time an item is logged.</p>
 
 <h3>Calling whip_core</h3>
-<p>Call an export straight when it returns at once, inside a handler whip_core runs (<code>GetItemAt</code>, <code>SetItemMetadata</code>). Use <code>Whip.call</code> for a call that can wait (<code>AddItem</code>, <code>Progress</code>), for everything after such a wait, and outside whip_core's handlers; it returns <code>false, why</code> instead of throwing. The full rule is in <a href="#patterns-calling">Calling whip_core</a>, and at the top of gunny's <code>server/main.lua</code> and <code>client/main.lua</code>.</p>
+<p>Call an export straight when it returns at once, inside a handler whip_core runs (<code>GetItemAt</code>, <code>SetItemMetadata</code>). Use <code>Whip.core</code> for a call that can wait (<code>AddItem</code>, <code>Progress</code>), for everything after such a wait, and outside whip_core's handlers; it returns <code>false, why</code> instead of throwing. The full rule is in <a href="#patterns-calling">Calling whip_core</a>, and at the top of gunny's <code>server/main.lua</code> and <code>client/main.lua</code>.</p>
 
 <h3 id="gunny-files">Where to look</h3>
 <p>Read <code>server/main.lua</code>, <code>server/items.lua</code>, <code>server/weapons.lua</code>, <code>server/magpanel.lua</code>, then <code>client/main.lua</code>.</p>
@@ -10089,9 +10089,9 @@ local function payOwed(source, charId)
 end</code></pre>
 
 <h3>A bar the server times, and a look after it</h3>
-<p>Coiling up runs the server <a href="#server-progress"><code>Progress</code></a> through <code>Whip.call</code> from a SecureEvent handler, which may wait (a SecureCallback may not). The bar takes seconds, so the handler looks again after it: the rope may be gone or in someone else's hands. Pockets that won't take the item make it owed instead.</p>
+<p>Coiling up runs the server <a href="#server-progress"><code>Progress</code></a> through <code>Whip.core</code> from a SecureEvent handler, which may wait (a SecureCallback may not). The bar takes seconds, so the handler looks again after it: the rope may be gone or in someone else's hands. Pockets that won't take the item make it owed instead.</p>
 <pre><code class="lang-lua">-- server/main.lua, onCoil (trimmed)
-local done = Whip.call('Progress', source, { label = 'Coiling up the rope', duration = Config.Item.CoilDuration or 3000, canCancel = true })
+local done = Whip.core:Progress(source, { label = 'Coiling up the rope', duration = Config.Item.CoilDuration or 3000, canCancel = true })
 if done ~= true then return false end             -- cancelled, or they left
 if Ropes.all[ropeId] ~= rope or Ropes.heldBy(source, true) ~= rope then return false end   -- still there, still theirs?
 Ropes.remove(ropeId)
@@ -10108,8 +10108,8 @@ local TIE = {
 -- five times a second: up only while an end is in the hand
 local wantTie = Rope.MyHeld() ~= nil
 if wantTie ~= tieUp then
-    if wantTie then tieUp = Whip.call('AddAction', TIE) == true
-    else Whip.call('RemoveAction', 'tie'); tieUp = false end
+    if wantTie then tieUp = Whip.core:AddAction(TIE) == true
+    else Whip.core:RemoveAction('tie'); tieUp = false end
 end</code></pre>
 <div class="info-box warn"><strong>Without <code>dependency 'whip_core'</code>, reset the flag.</strong> The action lives in whip_core's memory. A resource that keeps running through a whip_core restart must reset its "prompt is up" flag in <code>Whip.onCoreLost</code>, or the prompt never comes back.</div>
 
@@ -10304,7 +10304,7 @@ if not TuningServer.write(vehicleId, tuningChanges, propsFromBasket(lines)) then
 end</code></pre>
 
 <h3>A claim that every exit gives back</h3>
-<p>Trying parts on changes the real car for everyone near, so the server keeps one session per car and per player. Every way a visit ends puts the stored look back: the page closing, leaving the driver's seat (<code>whip_core:vehicle:exited</code>), <code>playerDropped</code>, whip_autos stopping. The client calls <code>Whip.call('HoldVehicleAppearance', vId, true)</code> so WHIP doesn't report the unpaid preview as the car's look.</p>
+<p>Trying parts on changes the real car for everyone near, so the server keeps one session per car and per player. Every way a visit ends puts the stored look back: the page closing, leaving the driver's seat (<code>whip_core:vehicle:exited</code>), <code>playerDropped</code>, whip_autos stopping. The client calls <code>Whip.core:HoldVehicleAppearance(vId, true)</code> so WHIP doesn't report the unpaid preview as the car's look.</p>
 
 <h3>Data on a car that every game applies</h3>
 <p>An engine swap, stance, handling setup and drivetrain aren't GTA mods, so the server writes them as <a href="#guide-vehicle-data">vehicle data</a>. Every game applies them with <code>WatchVehicleData</code>: <code>onGained</code>/<code>onChanged</code>/<code>onLost</code> for every car in view, or <code>driverOnly</code> with <code>onStart</code>/<code>onStop</code> for the driver alone (a <a href="#handling-layers">handling layer</a>).</p>
@@ -10714,10 +10714,10 @@ end)</code></pre>
     props = { { key = 'message', kind = 'text', label = 'Message', default = 'A customer is waiting', maxLength = 120 } },
     testSays = 'Would send "{message}" to the staff on duty',
     run = function(card)
-        local staff = Whip.call('GetClockedOnEmployees', 'mycafe')
+        local staff = Whip.core:GetClockedOnEmployees('mycafe')
         if type(staff) ~= 'table' or #staff == 0 then return 'nobody' end
         for _, s in ipairs(staff) do
-            if s.source then Whip.call('NotifyPlayer', s.source, card.props.message, 'info') end
+            if s.source then Whip.core:NotifyPlayer(s.source, card.props.message, 'info') end
         end
         card:record('called', { detail = card.props.message })
         return 'sent'
@@ -10777,7 +10777,7 @@ end)</code></pre>
   <tr><td>opts.event</td><td>table?</td><td>An event card's payload, as <code>SendDirectorEvent</code>'s</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>{ outcome, data }</code> (<code>'timeout'</code> when time ran out), or <code>false, reason</code> (Check's first problem, it failed, no answer in time)</div>
 <pre><code class="lang-lua">CreateThread(function()
-    local result, why = Whip.call('TestDirectorCard', 'mycafe.callStaff', { message = 'Test call' }, { player = source })
+    local result, why = Whip.core:TestDirectorCard('mycafe.callStaff', { message = 'Test call' }, { player = source })
     print(result and result.outcome or why)
 end)</code></pre>
 </div></div>
@@ -12130,8 +12130,8 @@ end)</code></pre>
     end
 end)</code></pre>
 
-<h3>Weapon shop: another WHIP resource, and Whip.call</h3>
-<p>Sell a pistol with whip_gunny (add <code>dependency 'whip_gunny'</code>). Once something has waited (<code>GiveWeapon</code> gives through <code>AddItem</code>), call whip_core through <code>Whip.call</code>, which returns even if whip_core stops meanwhile.</p>
+<h3>Weapon shop: another WHIP resource, and Whip.core</h3>
+<p>Sell a pistol with whip_gunny (add <code>dependency 'whip_gunny'</code>). Once something has waited (<code>GiveWeapon</code> gives through <code>AddItem</code>), call whip_core through <code>Whip.core</code>, which returns even if whip_core stops meanwhile.</p>
 <pre><code class="lang-lua">local COUNTER = vector3(21.6, -1106.5, 29.8)
 
 -- client.lua
@@ -12153,12 +12153,12 @@ Whip.register(function()
 
         local ok, why = exports.whip_gunny:GiveWeapon(source, 'gunny_pistol', nil, 'Pistol purchase')
         if not ok then
-            Whip.call('RefundPlayer', receipt)
+            Whip.core:RefundPlayer(receipt)
             return false, why
         end
         exports.whip_gunny:GiveMagazine(source, 'gunny_mag_pistol', 12, 'Pistol purchase')
-        Whip.call('AddItem', source, 'ammo_9mm', 24, nil, 'Pistol purchase')
-        Whip.call('NotifyPlayer', source, 'Pistol purchased!', 'success')
+        Whip.core:AddItem(source, 'ammo_9mm', 24, nil, 'Pistol purchase')
+        Whip.core:NotifyPlayer(source, 'Pistol purchased!', 'success')
     end)
 end)</code></pre>
 <h2 id="credits">Credits</h2>

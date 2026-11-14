@@ -302,10 +302,11 @@ local function sayRefusal(name, ...)
     return ...
 end
 
---- Call a whip_core export safely. Answers what the export answers, or (false, reason) when
---- whip_core is not running or the call threw — never an error in your code.
+--- Call a whip_core export safely, by a name built at run time (for a name you know, Whip.core:Name(...), below, is
+--- the same call with the export's types). Returns what the export returns, or (false, reason) when whip_core is not
+--- running or the call threw — never an error in your code.
 ---
----     local ok, err = Whip.call('AddItem', source, 'lemonade', 1, nil, { reason = 'bought at the stand' })
+---     local ok, err = Whip.call(exportName, source, 'lemonade', 1, nil, { reason = 'bought at the stand' })
 ---
 --- INSIDE A Whip.register FUNCTION, A DECLARING CALL'S REFUSAL IS PRINTED in your console, naming the export:
 --- Register..., Ensure..., Add..., On..., Watch..., SecureEvent and SecureCallback. Nobody else reads it there. A
@@ -397,7 +398,7 @@ end
 ---
 --- A handler waiting in `exports.whip_core:Progress` (or SkillCheck, or any export that waits)
 --- when whip_core stops is never answered, so anything it holds stays held; clear that here. Or
---- make the call through Whip.call, which answers it with `false, 'whip_core stopped'`.
+--- make the call through Whip.core, which returns `false, 'whip_core stopped'` for it.
 ---
 --- EVERY PLAYER HAS BEEN LOGGED OUT when this runs, and no whip_core:player:logout
 --- fires for them — whip_core is going away, and it cannot announce on the way down. So drop any
@@ -540,7 +541,7 @@ end
 --   rateLimit = false   no limit; default 3 at once, then one a second
 --   console = false     not from the server console (allowed by default)
 -- A refusal is said to the player as a toast (or printed for the console). fn runs in its own thread, so it may
--- wait (Whip.call with an export that waits).
+-- wait (Whip.core with an export that waits).
 if IsDuplicityVersion() then
     local _commandUse = {}   -- [name] = { [source] = { tokens, at } }
 
@@ -1162,7 +1163,7 @@ end
 --         props = { { key = 'message', kind = 'text', label = 'Message', default = '10-90 alarm', maxLength = 120 } },
 --         testSays = 'Would send "{message}" to the police on duty',
 --         run = function(card)
---             ...                              -- it may wait: Whip.call, the database
+--             ...                              -- it may wait: Whip.core, the database
 --             return 'sent'                    -- an outcome; or nothing, and Whip.answerCard(card.callId, 'sent') later
 --         end,
 --     })
@@ -1419,7 +1420,7 @@ end
 --             return true
 --         end,
 --         -- client, optional: the same rule, for a client script's SkillCheck({ difficulty, game }) (no source; it
---         -- must not wait: read what this game already knows, e.g. Whip.call('GetItemCount', 'phone') > 0)
+--         -- must not wait: read what this game already knows, e.g. Whip.core:GetItemCount('phone') > 0)
 --         run = function(difficulty, token)            -- client: play it (in a thread: it may wait)
 --             return passed, why                       -- why: 'failed' | 'cancelled' | 'timeout' | 'busy'
 --         end,
