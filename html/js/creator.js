@@ -1317,11 +1317,13 @@ function onCardClick(el) {
  *   bodyHtml its controls ('' for none)
  *   hero     { src, glyph, sub, meta } or null: the picture (src null = its glyph until there is one),
  *            the line under the heading (the item's collection) and the small count under that
- *   below    controls across the band's whole width, under the picture (hair's two colour grids:
- *            wide, they are five rows each, where beside the picture they were eight)
+ *   side     controls that stand beside the picture, filling its height (hair's two colour grids, one
+ *            over the other). The heading goes up to a line of its own above them, with the collection
+ *            beside it and `bodyHtml` at its end (hair's textures), so the band is the picture's height
+ *            and a line, and the grid under it keeps its rows of cards.
  * Neither controls nor a picture (eyes; "None" picked): the band goes and the grid takes its room.
  */
-function setOptions(title, bodyHtml, hero, below) {
+function setOptions(title, bodyHtml, hero, side) {
     const band = $('cr-options');
     if (!bodyHtml && !hero) {
         band.classList.remove('open');
@@ -1332,13 +1334,20 @@ function setOptions(title, bodyHtml, hero, below) {
     const pic = hero
         ? `<div class="cr-hero">${iconImg(hero.src)}<span class="cr-hero-art">${GLYPHS[hero.glyph] || ''}</span></div>`
         : '';
-    // The count's margin-top: auto stands it and the colours under it on the picture's bottom edge.
-    const head = `<div class="cr-band-title${hero ? '' : ' small'}">${title}</div>`
-        + (hero && hero.sub ? `<div class="cr-band-sub">${hero.sub}</div>` : '')
-        + (hero && hero.meta ? `<div class="cr-band-meta">${hero.meta}</div>` : '');
-    band.innerHTML = `<div class="cr-band-top">${pic}<div class="cr-band-main">${head}`
-        + `<div class="cr-band-body">${bodyHtml || ''}</div></div></div>`
-        + (below ? `<div class="cr-band-below">${below}</div>` : '');
+    if (side) {
+        band.innerHTML = `<div class="cr-band-head"><div class="cr-band-title">${title}</div>`
+            + (hero && hero.sub ? `<div class="cr-band-sub">${hero.sub}</div>` : '')
+            + `<div class="cr-band-body">${bodyHtml || ''}</div></div>`
+            + `<div class="cr-band-top">${pic}<div class="cr-band-side">${side}</div></div>`;
+    } else {
+        // The count's margin-top: auto stands it and the colours under it on the picture's bottom edge.
+        const head = `<div class="cr-band-title${hero ? '' : ' small'}">${title}</div>`
+            + (hero && hero.sub ? `<div class="cr-band-sub">${hero.sub}</div>` : '')
+            + (hero && hero.meta ? `<div class="cr-band-meta">${hero.meta}</div>` : '');
+        band.innerHTML = `<div class="cr-band-top">${pic}<div class="cr-band-main">${head}`
+            + `<div class="cr-band-body">${bodyHtml || ''}</div></div></div>`;
+    }
+    band.classList.toggle('cr-band-sided', !!side);
     band.classList.add('open');
 
     // When the controls are more than the band holds they scroll under the heading: the picked
@@ -1526,15 +1535,15 @@ function renderOptions() {
         nuiCallback('getMaxTexture', { type: 'hair', id: 2, drawable: hair.style }).then(resp => {
             if (gen !== optionsGen) return;
             const count = (resp && resp.maxTexture != null) ? resp.maxTexture : 0;
-            // One texture is no choice at all.
+            // One texture is no choice at all. Its small pictures sit at the end of the heading's line;
+            // the colours stand beside the big picture, Colour over Highlight, so the hairstyles below
+            // keep their rows.
             const tex = count > 1 ? texRowHtml(count, hair.texture, i => iconOf('component', 2, hair.style, i)) : '';
             setOptions(`Hair ${hair.style}`, tex,
                 { src: iconOf('component', 2, hair.style, hair.texture), glyph: 'hair',
-                  sub: collectionOf('component', 2, hair.style), meta: count > 1 ? `${count} textures` : '' },
-                `<div class="cr-band-cols">`
-                + `<div class="cr-band-col"><div class="cr-opt-label"><span>Colour</span></div>${swatchGridHtml('hairColor', hairPal, maxColor, hair.color)}</div>`
-                + `<div class="cr-band-col"><div class="cr-opt-label"><span>Highlight</span></div>${swatchGridHtml('hairHighlight', hairPal, maxColor, hair.highlight)}</div>`
-                + `</div>`);
+                  sub: collectionOf('component', 2, hair.style) },
+                `<div class="cr-band-colours"><div class="cr-opt-label"><span>Colour</span></div>${swatchGridHtml('hairColor', hairPal, maxColor, hair.color)}</div>`
+                + `<div class="cr-band-colours"><div class="cr-opt-label"><span>Highlight</span></div>${swatchGridHtml('hairHighlight', hairPal, maxColor, hair.highlight)}</div>`);
         });
         return;
     }

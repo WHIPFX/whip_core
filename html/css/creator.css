@@ -255,7 +255,6 @@
 }
 #cr-options.open { display: flex; animation: cr-fade 0.28s var(--ui-ease); }
 .cr-band-top { display: flex; gap: 25px; min-height: 0; }
-.cr-band-below { flex: 0 0 auto; }
 
 @keyframes cr-fade {
     from { opacity: 0; transform: translateY(6px); }
@@ -341,6 +340,42 @@
 }
 .cr-band-cols { display: flex; gap: 24px; }
 .cr-band-col { flex: 1 1 0; min-width: 0; }
+
+/* ---- the band with controls beside the picture (hair: creator.js setOptions `side`) ----
+   The heading on a line of its own, the collection after it and the item's own choices at its end
+   (hair's textures, as small pictures: seven at most). Under it the picture, a little
+   smaller than the other bands' so the band stays short, and beside it the two colour grids, Colour
+   over Highlight, three rows each, filling the picture's height. The grid of hairstyles below keeps
+   two rows and more. */
+.cr-band-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    min-height: 32px;
+    margin-bottom: 14px;
+}
+.cr-band-head .cr-band-title { font-size: 32px; }
+.cr-band-head .cr-band-sub { margin-top: 0; }
+.cr-band-head .cr-band-body {
+    flex: 0 1 auto;
+    align-self: center;
+    margin: 0 0 0 auto;
+    padding: 2px;
+    overflow: visible;
+}
+.cr-band-head .cr-texrow { flex-wrap: nowrap; gap: 6px; }
+.cr-band-head .cr-tex-pic { width: 44px; height: 44px; }
+.cr-band-head .cr-tex-pic .cr-icon { inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); }
+.cr-band-sided .cr-hero { flex-basis: 206px; height: 206px; }
+.cr-band-side {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.cr-band-side .cr-opt-label { margin: 0 0 6px; }
+.cr-band-side .cr-swatches { grid-template-columns: repeat(auto-fill, minmax(20px, 1fr)); gap: 4px; }
 
 .cr-opt-row { margin-bottom: 6px; }
 .cr-opt-label {
