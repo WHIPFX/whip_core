@@ -56,8 +56,9 @@ Config.MaxWeight = {   -- Kilograms
 -- Weights in this file and in RegisterItem are kilograms either way.
 Config.WeightUnit = 'kg'
 
--- The small strip beside the inventory: five slots that take anything. A car key in one goes into the ignition
--- by itself when its holder takes the driver's seat, and whip_phone looks for a phone in the first slot first.
+-- The small strip beside the inventory: slot 1 Phone, slot 2 Money (cash or a wallet), slots 3 to 5 Key. A car key
+-- in a Key slot goes into the ignition by itself when its holder takes the driver's seat, and back when they get
+-- out, so they can carry three cars' keys. whip_phone looks for a phone in the Phone slot first.
 --   true  = every character has it
 --   false = no strip: everything goes in the inventory, and keys go in the ignition by hand.
 --           What was in the strip moves into the inventory at next login.

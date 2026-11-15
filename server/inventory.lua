@@ -681,9 +681,9 @@ end
 -- Add Item (find slot, respect stacking)
 -- ============================================
 
---- Will this slot of a player container take this item? Only the accessory strip can say no: a resource
---- may type one of its slots (RegisterAccessorySlot's `accepts`, the same rule the player store kind reads),
---- so an overflowing reward can't land a burger in a badge slot. whip's own five take anything.
+--- Will this slot of a player container take this item? Only the accessory strip can say no: its slots are
+--- typed (RegisterAccessorySlot's `accepts` and `keys`, the same rule the player store kind reads), so an
+--- overflowing reward can't land a burger in the Money slot.
 ---@param container string
 ---@param slot number
 ---@param item string
@@ -691,7 +691,28 @@ end
 function Inventory.slotTakes(container, slot, item)
     if container ~= 'accessory' then return true end
     local def = Inventory.AccessorySlots[slot]
-    return def ~= nil and (not def.accepts or def.accepts == item)
+    if not def then return false end
+    if not def.accepts and not def.keys then return true end
+    if def.keys and Inventory.isIgnitionKey(item) then return true end
+    for _, name in ipairs(def.accepts or {}) do
+        if name == item then return true end
+    end
+    return false
+end
+
+--- Why a strip slot refuses an item, in the player's words: "Only Cash or Wallet can go there".
+---@param slot number
+---@return string
+function Inventory.slotRefusal(slot)
+    local def = Inventory.AccessorySlots[slot]
+    if not def then return 'No such accessory slot' end
+    local names = {}
+    for _, name in ipairs(def.accepts or {}) do
+        local item = Config.Items[name]
+        names[#names + 1] = item and item.name or name
+    end
+    if def.keys then names[#names + 1] = 'keys' end
+    return ('Only %s can go there'):format(#names > 0 and table.concat(names, ' or ') or def.label)
 end
 
 -- ============================================
@@ -1606,10 +1627,10 @@ end
 -- The stat system's contract, for the accessory slots and the ignition keys: registration is a
 -- self-describing config, re-registration is idempotent, the registry broadcasts on every change
 -- and on resource start, and a stopping satellite's entries are unregistered and rebroadcast. The
--- server's checks (the player store kind for `accepts`, the ignition gate and key sweeps) read
+-- server's checks (the player store kind for `accepts` and `keys`, the ignition gate and key sweeps) read
 -- this table; the NUI's copies only make refusals instant.
 
-Inventory.AccessorySlots = {}     -- [slot] = { slot, accepts, label, icon?, iconSvg? }
+Inventory.AccessorySlots = {}     -- [slot] = { slot, accepts? (a list of items), keys?, label, icon?, iconSvg? }
 Inventory.IgnitionKeys   = {}     -- [itemName] = true
 
 --- The wire payload both broadcast paths and the login sync share.
@@ -1619,6 +1640,7 @@ function Inventory.getSlotDefsPayload()
         slots[#slots + 1] = {
             slot   = def.slot,
             accepts = def.accepts,
+            keys   = def.keys,
             label  = def.label,
             icon   = def.icon,
             iconSvg = def.iconSvg,
@@ -1635,12 +1657,24 @@ local function broadcastSlotDefs()
     TriggerClientEvent('whip_core:client:invSlotDefs', -1, Inventory.getSlotDefsPayload())
 end
 
+--- What a slot accepts, as a list of item names: a registration gives one name or a list. nil takes anything.
+local function acceptsList(accepts)
+    if type(accepts) == 'string' then return accepts ~= '' and { accepts } or nil end
+    if type(accepts) ~= 'table' then return nil end
+    local out = {}
+    for _, name in ipairs(accepts) do
+        if type(name) == 'string' and name ~= '' then out[#out + 1] = name end
+    end
+    return #out > 0 and out or nil
+end
+
 --- A slot definition, COPIED: the caller keeps no live reference into the registry (same rule as
 --- Stats.register).
 local function copySlotDef(def)
     return {
         slot    = def.slot,
-        accepts = type(def.accepts) == 'string' and def.accepts or nil,
+        accepts = acceptsList(def.accepts),
+        keys    = def.keys == true or nil,
         label   = type(def.label) == 'string' and def.label or 'Accessory',
         icon    = type(def.icon) == 'string' and def.icon or nil,
         iconSvg = type(def.iconSvg) == 'string' and def.iconSvg or nil,
@@ -1685,7 +1719,7 @@ local _ignitionKeys = Registry.new('IgnitionKey', {
 ---
 --- `tag` is a run tag (shared/registry.lua): exports.whip_core:ReleaseTag(tag) puts whip's own slot back,
 --- for a slot that should only last as long as one run of something.
----@param def table { slot (1..Config.ContainerSlots.accessory), accepts?, label?, icon?, iconSvg?, tag? }
+---@param def table { slot (1..Config.ContainerSlots.accessory), accepts? (an item or a list), keys?, label?, icon?, iconSvg?, tag? }
 ---@param owner string|nil  the registering resource; nil writes a config default (no owner)
 ---@return boolean ok
 ---@return string|nil err
@@ -1742,13 +1776,14 @@ end)
 --- The read side of RegisterAccessorySlot: which slots exist and what each accepts. A copy, not the
 --- registry (writing goes through registration, with validation and an owner).
 ---
----@return table<number, { slot: number, accepts: string|nil, label: string, icon: string|nil }>
+---@return table<number, { slot: number, accepts: string[]|nil, keys: boolean|nil, label: string, icon: string|nil }>
 exports('GetAccessorySlots', function()
     local out = {}
     for slot, def in pairs(Inventory.AccessorySlots) do
         out[slot] = {
             slot    = def.slot,
-            accepts = def.accepts,
+            accepts = def.accepts and { table.unpack(def.accepts) } or nil,
+            keys    = def.keys,
             label   = def.label,
             icon    = def.icon,
         }

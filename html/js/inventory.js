@@ -9,7 +9,7 @@ import { invItemDefs } from './core/item-defs.js';
 import { whenMet } from './core/item-rules.js';
 import {
     inv, shop, invShopHooks, invHotbarHooks,
-    slotConfig, isIgnitionKeyItem, panelByKey,
+    slotConfig, isIgnitionKeyItem, panelByKey, slotTakesItem, slotTakesText,
 } from './core/inv-state.js';
 import { beginOp, extendOp, emit, commitOp, settleUnsentOp } from './core/inv-ops.js';
 import { registerRenderer, getRenderer, defaultSeated, setViewRenderHook } from './core/inventory.js';
@@ -341,13 +341,16 @@ function renderPlayerGrid() {
 function accessoryPlaceholder(cfg) {
     const el = document.createElement('div');
     el.className = 'inv-accessory-placeholder';
-    const svg = cfg.iconSvg || ACCESSORY_ICONS[cfg.icon] || ACCESSORY_ICONS[cfg.accepts];
+    // What it takes, by its first item (a slot can take a list); a Key slot is the key.
+    const first = Array.isArray(cfg.accepts) ? cfg.accepts[0] : null;
+    const svg = cfg.iconSvg || ACCESSORY_ICONS[cfg.icon] || ACCESSORY_ICONS[first]
+        || (cfg.keys && !first ? ACCESSORY_ICONS.vehicle_key : null);
     if (svg) {
         el.innerHTML = svg;
-    } else if (cfg.accepts) {
+    } else if (first) {
         const img = document.createElement('img');
         img.alt = '';
-        setItemImage(img, { item: cfg.accepts });
+        setItemImage(img, { item: first });
         el.classList.add('is-picture');
         el.appendChild(img);
     } else {
@@ -431,8 +434,8 @@ function renderAccessoryGrid(forceRebuild) {
         slot.className = 'inv-accessory-slot inv-slot';
         slot.dataset.container = 'accessory';
         slot.dataset.slot = slotNum;
-        // Store accepted item type for drag validation
-        if (cfg.accepts) slot.dataset.accepts = cfg.accepts;
+        // Store accepted item types for drag validation
+        if (Array.isArray(cfg.accepts)) slot.dataset.accepts = cfg.accepts.join(',');
 
         // Always add the placeholder (hidden via CSS when has-item)
         const placeholder = accessoryPlaceholder(cfg);
@@ -1094,9 +1097,8 @@ let dragHoverSlot = null;
                         // Check accessory slot restriction before drop-one
                         if (toContainer === 'accessory') {
                             const slotCfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
-                            if (slotCfg && slotCfg.accepts && fromData && fromData.item !== slotCfg.accepts) {
-                                const def = invItemDefs[slotCfg.accepts];
-                                uiNotify({ text: 'Only ' + (def ? def.name : slotCfg.label) + ' can go here', type: 'error', duration: 3000 });
+                            if (slotCfg && fromData && !slotTakesItem(slotCfg, fromData.item)) {
+                                uiNotify({ text: 'Only ' + slotTakesText(slotCfg, invItemDefs) + ' can go here', type: 'error', duration: 3000 });
                                 return;
                             }
                         }
@@ -1437,10 +1439,8 @@ function dragEndBody(e) {
                     if (fromData) {
                         // Check slot restriction
                         const slotCfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
-                        if (slotCfg && slotCfg.accepts && fromData.item !== slotCfg.accepts) {
-                            const def = invItemDefs[slotCfg.accepts];
-                            const slotName = def ? def.name : slotCfg.label;
-                            uiNotify({ text: 'Only ' + slotName + ' can go here', type: 'error', duration: 3000 });
+                        if (slotCfg && !slotTakesItem(slotCfg, fromData.item)) {
+                            uiNotify({ text: 'Only ' + slotTakesText(slotCfg, invItemDefs) + ' can go here', type: 'error', duration: 3000 });
                         } else if (inv.state.accessory[toKey]) {
                             // Slot occupied — swap
                             const existingAccessory = inv.state.accessory[toKey];
@@ -1464,10 +1464,8 @@ function dragEndBody(e) {
                         if (toData) {
                             // Check if the item being swapped back can go into the accessory slot
                             const slotCfg = slotConfig.accessorySlots.find(c => c.slot === fromSlot);
-                            if (slotCfg && slotCfg.accepts && toData.item !== slotCfg.accepts) {
-                                const def = invItemDefs[slotCfg.accepts];
-                                const slotName = def ? def.name : slotCfg.label;
-                                uiNotify({ text: 'Only ' + slotName + ' can go in that slot', type: 'error', duration: 3000 });
+                            if (slotCfg && !slotTakesItem(slotCfg, toData.item)) {
+                                uiNotify({ text: 'Only ' + slotTakesText(slotCfg, invItemDefs) + ' can go in that slot', type: 'error', duration: 3000 });
                             } else {
                                 // Swap
                                 inv.state.accessory[fromKey] = toData;
@@ -1489,15 +1487,13 @@ function dragEndBody(e) {
                         // Check restriction on target slot
                         const toCfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
                         const fromCfg = slotConfig.accessorySlots.find(c => c.slot === fromSlot);
-                        const toAcceptsFrom = !toCfg.accepts || fromData.item === toCfg.accepts;
-                        const fromAcceptsTo = !toData || !fromCfg.accepts || toData.item === fromCfg.accepts;
+                        const toAcceptsFrom = slotTakesItem(toCfg, fromData.item);
+                        const fromAcceptsTo = !toData || slotTakesItem(fromCfg, toData.item);
 
                         if (!toAcceptsFrom) {
-                            const def = invItemDefs[toCfg.accepts];
-                            uiNotify({ text: 'Only ' + (def ? def.name : toCfg.label) + ' can go here', type: 'error', duration: 3000 });
+                            uiNotify({ text: 'Only ' + slotTakesText(toCfg, invItemDefs) + ' can go here', type: 'error', duration: 3000 });
                         } else if (!fromAcceptsTo) {
-                            const def = invItemDefs[fromCfg.accepts];
-                            uiNotify({ text: 'Only ' + (def ? def.name : fromCfg.label) + ' can go in that slot', type: 'error', duration: 3000 });
+                            uiNotify({ text: 'Only ' + slotTakesText(fromCfg, invItemDefs) + ' can go in that slot', type: 'error', duration: 3000 });
                         }
 
                         if (toAcceptsFrom && fromAcceptsTo) {
@@ -1942,8 +1938,7 @@ function isPocketGrid(container) {
 
 /** The accessory strip's typed slots — this screen's copy of the player kind's allowsAt. */
 function accessoryTakes(slot, itemKey) {
-    const cfg = slotConfig.accessorySlots.find(c => c.slot === slot);
-    return !!cfg && (!cfg.accepts || cfg.accepts === itemKey);
+    return slotTakesItem(slotConfig.accessorySlots.find(c => c.slot === slot), itemKey);
 }
 
 /** A bag (a resource's panel) and the ground or another player's inventory: the server has no move between them

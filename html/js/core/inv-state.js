@@ -189,11 +189,11 @@ export function invRegisterHotbarHooks(hooks) { invHotbarHooks = hooks; }
 
 export const slotConfig = {
     accessorySlots: [
-        { slot: 1, accepts: null, label: 'Accessory' },
-        { slot: 2, accepts: null, label: 'Accessory' },
-        { slot: 3, accepts: null, label: 'Accessory' },
-        { slot: 4, accepts: null, label: 'Accessory' },
-        { slot: 5, accepts: null, label: 'Accessory' },
+        { slot: 1, accepts: null, label: 'Phone', icon: 'phone' },
+        { slot: 2, accepts: ['cash', 'wallet'], label: 'Money', icon: 'cash' },
+        { slot: 3, accepts: null, keys: true, label: 'Key', icon: 'vehicle_key' },
+        { slot: 4, accepts: null, keys: true, label: 'Key', icon: 'vehicle_key' },
+        { slot: 5, accepts: null, keys: true, label: 'Key', icon: 'vehicle_key' },
     ],
     ignitionKeys: ['vehicle_key', 'hacked_vehicle_key'],
 };
@@ -206,4 +206,21 @@ export function adoptSlotDefs(payload) {
 
 export function isIgnitionKeyItem(item) {
     return slotConfig.ignitionKeys.indexOf(item) !== -1;
+}
+
+/** Does this strip slot take this item? The server's Inventory.slotTakes: `accepts` (a list of items) and `keys`
+ *  (any ignition key); a slot with neither takes anything. */
+export function slotTakesItem(cfg, item) {
+    if (!cfg) return false;
+    if (!cfg.accepts && !cfg.keys) return true;
+    if (cfg.keys && isIgnitionKeyItem(item)) return true;
+    return Array.isArray(cfg.accepts) && cfg.accepts.indexOf(item) !== -1;
+}
+
+/** What a strip slot takes, in words for a refusal ("Cash or Wallet"), as the server's Inventory.slotRefusal.
+ *  @param defs  the item definitions, for their names */
+export function slotTakesText(cfg, defs) {
+    const names = (cfg.accepts || []).map((key) => (defs && defs[key] && defs[key].name) || key);
+    if (cfg.keys) names.push('keys');
+    return names.length ? names.join(' or ') : cfg.label;
 }

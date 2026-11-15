@@ -1558,9 +1558,10 @@ function whip_core:SanitizeAppearance(appearance) end
 
 --- Register (or replace) one accessory-strip slot. Re-registration is
 --- idempotent, and a stopping resource's slots are unregistered automatically.
---- `accepts` names the item key the slot takes; the registry is the rule, the
+--- `accepts` names the item key the slot takes, or a list of them; `keys = true` takes any ignition key
+--- too (RegisterIgnitionKey); with neither it takes anything. The registry is the rule, the
 --- NUI's copy only makes refusals instant. `tag` is a run tag: ReleaseTag(tag) puts whip's own slot back.
----@param def { slot: number, accepts?: string, label?: string, icon?: string, iconSvg?: string, tag?: string } slot is 1..Config.ContainerSlots.accessory
+---@param def { slot: number, accepts?: string|string[], keys?: boolean, label?: string, icon?: string, iconSvg?: string, tag?: string } slot is 1..Config.ContainerSlots.accessory
 ---@return boolean ok
 ---@return string|nil err
 function whip_core:RegisterAccessorySlot(def) end
@@ -1571,7 +1572,7 @@ function whip_core:RegisterAccessorySlot(def) end
 --- never ask what was already there, so the only way to learn whether a slot was free was to try a
 --- move and see whether the store refused it. A copy, not the registry — assigning into the
 --- returned table changes nothing.
----@return table<number, { slot: number, accepts: string|nil, label: string, icon: string|nil }>
+---@return table<number, { slot: number, accepts: string[]|nil, keys: boolean|nil, label: string, icon: string|nil }>
 function whip_core:GetAccessorySlots() end
 
 --- Register an item the vehicle ignition slot accepts — and that the

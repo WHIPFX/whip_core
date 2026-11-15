@@ -21,7 +21,7 @@
 // or 'targetPlayer' (an admin looking into someone's pockets).
 // ========================================
 
-import { inv, shop, slotConfig, isIgnitionKeyItem, panelByKey } from './inv-state.js';
+import { inv, shop, slotConfig, isIgnitionKeyItem, panelByKey, slotTakesItem, slotTakesText } from './inv-state.js';
 import { getItemDefs } from './item-defs.js';
 import { whenMet } from './item-rules.js';
 import { beginOp, extendOp, emit, commitOp, settleUnsentOp } from './inv-ops.js';
@@ -63,8 +63,7 @@ export function isPocketGrid(container) {
 
 /** Does this accessory slot take this item? */
 export function accessoryTakes(slot, itemKey) {
-    const cfg = slotConfig.accessorySlots.find(c => c.slot === slot);
-    return !!cfg && (!cfg.accepts || cfg.accepts === itemKey);
+    return slotTakesItem(slotConfig.accessorySlots.find(c => c.slot === slot), itemKey);
 }
 
 /** A slot-keyed store: its view, items, size, weight and per-slot rule. Null for the ground, the
@@ -256,10 +255,7 @@ function moveBetweenStores(fromStore, fromKey, toStore, toKey) {
     return true;
 }
 
-const onlyHere = (cfg, verb) => {
-    const def = defOf(cfg.accepts);
-    return 'Only ' + (def ? def.name : cfg.label) + verb;
-};
+const onlyHere = (cfg, verb) => 'Only ' + slotTakesText(cfg, getItemDefs()) + verb;
 
 // ------------------------------------------
 // Move a whole stack (a drag)
@@ -306,7 +302,7 @@ function moveBody(opId, fromContainer, fromSlot, toContainer, toSlot) {
             const fromData = inv.state[fromContainer] && inv.state[fromContainer][fromKey];
             if (!fromData) return no();
             const cfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
-            if (cfg && cfg.accepts && fromData.item !== cfg.accepts) return no(onlyHere(cfg, ' can go here'));
+            if (cfg && !slotTakesItem(cfg, fromData.item)) return no(onlyHere(cfg, ' can go here'));
             if (!inv.state.accessory) inv.state.accessory = {};
             if (inv.state.accessory[toKey]) {
                 const existing = inv.state.accessory[toKey];
@@ -326,7 +322,7 @@ function moveBody(opId, fromContainer, fromSlot, toContainer, toSlot) {
             const toData = inv.state[toContainer][toKey];
             if (toData) {
                 const cfg = slotConfig.accessorySlots.find(c => c.slot === fromSlot);
-                if (cfg && cfg.accepts && toData.item !== cfg.accepts) return no(onlyHere(cfg, ' can go in that slot'));
+                if (cfg && !slotTakesItem(cfg, toData.item)) return no(onlyHere(cfg, ' can go in that slot'));
                 inv.state.accessory[fromKey] = toData;
                 inv.state[toContainer][toKey] = fromData;
             } else {
@@ -341,8 +337,8 @@ function moveBody(opId, fromContainer, fromSlot, toContainer, toSlot) {
         if (!fromData) return no();
         const toCfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
         const fromCfg = slotConfig.accessorySlots.find(c => c.slot === fromSlot);
-        if (toCfg && toCfg.accepts && fromData.item !== toCfg.accepts) return no(onlyHere(toCfg, ' can go here'));
-        if (toData && fromCfg && fromCfg.accepts && toData.item !== fromCfg.accepts) return no(onlyHere(fromCfg, ' can go in that slot'));
+        if (toCfg && !slotTakesItem(toCfg, fromData.item)) return no(onlyHere(toCfg, ' can go here'));
+        if (toData && fromCfg && !slotTakesItem(fromCfg, toData.item)) return no(onlyHere(fromCfg, ' can go in that slot'));
         if (toData) {
             inv.state.accessory[fromKey] = toData;
             inv.state.accessory[toKey] = fromData;
@@ -609,7 +605,7 @@ export function moveOne(from, to) {
 
     if (toContainer === 'accessory') {
         const cfg = slotConfig.accessorySlots.find(c => c.slot === toSlot);
-        if (cfg && cfg.accepts && fromData && fromData.item !== cfg.accepts) return no(onlyHere(cfg, ' can go here'));
+        if (cfg && fromData && !slotTakesItem(cfg, fromData.item)) return no(onlyHere(cfg, ' can go here'));
     }
     const op = beginOp(['state']);
     const there = inv.state[toContainer] && inv.state[toContainer][toKey];

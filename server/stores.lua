@@ -1081,14 +1081,7 @@ Stores.defineKind('player', {
     -- The accessory strip's per-slot rule, on every path (beforeMove below only sees the drag path).
     allowsAt = function(h, slot, itemKey)
         if h.container ~= 'accessory' then return true end
-        local def = Inventory.AccessorySlots[slot]
-        if not def then
-            return false, 'No such accessory slot'
-        end
-        if def.accepts and itemKey ~= def.accepts then
-            local acceptedDef = Config.Items[def.accepts]
-            return false, ('Only %s can go there'):format(acceptedDef and acceptedDef.name or def.label)
-        end
+        if not Inventory.slotTakes('accessory', slot, itemKey) then return false, Inventory.slotRefusal(slot) end
         return true
     end,
 
@@ -1104,14 +1097,7 @@ Stores.defineKind('player', {
         else
             return true
         end
-        local def = Inventory.AccessorySlots[destSlot]
-        if not def then
-            return false, 'No such accessory slot'
-        end
-        if def.accepts and ctx.item ~= def.accepts then
-            local acceptedDef = Config.Items[def.accepts]
-            return false, ('Only %s can go there'):format(acceptedDef and acceptedDef.name or def.label)
-        end
+        if not Inventory.slotTakes('accessory', destSlot, ctx.item) then return false, Inventory.slotRefusal(destSlot) end
         return true
     end,
 
@@ -1178,7 +1164,7 @@ Stores.defineKind('rawInventory', {
     -- The accessory strip's typed slots, as the 'player' kind.
     allowsAt = function(h, slot, itemKey)
         if Inventory.slotTakes(h.container, slot, itemKey) then return true end
-        return false, 'That slot only takes one kind of item'
+        return false, Inventory.slotRefusal(slot)
     end,
 
     persist = function(h) return Inventory.buildSaveQueries(h.charId, h.cache) end,

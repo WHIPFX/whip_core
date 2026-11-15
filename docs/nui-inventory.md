@@ -76,7 +76,8 @@ the last render can be a dead copy.
 `api.actions.groundShowing()` (on foot, with nothing else in its place).
 
 `api.shop` is the shop screen's state, drawn by whip (see Shops). `api.slotConfig` is the accessory
-strip's slots (`accessorySlots`: `{ slot, accepts, label, icon, iconSvg }`) and the ignition keys
+strip's slots (`accessorySlots`: `{ slot, accepts, keys, label, icon, iconSvg }`, where `accepts` is a list of
+item keys and `keys` takes any ignition key; `api.slotTakesItem(cfg, item)` answers as the server does) and the ignition keys
 (`ignitionKeys`).
 
 **An address** is `{ container, slot }`: `'player'`, `'accessory'`, `'ground'`, `'container'`,
@@ -234,7 +235,8 @@ The accessory strip and the ignition's keys are registries, not hard-coded:
 -- from any satellite, inside Whip.register
 local ok, err = exports.whip_core:RegisterAccessorySlot({
     slot    = 4,           -- required; 1..Config.ContainerSlots.accessory
-    accepts = 'badge',     -- optional item filter (nil = anything)
+    accepts = 'badge',     -- optional item filter: one key or a list (nil = anything)
+    keys    = false,       -- optional: true takes any ignition key too
     label   = 'Badge',     -- optional, defaults to 'Accessory'
     icon    = 'phone',     -- optional icon name from whip's set
     iconSvg = '<svg…>',    -- optional inline SVG, wins over icon
