@@ -8198,6 +8198,18 @@ end)</code></pre>
     } },
     { id = 'wash', label = 'Wash', onSelect = function() TriggerServerEvent('mech:wash') end },
 }</code></pre>
+<p>A menu whose options depend on the player (the cars they own, the orders waiting for them) is <strong>filled when it opens</strong>: give <code>options</code> a function returning the list. It's called each time the menu opens, with the same <code>ctx</code> as <code>onSelect</code>, in a thread of its own, so it can wait for a server callback. The prompt shows "One moment…" until it returns and "Nothing here" for an empty list. What it returns is read like any options, menus of either kind included. Going Back to a filled menu shows the list it had, without asking again.</p>
+<p>An option with <code>stay = true</code> keeps the prompt on its menu after <code>onSelect</code>, instead of folding back to the top, and a filled menu is filled again once <code>onSelect</code> has finished. Use it for something a player may press twice, or that changes what the menu shows.</p>
+<pre><code class="lang-lua">{ id = 'orders', label = 'My orders', options = function(ctx)
+    local orders = exports.whip_core:Callback('mycafe:myOrders') or {}
+    local list = {}
+    for _, o in ipairs(orders) do
+        list[#list + 1] = { id = 'order' .. o.id, label = o.name, stay = true, onSelect = function()
+            exports.whip_core:Callback('mycafe:collect', o.id)
+        end }
+    end
+    return list
+end }</code></pre>
 
 <h3>Changing and removing actions</h3>
 

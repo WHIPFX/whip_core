@@ -86,6 +86,8 @@
 --     options = { { id = 'buy', label = 'Buy', onSelect = ... }, { id = 'sell', label = 'Sell', ... } }
 -- On a world prompt an option may have `options` of its own: a menu (see Menus below). Leaves take
 -- what they leave out from the options above them, then the action; onSelect gets ctx.under.
+-- `options = function(ctx) return { ... } end` fills the menu each time it opens (it may wait), and
+-- `stay = true` on an option down a menu keeps the prompt there after its onSelect.
 --
 -- Each action is mounted into the engine its `at` names as an entry called `act:<resource>:<id>`.
 
@@ -473,7 +475,8 @@ end
 ---@param extra table|nil entity, coords, player
 ---@param here vector3|nil  where a `press` presses when that is not ctx.coords (a car part's prompt)
 ---@param handless boolean|nil  the F1 wheel: `press` is not read there (shared/interact_spec.lua)
-local function fire(entry, o, pid, extra, here, handless)
+---@param after function|nil  called once onSelect has finished (a `stay` option's menu filled again)
+local function fire(entry, o, pid, extra, here, handless, after)
     local ctx = { id = entry.id, owner = entry.owner, option = o.id }
     if extra then for k, v in pairs(extra) do ctx[k] = v end end
     if pid then promptVerbs(ctx, pid) else menuVerbs(ctx) end
@@ -515,6 +518,7 @@ local function fire(entry, o, pid, extra, here, handless)
     CreateThread(function()
         local ok, err = pcall(fn, ctx)
         if not ok then report(entry.key, 'onSelect', err) end
+        if after then after() end
     end)
 end
 
@@ -615,13 +619,51 @@ end
 -- Menus: an option with options of its own (world prompts). Choosing it puts its options on the same
 -- prompt with a Back first; pressing one, or looking away, folds the prompt back to the top. An option
 -- down there must also pass the ones it is under and takes what it leaves out from them, then the action.
+--
+-- A FILLED menu: `options` is a function(ctx) returning the list, called each time the menu opens, in a
+-- thread of its own (it may wait: a server callback for what this player has). "One moment…" shows meanwhile,
+-- "Nothing here" for an empty list. An option with `stay = true` keeps the prompt on its menu after its
+-- onSelect, and a filled menu is filled again then (a count it shows is current).
 
-local menuAt = {}   -- [prompt id] = the option whose menu the prompt shows (nil: the top)
+local menuAt = {}     -- [prompt id] = the option whose menu the prompt shows (nil: the top)
+local filledAt = {}   -- [prompt id] = { [a filled menu's option] = its options as last filled } (per prompt)
+local fillGen = {}    -- [prompt id] = the last fill asked, so an older one that answers late is dropped
 
-local function isMenu(o) return type(o.options) == 'table' and #o.options > 0 end
+local readOptions     -- (defined with tidy below; a filled menu's list is read with it)
 
---- A menu option's own options, made once: copies with ids, each knowing the option it is under (`_up`).
-local function optionsUnder(o)
+--- Does this option's menu fill when it opens (a function)?
+local function fills(o) return InteractSpec.callable(o.options) end
+
+local function isMenu(o) return fills(o) or (type(o.options) == 'table' and #o.options > 0) end
+
+--- The prompt back at the top of its menus, the filled ones forgotten.
+local function atTop(pid)
+    menuAt[pid] = nil
+    filledAt[pid] = nil
+    fillGen[pid] = (fillGen[pid] or 0) + 1
+end
+
+--- Has an option a picture to show: its own, a menu's it is under, or the action's (as resolveText reads them)?
+local function givesImage(o, def)
+    local up = o
+    while up do
+        if up.image ~= nil then return true end
+        up = up._up
+    end
+    return def.image ~= nil
+end
+
+--- A row of a filled menu that does nothing when pressed ("One moment…", "Nothing here").
+local function quietRow(o, id, label, icon)
+    return { id = id, label = label, icon = icon, _up = o, _quiet = true }
+end
+
+--- A menu option's own options: a filled one's as last filled for this prompt ("One moment…" until then), else
+--- copies made once, with ids, each knowing the option it is under (`_up`).
+local function optionsUnder(o, pid)
+    if fills(o) then
+        return (filledAt[pid] and filledAt[pid][o]) or { quietRow(o, '<wait>', 'One moment…', 'timer') }
+    end
     if o._kids then return o._kids end
     local kids = {}
     for i, c in ipairs(o.options) do
@@ -647,13 +689,69 @@ local function playerOfPed(ped)
     return { serverId = sid, playerIdx = idx, isDead = st[PLAYER_DEAD_KEY], activeJob = st[PLAYER_JOB_KEY] }
 end
 
+--- A filled menu's answer as kept: read like any option list (a misspelt field warned about, once), a bad
+--- `require` or a second option with one id left out, each knowing the menu it is under.
+---@return table kids
+local function readFilled(entry, o, list)
+    local where = ('options of "%s"'):format(tostring(o.id))
+    local warn = {}
+    if type(list) ~= 'table' or InteractSpec.callable(list) then
+        if list ~= nil then warn[#warn + 1] = where .. ' answered ' .. type(list) .. ', not a list of options' end
+        list = {}
+    end
+    local read = readOptions(list, where, warn, true)
+    local kids, seen = {}, {}
+    for i, c in ipairs(read) do
+        local oid = c.id ~= nil and tostring(c.id) or ('opt' .. i)
+        local rWhy = checkRequire(c.require, entry.kind)
+        if seen[oid] then
+            warn[#warn + 1] = ('%s: two options have the id "%s". The second was left out'):format(where, oid)
+        elseif rWhy then
+            warn[#warn + 1] = ('%s, option "%s": %s. It was left out'):format(where, oid, rWhy)
+        else
+            seen[oid] = true
+            c.id = oid
+            c._up = o
+            kids[#kids + 1] = c
+        end
+    end
+    if #warn > 0 then InteractSpec.say('actions', entry.owner, ('action "%s"'):format(tostring(entry.id)), warn) end
+    if #kids == 0 then kids[1] = quietRow(o, '<empty>', 'Nothing here', 'info') end
+    return kids
+end
+
+--- Fill menu option `o` on prompt `pid`: its function is called in a thread of its own with the ctx onSelect gets
+--- (bar the verbs), and the prompt shows the answer if it is still on that menu and no newer fill was asked.
+--- `keep`: the list it shows now stays up until the answer (filled again after a `stay` press), else "One moment…".
+local function fill(entry, pid, o, extra, show, keep)
+    fillGen[pid] = (fillGen[pid] or 0) + 1
+    local gen = fillGen[pid]
+    if not keep and filledAt[pid] then filledAt[pid][o] = nil end
+    CreateThread(function()
+        local ctx = { id = entry.id, owner = entry.owner, option = o.id, under = o._up and o._up.id or nil }
+        for k, v in pairs(extra or {}) do ctx[k] = v end
+        local ok, list = pcall(o.options, ctx)
+        if fillGen[pid] ~= gen or menuAt[pid] ~= o then return end
+        local kids
+        if ok then
+            kids = readFilled(entry, o, list)
+        else
+            report(entry.key, ('options of "%s"'):format(tostring(o.id)), list)
+            kids = { quietRow(o, '<failed>', 'Not available', 'warning') }
+        end
+        filledAt[pid] = filledAt[pid] or setmetatable({}, { __mode = 'k' })
+        filledAt[pid][o] = kids
+        show()
+    end)
+end
+
 --- A world prompt's options at the menu it is on, for prompt `pid`. `entityNow` answers the entity it is on
 --- (nil at a spot), `whereNow` where it is. `about`: what a model action adds to ctx (prop model, face, id).
 --- `gate`: asked before every option of every level (an aimBox prompt: only while the look meets something).
 local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
     local def = entry.def
     local down = menuAt[pid]
-    local level = down and optionsUnder(down) or entry.opts
+    local level = down and optionsUnder(down, pid) or entry.opts
     local options = {}
     local function open() return gate == nil or gate() == true end
 
@@ -662,12 +760,26 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
         Interactions.setOptions(pid, promptOptions(entry, pid, entityNow, whereNow, about, gate))
     end
 
+    -- What onSelect and a filled menu's function are told: where the prompt is now (one riding on something has
+    -- moved), what it is on, and a model action's prop details.
+    local function extraNow()
+        local cx, cy, cz = whereNow()
+        local extra = { entity = entityNow(), coords = vector3(cx or 0.0, cy or 0.0, cz or 0.0) }
+        extra.player = playerOfPed(extra.entity)
+        if about then
+            for k, v in pairs(about) do extra[k] = v end
+        end
+        return extra
+    end
+
     if down then
         options[1] = {
             id = '<back>', label = 'Back', icon = 'back',
             condition = function() return open() end,
             callback  = function()
+                -- Back up to a filled menu: the list it showed, not asked again.
                 menuAt[pid] = down._up
+                fillGen[pid] = (fillGen[pid] or 0) + 1
                 show()
             end,
         }
@@ -690,30 +802,33 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
         options[#options + 1] = {
             id        = o.id,
             -- Hold to use: the option's own, else the action's. A menu entry is always a press.
-            holdMs    = not menu and (o.holdMs or def.holdMs) or nil,
+            holdMs    = not menu and not o._quiet and (o.holdMs or def.holdMs) or nil,
             label     = function()
                 local text = resolveText(entry, o, 'label', current())
                 if menu then return (text or o.id) .. '  ›' end
                 return text
             end,
             icon      = function() return resolveText(entry, o, 'icon', current()) end,
-            image     = (o.image ~= nil or def.image ~= nil) and function() return resolveText(entry, o, 'image', current()) end or nil,
+            -- A picture of its own, a menu's above it (a car's page shows the car), or the action's.
+            image     = givesImage(o, def) and function() return resolveText(entry, o, 'image', current()) end or nil,
             condition = function() return open() and (check(entry, o, current())) end,
             callback  = function()
                 if menu then
                     menuAt[pid] = o
+                    if fills(o) then fill(entry, pid, o, extraNow(), show) end
                     return show()
                 end
-                -- Where it is now: a prompt riding on something has moved.
-                local cx, cy, cz = whereNow()
-                local extra = { entity = entityNow(), coords = vector3(cx or 0.0, cy or 0.0, cz or 0.0) }
-                extra.player = playerOfPed(extra.entity)
-                if about then
-                    for k, v in pairs(about) do extra[k] = v end
-                end
-                fire(entry, o, pid, extra)
-                if menuAt[pid] then
-                    menuAt[pid] = nil
+                if o._quiet then return end
+                -- `stay`: still on this menu after it (filled again once onSelect is done); else back to the top.
+                local stay = o.stay == true and menuAt[pid] ~= nil
+                local extra = extraNow()
+                fire(entry, o, pid, extra, nil, nil, stay and function()
+                    local m = menuAt[pid]
+                    if m == nil or m ~= o._up then return end
+                    if fills(m) then fill(entry, pid, m, extra, show, true) else show() end
+                end or nil)
+                if menuAt[pid] and not stay then
+                    atTop(pid)
                     show()
                 end
             end,
@@ -727,7 +842,7 @@ local function foldOnBlur(entry, pid, entityNow, whereNow, about, gate)
     local own = entry.def.onBlur
     return function()
         if menuAt[pid] then
-            menuAt[pid] = nil
+            atTop(pid)
             CreateThread(function()
                 Interactions.setOptions(pid, promptOptions(entry, pid, entityNow, whereNow, about, gate))
             end)
@@ -793,7 +908,7 @@ local function mountPrompt(entry)
         end
         return x, y, z
     end
-    menuAt[pid] = nil
+    atTop(pid)
     local options = promptOptions(entry, pid, entityNow, whereNow)
 
     -- Kept, so a netId prompt can be put back on its entity as mounted.
@@ -880,7 +995,7 @@ local function mountAimBox(entry)
     end
     -- Offered only while the look meets something (the gate); looking away folds a menu back.
     local function gate() return a.on end
-    menuAt[pid] = nil
+    atTop(pid)
     local options = promptOptions(entry, pid, entityNow, whereNow, a.about, gate)
 
     local reg = promptLook(entry)
@@ -953,14 +1068,14 @@ local function mountProps(entry)
             local about = { model = rec.model, face = rec.face, prop = rec.baseId }
             local function entityNow() return rec.entity end
             local function whereNow() return rec.x, rec.y, rec.z end
-            menuAt[rec.id] = nil
+            atTop(rec.id)
             local reg = promptLook(entry)
             reg.options = promptOptions(entry, rec.id, entityNow, whereNow, about)
             reg.onBlur = foldOnBlur(entry, rec.id, entityNow, whereNow, about)
             return reg
         end,
         -- A prop's prompt gone: its menus forgotten.
-        onRemove  = function(rec) menuAt[rec.id] = nil end,
+        onRemove  = function(rec) atTop(rec.id) end,
     })
     -- onFound / onLost follow a watch of their own (PropPrompts.watch): every prop of the models within
     -- 50 m, seated or not, whereas the prompts' sweep finds only the nearest of each model.
@@ -1139,11 +1254,17 @@ local PLACE_NAME = { prompt = 'a world prompt', part = 'a car part', radial = 't
 --- The places whose options may be menus: the world prompts.
 local MENU_KINDS = { prompt = true, props = true, aimbox = true }
 
-local function isMenuDef(o) return type(o) == 'table' and type(o.options) == 'table' and #o.options > 0 end
+--- A menu: a list of options, or a function filling it when it opens.
+local function isMenuDef(o)
+    if type(o) ~= 'table' then return false end
+    if InteractSpec.callable(o.options) then return true end
+    return type(o.options) == 'table' and #o.options > 0
+end
 
 --- An option list read field by field (InteractSpec), every menu down; a misspelt field is warned about at its
---- path. `menus`: false on a place that has none, where a menu is warned about and dropped.
-local function readOptions(opts, path, warn, menus)
+--- path. `menus`: false on a place that has none, where a menu is warned about and dropped. A filled menu's
+--- function is kept as it is: what it answers is read the same way when it is called (readFilled).
+readOptions = function(opts, path, warn, menus)
     local out = {}
     for i, o in ipairs(opts) do
         local at = ('%s[%d]'):format(path, i)
@@ -1153,8 +1274,10 @@ local function readOptions(opts, path, warn, menus)
                 if not menus then
                     warn[#warn + 1] = ('%s.options (a menu) is read only on a world prompt. It was ignored'):format(at)
                     r.options = nil
+                elseif InteractSpec.callable(r.options) then
+                    -- A filled menu: called each time it opens.
                 elseif type(r.options) ~= 'table' or #r.options == 0 then
-                    warn[#warn + 1] = ('%s.options is a list of options. It was ignored'):format(at)
+                    warn[#warn + 1] = ('%s.options is a list of options, or a function returning one. It was ignored'):format(at)
                     r.options = nil
                 else
                     r.options = readOptions(r.options, at .. '.options', warn, menus)
@@ -1173,7 +1296,10 @@ local function warnLeaves(opts, inherited, path, warn)
     for i, o in ipairs(opts) do
         local fn = o.onSelect ~= nil and o.onSelect or inherited
         if isMenuDef(o) then
-            warnLeaves(o.options, fn, ('%s[%d].options'):format(path, i), warn)
+            -- (A filled menu's options are not known until it opens.)
+            if not InteractSpec.callable(o.options) then
+                warnLeaves(o.options, fn, ('%s[%d].options'):format(path, i), warn)
+            end
         elseif fn == nil then
             warn[#warn + 1] = ('%s[%d] has no onSelect (on it, on an option above it, or on the action): pressing it does nothing')
                 :format(path, i)
@@ -1181,10 +1307,12 @@ local function warnLeaves(opts, inherited, path, warn)
     end
 end
 
---- Has anything in the action something to do? Its own onSelect, or any option's at any depth.
+--- Has anything in the action something to do? Its own onSelect, or any option's at any depth (a filled menu
+--- is taken to have: what it fills with is not known until it opens).
 local function anySelect(opts)
-    for _, o in ipairs(type(opts) == 'table' and opts or {}) do
-        if type(o) == 'table' and (o.onSelect ~= nil or (isMenuDef(o) and anySelect(o.options))) then return true end
+    for _, o in ipairs(type(opts) == 'table' and not InteractSpec.callable(opts) and opts or {}) do
+        if type(o) == 'table' and (o.onSelect ~= nil or InteractSpec.callable(o.options)
+            or (isMenuDef(o) and anySelect(o.options))) then return true end
     end
     return false
 end
@@ -1308,7 +1436,8 @@ local reg = Registry.new('action', {
                     seen[oid] = true
                     local rWhy = checkRequire(o.require, kind)
                     if rWhy then return ('action "%s", option "%s": %s'):format(tostring(id), oid, rWhy) end
-                    if MENU_KINDS[kind] and isMenuDef(o) then
+                    -- (A filled menu's options are checked as it fills: readFilled.)
+                    if MENU_KINDS[kind] and isMenuDef(o) and not InteractSpec.callable(o.options) then
                         local w = checkLevel(o.options, (' under "%s"'):format(oid))
                         if w then return w end
                     end

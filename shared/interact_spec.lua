@@ -121,10 +121,14 @@ InteractSpec.ACTION_OPTION = {
     onSelect    = { kind = 'function' },
     enabled     = { kind = 'boolean' },
     holdMs      = { kind = 'number', min = 0, max = 10000 },
-    -- Per-option versions of the action's `press`, `first`; `options` makes a menu (world prompts).
+    -- Per-option versions of the action's `press`, `first`; `options` makes a menu (world prompts): a list, or a
+    -- function(ctx) returning one each time the menu opens (client/actions.lua checks which).
     press       = { kind = 'any' },
-    options     = { kind = 'list' },
+    options     = { kind = 'any' },
     first       = { kind = 'boolean' },
+    -- Down a menu: after its onSelect the prompt stays on this menu (filled again, if it is filled) instead of
+    -- going back to the top.
+    stay        = { kind = 'boolean' },
 }
 
 --- An action's `at`. A `place` names where it is (one, checked by AddAction); other keys are read only `with` one.
