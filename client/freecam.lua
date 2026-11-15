@@ -8,7 +8,8 @@
 -- small and lives in `opts`, plus one runtime switch:
 --
 --   noclip      plain scroll zooms, Shift+scroll changes fly speed, and exiting drops the ped
---               wherever the camera ended up. That is what noclip IS. It listens the whole time.
+--               wherever the camera ended up, with the car they sit in (`vehicle`). That is what
+--               noclip IS. It listens the whole time.
 --   furnisher   the wheel as noclip has it, but it listens only while the right mouse button is
 --               down (let go, the wheel scrolls its catalog), because it holds NUI focus and the
 --               pointer is also picking things out of a catalog (FreeCam.setInputEnabled); exiting
@@ -132,6 +133,34 @@ local startHeading = 0.0
 
 -- Look, move, Tab, attack/aim and the wheel, held off for the flight (FreeCam.start, FreeCam.holdControls).
 local FREECAM_BLOCK = { groups = { 'look', 'move' }, controls = { 37, 24, 25, 241, 242 } }
+-- The same with a car carried (`vehicle`): its driving, getting out, its guns, the radio and the horn too, as the
+-- keys that fly the camera also drive, honk and leave a car.
+local CARRY_BLOCK = { groups = { 'look', 'move', 'driving', 'vehicleCombat', 'radio' }, controls = { 37, 24, 25, 241, 242, 86 } }
+local block = FREECAM_BLOCK   -- the one held for this flight
+
+-- THE CAR THE PLAYER SITS IN, CARRIED (noclip's `vehicle`): it goes where the ped goes, hidden, frozen and
+-- without collision for the flight, and the player stays in their seat. nil when none is carried.
+local carried = nil   -- { veh, seat, from, heading }
+
+--- The car the ped sits in, if this game may move it (Vehicles.takeControl: never one another player drives).
+--- Waits for control.
+local function takeCar(ped)
+    local veh = GetVehiclePedIsIn(ped, false)
+    if veh == 0 or not Vehicles.takeControl(veh) then return nil end
+    local seat = -1
+    for s = -1, GetVehicleMaxNumberOfPassengers(veh) - 1 do
+        if GetPedInVehicleSeat(veh, s) == ped then seat = s break end
+    end
+    return { veh = veh, seat = seat, from = GetEntityCoords(veh), heading = GetEntityHeading(veh) }
+end
+
+--- Hide, freeze and take the collision off the carried car for the flight, or give them back.
+local function holdCar(veh, on)
+    FreezeEntityPosition(veh, on)
+    SetEntityCollision(veh, not on, not on)
+    SetEntityVisible(veh, not on, false)
+    SetEntityVelocity(veh, 0.0, 0.0, 0.0)
+end
 
 -- ============================================
 -- Enter / exit
@@ -155,10 +184,17 @@ local FREECAM_BLOCK = { groups = { 'look', 'move' }, controls = { 37, 24, 25, 24
 ---   pad      string    'auto' the controller's reads while a pad is the device (WhipPadActive), the keys'
 ---                      and mouse's otherwise, followed every frame (noclip). Default: the keys' reads
 ---                      until the caller says otherwise (FreeCam.setPad)
+---   vehicle  boolean   the car the player sits in goes with them, and they stay in their seat (noclip).
+---                      Not one another player drives: the player leaves that one, as on foot. Waits for
+---                      control of the car.
 --- }
 function FreeCam.start(o)
     if active then return end
+    local car = type(o) == 'table' and o.vehicle and takeCar(PlayerPedId()) or nil
+    if active then return end   -- started meanwhile, while control of the car was asked for
     opts = o or {}
+    carried = car
+    if carried then holdCar(carried.veh, true) end
 
     local ped = PlayerPedId()
     local coords = GetEntityCoords(ped)
@@ -208,7 +244,8 @@ function FreeCam.start(o)
     -- the camera still reads them through the disabled readers. Not Esc: a block that names 200 owns
     -- it, and nothing in noclip or lighttest exits on it. A caller whose Esc is an exit names 200 in
     -- its own block; GTA's pause stays shut by pauseKeys.
-    ControlBlocks.hold('freecam', FREECAM_BLOCK)
+    block = carried and CARRY_BLOCK or FREECAM_BLOCK
+    ControlBlocks.hold('freecam', block)
     startLoop()
 end
 
@@ -217,7 +254,7 @@ end
 ---@param on boolean
 function FreeCam.holdControls(on)
     if not active then return end
-    if on then ControlBlocks.hold('freecam', FREECAM_BLOCK) else ControlBlocks.release('freecam') end
+    if on then ControlBlocks.hold('freecam', block) else ControlBlocks.release('freecam') end
 end
 
 --- Start or stop listening to the mouse and keyboard. See `inputEnabled`.
@@ -235,6 +272,26 @@ function FreeCam.isInputEnabled() return inputEnabled end
 function FreeCam.setPad(on, triggers)
     padMode = on and true or false
     padTriggers = triggers ~= false
+end
+
+--- Put the carried car down at `dest`: on the ground under it when there is ground (a car dropped from the camera
+--- lands hard), facing `heading`, the player back in their seat, and the car shown, unfrozen and solid again. Waits.
+local function landCar(car, ped, dest, heading)
+    local veh = car.veh
+    SetEntityCoordsNoOffset(veh, dest.x, dest.y, dest.z, false, false, false)
+    -- Collision first, as for the ped in FreeCam.stop: the ground under it may not be streamed yet.
+    RequestCollisionAtCoord(dest.x, dest.y, dest.z)
+    local timeout = 0
+    while not HasCollisionLoadedAroundEntity(veh) and timeout < 2000 do
+        Wait(10)
+        timeout = timeout + 10
+    end
+    local found, groundZ = GetGroundZFor_3dCoord(dest.x, dest.y, dest.z, false)
+    if found then SetEntityCoordsNoOffset(veh, dest.x, dest.y, groundZ + 0.5, false, false, false) end
+    SetEntityHeading(veh, heading % 360.0)
+    if GetVehiclePedIsIn(ped, false) ~= veh then SetPedIntoVehicle(ped, veh, car.seat) end
+    holdCar(veh, false)
+    if found then SetVehicleOnGroundProperly(veh) end
 end
 
 --- Put the camera back on the player.
@@ -267,7 +324,15 @@ function FreeCam.stop(o)
     -- are a real teleport, because the loop has been dragging the ped around behind the camera the
     -- whole time to keep the world streamed. Or nowhere (`stay`): the player moved themselves, and is
     -- where they should be — sending them back would undo it (and pull them out of a car).
-    if not o.stay then
+    local car = carried and DoesEntityExist(carried.veh) and carried or nil
+    carried = nil
+    if car and o.stay then
+        holdCar(car.veh, false)
+    elseif car then
+        -- The car goes there with the player in it, facing where the camera looked (or back as it stood).
+        local back = o.movePed == false
+        landCar(car, ped, back and car.from or finalCoords, back and car.heading or camYaw)
+    elseif not o.stay then
         local dest = (o.movePed ~= false) and finalCoords or (startCoords or finalCoords)
 
         -- COLLISION FIRST, OR YOU FALL THROUGH THE WORLD. The ped is being put somewhere the game may
@@ -605,8 +670,10 @@ local function loop()
             -- position as far as the server is concerned (proximity checks, the saved position).
             frames = (frames + 1) % FOCUS_EVERY
             focusAt(x, y, z, frames)
+            -- A carried car goes instead, with the player in it: moving the ped alone takes it out of its seat.
             if frames == 0 and opts.pedFollows ~= false then
-                SetEntityCoordsNoOffset(PlayerPedId(), x, y, z, false, false, false)
+                local mover = carried and DoesEntityExist(carried.veh) and carried.veh or PlayerPedId()
+                SetEntityCoordsNoOffset(mover, x, y, z, false, false, false)
             end
 
             Wait(0)
@@ -641,6 +708,9 @@ AddEventHandler('onResourceStop', function(res)
         SetEntityCoordsNoOffset(ped, startCoords.x, startCoords.y, startCoords.z, false, false, false)
         SetEntityHeading(ped, startHeading)
     end
+    -- A carried car is shown and let go where it is (landing it waits for collision).
+    if carried and DoesEntityExist(carried.veh) then holdCar(carried.veh, false) end
+    carried = nil
     if opts.hidePed ~= false then
         PedHold.release('freecam')
         SetLocalPlayerVisibleLocally(true)
