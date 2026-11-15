@@ -10,9 +10,10 @@
 //                 the button is down the cursor is put away and this page goes inert (.fz-looking).
 //   The markers   the selected object wears X / Y / Z arrows, or rings after R, dragged with the mouse
 //                 (js/furnisher-gizmo.js, an SVG under this shell). A click on the room that is not on a marker
-//                 selects what it lands on; the shell takes clicks only on its own controls.
+//                 selects what it lands on (Ctrl+click adds to it, a drag selects everything in its box); the shell
+//                 takes clicks only on its own controls.
 //   The bar       along the top: the property, the Furniture switch that shows the catalog, Move / Rotate, the snap
-//                 step, Exit and Save.
+//                 step, Grid lock (L), Exit and Save.
 //   The bubble    beside the selection (#fz-sel): its name, Go to, Remove, and how to move or turn it (placeSel).
 //   Typing        the game reads the keyboard too (KeepInput), so the search box tells Lua when it has focus
 //                 (focusin/focusout) and client/property_furnish.lua stands its key reader down until it is blurred.
@@ -95,7 +96,7 @@ let fzItems = [];
 /* Which row is selected, straight from Lua. Nine identical chairs share a name; only this tells
    them apart. */
 let fzSelIndex = null;
-/* Several selected (Ctrl+click: the world builder's), straight from Lua: their rows, the primary (fzSelIndex) last;
+/* Several selected (Ctrl+click, or a box dragged over the room), straight from Lua: their rows, the primary (fzSelIndex) last;
    null with one or none. */
 let fzSelRows = null;
 /** Is this row selected (the one, or one of several)? */
@@ -623,9 +624,9 @@ function selectedName(d) {
     return (it && it.label) || (d.selected ? nameOf(d.selected.model) : '');
 }
 
-/** The step, as the chip and the strip say it. */
+/** The step, as the chip and the strip say it ("Grid" first while locked to the world grid). */
 function stepText(d) {
-    return num(d.move) + ' m · ' + num(d.turn, 0) + '°';
+    return (d.grid === true ? 'Grid ' : 'Snap ') + num(d.move) + ' m · ' + num(d.turn, 0) + '°';
 }
 
 function setCatalogOpen(open) {
@@ -658,13 +659,15 @@ function renderCard(d) {
         selFrame = null;   // (the bar's width changed)
     }
     const step = $('fz-steptext');
-    if (step) step.textContent = on ? 'Snap ' + stepText(d) : 'Snap off';
+    if (step) step.textContent = on ? stepText(d) : 'Snap off';
+    const grid = $('fz-grid-btn');
+    if (grid) grid.classList.toggle('on', d.grid === true);
     // The Director's world builder has no bar: the hint line says what R switches to, and G the step while snap is on.
     const dir = !!(fzBuilder && fzBuilder.director);
     const modeHint = $('fz-mode-hint');
     if (modeHint) modeHint.textContent = (d.mode || 'move') === 'rotate' ? 'Move' : 'Rotate';
     const snapHint = $('fz-snap-hint');
-    if (snapHint) snapHint.textContent = dir && on ? 'Snap ' + stepText(d) : 'Snap';
+    if (snapHint) snapHint.textContent = dir && on ? stepText(d) : 'Snap';
     renderSel(d);
 }
 
@@ -732,7 +735,7 @@ function renderSel(d) {
     }
     const it = selectedItem(d);
     const kind = (it && it.kind) || 'prop';
-    // Several selected (Ctrl+click): "5 selected", what they are, and only what works on all of them: Configure, Add
+    // Several selected (Ctrl+click, a box): "5 selected", what they are, and only what works on all of them: Configure, Add
     // task (all NPCs), Add to group (all NPCs and props), Go to and Remove. The rest are one thing's.
     const set = pickedItems();
     const kinds = set ? set.map((x) => x.kind || 'prop') : null;
@@ -1793,7 +1796,7 @@ function setExitLabel(armed) {
         // Clicking a row selects that object, exactly as clicking it in the room would. Lua answers
         // with a state push that moves the highlight — nothing is marked optimistically here,
         // because the click can be refused (a row clicked between a delete and the resend).
-        // (Ctrl held: into the selection beside what is selected, or out of it: the world builder's.)
+        // (Ctrl held: into the selection beside what is selected, or out of it.)
         ['row',       (el, e) => nuiCallback('furnishSelectIndex', { index: Number(el.dataset.index), ctrl: !!(e && e.ctrlKey) })],
         ['goto',      () => nuiCallback('furnishGoTo', {})],
         ['catalog',   () => setCatalogOpen(!fzCatalogOpen)],
@@ -1801,6 +1804,7 @@ function setExitLabel(armed) {
         // The step chip goes round the config's steps, the same as G: both lists move together.
         // The snap chip goes round as G does: the next step, and past the last, off.
         ['step',      () => nuiCallback('furnishSetStep', { cycle: true })],
+        ['grid',      () => nuiCallback('furnishToggleGrid', {})],
         ['delete',    () => nuiCallback('furnishDelete', {})],
         // The world builder's warning: Remove (for the one it was about), or Keep.
         ['confirm-remove', () => {

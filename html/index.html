@@ -897,6 +897,9 @@
                  which nudges by it. Pressed, it goes round as G does. -->
             <button id="fz-stepchip" class="fz-chip" type="button" data-fz="step"
                     title="The snap step (G)"><span id="fz-steptext">Snap 0.05 m · 15°</span></button>
+            <!-- Grid lock (L): the arrows along the world, moves on its grid at the snap step (js/furnisher.js renderCard). -->
+            <button id="fz-grid-btn" class="fz-btn fz-btn-sm fz-btn-keyed" type="button" data-fz="grid"
+                    title="Lock moves to the world grid at the snap step (L)"><span class="fz-btn-label">Grid</span><span class="fz-key" aria-hidden="true">L</span></button>
             <!-- The Director's world builder only (#furnisher.fz-director): its blueprint, in a window
                  over the room (#fz-bp). -->
             <button id="fz-bp-btn" class="fz-btn fz-btn-sm fz-dir-only" type="button" data-fz="blueprint"
@@ -1004,6 +1007,8 @@
                          snap step in G's words while snap is on (js/furnisher.js renderCard). -->
                     <span class="fz-hint fz-dir-hint"><span class="fz-key">R</span> <span id="fz-mode-hint">Rotate</span></span>
                     <span class="fz-hint"><span class="fz-key">G</span> <span id="fz-snap-hint">Snap</span></span>
+                    <span class="fz-hint"><span class="fz-key">L</span> Grid</span>
+                    <span class="fz-hint"><span class="fz-key">Ctrl</span><span class="fz-plus">+</span><span class="fz-key fz-key-mouse" title="Left click"><svg viewBox="0 0 12 16"><use href="#fz-mouse-l"/></svg></span> Add</span>
                 </span>
                 <span class="fz-hint-row fz-hints-look">
                     <span class="fz-hint"><span class="fz-key">W</span><span class="fz-key">A</span><span class="fz-key">S</span><span class="fz-key">D</span> Fly</span>

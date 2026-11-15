@@ -19,8 +19,11 @@
 //   b  the last move was refused (outside the property)
 //   h  how far its top is above its origin, metres (a prompt it carries counted), when known
 //   n  no markers: it cannot be moved (a picked door); only where it is, for the bubble
-//   g  several selected (Ctrl+click): each one's [x, y, z] in order round their middle. `o` is then that middle (the
-//      markers move and turn them together) and a shape is drawn through them: a line, a triangle, their outline
+//   g  several selected (Ctrl+click, or a box): each one's [x, y, z] in order round their middle. `o` is then that
+//      middle (the markers move and turn them together) and a shape is drawn through them: a line, a triangle, their
+//      outline. `a` is then the primary's [x, y, z], which a grid-locked move puts on the grid
+//   w  grid lock (L): the arrows run along the world's X and Y, a move along them lands on the world grid at the snap
+//      step, a turn on whole steps; and the grid is drawn on the floor, `f` metres under `o`
 // basis / project / rayAt below are the page's half of client/furnish_view.lua and must stay the
 // same maths: the Lua half aims clicks, this half draws and drags.
 //
@@ -33,6 +36,9 @@
 // ring's plane), sent once a frame as furnishMove; Lua refuses anything outside the property's space
 // and the object — and so the markers, which are drawn where Lua says it is — stays at the edge.
 //
+// A DRAG ON THE ROOM (not on a marker) draws a box, and lets go to select everything in it (furnishSelectBox; Ctrl
+// held: added to what is selected). A press let go where it went down is a click, as before.
+//
 // THE CENTRE DOT: grabbed, the object follows the pointer over the world, "like
 // clicking where you want to place something". Only the game can see the world, so the page sends the
 // pointer itself (furnishDragTo, 0-1 across and down, once a frame) and Lua stands the object on what
@@ -40,7 +46,7 @@
 //
 // THE AXES:
 //   arrows  X and Y follow the object's own heading (so "along the sofa" is an arrow, in any room at
-//           any angle); Z is straight up.
+//           any angle); Z is straight up. Grid-locked, X and Y are the world's.
 //   rings   a gimbal on GTA's rotation order 2 (the entity's matrix is Rz · Rx · Ry), so each ring
 //           changes exactly one of the three numbers the object is saved with:
 //             Z  round straight up                      → rz (its heading)
@@ -64,6 +70,11 @@ const GRAB_PX = 12;
 /** A drag can carry an object at most this far from where it started, in metres. Past it the ray
  *  is running almost along the arrow and a pixel of mouse is metres of room. */
 const MAX_MOVE = 20;
+/** How far a press goes before it is a box rather than a click, in screen pixels. */
+const BOX_PX = 6;
+/** The floor grid: at least this far out from the selection each way, in metres, and at most this many lines a side. */
+const GRID_REACH = 2;
+const GRID_MAX = 30;
 /** Points round each ring. */
 const RING_STEPS = 64;
 /** See the header. 1 = right-handed. */
@@ -76,13 +87,15 @@ let looking = false;      // right button held: the room is turning, the markers
 let snap = { move: 0.25, turn: 15, on: false };   // on: every drag snaps (G); off: only with Shift held
 let hot = null;           // the marker under the pointer, or being dragged: 'x' | 'y' | 'z' | 'c' (the dot)
 let drag = null;          // the drag in progress (see startDrag)
+let box = null;           // a press on the room: { x0, y0, x1, y1, ctrl, on } (on: dragged far enough to be a box)
 let pending = null;       // the move waiting for the next frame
 let frameId = 0;
 let anchorFn = null;      // told where the markers are each time they are drawn (onAnchor)
 let carryFn = null;       // told as a carry starts and ends (onCarry: the page's hint line)
 /** Where the drags go: the furnisher's callbacks, or the object viewer's Move while it has the markers
  *  (js/ov-panel.js, FurnishGizmo.route). */
-const FURNISH_ROUTE = { move: 'furnishMove', dragTo: 'furnishDragTo', end: 'furnishMoveEnd', click: 'furnishClick' };
+const FURNISH_ROUTE = { move: 'furnishMove', dragTo: 'furnishDragTo', end: 'furnishMoveEnd', click: 'furnishClick',
+                        box: 'furnishSelectBox' };
 let route = FURNISH_ROUTE;
 
 // ---- vectors: plain [x, y, z] arrays ----
@@ -130,8 +143,9 @@ export function rayAt(cam, px, py) {
 // THE MARKERS' GEOMETRY
 // ========================================
 
-/** The arrows: X and Y along the object's heading, Z up. */
+/** The arrows: X and Y along the object's heading (the world's, grid-locked), Z up. */
 function moveAxes(o) {
+    if (view && view.w) return { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
     const c = Math.cos(rad(o[5])), s = Math.sin(rad(o[5]));
     return { x: [c, s, 0], y: [-s, c, 0], z: [0, 0, 1] };
 }
@@ -173,9 +187,10 @@ function layout() {
         shape = view.g.map((p) => project(cam, p));
         if (shape.some((p) => !p)) shape = null;
     }
-    const out = { cam, O, L, centre, top, shape, axes: {}, fixed: view.n };
+    const out = { cam, O, L, centre, top, shape, axes: {}, fixed: view.n, grid: null };
     // (Nothing to drag on a thing that cannot be moved: only where it is.)
     if (view.n) return out;
+    if (view.w) out.grid = gridLines(cam);
 
     if (mode === 'move') {
         const ax = moveAxes(o);
@@ -208,6 +223,27 @@ function layout() {
     return out;
 }
 
+/** Grid-locked: the world grid at the snap step on the floor under the selection, round the grid point nearest the
+ *  primary, as screen segments faded towards their ends [[x1, y1, x2, y2, fade], ...]. A line part behind the camera
+ *  is left out. */
+function gridLines(cam) {
+    const s = snap.move > 0 ? snap.move : 0.25;
+    const A = view.a || view.o;
+    const z = view.o[2] - view.f;
+    const n = Math.min(GRID_MAX, Math.max(4, Math.ceil(GRID_REACH / s)));
+    const cx = Math.round(A[0] / s) * s, cy = Math.round(A[1] / s) * s;
+    const ext = n * s;
+    const out = [];
+    for (let i = -n; i <= n; i++) {
+        const fade = 1 - Math.abs(i) / (n + 1);
+        const a = project(cam, [cx + i * s, cy - ext, z]), b = project(cam, [cx + i * s, cy + ext, z]);
+        if (a && b) out.push([a[0], a[1], b[0], b[1], fade]);
+        const c = project(cam, [cx - ext, cy + i * s, z]), d = project(cam, [cx + ext, cy + i * s, z]);
+        if (c && d) out.push([c[0], c[1], d[0], d[1], fade]);
+    }
+    return out;
+}
+
 // ========================================
 // DRAWING
 // ========================================
@@ -225,7 +261,9 @@ function el(name, cls) {
 
 (function build() {
     if (!svg) return;
-    // (First, so the markers are drawn over it.)
+    // (First, so the markers are drawn over them.)
+    parts.grid = el('g', 'fz-gz-grid');
+    parts.gridLines = [];
     parts.shapeUnder = el('polygon', 'fz-gz-shape-under');
     parts.shape = el('polygon', 'fz-gz-shape');
     parts.corners = [];
@@ -241,6 +279,8 @@ function el(name, cls) {
         parts[k].label.textContent = k.toUpperCase();
     }
     parts.dot = el('circle', 'fz-gz-dot');
+    parts.box = el('rect', 'fz-gz-box');
+    hide(parts.box);
 })();
 
 const xy = (p) => p[0].toFixed(1) + ',' + p[1].toFixed(1);
@@ -269,6 +309,35 @@ function renderShape(shape) {
     parts.shapeUnder.setAttribute('points', line);
     parts.shape.setAttribute('points', line);
     show(parts.shapeUnder); show(parts.shape);
+}
+
+/** Grid-locked: the floor grid's lines (none otherwise). */
+function renderGrid(lines) {
+    const ls = lines || [];
+    while (parts.gridLines.length < ls.length) {
+        const l = document.createElementNS(SVG_NS, 'line');
+        parts.grid.appendChild(l);
+        parts.gridLines.push(l);
+    }
+    parts.gridLines.forEach((l, i) => {
+        if (i >= ls.length) { hide(l); return; }
+        const g = ls[i];
+        l.setAttribute('x1', g[0]); l.setAttribute('y1', g[1]);
+        l.setAttribute('x2', g[2]); l.setAttribute('y2', g[3]);
+        l.style.opacity = g[4].toFixed(2);
+        show(l);
+    });
+}
+
+/** The selection box while a press on the room is dragged out. */
+function renderBox() {
+    if (!parts.box) return;
+    if (!box || !box.on) { hide(parts.box); return; }
+    parts.box.setAttribute('x', Math.min(box.x0, box.x1));
+    parts.box.setAttribute('y', Math.min(box.y0, box.y1));
+    parts.box.setAttribute('width', Math.abs(box.x1 - box.x0));
+    parts.box.setAttribute('height', Math.abs(box.y1 - box.y0));
+    show(parts.box);
 }
 
 /** The box round everything drawn this frame, and the thing's top, in screen pixels, to onAnchor's
@@ -301,7 +370,9 @@ function render() {
     svg.classList.toggle('fz-gz-on', !!g && !g.fixed);
     svg.style.cursor = drag ? 'grabbing' : (hot ? 'grab' : '');
     reportAnchor(g);
+    renderBox();
     if (!g || g.fixed) return;
+    renderGrid(g.grid);
     renderShape(g.shape);
 
     for (const k of AXES) {
@@ -425,7 +496,7 @@ function startDrag(axis, px, py) {
         const a = moveAxes(o)[axis];
         const t0 = closestT(O, a, rayAt(cam, px, py));
         if (t0 === null) return false;
-        drag = { kind: 'move', axis, a, O, t0, index: view.i };
+        drag = { kind: 'move', axis, a, O, t0, index: view.i, grid: view.w, A: (view.a || O).slice() };
     } else {
         const a = ringAxes(o)[axis];
         const { u1, u2 } = ringFrame(a);
@@ -434,7 +505,7 @@ function startDrag(axis, px, py) {
         const method = Math.abs(dot(ray.d, a)) > 0.15 ? 'plane' : 'screen';
         const facing = dot(a, sub(cam.C, O)) >= 0 ? 1 : -1;
         const start = axis === 'x' ? o[3] : axis === 'y' ? o[4] : o[5];
-        drag = { kind: 'turn', axis, a, O, u1, u2, method, facing, start, total: 0, prev: 0, index: view.i };
+        drag = { kind: 'turn', axis, a, O, u1, u2, method, facing, start, total: 0, prev: 0, index: view.i, grid: view.w };
         const first = angleAt(drag, cam, px, py);
         if (first === null) { drag = null; return false; }
         drag.prev = first;
@@ -456,6 +527,16 @@ function moveDrag(px, py, shift) {
         const t = closestT(drag.O, drag.a, rayAt(cam, px, py));
         if (t === null) return;
         let delta = Math.max(-MAX_MOVE, Math.min(MAX_MOVE, t - drag.t0));
+        const k = AXES.indexOf(drag.axis);
+        if (snapping && snap.move > 0 && drag.grid && k < 2) {
+            // Grid-locked along X or Y: the primary lands on the world's grid line, the middle keeping its place from it.
+            // (Up is still by the step from where it was: floors are not on the grid.)
+            const P = add(drag.O, mul(drag.a, delta));
+            const off = drag.A[k] - drag.O[k];
+            P[k] = Math.round((P[k] + off) / snap.move) * snap.move - off;
+            queue(route.move, { i: drag.index, x: P[0], y: P[1], z: P[2] });
+            return;
+        }
         if (snapping && snap.move > 0) delta = Math.round(delta / snap.move) * snap.move;
         const P = add(drag.O, mul(drag.a, delta));
         queue(route.move, { i: drag.index, x: P[0], y: P[1], z: P[2] });
@@ -469,8 +550,13 @@ function moveDrag(px, py, shift) {
         drag.total += step;
         drag.prev = ang;
         let deg = drag.total * 180 / Math.PI * RING_SIGN[drag.axis];
-        if (snapping && snap.turn > 0) deg = Math.round(deg / snap.turn) * snap.turn;
-        const value = (((drag.start + deg) % 360) + 360) % 360;
+        let value = drag.start + deg;
+        // Grid-locked: onto a whole step of the turn; else turned by whole steps from where it was.
+        if (snapping && snap.turn > 0) {
+            value = drag.grid ? Math.round(value / snap.turn) * snap.turn
+                              : drag.start + Math.round(deg / snap.turn) * snap.turn;
+        }
+        value = ((value % 360) + 360) % 360;
         queue(route.move, { i: drag.index, ['r' + drag.axis]: value });
     }
 }
@@ -505,6 +591,27 @@ function endUnlessCarried() { if (!(drag && drag.carry)) endDrag(); }
 // THE POINTER
 // ========================================
 
+function roomClick(px, py, ctrl) {
+    nuiCallback(route.click, { x: px / window.innerWidth, y: py / window.innerHeight, ctrl });
+}
+
+/** A press on the room let go: a click where it went down, or everything in the box it was dragged out to. */
+function endBox(px, py) {
+    const b = box;
+    box = null;
+    renderBox();
+    if (!b) return;
+    if (!b.on) { roomClick(b.x0, b.y0, b.ctrl); return; }
+    const W = window.innerWidth, H = window.innerHeight;
+    nuiCallback(route.box, { x0: b.x0 / W, y0: b.y0 / H, x1: px / W, y1: py / H, ctrl: b.ctrl });
+}
+
+function cancelBox() {
+    if (!box) return;
+    box = null;
+    renderBox();
+}
+
 if (svg) {
     svg.addEventListener('pointerdown', (e) => {
         // Only the left button. The right one turns the room, and the game is the one reading it.
@@ -523,19 +630,28 @@ if (svg) {
             e.preventDefault();
             return;
         }
-        // Not on a marker: a click on the room, which selects whatever is under it (or nothing).
-        nuiCallback(route.click, { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight, ctrl: e.ctrlKey });
+        // Not on a marker: a press on the room. Let go where it went down, a click, which selects whatever is under it (or
+        // nothing); dragged, a box (where the route has one: the object viewer's has not).
+        if (!route.box) { roomClick(e.clientX, e.clientY, e.ctrlKey); return; }
+        box = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, ctrl: e.ctrlKey, on: false };
+        try { svg.setPointerCapture(e.pointerId); } catch (_) { /* gone already */ }
     });
 
     svg.addEventListener('pointermove', (e) => {
         if (looking) return;
+        if (box) {
+            box.x1 = e.clientX; box.y1 = e.clientY;
+            if (!box.on && Math.hypot(box.x1 - box.x0, box.y1 - box.y0) >= BOX_PX) box.on = true;
+            if (box.on) renderBox();
+            return;
+        }
         if (drag) { moveDrag(e.clientX, e.clientY, e.shiftKey); return; }
         const k = markerAt(e.clientX, e.clientY);
         if (k !== hot) { hot = k; render(); }
     });
 
-    svg.addEventListener('pointerup', endUnlessCarried);
-    svg.addEventListener('pointercancel', endUnlessCarried);
+    svg.addEventListener('pointerup', (e) => { if (box) endBox(e.clientX, e.clientY); else endUnlessCarried(); });
+    svg.addEventListener('pointercancel', () => { cancelBox(); endUnlessCarried(); });
     svg.addEventListener('lostpointercapture', endUnlessCarried);
     svg.addEventListener('pointerleave', () => { if (!drag && hot) { hot = null; render(); } });
 }
@@ -559,7 +675,8 @@ export const FurnishGizmo = {
         // `t`: may it tilt (false: the world builder's upright things; a property's furniture always may).
         view = { c: d.c, r: d.r, k: d.k, o: d.o, i: d.i, b: d.b === true, t: d.t !== false,
                  h: typeof d.h === 'number' ? d.h : 0, n: d.n === true,
-                 g: Array.isArray(d.g) && d.g.length > 1 ? d.g : null };
+                 g: Array.isArray(d.g) && d.g.length > 1 ? d.g : null,
+                 w: d.w === true, f: typeof d.f === 'number' ? d.f : 0, a: Array.isArray(d.a) ? d.a : null };
         if (view.n) { endDrag(); hot = null; }
         render();
     },
@@ -580,6 +697,7 @@ export const FurnishGizmo = {
     setLooking(on) {
         looking = !!on;
         if (looking) {
+            cancelBox();
             if (!(drag && drag.carry)) endDrag();
             if (hot && !drag) { hot = null; render(); }
         }
@@ -616,11 +734,15 @@ export const FurnishGizmo = {
     },
     /** The step, and whether every drag snaps to it (G) or only one with Shift held. */
     setSnap(move, turn, on) {
+        const was = snap.move;
         if (Number(move) > 0) snap.move = Number(move);
         if (Number(turn) > 0) snap.turn = Number(turn);
         snap.on = on === true;
+        // (The floor grid is drawn at the step.)
+        if (snap.move !== was && view && view.w) render();
     },
     reset() {
+        cancelBox();
         endDrag();
         view = null;
         hot = null;
@@ -631,7 +753,9 @@ export const FurnishGizmo = {
     /** Send the drags somewhere else: { move, dragTo, end, click } callback names, or null for the furnisher's own.
      *  The object viewer's Move borrows the markers this way while the furnisher is closed. */
     route(names) {
+        cancelBox();
         endDrag();
-        route = names ? { ...FURNISH_ROUTE, ...names } : FURNISH_ROUTE;
+        // (A borrower has no box unless it names one: a press on the room is a click.)
+        route = names ? { ...FURNISH_ROUTE, box: null, ...names } : FURNISH_ROUTE;
     },
 };
