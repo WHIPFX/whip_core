@@ -324,12 +324,13 @@ local function direct(veh, s, shot, dt)
     local name = choose(b, dt)
     if k[name] then dir.k = k[name] end   -- a lingering moment keeps the strength it last had
     local C, F = FRAMING.cruise, FRAMING[name]
-    if not dir.f then
-        dir.f = {}
-        for key, v in pairs(C) do dir.f[key] = v end
+    local f = dir.f
+    if not f then
+        f = {}
+        for key, v in pairs(C) do f[key] = v end
+        dir.f = f
     end
     local rate = BLEND_FAST[name] or BLEND
-    local f = dir.f
     for key, v in pairs(C) do f[key] = M.damp(f[key], M.lerp(v, F[key], dir.k), rate, dt) end
     shot.dist, shot.distAdd, shot.height = shot.dist * f.dist, shot.distAdd * f.dist, shot.height * f.height
     shot.fov, shot.stiff, shot.turnRate = shot.fov + f.fov, shot.stiff * f.stiff, shot.turnRate * f.stiff
