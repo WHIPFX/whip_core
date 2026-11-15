@@ -185,8 +185,8 @@ if not SERVER then
     --- A player's ped on this game, by their server id, while they are here and alive; nil otherwise.
     function K.pedOfServerId(sid)
         if not sid then return nil end
-        local pl = GamePlatform.playerIndex(sid)
-        if not pl then return nil end
+        local pl = GetPlayerFromServerId(sid)
+        if pl == -1 then return nil end
         local p = GetPlayerPed(pl)
         if p == 0 or not DoesEntityExist(p) or IsPedDeadOrDying(p, true) then return nil end
         return p

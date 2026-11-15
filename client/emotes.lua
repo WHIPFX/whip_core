@@ -392,8 +392,8 @@ end
 local function refreshMoods()
     for id, dressed in pairs(moodWatch) do
         local cmd = Player(id).state[PLAYER_MOOD_KEY]
-        local p = GamePlatform.playerIndex(id)
-        local ped = p and GetPlayerPed(p) or 0
+        local p = GetPlayerFromServerId(id)
+        local ped = p ~= -1 and GetPlayerPed(p) or 0
         if cmd == nil then
             if ped ~= 0 and DoesEntityExist(ped) then ClearFacialIdleAnimOverride(ped) end
             moodWatch[id] = nil
@@ -426,8 +426,8 @@ AddStateBagChangeHandler(PLAYER_MOOD_KEY, nil, function(bagName, _, value)
     local id = tonumber(bagName:match('^player:(%d+)$'))
     if not id then return end
     -- The bag still holds the OLD value inside this handler; `value` is the new one.
-    local p = GamePlatform.playerIndex(id)
-    local ped = p and GetPlayerPed(p) or 0
+    local p = GetPlayerFromServerId(id)
+    local ped = p ~= -1 and GetPlayerPed(p) or 0
     if ped ~= 0 and DoesEntityExist(ped) then faceOn(ped, value) end
     if value == nil then
         moodWatch[id] = nil

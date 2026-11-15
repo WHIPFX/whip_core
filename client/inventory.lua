@@ -2285,7 +2285,8 @@ function Inventory.watchThrow(netId, throwerServerId)
     throwerServerId = tonumber(throwerServerId)
     if not netId or not throwerServerId or watched[netId] then return end
     -- The thrower as this game knows them (nil when not here)
-    watched[netId] = { since = GetGameTimer(), thrower = GamePlatform.playerIndex(throwerServerId) }
+    local thrower = GetPlayerFromServerId(throwerServerId)
+    watched[netId] = { since = GetGameTimer(), thrower = thrower ~= -1 and thrower or nil }
     watchThrows()
 end
 
@@ -2634,8 +2635,8 @@ RegisterNetEvent('whip_core:client:playGiveAnim', function(otherServerId, isGive
     local clip = isGiver and 'givetake1_a' or 'givetake1_b'
 
     -- Face the other player.
-    local otherPlayerIdx = GamePlatform.playerIndex(otherServerId)
-    if otherPlayerIdx then
+    local otherPlayerIdx = GetPlayerFromServerId(otherServerId)
+    if otherPlayerIdx ~= -1 then
         local otherPed = GetPlayerPed(otherPlayerIdx)
         if otherPed and otherPed ~= 0 then
             TaskTurnPedToFaceEntity(ped, otherPed, 500)

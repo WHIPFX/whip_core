@@ -677,30 +677,6 @@ function Whip.voice(name, ...)
     return a, b
 end
 
--- ============================================
--- Another player, in this game (client)
--- ============================================
---
--- Never GetPlayerFromServerId's answer alone: for a player this game does not have (too far, gone),
--- it answers -1 on Legacy but 0 on FiveM for GTAV Enhanced, and 0 can be a real player, often you.
---
---     local idx = Whip.playerIndex(serverId)          -- nil: not in this game
---     if idx then local ped = GetPlayerPed(idx) ... end
---
--- (whip_core's own code has the same as GamePlatform.playerIndex.)
-if not IsDuplicityVersion() then
-    --- This game's player index for a server id, or nil when that player is not in this game.
-    ---@param serverId number
-    ---@return number|nil
-    function Whip.playerIndex(serverId)
-        local id = tonumber(serverId)
-        if not id then return nil end
-        local idx = GetPlayerFromServerId(id)
-        if not idx or idx < 0 or GetPlayerServerId(idx) ~= id then return nil end
-        return idx
-    end
-end
-
 --- Does this announcement concern us?
 ---
 --- 'coreStarted': whip_core has just (re)started and remembers nothing — always. 'resourceStarted':

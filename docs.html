@@ -2145,7 +2145,6 @@ end)</code></pre>
 
 <table class="event-table">
 <tr><th>What</th><th>On Enhanced</th><th>Do this</th></tr>
-<tr><td>Another player's index</td><td><code>GetPlayerFromServerId</code> returns <code>0</code>, not <code>-1</code>, for a player this game doesn't have, and 0 can be a real player (often you)</td><td><code>Whip.playerIndex(serverId)</code>: <code>nil</code> when they aren't in this game</td></tr>
 <tr><td>Models, maps, props</td><td>Legacy models must be converted</td><td>Ship both: <code>stream/</code> for Legacy and <code>stream_enhanced/</code> for Enhanced, which is used instead when it exists</td></tr>
 <tr><td>NPCs made at start</td><td>An NPC made before any character loads can lose its network id</td><td>Make NPCs after <code>whip_core:player:loaded</code>, or in <code>Whip.register</code> once a player is on</td></tr>
 <tr><td>Wide DUI pages</td><td><code>CreateDui</code> refuses pages wider than 8192 pixels</td><td>Pack an atlas into rows</td></tr>

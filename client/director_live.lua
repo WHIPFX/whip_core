@@ -47,9 +47,8 @@ local function entityOf(it)
     local x = type(it) == 'table' and it.extra or nil
     if type(x) ~= 'table' then return nil end
     if x.sid then
-        -- (GamePlatform.playerIndex: GetPlayerFromServerId answers 0 on Enhanced for a player not here.)
-        local p = GamePlatform.playerIndex(x.sid)
-        local ped = p and GetPlayerPed(p) or 0
+        local p = GetPlayerFromServerId(x.sid)
+        local ped = p ~= -1 and GetPlayerPed(p) or 0
         return ped ~= 0 and DoesEntityExist(ped) and ped or nil
     end
     if x.netId and NetworkDoesNetworkIdExist(x.netId) then

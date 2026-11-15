@@ -106,8 +106,8 @@ end
 
 --- This game's ped for a server id, or 0 when it does not have them.
 local function pedOf(serverId)
-    local idx = GamePlatform.playerIndex(serverId)
-    if not idx then return 0 end
+    local idx = GetPlayerFromServerId(serverId)
+    if idx == -1 then return 0 end
     local ped = GetPlayerPed(idx)
     return (ped ~= 0 and DoesEntityExist(ped)) and ped or 0
 end

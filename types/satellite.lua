@@ -453,13 +453,6 @@ function WhipSatellite.skillCheckGame(id, def) end
 ---@return boolean ok
 function WhipSatellite.removeSkillCheckGame(id) end
 
---- CLIENT. This game's player index for a server id, or nil when that player is not in this game. Never
---- what GetPlayerFromServerId returns, alone: it is -1 on Legacy but 0 on Enhanced for a player this game lacks, and 0 can
---- be a real player (often you).
----@param serverId number
----@return number|nil
-function WhipSatellite.playerIndex(serverId) end
-
 ---@class WhipPadScreen
 local WhipPadScreen = {}
 --- Take your NUI focus (no cursor on a pad) and start reading the pad. Returns whether a pad is in the

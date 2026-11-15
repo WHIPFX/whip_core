@@ -19,7 +19,7 @@ local StepReg = Registry.new('directorTaskStep', {
 
 local seq = 0
 
--- (DirectorKit's, shared/director/kit.lua: a player's ped by server id goes through GamePlatform.playerIndex.)
+-- (DirectorKit's, shared/director/kit.lua.)
 local callable, entityOfNet, pedOfServerId = DirectorKit.callable, DirectorKit.entityOfNet, DirectorKit.pedOfServerId
 
 -- (What the server and the preview work a target out into: the code is handed the target itself.)

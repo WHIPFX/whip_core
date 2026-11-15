@@ -22,8 +22,8 @@ exports('GetEscortTarget', function() return escortTarget end)
 -- ============================================
 
 local function getPlayerPedFromServerId(serverId)
-    local playerId = GamePlatform.playerIndex(serverId)
-    if playerId then
+    local playerId = GetPlayerFromServerId(serverId)
+    if playerId ~= -1 then
         return GetPlayerPed(playerId)
     end
     return nil

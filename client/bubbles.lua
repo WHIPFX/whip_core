@@ -85,8 +85,8 @@ local function pedOf(owner, myId)
         return (ent ~= 0 and IsEntityAPed(ent)) and ent or nil
     end
     if owner == myId then return PlayerPedId() end
-    local player = GamePlatform.playerIndex(owner)
-    if not player then return nil end
+    local player = GetPlayerFromServerId(owner)
+    if player == -1 then return nil end
     return GetPlayerPed(player)
 end
 

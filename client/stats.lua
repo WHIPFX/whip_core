@@ -912,8 +912,8 @@ RegisterNetEvent('whip_core:client:statsDebugNearby', function(list)
     if not debugActive or type(list) ~= 'table' or not DebugCards then return end
     local keep = {}
     for _, e in ipairs(list) do
-        local idx = type(e) == 'table' and GamePlatform.playerIndex(e.s) or nil
-        local ped = idx and GetPlayerPed(idx) or 0
+        local idx = type(e) == 'table' and e.s and GetPlayerFromServerId(e.s) or -1
+        local ped = idx ~= -1 and GetPlayerPed(idx) or 0
         -- Only a player this game can see: the card hangs on their ped.
         if ped ~= 0 and DoesEntityExist(ped) then
             local key = 'p:' .. tostring(e.s)

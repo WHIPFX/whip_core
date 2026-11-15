@@ -33,22 +33,6 @@ if IsDuplicityVersion() then
     -- So players' games read it even from a `set` (on Legacy; Enhanced needs the setr).
     SetConvarReplicated('whip_platform', GamePlatform.name)
 else
-    --- This game's player index for a server id, or nil when that player is not in this game.
-    ---
-    --- Use it instead of GetPlayerFromServerId: for a player this game does not have, that answers -1 on
-    --- Legacy but 0 on Enhanced (citizenfx/rfc #592), and 0 can be a real player, often you, so "not -1"
-    --- put another player's prompt, bubble or emote on you. The answer is checked back here. Satellites
-    --- have the same as Whip.playerIndex (lib/satellite.lua).
-    ---@param serverId number
-    ---@return number|nil
-    function GamePlatform.playerIndex(serverId)
-        local id = tonumber(serverId)
-        if not id then return nil end
-        local idx = GetPlayerFromServerId(id)
-        if not idx or idx < 0 or GetPlayerServerId(idx) ~= id then return nil end
-        return idx
-    end
-
     -- What this game read when whip started, and what it reads now. Both legacy on an Enhanced server:
     -- the value never arrived (server.cfg needs setr). Only the second right: it arrived after whip started.
     -- Developer mode only. (Not DevCommand: shared scripts load before client/dev_commands.lua.)
