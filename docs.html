@@ -3833,10 +3833,18 @@ if not holdId then return false, why end
 <h3>Pockets</h3>
 <table class="event-table">
 <tr><th>Pocket</th><th>Slots</th><th>Max weight</th><th>For</th></tr>
-<tr><td><code>player</code></td><td>30</td><td>80 kg</td><td>The main inventory: items go here first</td></tr>
-<tr><td><code>accessory</code></td><td>5</td><td>10 kg</td><td>The strip: slot 1 Phone, slot 2 Money (cash or a wallet), slots 3 to 5 Key. A key there goes in the ignition by itself</td></tr>
+<tr><td><code>player</code></td><td>30</td><td>80 kg, the strip included</td><td>The main inventory. It takes anything, and items go here first</td></tr>
+<tr><td><code>accessory</code></td><td>5</td><td>10 kg of the 80</td><td>The strip beside it. Each slot takes one kind of item</td></tr>
 </table>
-<p>Sizes come from <code>Config.ContainerSlots</code> and <code>Config.MaxWeight</code>. <code>Config.AccessoryStrip = false</code> removes the strip, and what a character had in it moves into <code>player</code> at login. Read the list with <a href="#inventory"><code>GetPockets()</code></a> rather than typing it out.</p>
+<p>Sizes come from <code>Config.ContainerSlots</code> and <code>Config.MaxWeight</code>. <code>Config.AccessoryStrip = false</code> removes the strip (keys then go in the ignition by hand), and what a character had in it moves into <code>player</code> at login. Read the list with <a href="#inventory"><code>GetPockets()</code></a> rather than typing it out.</p>
+<table class="event-table">
+<tr><th>Strip slot</th><th>Takes</th></tr>
+<tr><td>1 Phone</td><td>Phones while whip_phone runs; it looks here for one first. Without whip_phone, anything</td></tr>
+<tr><td>2 Money</td><td><code>cash</code> or a <code>wallet</code></td></tr>
+<tr><td>3 to 5 Key</td><td>Any ignition key (<a href="#registerignitionkey"><code>RegisterIgnitionKey</code></a>)</td></tr>
+</table>
+<p>The server holds each slot to its rule on a drag, a <code>StoreMove</code> and an <code>AddItem</code>, and tells a player why ("Only Cash or Wallet can go there"). A reward too big for the main inventory only spills into a slot that takes it. What a slot held before its rule changed stays until it's moved. Reshape a slot with <a href="#registeraccessoryslot"><code>RegisterAccessorySlot</code></a>.</p>
+<p>A <code>vehicle_key</code> in the strip goes into the ignition by itself when its holder takes the driver's seat of the car it fits, and comes back when they leave the seat, so three Key slots carry three cars' keys. Keys in <code>player</code> never move by themselves.</p>
 <div class="info-box tip"><strong>More room is an item, not a pocket.</strong> A duffle bag holds 25 slots, and players find, drop, steal and lose it like anything else. See <a href="#guide-panels">RegisterPanelItem</a>.</div>
 
 <h3>The four calls</h3>
