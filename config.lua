@@ -42,7 +42,7 @@ Config.BlockOwnCharacterTransfers = true
 Config.ContainerSlots = {
     -- Main inventory: five columns, four rows showing, then it scrolls. Any number works.
     player    = 30,
-    accessory = 5,    -- The small strip for a wallet, a bag, and similar.
+    accessory = 5,    -- The small strip: Phone, Money and three Keys (Config.AccessoryStrip below).
 }
 
 Config.MaxWeight = {   -- Kilograms

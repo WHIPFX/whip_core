@@ -609,7 +609,7 @@ end
 --
 -- The accessory key. A key in any slot of the accessory strip goes into the ignition of the car it
 -- fits when its holder takes the driver's seat, and back to them when they leave that seat (getting
--- out, or sliding across). The strip has no Key slot (Josh, 5 Nov 2026: every slot takes anything).
+-- out, or sliding across). Slots 3 to 5 are its Key slots (shared/inventory_shape.lua).
 -- Only:
 --   * a key that was in the strip FIRST (keys in the main pockets never move by themselves);
 --   * the driver's seat;
