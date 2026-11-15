@@ -1137,6 +1137,49 @@ local function mountPart(entry)
     return true
 end
 
+--- `at = { list = '<prompt group>:<option id>' }`: options added to another prompt's list, right after that option
+--- ('atm:balance': under the ATM's Check Balance). ctx.entity is the prop the prompt is on (a prop prompt's), ctx.model
+--- its model name; label and icon are read as the list is built.
+local function mountList(entry)
+    local listKey = entry.def.at.list
+    local ids = {}
+    for _, o in ipairs(entry.opts) do
+        local oid = engineId(entry, o)
+        local c = condCtx(entry, o)
+        --- The prompt's prop into ctx, for conditions and labels
+        local function bind(ctx, pid)
+            local rec = PropPrompts.get(pid)
+            local reg = Interactions.getAll()[pid]
+            ctx.entity = rec and rec.entity or nil
+            ctx.model = rec and rec.model or nil
+            ctx.coords = (ctx.entity and DoesEntityExist(ctx.entity) and GetEntityCoords(ctx.entity))
+                or (reg and reg.x and vector3(reg.x, reg.y, reg.z)) or nil
+            return ctx
+        end
+        local ok, why = Interactions.addListOption(entry.owner, listKey, {
+            id    = oid,
+            label = function(pid) return resolveText(entry, o, 'label', bind(c, pid)) end,
+            icon  = (o.icon ~= nil or entry.def.icon ~= nil)
+                and function(pid) return resolveText(entry, o, 'icon', bind(c, pid)) end or nil,
+            holdMs = o.holdMs or entry.def.holdMs,
+            can   = function(pid) return (check(entry, o, bind(c, pid))) end,
+            act   = function(pid)
+                local x = bind({}, pid)
+                local reg = Interactions.getAll()[pid]
+                local here = reg and reg.x and vector3(reg.x, reg.y, reg.z) or nil
+                fire(entry, o, pid, { entity = x.entity, model = x.model, coords = x.coords }, here)
+            end,
+        })
+        if not ok then
+            for _, done in ipairs(ids) do Interactions.removeListOption(entry.owner, listKey, done) end
+            return false, why
+        end
+        ids[#ids + 1] = oid
+    end
+    mounted[entry.key] = { kind = 'list', listKey = listKey, ids = ids, owner = entry.owner }
+    return true
+end
+
 local function mountRadial(entry)
     local ids = {}
     for _, o in ipairs(entry.opts) do
@@ -1178,6 +1221,8 @@ local function unmount(key)
         for _, id in ipairs(m.ids) do VehiclePartOptions.remove(m.owner, m.partKey, id) end
     elseif m.kind == 'radial' then
         for _, id in ipairs(m.ids) do WhipRadialRemove(id) end
+    elseif m.kind == 'list' then
+        for _, id in ipairs(m.ids) do Interactions.removeListOption(m.owner, m.listKey, id) end
     elseif m.kind == 'props' then
         -- Every prop's prompt goes with its kind, and its watch (onLost is told for each found prop)
         PropPrompts.undefine(m.propKind)
@@ -1196,7 +1241,7 @@ local function kindOf(at)
     end
     -- One place only: two is refused rather than guessed.
     local named = {}
-    for _, k in ipairs({ 'coords', 'entity', 'netId', 'vehiclePart', 'aimBox', 'model' }) do
+    for _, k in ipairs({ 'coords', 'entity', 'netId', 'vehiclePart', 'aimBox', 'model', 'list' }) do
         if at[k] ~= nil then named[#named + 1] = k end
     end
     if at.radial then named[#named + 1] = 'radial' end
@@ -1235,6 +1280,13 @@ local function kindOf(at)
         return 'props'
     end
     if at.vehiclePart ~= nil then return 'part' end
+    -- Another prompt's list, by an option in it: '<prompt group>:<option id>'
+    if at.list ~= nil then
+        if type(at.list) ~= 'string' or not at.list:match('^[^:]+:.+$') then
+            return nil, "at.list names another prompt's list by an option in it: '<prompt group>:<option id>' ('atm:balance')"
+        end
+        return 'list'
+    end
     if at.radial then return 'radial' end
     -- A place spelt wrong (`coord`, `pos`) is the likeliest reason none was found: say which.
     for k in pairs(at) do
@@ -1250,7 +1302,8 @@ end
 
 --- What each place is called in a warning.
 local PLACE_NAME = { prompt = 'a world prompt', part = 'a car part', radial = 'the F1 wheel',
-                     props = 'the props of a model', aimbox = 'a prompt where the player aims' }
+                     props = 'the props of a model', aimbox = 'a prompt where the player aims',
+                     list = "another prompt's list" }
 
 --- The places whose options may be menus: the world prompts.
 local MENU_KINDS = { prompt = true, props = true, aimbox = true }
@@ -1400,6 +1453,7 @@ local function mount(key, def, owner)
     elseif kind == 'aimbox' then ok, why = mountAimBox(entry)
     elseif kind == 'part' then ok, why = mountPart(entry)
     elseif kind == 'radial' then ok, why = mountRadial(entry)
+    elseif kind == 'list' then ok, why = mountList(entry)
     elseif kind == 'props' then ok, why = mountProps(entry) end
     if not ok then
         mountError[key] = tostring(why or 'the engine refused it')

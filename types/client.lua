@@ -760,6 +760,7 @@ function whip_core:IsRadialOpen() end
 ---@field bone string|nil With entity or netId: ride this bone
 ---@field vehiclePart 'hood'|'trunk'|'door_dside_f'|'door_pside_f'|'door_dside_r'|'door_pside_r'|'bike'|'bicycle'|'boat'|nil A choice on a car part's prompt; `hood` only while the bonnet is open; `bike`, `bicycle`, `boat` their one prompt each
 ---@field model string|string[]|nil A prompt on every prop of this model NAME (or any of a list of names) near the player — a hash is refused
+---@field list string|nil Options added to ANOTHER prompt's list, right after one of its options: '<prompt group>:<option id>' — 'atm:balance' puts them under the ATM's Check Balance. Every list holding that option gets them (a submenu without it does not). ctx.entity / ctx.model: the prop that prompt is on
 ---@field faces 1|2|nil With model: 2 for a prop used from both sides
 ---@field perModel table<string, { offset: vector3|nil, heading: number|nil }>|nil With model: one model placed its own way; what an entry leaves out is the action's offset / heading. /actionplace <id> aims it and copies the line
 ---@field radial boolean|nil The F1 wheel (a label is required; its slab shows `icon`, the pill under it `description`)
@@ -895,7 +896,7 @@ function whip_core:IsRadialOpen() end
 ---@field at table The plain values of `at`
 ---@field label string|nil When a string
 ---@field icon string|nil When a string
----@field mounted 'prompt'|'aimbox'|'props'|'radial'|'part'|false Where it lives ('aimbox': at = { aimBox }; 'props': at = { model }, on each prop of it found); false if it could not be put there (F8 says why)
+---@field mounted 'prompt'|'aimbox'|'props'|'radial'|'part'|'list'|false Where it lives ('aimbox': at = { aimBox }; 'props': at = { model }, on each prop of it found); false if it could not be put there (F8 says why)
 ---@field engineIds string[] The engine entries it is mounted as
 ---@field options { id: string, label: string|nil, offered: boolean, why: string|nil }[] Would each be offered to this player now, and why not
 

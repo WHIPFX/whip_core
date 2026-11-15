@@ -140,6 +140,7 @@ InteractSpec.ACTION_AT = {
     aimBox      = { place = true },   -- where the player looks, on what they aim at (client/aim_box.lua)
     radial      = { place = true },
     model       = { place = true },
+    list        = { place = true },   -- another prompt's list, by an option in it: 'atm:balance' (client/interact.lua)
     heading     = { with = { 'coords', 'entity', 'netId', 'model' } },
     follow      = { with = { 'coords' } },
     offset      = { with = { 'entity', 'netId', 'model' } },
