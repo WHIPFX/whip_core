@@ -918,7 +918,7 @@ SecureEvent('whip_core:server:devKillMe', {
     TriggerClientEvent('whip_core:client:devKillMe', source)
 end)
 
--- /w Restore All (tools/player.lua): health, armour, food and drink. Stats.set clamps to each stat's own max, so
+-- /w Restore Player Cores (tools/player.lua): health, armour, food and drink. Stats.set clamps to each stat's own max, so
 -- an over-large value is "full" without knowing the numbers (hunger and thirst are registered even when switched
 -- off in the config, so setting them is always safe).
 --
@@ -935,7 +935,7 @@ SecureEvent('whip_core:server:devRestore', {
         MarkPlayerAlive(source, player, 'revive:admin')
         TriggerClientEvent('whip_core:client:revive', source)
         revived = true
-        print(('[whip_core] %s revived themselves (/w Restore All)'):format(tostring(player.fullName)))
+        print(('[whip_core] %s revived themselves (/w Restore Player Cores)'):format(tostring(player.fullName)))
     end
     for _, name in ipairs({ 'health', 'armour', 'hunger', 'thirst' }) do
         Stats.set(source, name, 1e9, 'devtools:restore')

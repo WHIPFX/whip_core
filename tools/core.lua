@@ -23,7 +23,7 @@ local tools = {
     -- tools/player.lua.
     { name = 'Invisible', active = false, desc = 'Nobody else sees you. You see yourself faded.' },
     { name = 'God Mode', active = false, desc = 'No damage; your health is kept full.' },
-    { name = 'Restore All', active = false, kind = 'run',
+    { name = 'Restore Player Cores', active = false, kind = 'run',
       desc = 'Fills your health, armour, food and drink. If you are down, it revives you first.' },
     -- tools/show_players.lua.
     { name = 'Reveal Players', active = false,
@@ -340,7 +340,7 @@ local function ToggleTool(index)
         ['Noclip'] = true,
         ['Invisible'] = true,
         ['God Mode'] = true,
-        ['Restore All'] = true,
+        ['Restore Player Cores'] = true,
         ['Kill Me'] = true,
         ['Repair Vehicle'] = true,
         ['Coords'] = true,
@@ -956,7 +956,7 @@ end
 -- whip.devtools, developer mode on or off — it is how a developer reaches the switch — so it asks
 -- dev.eligible (askAccess, at load and when dev tools are given or taken), not the whip.devtools ACE,
 -- which with developer mode off answers no. The server still decides: ToggleDevMenu asks again.
--- Also while downed (alive = false): God Mode and Restore All are what a downed admin reaches for.
+-- Also while downed (alive = false): God Mode and Restore Player Cores are what a downed admin reaches for.
 AddEventHandler('whip_core:onReady', function()
     Actions.add(GetCurrentResourceName(), {
         id          = 'devmenu',

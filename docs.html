@@ -2105,7 +2105,7 @@ end)</code></pre>
 <tr><td>A Director card or scenario</td><td><code>TestDirectorCard(type, props, { player = source })</code>, <code>TestDirectorScenario</code> (<a href="#director-cards">Director cards</a>)</td></tr>
 <tr><td>Something done to another player, alone</td><td>Pass <code>{ charId = n }</code> for a second character of yours, then log in as them to see it</td></tr>
 <tr><td>Two players at once</td><td>Two FiveM clients on one PC, same account, different characters. Turn off <code>Config.BlockOwnCharacterTransfers</code> on a test server to move money between them</td></tr>
-<tr><td>Dying, healing, a broken car</td><td><code>/w</code> → Kill Me, Restore All, Repair Vehicle (<a href="#guide-devtools">Dev Tools</a>)</td></tr>
+<tr><td>Dying, healing, a broken car</td><td><code>/w</code> → Kill Me, Restore Player Cores, Repair Vehicle (<a href="#guide-devtools">Dev Tools</a>)</td></tr>
 <tr><td>What your events did</td><td><code>/whip</code> → System → Monitor: each SecureEvent call, the reason for a refusal, and how long your handler took</td></tr>
 <tr><td>Errors you missed</td><td><code>whiperrors</code> in the server console (F8 in developer mode); <a href="#geterrorlog"><code>GetErrorLog</code></a> in code</td></tr>
 </table>
@@ -11653,7 +11653,7 @@ end</code></pre>
 <tr><td><strong>Noclip</strong></td><td>Fly, invisible and invincible: WASD, <kbd>Space</kbd>/<kbd>Ctrl</kbd>, <kbd>Shift</kbd> for speed. In a car, the car comes too and you stay in your seat, unless another player is driving it</td></tr>
 <tr><td><strong>Invisible</strong></td><td>Nobody sees you; you see yourself at half opacity</td></tr>
 <tr><td><strong>God Mode</strong></td><td>No damage; health kept full</td></tr>
-<tr><td><strong>Restore All</strong></td><td>Once: revives you if down (as <code>/whip_revive</code>), then fills your health, armour, food and drink</td></tr>
+<tr><td><strong>Restore Player Cores</strong></td><td>Once: revives you if down (as <code>/whip_revive</code>), then fills your health, armour, food and drink</td></tr>
 <tr><td><strong>Reveal Players</strong></td><td>Every player as a named blip, and within 250 m a tag over their head: character name, charId and account name</td></tr>
 <tr><td><strong>Kill Me</strong></td><td>Once: an ordinary death where you are. Noclip and God Mode go off first</td></tr>
 <tr><td><strong>Repair Vehicle</strong></td><td>Once: repairs the car you're in, driving or not</td></tr>
