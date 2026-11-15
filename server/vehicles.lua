@@ -91,6 +91,7 @@ local FIELDS = {
     trunkMaxWeight    = 'number',
     gloveboxSlots     = 'int',
     gloveboxMaxWeight = 'number',
+    keyToken          = 'string',
 }
 
 --- NULL, as a value you can pass: `fields.x = nil` is just an absent key in Lua, so it can't mean
@@ -264,6 +265,9 @@ function Vehicles.ensureTable()
             `trunkMaxWeight`     FLOAT            DEFAULT NULL,
             `gloveboxSlots`      SMALLINT UNSIGNED DEFAULT NULL,
             `gloveboxMaxWeight`  FLOAT            DEFAULT NULL,
+            -- The car's locks (Vehicles.changeLocks): set, only keys cut with it fit; NULL, every key of
+            -- this car does (migration 044 adds it to an existing table).
+            `keyToken`           VARCHAR(24)      DEFAULT NULL,
             `createdAt`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`vehicleId`),
             UNIQUE KEY `uk_plate` (`plate`),
@@ -445,6 +449,8 @@ function Vehicles.loadAll()
                 -- (below), or its owner would be locked out. Garage retrieve sets its own lock.
                 locked           = DbBool(row.locked),
                 vehType          = row.vehType or 'automobile',
+                -- Its locks, once changed: only keys cut since fit (Vehicles.keyFits). Never sent to a client.
+                keyToken         = type(row.keyToken) == 'string' and row.keyToken ~= '' and row.keyToken or nil,
             }
             count = count + 1
         end
@@ -3782,8 +3788,9 @@ end
 function Vehicles.keyFits(metadata, vehicleId)
     if not metadata or tonumber(metadata.vehicleId) ~= vehicleId then return false end
     local def = Vehicles._records[vehicleId]
-    -- A SECURE car (SpawnTempVehicle opts.secure, a Director run's) takes only keys cut for THIS car:
-    -- its plate can be fixed, so id + plate can be yesterday's too.
+    -- A car with a token takes only keys cut with it: a SECURE car (SpawnTempVehicle opts.secure, a Director run's),
+    -- whose plate can be fixed, so id + plate can be yesterday's too; and an owned car whose locks were changed
+    -- (Vehicles.changeLocks), so every key cut before stops fitting.
     if def and def.keyToken and metadata.token ~= def.keyToken then return false end
     if def and def.session then
         local keyPlate = metadata.plate and tostring(metadata.plate):upper():gsub('%s+', '')
@@ -4267,7 +4274,7 @@ function Vehicles.setSecure(vehicleId, on, fresh)
     if not def or not def.temp then return false, 'Only a temporary car' end
     if on then
         def.secure = true
-        def.keyToken = ('%x%x%x'):format(math.random(0x10000000, 0x7fffffff), os.time() % 0x10000000, vehicleId % 0x10000)
+        def.keyToken = Vehicles.newKeyToken(vehicleId, def.keyToken)
     else
         def.secure, def.keyToken = nil, nil
     end
@@ -4275,6 +4282,37 @@ function Vehicles.setSecure(vehicleId, on, fresh)
         Vehicles.resyncAllKeys()
         Vehicles.tellIgnition(vehicleId)
     end
+    return true
+end
+
+--- A new token for a car's keys (at most 19 characters), never the one it has now.
+---@param vehicleId number
+---@param was string|nil  its token now
+---@return string
+function Vehicles.newKeyToken(vehicleId, was)
+    local token
+    repeat
+        token = ('%x%x%x'):format(math.random(0x10000000, 0x7fffffff), os.time() % 0x10000000, vehicleId % 0x10000)
+    until token ~= was
+    return token
+end
+
+--- Change an owned car's locks: every key of it cut before stops fitting, wherever it is (pockets, a stash, a boot,
+--- its own ignition, the ground, a character who is not playing), and the keys cut after fit. Saved with the car, so
+--- it lasts through a restart. Whoever holds or sits with a key of it is told again; a car running on an old key in
+--- its ignition stops.
+---@param vehicleId number
+---@return boolean ok
+---@return string|nil err
+function Vehicles.changeLocks(vehicleId)
+    local def = Vehicles._records[vehicleId]
+    if not def then return false, 'Vehicle not found' end
+    -- A street car or a temporary one has no row to keep its locks in (a temporary car is made secure instead).
+    if def.session or def.temp then return false, 'Only a car someone owns' end
+    local ok, err = Vehicles.persist(vehicleId, { keyToken = Vehicles.newKeyToken(vehicleId, def.keyToken) })
+    if not ok then return false, err or 'Could not save the new locks' end
+    Vehicles.resyncAllKeys()
+    Vehicles.tellIgnition(vehicleId)
     return true
 end
 
@@ -4475,17 +4513,45 @@ local function keyHolder(who)
     return src, player
 end
 
-exports('GiveVehicleKey', function(who, vehicleId)
+--- Cut a key of a car into a person's pockets. Refused when they hold one already, unless `opts.spare = true`
+--- (a second key, one to hand to a friend).
+---@param who number|table  a server id, or { charId = n } while they play
+---@param vehicleId number|WhipVehicleRef|nil
+---@param opts table|nil  { spare?: boolean }
+---@return boolean ok, string|nil err
+exports('GiveVehicleKey', function(who, vehicleId, opts)
     local source, player = keyHolder(who)
     if not source then return false, player end
     ---@cast player table   -- with a source, keyHolder's second answer is the player
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
     if not vehicleId then return false, refErr end
-    local ok, err = Vehicles.giveKey(source, player, vehicleId)
+    local ok, err = Vehicles.giveKey(source, player, vehicleId, { spare = type(opts) == 'table' and opts.spare == true })
     if not ok then return false, err end
     -- Just true: a second value from an export is always a reason (giveKey's is a message).
     return true
+end)
+
+--- Change an owned car's locks: every key of it cut so far stops fitting, wherever it is, and keys cut after fit
+--- (Vehicles.changeLocks). A street or temporary car is refused.
+---@param vehicleId number|WhipVehicleRef|nil
+---@return boolean ok, string|nil err
+exports('ChangeVehicleLocks', function(vehicleId)
+    local refErr
+    vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
+    if not vehicleId then return false, refErr end
+    return Vehicles.changeLocks(vehicleId)
+end)
+
+--- How many keys fit this car now, wherever they are (Vehicles.countKeys): a number, or false and why.
+---@param vehicleId number|WhipVehicleRef|nil
+---@return number|false count, string|nil err
+exports('CountVehicleKeys', function(vehicleId)
+    local refErr
+    vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference
+    if not vehicleId then return false, refErr end
+    if not Vehicles.getDef(vehicleId) then return false, 'Vehicle not found' end
+    return Vehicles.countKeys(vehicleId)
 end)
 
 --- The pockets a person's keys are in: an online player's live ones, or an offline character's keys read from the

@@ -1651,13 +1651,33 @@ function whip_core:GetVehiclePosition(vehicleId) end
 function whip_core:SetVehicleLocked(vehicleId, locked) end
 
 --- Give a vehicle key item to a player: their server id, or { charId = n } while they play (a key goes into
---- pockets, so they must be online).
+--- pockets, so they must be online). Refused when they hold a key of it already, unless `opts.spare = true` (a
+--- second key, to hand to someone).
 ---@param who number|{ charId: number }
 ---@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
+---@param opts { spare?: boolean }|nil
 ---@return boolean success
 ---@return string|nil err  only with false: 'Already has a key for this vehicle', no room, not online, ...
 ---@async
-function whip_core:GiveVehicleKey(who, vehicleId) end
+function whip_core:GiveVehicleKey(who, vehicleId, opts) end
+
+--- Change an owned car's locks: every key of it cut so far stops fitting, wherever it is (pockets, a stash, a boot,
+--- its own ignition, the ground, a character who is not playing), and keys cut after fit. It lasts through a
+--- restart. A car running on an old key stops. A street or temporary car is refused.
+---@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
+---@return boolean ok
+---@return string|nil err  only with false
+---@async
+function whip_core:ChangeVehicleLocks(vehicleId) end
+
+--- How many keys fit a car now, wherever they are: every character's pockets (online or not), every stash, every
+--- car's boot, glovebox and ignition, and the ground. A key inside another item (a bag), a resource's own stores and
+--- an open panel's slots are not counted.
+---@param vehicleId number|WhipVehicleRef Vehicle ID, or a vehicle reference
+---@return number|false count
+---@return string|nil err  only with false: no such vehicle, the database could not be read
+---@async
+function whip_core:CountVehicleKeys(vehicleId) end
 
 --- Has this person a key for a vehicle (scans their pockets)? A character who is not playing is read from the
 --- database.

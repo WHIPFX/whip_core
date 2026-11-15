@@ -51,6 +51,9 @@ function Vehicles.linkHackedKey(vehicleId)
     slotData.metadata.plate = def.plate
     slotData.metadata.model = modelName
     slotData.metadata.status = 'hacked'
+    -- Cut for the car's locks as they are (Vehicles.keyFits): a car whose locks were changed takes it now, and a
+    -- later change of them shuts it out like every other key.
+    slotData.metadata.token = def.keyToken
 
     pcall(Vehicles.saveInventory, vehicleId, 'key')
     return true

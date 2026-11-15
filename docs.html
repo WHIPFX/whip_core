@@ -5187,11 +5187,13 @@ exports.whip_core:OpenPanel(source, {
 <p>Cars that are out stay in the world when their player leaves or drives off, and come back where they stood after a restart.</p>
 
 <h3>Keys and the ignition</h3>
-<p>A key is an item, <code>vehicle_key</code>, with metadata <code>{ vehicleId, plate, model }</code>. It doesn't stack and weighs 0.1 kg.</p>
+<p>A key is an item, <code>vehicle_key</code>, with metadata <code>{ vehicleId, plate, model }</code>, and a <code>token</code> when the car's locks have been changed. It doesn't stack and weighs 0.1 kg.</p>
 <ul>
   <li><strong>Getting one.</strong> <code>GiveVehicleKey</code>, or <code>CreateOwnedVehicle</code> with <code>{ giveKey = true }</code> (without it, no key). <code>SpawnTempVehicle</code> with <code>forSource</code> gives that player one unless <code>giveKey = false</code>; <code>keyInIgnition = true</code> puts one in the ignition instead.</li>
-  <li><strong>Starting the engine.</strong> The driver drags the key into the car's one-slot ignition in the inventory; only a key whose <code>metadata.vehicleId</code> matches fits. Mouse wheel up starts the engine, down stops it.</li>
+  <li><strong>Starting the engine.</strong> The driver drags the key into the car's one-slot ignition in the inventory; only a key whose <code>metadata.vehicleId</code> matches fits, and after a change of locks only one cut since. Mouse wheel up starts the engine, down stops it.</li>
   <li><strong>No key in the ignition:</strong> the engine stays off and wheel up shows "No key in ignition!".</li>
+  <li><strong>A spare.</strong> <code>GiveVehicleKey</code> refuses a player who already holds a key of the car, unless you pass <code>{ spare = true }</code>, which cuts another one to hand to a friend.</li>
+  <li><strong>Changing the locks.</strong> <code>ChangeVehicleLocks</code> makes every key of an owned car cut so far stop fitting, wherever it is, so a lost or copied key is worthless; keys cut after fit. <code>CountVehicleKeys</code> says how many keys fit the car now.</li>
 </ul>
 <div class="info-box tip"><strong>Stopping an engine</strong> (an overheat, a breakdown): <code>HoldVehicleEngine</code> keeps it off and shows the driver your reason until <code>ReleaseVehicleEngine</code>. Otherwise a running engine stays on while its key is in the ignition.</div>
 
@@ -5413,14 +5415,36 @@ print(v.plate, v.model, v.owner.charId, v.state, v.locked)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>bool, string|nil</code></div>
 </div></div>
 
-<div class="export-card" data-search="givevehiclekey give key vehicle">
-<div class="export-header"><span class="export-name">GiveVehicleKey(who, vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-card" data-search="givevehiclekey give key vehicle spare second copy">
+<div class="export-header"><span class="export-name">GiveVehicleKey(who, vehicleId, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Put a <code>vehicle_key</code> for the car in a player's inventory.</p>
+  <p>Put a <code>vehicle_key</code> for the car in a player's inventory. A player who already holds one is refused, unless <code>opts.spare</code> asks for another.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>who</td><td>number|table</td><td>A <a href="#person-refs">person</a> who is playing: server id, or <code>{ charId = n }</code></td></tr>
-  <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr></table>
+  <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr>
+  <tr><td>opts.spare</td><td>bool</td><td><code>true</code> cuts a key even when they hold one, a second key to hand to someone</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'Already has a key for this vehicle'</code>, no room, not online)</div>
+</div></div>
+
+<div class="export-card" data-search="changevehiclelocks change locks disable revoke old keys lost stolen copied">
+<div class="export-header"><span class="export-name">ChangeVehicleLocks(vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>Change an owned car's locks. Every key of it cut so far stops fitting, wherever it is: someone's pockets (playing or not), a stash, a boot, its own ignition or the ground. Keys cut after fit, and the change lasts through a restart. A car running on an old key in its ignition stops. Old keys stay where they are as items that no longer open anything. A street car or a temporary one is refused; a temporary car takes <code>secure = true</code> instead.</p>
+<pre><code class="lang-lua">-- The owner lost a key: new locks, and one new key for them
+local ok, why = exports.whip_core:ChangeVehicleLocks(vehicleId)
+if ok then exports.whip_core:GiveVehicleKey(source, vehicleId) end</code></pre>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code> (<code>'Only a car someone owns'</code>, <code>'Vehicle not found'</code>, a save that failed)</div>
+</div></div>
+
+<div class="export-card" data-search="countvehiclekeys count keys how many active copies">
+<div class="export-header"><span class="export-name">CountVehicleKeys(vehicleId)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>How many keys fit the car now, wherever they are: every character's pockets (playing or not), every stash, every car's boot, glovebox and ignition, and the ground. A key inside another item (a bag), a resource's own stores and an open panel's slots aren't counted. Keys from before a <code>ChangeVehicleLocks</code> don't fit, so they aren't counted either.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>vehicleId</td><td>number|table</td><td>A <a href="#vehicle-references">vehicle reference</a></td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>number</code>, or <code>false, reason</code> (no such vehicle, the database couldn't be read)</div>
 </div></div>
 
 <div class="export-card" data-search="removevehiclekey remove key vehicle confiscate impound">

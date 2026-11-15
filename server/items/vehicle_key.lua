@@ -122,12 +122,14 @@ function Vehicles.keyMetadata(vehicleId, extra)
     return md
 end
 
---- Give a vehicle key to a player: add to inventory, save, sync to client.
+--- Give a vehicle key to a player: add to inventory, save, sync to client. Refused when they hold one that fits
+--- already, unless `opts.spare` (a second key, for someone else).
 --- @param source number  Player server ID
 --- @param player table   WhipPlayer instance
 --- @param vehicleId number
+--- @param opts table|nil  { spare?: boolean }
 --- @return boolean success, string message
-function Vehicles.giveKey(source, player, vehicleId)
+function Vehicles.giveKey(source, player, vehicleId, opts)
     if not player or not player.inventory then
         return false, 'Player has no inventory'
     end
@@ -137,7 +139,8 @@ function Vehicles.giveKey(source, player, vehicleId)
         return false, ('Vehicle #%d not found'):format(vehicleId)
     end
 
-    if Vehicles.playerHasKey(player, vehicleId) then
+    local spare = type(opts) == 'table' and opts.spare == true
+    if not spare and Vehicles.playerHasKey(player, vehicleId) then
         return false, 'Already has a key for this vehicle'
     end
 
@@ -149,7 +152,7 @@ function Vehicles.giveKey(source, player, vehicleId)
 
     -- A key being made is an item entering the game — and a free key was one of the worst bugs
     -- the 22 Sep audit found, so every one is on the record.
-    Log.gained(player.charId, 'vehicle_key', 1, 'key for ' .. tostring(def.plate))
+    Log.gained(player.charId, 'vehicle_key', 1, (spare and 'spare key for ' or 'key for ') .. tostring(def.plate))
 
     -- Flushed through the store (which also sends the inventory update and the key sync). A key is
     -- usually handed over beside a write-through change — a purchase, a garage record — so it is
@@ -194,4 +197,79 @@ function Vehicles.removeKey(source, player, vehicleId)
     end
     Inventory.syncAndFlush(source, player)   -- see giveKey
     return true
+end
+
+--- How many keys fit this car now (Vehicles.keyFits), wherever they are: every living character's pockets, every
+--- stash, every car's boot, glovebox and ignition, and the ground. What is loaded is counted as it is now (an online
+--- player's pockets, an open stash, a car's storage, every pile), the rest as saved. A stack counts each key in it.
+--- NOT counted: a key inside another item (a bag), a resource's own stores and an open panel's slots.
+---@param vehicleId number
+---@return number|false count
+---@return string|nil err
+function Vehicles.countKeys(vehicleId)
+    local items, marks = {}, {}
+    for item in pairs(Inventory.IgnitionKeys) do
+        items[#items + 1] = item
+        marks[#marks + 1] = '?'
+    end
+    if #items == 0 then return 0 end
+    local inList = table.concat(marks, ',')
+
+    -- The saved rows first (only key items, read and never written). The loaded stores are walked after, with no
+    -- wait between that walk and the choice of which saved rows to count, so a stash loaded or put away while the
+    -- database answered is counted once.
+    local reads = {
+        { what = 'character', sql = 'SELECT ci.`charId` AS id, ci.`item`, ci.`amount`, ci.`metadata` FROM `character_inventory` ci '
+            .. 'JOIN `characters` c ON c.`charId` = ci.`charId` AND c.`deleted` IS NULL WHERE ci.`item` IN (' .. inList .. ')' },
+        { what = 'stash', sql = 'SELECT `containerId` AS id, `item`, `amount`, `metadata` FROM `container_inventory` '
+            .. 'WHERE `item` IN (' .. inList .. ')' },
+        { what = 'vehicle', sql = 'SELECT `vehicleId` AS id, `item`, `amount`, `metadata` FROM `vehicle_inventory` '
+            .. 'WHERE `item` IN (' .. inList .. ')' },
+    }
+    for _, r in ipairs(reads) do
+        local ok, rows = pcall(MySQL.query.await, r.sql, items)
+        if not ok then return false, 'The database could not be reached — try again' end
+        r.rows = rows or {}
+    end
+
+    local n = 0
+    local function add(d)
+        if type(d) == 'table' and Inventory.isIgnitionKey(d.item) and Vehicles.keyFits(d.metadata, vehicleId) then
+            n = n + (math.tointeger(tonumber(d.amount)) or 1)
+        end
+    end
+
+    local playing = {}
+    for _, p in pairs(Players) do
+        if p.charId then playing[p.charId] = true end
+        if p.inventory then
+            for _, c in ipairs(PlayerContainers) do
+                for _, d in pairs(p.inventory[c] or {}) do add(d) end
+            end
+        end
+    end
+    for _, inv in pairs(Containers.invCache or {}) do
+        for _, d in pairs(inv) do add(d) end
+    end
+    for _, inv in pairs(Vehicles.invCache or {}) do
+        for _, slots in pairs(inv) do
+            for _, d in pairs(slots) do add(d) end
+        end
+    end
+    for _, row in pairs(GroundItems and GroundItems.cache or {}) do add(row) end
+
+    local loaded = { character = playing, stash = Containers.invCache or {}, vehicle = Vehicles.invCache or {} }
+    local idText = tostring(vehicleId)
+    for _, r in ipairs(reads) do
+        local skip = loaded[r.what]
+        for _, row in ipairs(r.rows) do
+            -- Only rows that can name this car are read (the text holds its id somewhere).
+            local raw = row.metadata
+            if not skip[row.id] and (type(raw) ~= 'string' or raw:find(idText, 1, true)) then
+                add({ item = row.item, amount = row.amount, metadata = Inventory.readMetadata(raw,
+                    ('%s %s key'):format(r.what, tostring(row.id))) })
+            end
+        end
+    end
+    return n
 end

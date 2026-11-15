@@ -735,6 +735,16 @@ Migrations.list = {
             return complete
         end,
     },
+    {
+        id   = '044_vehicle_key_token',
+        note = 'A car\'s locks (ChangeVehicleLocks): once changed, only keys cut since fit it, and that lasts through a '
+            .. 'restart. NULL is a car whose locks were never changed, which every key of it fits. The CREATE in '
+            .. 'server/vehicles.lua has it, so a fresh database skips this.',
+        statements = {
+            { sql = 'ALTER TABLE `vehicles` ADD COLUMN `keyToken` VARCHAR(24) DEFAULT NULL AFTER `gloveboxMaxWeight`',
+              unless = { column = { 'vehicles', 'keyToken' } } },
+        },
+    },
 }
 
 -- ============================================
