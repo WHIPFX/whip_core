@@ -296,7 +296,7 @@ end)
 
 --- Activity log: a player activated a 3D interaction point, a radial option, or an
 --- aim-target option. Fired by the three client systems' ONE activation site each, so
---- every satellite's registrations (whip_dealership_example's door, whip_autos' radial entry)
+--- every satellite's registrations (whip_dealership's Simon, whip_autos' radial entry)
 --- are covered centrally with zero satellite edits. Client-supplied label — this is a
 --- timeline note, not an authorization; anything the label CLAIMS was still separately
 --- validated by whatever the activation actually did.
