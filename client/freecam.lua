@@ -162,6 +162,15 @@ local function holdCar(veh, on)
     SetEntityVelocity(veh, 0.0, 0.0, 0.0)
 end
 
+--- Give the carried car back to the game: shown, solid, unfrozen, and its physics woken. Unfrozen alone it hung where
+--- it was let go, in the air too, until it was driven (the game leaves a frozen car's physics asleep); the small push
+--- down starts the fall. Called after the player's own hold is let go: a frozen player in its seat holds it too.
+local function letGoCar(veh)
+    holdCar(veh, false)
+    ActivatePhysics(veh)
+    SetEntityVelocity(veh, 0.0, 0.0, -0.01)
+end
+
 -- ============================================
 -- Enter / exit
 -- ============================================
@@ -274,9 +283,9 @@ function FreeCam.setPad(on, triggers)
     padTriggers = triggers ~= false
 end
 
---- Put the carried car at `dest`, exactly, as the ped is put on foot (from up in the air it falls, as the ped does),
---- facing `heading`, the player back in their seat, and the car shown, unfrozen and solid again. Its passengers
---- ride in it the whole way: nothing here moves them. Waits.
+--- Put the carried car at `dest`, exactly, as the ped is put on foot, facing `heading`, with the player back in their
+--- seat. Still held: FreeCam.stop lets it go (letGoCar) once the player's own hold is off, and from up in the air it
+--- falls then, as the ped does. Its passengers ride in it the whole way: nothing here moves them. Waits.
 local function landCar(car, ped, dest, heading)
     local veh = car.veh
     SetEntityCoordsNoOffset(veh, dest.x, dest.y, dest.z, false, false, false)
@@ -289,7 +298,6 @@ local function landCar(car, ped, dest, heading)
         timeout = timeout + 10
     end
     if GetVehiclePedIsIn(ped, false) ~= veh then SetPedIntoVehicle(ped, veh, car.seat) end
-    holdCar(veh, false)
 end
 
 --- Put the camera back on the player.
@@ -324,12 +332,13 @@ function FreeCam.stop(o)
     -- where they should be — sending them back would undo it (and pull them out of a car).
     local car = carried and DoesEntityExist(carried.veh) and carried or nil
     carried = nil
-    if car and o.stay then
-        holdCar(car.veh, false)
-    elseif car then
-        -- The car goes there with the player in it, facing where the camera looked (or back as it stood).
-        local back = o.movePed == false
-        landCar(car, ped, back and car.from or finalCoords, back and car.heading or camYaw)
+    if car then
+        -- The car goes there with the player in it, facing where the camera looked (or back as it stood); with
+        -- `stay`, it stays. Let go below, after the player's own hold.
+        if not o.stay then
+            local back = o.movePed == false
+            landCar(car, ped, back and car.from or finalCoords, back and car.heading or camYaw)
+        end
     elseif not o.stay then
         local dest = (o.movePed ~= false) and finalCoords or (startCoords or finalCoords)
 
@@ -352,6 +361,7 @@ function FreeCam.stop(o)
         PedHold.release('freecam')
         SetLocalPlayerVisibleLocally(true)
     end
+    if car then letGoCar(car.veh) end
 
     opts = {}
     return finalCoords
@@ -706,11 +716,12 @@ AddEventHandler('onResourceStop', function(res)
         SetEntityCoordsNoOffset(ped, startCoords.x, startCoords.y, startCoords.z, false, false, false)
         SetEntityHeading(ped, startHeading)
     end
-    -- A carried car is shown and let go where it is (landing it waits for collision).
-    if carried and DoesEntityExist(carried.veh) then holdCar(carried.veh, false) end
+    -- A carried car is shown and let go where it is (landing it waits for collision), after the player's hold.
+    local car = carried and DoesEntityExist(carried.veh) and carried.veh or nil
     carried = nil
     if opts.hidePed ~= false then
         PedHold.release('freecam')
         SetLocalPlayerVisibleLocally(true)
     end
+    if car then letGoCar(car) end
 end)
