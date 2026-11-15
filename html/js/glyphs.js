@@ -197,6 +197,15 @@
             + '<path d="M3.4 14.2v5.2a1 1 0 0 0 1 1h15.2a1 1 0 0 0 1-1v-5.2"/>'
             + '<path d="M3.4 14.2h17.2"/></svg>',
 
+        // A STASH, OPENED: a box with its latch, the lid swinging up off it. For a container's prompt (a crate, a
+        // locker, a safe): what it does is open that box. Not `bag`, which is your own pockets (the F1 wheel's
+        // Inventory), and no arrow, which would say putting in or taking out (`store`, `pickup`).
+        stash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"'
+            + ' stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M3.6 11.4h16.8v7.6a1.2 1.2 0 0 1-1.2 1.2H4.8a1.2 1.2 0 0 1-1.2-1.2z"/>'
+            + '<path d="M3.6 11.4 18.2 4.2"/><path d="M18.2 4.2l1.2 2.6L5.2 13.8"/>'
+            + '<path d="M10.8 11.4v2.8h2.4v-2.8"/></svg>',
+
         // A TURBOCHARGER, seen the way one sits on a bench: the volute housing, the compressor hub
         // at its centre, and the discharge duct coming off tangentially with its flange.
         //

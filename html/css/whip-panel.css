@@ -1371,8 +1371,11 @@
 .wp-tiles-fill .wp-tile { width: var(--wp-tile-w, 108px); }
 .wp-tiles-fill .wp-tile-img,
 .wp-tiles-fill .wp-tile-art { height: calc(var(--wp-tile-w, 108px) * 0.6); }
-/* The prop picked, large, over its Model box and chips (pickers.js propPicker): a square, as tall as a car's. */
+/* The prop picked, large, over its chips (pickers.js propPicker): a square, as tall as a car's. */
 .wp-pick-col .wp-pick-hero.wp-hero-square { height: 220px; align-items: center; padding: var(--ui-sp-5); box-sizing: border-box; }
+/* The picked one's name and model never give way to a long run of chips under them (a .wp-item-sub is overflow
+   hidden, so in a short column it was squeezed and cut off): the chips scroll instead. */
+.wp-pick-col > .wp-pick-name, .wp-pick-col > .wp-item-sub { flex: 0 0 auto; }
 /* A picker's top row: a field beside its search (the container wizard's Name), the two sharing the row. */
 .wp-pick-top { flex: 0 0 auto; display: flex; align-items: stretch; gap: var(--ui-sp-4); }
 .wp-pick-top > * { flex: 1 1 0; min-width: 0; margin-bottom: 0; }

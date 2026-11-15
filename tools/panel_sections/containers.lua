@@ -76,7 +76,7 @@ RegisterNUICallback('cmPlace', function(data, cb)
 
     local function card()
         return {
-            house = true, icon = 'bag', title = 'Container', sub = name,
+            house = true, icon = 'stash', title = 'Container', sub = name,
             chip = { text = prop },
             rows = {
                 { label = 'Aim', value = aimed and ('facing %.0f°'):format(heading) or 'at the ground where it goes',

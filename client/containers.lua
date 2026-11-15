@@ -251,7 +251,7 @@ local function registerContainerInteraction(cId, data)
         z = data.z,
         follow = promptFollow(cId),   -- round its prop, on your side (above)
         label = data.name or 'Container',
-        icon = 'bag',                 -- what is inside, as the F1 wheel's Inventory: not the bare E
+        icon = 'stash',               -- a box opening (html/js/glyphs.js), not the bare E
         group = 'containers',
         -- `containerPending` is not part of this condition: a request lost to the rate limiter would hide the prompt
         -- until a timeout (see Vehicles.tryOpenGlovebox).
