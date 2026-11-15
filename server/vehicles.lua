@@ -4544,7 +4544,7 @@ end
 ---@return boolean ok, string|nil err
 exports('GiveVehicleKey', function(who, vehicleId, opts)
     local source, player = keyHolder(who)
-    if not source then return false, player end
+    if not source then return false, player --[[@as string]] end
     ---@cast player table   -- with a source, keyHolder's second answer is the player
     local refErr
     vehicleId, refErr = Vehicles.idFromRef(vehicleId)   -- a vehicleId or a vehicle reference

@@ -855,7 +855,7 @@ function whip_core:IsRadialOpen() end
 ---@field onSelect nil|fun(ctx: WhipActionCtx) Falls back to the option above it (a menu's), then the action's
 ---@field holdMs number|nil Held to use, falling back to the action's; 0 is a press
 ---@field press boolean|vector3|{ coords?: vector3, offset?: vector3, normal?: vector3 }|nil Used with the hand, falling back to the menu's, then the action's (WhipAction.press)
----@field options WhipActionOption[]|fun(ctx: WhipActionCtx): WhipActionOption[]|nil World prompts: a MENU — choosing it shows these on the prompt, with a Back (any number of levels; looking away folds it). Its options pass this one's require / canInteract too and take what they leave out from it. A function fills the menu each time it opens, in a thread of its own (it may wait: "One moment…" shows meanwhile, "Nothing here" for an empty list)
+---@field options? WhipActionOption[]|fun(ctx: WhipActionCtx): WhipActionOption[] World prompts: a MENU — choosing it shows these on the prompt, with a Back (any number of levels; looking away folds it). Its options pass this one's require / canInteract too and take what they leave out from it. A function fills the menu each time it opens, in a thread of its own (it may wait: "One moment…" shows meanwhile, "Nothing here" for an empty list)
 ---@field stay boolean|nil Down a menu: after its onSelect the prompt stays on this menu (a filled one is filled again) instead of going back to the top
 
 ---@class WhipAction

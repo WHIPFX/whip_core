@@ -692,14 +692,14 @@ end
 --- A filled menu's answer as kept: read like any option list (a misspelt field warned about, once), a bad
 --- `require` or a second option with one id left out, each knowing the menu it is under.
 ---@return table kids
-local function readFilled(entry, o, list)
+local function readFilled(entry, o, answer)
     local where = ('options of "%s"'):format(tostring(o.id))
     local warn = {}
-    if type(list) ~= 'table' or InteractSpec.callable(list) then
-        if list ~= nil then warn[#warn + 1] = where .. ' answered ' .. type(list) .. ', not a list of options' end
-        list = {}
+    if type(answer) ~= 'table' or InteractSpec.callable(answer) then
+        if answer ~= nil then warn[#warn + 1] = where .. ' answered ' .. type(answer) .. ', not a list of options' end
+        answer = {}
     end
-    local read = readOptions(list, where, warn, true)
+    local read = readOptions(answer, where, warn, true)
     local kids, seen = {}, {}
     for i, c in ipairs(read) do
         local oid = c.id ~= nil and tostring(c.id) or ('opt' .. i)
@@ -730,13 +730,13 @@ local function fill(entry, pid, o, extra, show, keep)
     CreateThread(function()
         local ctx = { id = entry.id, owner = entry.owner, option = o.id, under = o._up and o._up.id or nil }
         for k, v in pairs(extra or {}) do ctx[k] = v end
-        local ok, list = pcall(o.options, ctx)
+        local ok, answer = pcall(o.options, ctx)
         if fillGen[pid] ~= gen or menuAt[pid] ~= o then return end
         local kids
         if ok then
-            kids = readFilled(entry, o, list)
+            kids = readFilled(entry, o, answer)
         else
-            report(entry.key, ('options of "%s"'):format(tostring(o.id)), list)
+            report(entry.key, ('options of "%s"'):format(tostring(o.id)), answer)
             kids = { quietRow(o, '<failed>', 'Not available', 'warning') }
         end
         filledAt[pid] = filledAt[pid] or setmetatable({}, { __mode = 'k' })
