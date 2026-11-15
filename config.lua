@@ -1415,7 +1415,7 @@ Config.ActivityLogDays = 30    -- How long player/item timelines are kept before
 -- false: no warning.
 Config.PlayerManagerSessionWarn = false
 
-Config.ContainerInteractRange = 2.5     -- How close to stand to open a stash or other container
+Config.ContainerInteractRange = 2.5     -- How close to stand to open a stash or other container (from a big prop's edge)
 Config.ContainerStreamRange   = 100.0   -- How far away its prop still appears
 -- Where a stash's E prompt sits on its prop, for a player who has not picked their own (pause menu, Settings,
 -- Server, Map & HUD, Stash prompt):

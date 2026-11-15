@@ -47,6 +47,10 @@ function Containers.ensureTable()
             `z`            FLOAT            NOT NULL,
             `heading`      FLOAT            NOT NULL DEFAULT 0.0,
             `prop`         VARCHAR(60)      NOT NULL DEFAULT 'prop_cs_cardbox_01',
+            -- How far its prop reaches out from its spot, in metres (half its footprint's diagonal, as the
+            -- admin's game measured it): the open range is counted from there, where its prompt is
+            -- (Containers.openFor). NULL: from its spot. Migration 045 adds it to an existing table.
+            `reach`        FLOAT            DEFAULT NULL,
             `allowedItems` JSON             DEFAULT NULL,
             `createdAt`    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `createdBy`    INT UNSIGNED     DEFAULT NULL,
@@ -94,6 +98,17 @@ end
 -- ============================================
 -- Load All Definitions
 -- ============================================
+
+local MAX_REACH = 25.0   -- metres: a shipping container's half-diagonal is about 7
+
+--- A container's `reach` (the `reach` column): how far its prop reaches out from its spot, in metres, or nil for
+--- none (a small prop, one never measured, a nonsense value).
+---@return number|nil
+function Containers.reachOf(v)
+    v = tonumber(v)
+    if not v or v ~= v or v <= 0 then return nil end
+    return math.min(v, MAX_REACH)
+end
 
 function Containers.loadAll()
     Containers.ensureTable()
@@ -148,6 +163,7 @@ function Containers.loadAll()
                 heading     = row.heading or 0.0,
                 prop        = prop,
                 allowedItems = allowed,
+                reach       = Containers.reachOf(row.reach),
                 propertyId  = row.propertyId,
                 createdAt   = EpochSeconds(row.createdAt),   -- seconds, like a container made this session
                 createdBy   = row.createdBy,
@@ -363,6 +379,7 @@ local function createRuntime(data, owner, requirements)
         ry           = tonumber(data.ry),
         interior     = data.interior == true or nil, -- inside an MLO: its prop waits for the interior
         allowedItems = data.allowedItems,
+        reach        = Containers.reachOf(data.reach),
         createdAt    = os.time(),
         requirements = requirements,
     }
@@ -436,7 +453,7 @@ function Containers.create(data, owner)
     local propertyId = math.tointeger(tonumber(data.propertyId))
 
     local ok, insertId = pcall(MySQL.insert.await,
-        'INSERT INTO `containers` (`name`,`type`,`slots`,`maxWeight`,`ownerCharId`,`accessCharId`,`locked`,`x`,`y`,`z`,`heading`,`prop`,`allowedItems`,`createdBy`,`key`,`declared`,`requirements`,`propertyId`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO `containers` (`name`,`type`,`slots`,`maxWeight`,`ownerCharId`,`accessCharId`,`locked`,`x`,`y`,`z`,`heading`,`prop`,`reach`,`allowedItems`,`createdBy`,`key`,`declared`,`requirements`,`propertyId`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         {
             data.name or 'Stash',
             data.type or 'stash',
@@ -448,6 +465,7 @@ function Containers.create(data, owner)
             data.x, data.y, data.z,
             data.heading or 0.0,
             prop == false and '' or prop,
+            Containers.reachOf(data.reach),
             allowedJson,
             data.createdBy or nil,
             data.key or nil,
@@ -476,6 +494,7 @@ function Containers.create(data, owner)
         z            = data.z,
         heading      = data.heading or 0.0,
         prop         = prop,
+        reach        = Containers.reachOf(data.reach),
         allowedItems = data.allowedItems,
         createdAt    = os.time(),
         createdBy    = data.createdBy,
@@ -496,7 +515,7 @@ end
 --- works on and the copy back cannot drift apart.
 local UPDATABLE_FIELDS = {
     'name', 'type', 'slots', 'maxWeight', 'ownerCharId', 'accessCharId', 'locked',
-    'x', 'y', 'z', 'heading', 'prop', 'allowedItems', 'key', 'declared', 'requirements',
+    'x', 'y', 'z', 'heading', 'prop', 'reach', 'allowedItems', 'key', 'declared', 'requirements',
 }
 
 --- The highest slot that holds something, loading the contents to find out. nil and why when they
@@ -541,6 +560,8 @@ local function updateNow(containerId, data)
     if data.z           ~= nil then nextDef.z           = tonumber(data.z) or def.z end
     if data.heading     ~= nil then nextDef.heading     = tonumber(data.heading) or def.heading end
     if data.prop        ~= nil then nextDef.prop        = data.prop end
+    -- 0 or false: measured from its spot again.
+    if data.reach       ~= nil then nextDef.reach       = Containers.reachOf(data.reach) end
     if data.allowedItems ~= nil then
         -- Empty table/array means "clear" (allow all items). Empty is next() == nil, not # == 0: a
         -- keyed whitelist `{ evidence_bag = true }` has a length of 0.
@@ -618,11 +639,12 @@ local function updateNow(containerId, data)
     local ok, err = true, nil
     if not Containers.isRuntime(def) then
         ok, err = pcall(MySQL.query.await,
-            'UPDATE `containers` SET `name`=?,`type`=?,`slots`=?,`maxWeight`=?,`ownerCharId`=?,`accessCharId`=?,`locked`=?,`x`=?,`y`=?,`z`=?,`heading`=?,`prop`=?,`allowedItems`=?,`key`=?,`declared`=?,`requirements`=? WHERE `containerId`=?',
+            'UPDATE `containers` SET `name`=?,`type`=?,`slots`=?,`maxWeight`=?,`ownerCharId`=?,`accessCharId`=?,`locked`=?,`x`=?,`y`=?,`z`=?,`heading`=?,`prop`=?,`reach`=?,`allowedItems`=?,`key`=?,`declared`=?,`requirements`=? WHERE `containerId`=?',
             {
                 nextDef.name, nextDef.type, nextDef.slots, nextDef.maxWeight,
                 nextDef.ownerCharId, nextDef.accessCharId, nextDef.locked and 1 or 0,
-                nextDef.x, nextDef.y, nextDef.z, nextDef.heading, nextDef.prop == false and '' or nextDef.prop, allowedJson,
+                nextDef.x, nextDef.y, nextDef.z, nextDef.heading, nextDef.prop == false and '' or nextDef.prop,
+                nextDef.reach, allowedJson,
                 nextDef.key, declaredJson, requirementsJson,
                 containerId,
             }
@@ -1478,8 +1500,12 @@ function Containers.openFor(source, player, containerId, opts)
     -- Distance check. Skippable because a script-driven open is not always the player walking
     -- up to a prop, and because the caller has already decided the open is legitimate.
     -- IsPlayerNear, which also refuses a missing ped and a player still in the character creator.
+    -- COUNTED FROM ITS EDGE (Josh: a large crate whose prompt he stood at said "Too far away"): its prompt
+    -- stands on its side, so a big prop's reach (half its footprint) goes on top. Whoever can reach the
+    -- prompt can open it.
+    local reach = Containers.reachOf(def.reach) or 0.0
     if not opts.skipDistance then
-        local range = Config.ContainerInteractRange + 2.0
+        local range = Config.ContainerInteractRange + 2.0 + reach
         if not (def.x and IsPlayerNear(source, def.x, def.y, def.z, range)) then
             return false, 'Too far away'
         end
@@ -1489,10 +1515,10 @@ function Containers.openFor(source, player, containerId, opts)
     --
     -- The anchor is the keep range: a distance-checked open stays usable only while the player stays
     -- near it (Stores.viewerInRange, on every move). Twice the open range, so shuffling at the stash
-    -- never refuses anything; walking off does.
+    -- never refuses anything; walking off does. From its edge too.
     local anchor = nil
     if not opts.skipDistance then
-        anchor = { x = def.x, y = def.y, z = def.z, range = (Config.ContainerInteractRange + 2.0) * 2 }
+        anchor = { x = def.x, y = def.y, z = def.z, range = (Config.ContainerInteractRange + 2.0) * 2 + reach }
     end
     -- And the access is held, like the distance: an open that asked canAccess keeps being asked on
     -- every move (Stores.fromWire), so a stash locked or re-assigned while open, or an officer going

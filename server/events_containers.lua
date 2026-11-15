@@ -139,6 +139,7 @@ SecureEvent('whip_core:server:createContainer', {
     data.prop   = Sanitize.key(data.prop, 80) or Config.ContainerDefaultProp
     data.slots  = Sanitize.int(data.slots, 1, 1000, Config.ContainerDefaultSlots)
     data.maxWeight = Sanitize.number(data.maxWeight, 0, 10000, Config.ContainerDefaultWeight)
+    data.reach  = Containers.reachOf(data.reach)   -- its prop's, as the admin's game measured it
     data.ownerCharId  = tonumber(data.ownerCharId) or nil
     data.accessCharId = tonumber(data.accessCharId) or nil
     if data.ownerCharId  == 0 then data.ownerCharId  = nil end
@@ -170,12 +171,36 @@ SecureEvent('whip_core:server:updateContainer', {
     if data.prop      ~= nil then data.prop      = Sanitize.key(data.prop, 80) end
     if data.slots     ~= nil then data.slots     = Sanitize.int(data.slots, 1, 1000) end
     if data.maxWeight ~= nil then data.maxWeight = Sanitize.number(data.maxWeight, 0, 10000) end
+    if data.reach     ~= nil then data.reach     = Containers.reachOf(data.reach) or 0 end
 
     -- Its reason ("slot 12 still holds something", "being changed — try again"), not a generic one
     local ok, why = Containers.update(containerId, data)
     if not ok then return false, why or 'Failed to update container' end
     ShowSuccess(source,
         ('Container #%d updated'):format(containerId))
+end)
+
+--- An admin's game measured the props of saved containers that had no reach yet (client/containers.lua, as /whip's
+--- Containers opens): kept, so each opens from its edge (Containers.openFor). Only ones with none; nothing is said,
+--- as nothing the admin did changed.
+SecureEvent('whip_core:server:cmContainerReach', {
+    ace = 'whip.devtools',
+    rateLimit = 2000,
+    params = { {'reaches', 'any'} },
+}, function(_, _, reaches)
+    if type(reaches) ~= 'table' then return end
+    local n = 0
+    for id, r in pairs(reaches) do
+        n = n + 1
+        if n > 500 then break end
+        local containerId = math.tointeger(tonumber(id))
+        local def = containerId and Containers.getDef(containerId)
+        local reach = Containers.reachOf(r)
+        if def and reach and def.reach == nil and not Containers.isRuntime(def) then
+            local ok, why = Containers.update(containerId, { reach = reach })
+            if not ok then print(('[whip_core:container] #%d keeps no reach: %s'):format(containerId, tostring(why))) end
+        end
+    end
 end)
 
 SecureEvent('whip_core:server:deleteContainer', {

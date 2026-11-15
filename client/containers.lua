@@ -251,6 +251,7 @@ local function registerContainerInteraction(cId, data)
         z = data.z,
         follow = promptFollow(cId),   -- round its prop, on your side (above)
         label = data.name or 'Container',
+        icon = 'bag',                 -- what is inside, as the F1 wheel's Inventory: not the bare E
         group = 'containers',
         -- `containerPending` is not part of this condition: a request lost to the rate limiter would hide the prompt
         -- until a timeout (see Vehicles.tryOpenGlovebox).
@@ -459,9 +460,53 @@ RegisterNUICallback('cmTeleport', function(data, cb)
     cb('ok')
 end)
 
+--- How far a prop reaches out from where it stands, in metres: half its footprint's diagonal. Sent with an admin's
+--- create or change, so the server counts the open range from its edge, where its prompt is (Containers.openFor).
+--- nil when the model is not in the game or does not load in time.
+---@param prop string|false|nil
+---@return number|nil
+local function propReach(prop)
+    if type(prop) ~= 'string' or prop == '' then return nil end
+    local model = GetHashKey(prop)
+    if not IsModelInCdimage(model) then return nil end
+    RequestModel(model)
+    local untilAt = GetGameTimer() + 2000
+    while not HasModelLoaded(model) and GetGameTimer() < untilAt do Wait(0) end
+    if not HasModelLoaded(model) then return nil end
+    local lo, hi = GetModelDimensions(model)
+    SetModelAsNoLongerNeeded(model)
+    local hx = math.max(math.abs(lo.x), math.abs(hi.x))
+    local hy = math.max(math.abs(lo.y), math.abs(hi.y))
+    return math.sqrt(hx * hx + hy * hy)
+end
+
 RegisterNUICallback('cmCreateContainer', function(data, cb)
-    TriggerServerEvent('whip_core:server:createContainer', data)
     cb('ok')
+    if type(data) ~= 'table' then return end
+    CreateThread(function()
+        data.reach = propReach(data.prop or Config.ContainerDefaultProp)
+        TriggerServerEvent('whip_core:server:createContainer', data)
+    end)
+end)
+
+-- /whip's Containers, opened by an admin (its list, tools/panel_sections/containers.lua): a saved container whose prop
+-- was never measured is measured here and sent, so it opens from its edge as one set up since does.
+RegisterNetEvent('whip_core:client:cmAllData', function(containers)
+    if type(containers) ~= 'table' then return end
+    CreateThread(function()
+        local found, byProp, any = {}, {}, false
+        for id, c in pairs(containers) do
+            if type(c) == 'table' and c.reach == nil and c.persist ~= false and type(c.prop) == 'string' and c.prop ~= '' then
+                if byProp[c.prop] == nil then byProp[c.prop] = propReach(c.prop) or false end
+                local cId = tonumber(c.containerId) or tonumber(id)
+                if byProp[c.prop] and cId then
+                    found[cId] = byProp[c.prop]
+                    any = true
+                end
+            end
+        end
+        if any then TriggerServerEvent('whip_core:server:cmContainerReach', found) end
+    end)
 end)
 
 RegisterNetEvent('whip_core:client:cmContainerCreated', function(def)
@@ -470,8 +515,19 @@ RegisterNetEvent('whip_core:client:cmContainerCreated', function(def)
 end)
 
 RegisterNUICallback('cmUpdateContainer', function(data, cb)
-    TriggerServerEvent('whip_core:server:updateContainer', tonumber(data.containerId), data)
     cb('ok')
+    if type(data) ~= 'table' then return end
+    local id = tonumber(data.containerId)
+    CreateThread(function()
+        -- Measured at every save, so one made before the reach was kept gets it the next time it is changed.
+        local prop = data.prop
+        if prop == nil then
+            local d = id and containerDefs[id]
+            prop = d and d.prop
+        end
+        data.reach = propReach(prop)
+        TriggerServerEvent('whip_core:server:updateContainer', id, data)
+    end)
 end)
 
 RegisterNUICallback('cmDeleteContainer', function(data, cb)

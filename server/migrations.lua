@@ -745,6 +745,16 @@ Migrations.list = {
               unless = { column = { 'vehicles', 'keyToken' } } },
         },
     },
+    {
+        id   = '045_containers_reach',
+        note = 'How far a container\'s prop reaches out from its spot, so its open range is counted from its edge, '
+            .. 'where its prompt is: a large crate opens from its side. NULL is from its spot, as before. The CREATE '
+            .. 'in server/containers.lua has it, so a fresh database skips this.',
+        statements = {
+            { sql = 'ALTER TABLE `containers` ADD COLUMN `reach` FLOAT DEFAULT NULL AFTER `prop`',
+              unless = { column = { 'containers', 'reach' } } },
+        },
+    },
 }
 
 -- ============================================
