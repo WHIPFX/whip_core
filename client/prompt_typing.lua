@@ -260,8 +260,8 @@ local function place(sess)
     local h = w * rect.h / rect.w
     local rx, ry, rz, ux, uy, uz = WorldQuad.billboardBasis()
     local cx, cy, cz = ax + nx * pull, ay + ny * pull, az + nz * pull
-    -- `hang`: under the anchor (a conversation's keyboard, below what the NPC says) rather than on it.
-    if sess.hang and sess.look ~= 'capsule' then
+    -- `hang`: under the anchor (a conversation's capsule or keyboard, below what the NPC says) rather than on it.
+    if sess.hang then
         local drop = h * 0.5 + 0.04
         cx, cy, cz = cx - ux * drop, cy - uy * drop, cz - uz * drop
     end

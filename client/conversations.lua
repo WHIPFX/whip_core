@@ -9,9 +9,9 @@
 --     or they go down.
 --   * An answer whose reply the server sent ahead (`next`) shows it at once; otherwise the capsule dims until the
 --     server speaks.
---   * An answer that takes an amount (`input`) becomes a field when chosen (Interactions.beginInput,
---     client/prompt_typing.lua): on a keyboard the digits show in the answer's row (no capsule: the dialog is it),
---     Enter gives it, Esc or Backspace on an empty field steps back; on a pad the number pad hangs under the dialog.
+--   * An answer that takes an amount (`input`) is typed when chosen as every prompt's value is (Interactions.beginInput,
+--     client/prompt_typing.lua): the capsule on a keyboard, the number pad on a pad, hanging under the dialog and
+--     titled with the answer. Enter or Done gives it; Esc, B or Backspace on nothing steps back.
 --   * A haggle (`haggle` on the line) draws a ruler over the answers; the amount starts mid-range and ← → move it
 --     (a keyboard: the pad's D-pad is the number pad's).
 --
@@ -48,16 +48,9 @@ local function entityOf(netId)
     return ent
 end
 
-local TYPING_HINT = 'Type the amount · Enter to give it · Esc to go back'
-local TEAM_TYPING_HINT = 'Type their character ID · Enter to ask them · Esc to go back'
-local HAGGLE_TYPING_HINT = '← → or type it · Enter to ask · Esc to go back'
-
---- What a typed answer shows while it is being typed: "$1250|".
-local function typedLabel(c)
-    local t = c.typing
-    if not t then return nil end
-    return t.prefix .. (Interactions.inputText(PROMPT) or '') .. Interactions.inputCaret()
-end
+-- While an amount is typed (in the capsule or on the keyboard under the dialog): what the dialog's hint line says.
+-- A haggle's ruler moves with ← → on a keyboard; on a pad the D-pad is the keyboard's.
+local HAGGLE_KEYS_HINT = '← → move the amount along the ruler'
 
 -- A team page lists more than four answers: the capsule shows four rows at a time (`top` is the first), so scrolling
 -- within them is still a UV switch and only moving the window repaints.
@@ -65,14 +58,14 @@ local TEAM_ROWS_SHOWN = 4
 
 local function paint()
     if not conv then return end
+    -- The answers as they are: an amount is typed into the capsule or the keyboard under the dialog, not into its row.
     local labels = {}
     for i, o in ipairs(conv.layer.options or {}) do
-        labels[i] = (conv.typing and conv.typing.id == o.id) and typedLabel(conv) or (o.label or '')
+        labels[i] = o.label or ''
     end
     local team, haggle = conv.layer.team, conv.layer.haggle
-    -- The keys' words on a keyboard; on a pad the number pad under the dialog has its own.
     local keyboard = PromptTyping.look() == 'capsule'
-    local hint = (conv.typing and keyboard) and (team and TEAM_TYPING_HINT or haggle and HAGGLE_TYPING_HINT or TYPING_HINT) or ''
+    local hint = (conv.typing and haggle and keyboard) and HAGGLE_KEYS_HINT or ''
     local asking = haggle and conv.typing and tonumber(Interactions.inputText(PROMPT) or '') or nil
     send({ layout = team and 'team' or haggle and 'haggle' or conv.layout, speaker = conv.speaker or '', line = conv.layer.line or '',
            options = labels, waiting = conv.waiting == true, hint = hint,
@@ -130,17 +123,19 @@ end
 
 local applyUpdate   -- defined below
 
---- An answer that takes an amount: the prompt becomes the field. onSubmit sends the answer with the number;
---- onCancel (Backspace on an empty field) puts the answers back.
+--- An answer that takes an amount: typed as every prompt's value is (client/prompt_typing.lua), the capsule on a
+--- keyboard and the number pad on a pad, hanging under the dialog from its lower edge (drawLoop keeps where that is),
+--- titled with the answer. onSubmit sends the answer with the number; onCancel (Esc, B, or Backspace on nothing)
+--- puts the answers back.
 local function beginTyping(c, opt)
     local maxDigits = #tostring(math.floor(tonumber(opt.input.max) or 999999999))
     c.typing = { id = opt.id, prefix = opt.input.prefix or '' }
     local started = Interactions.beginInput(PROMPT, {
         max = math.max(1, math.min(9, maxDigits)),
         title = opt.label, prefix = opt.input.prefix,
-        -- On a keyboard the answer's row is the field (paint), so no capsule; on a pad the number pad hangs under
-        -- the dialog, from its lower edge (drawLoop keeps where that is).
-        capsule = false, hang = true,
+        hang = true,
+        -- The haggle's ruler follows the amount as it is typed.
+        onChange = function() if conv == c then paint() end end,
         anchor = function()
             local at = conv == c and c.dialogAt or nil
             if not at then return nil end
@@ -244,16 +239,9 @@ local function drawLoop()
         local now = GetGameTimer()
         local dt = (now - last) / 1000
         last = now
-        -- A typed amount is repainted when it changes, not every frame. ← → nudge a haggle on a keyboard (on a pad
-        -- the D-pad is the number pad's).
-        if conv.typing then
-            if PromptTyping.look() == 'capsule' then nudge(conv, now) end
-            local shown = typedLabel(conv)
-            if shown ~= conv.typing.shown then
-                conv.typing.shown = shown
-                paint()
-            end
-        end
+        -- ← → nudge a haggle's amount on a keyboard (on a pad the D-pad is the number pad's). The amount itself is
+        -- shown by the typing; the ruler is repainted by onChange.
+        if conv.typing and PromptTyping.look() == 'capsule' then nudge(conv, now) end
         local ped = entityOf(conv.netId)
         if ped and page:up() then
             local b = boxOf(GetEntityModel(ped))
