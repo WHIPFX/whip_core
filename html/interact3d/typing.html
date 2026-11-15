@@ -116,7 +116,7 @@ html, body {
     border: 1.5px solid var(--ui-border-hover);
     border-radius: 14px;
 }
-.field .line { font-size: 38px; }
+.field .line { font-size: 38px; flex: 1 1 auto; min-width: 0; }
 .area { position: absolute; }
 .key {
     position: absolute;
@@ -190,6 +190,14 @@ html, body {
         return pre + esc(text) + '<i class="caret"></i>';
     }
 
+    /** The line, its end in view: a long text (a song's link) shows where it is being typed, not where it began. */
+    function showLine(el, m) {
+        el.innerHTML = lineHtml(m);
+        // (Called once its look is shown: a hidden line has no width to scroll.) With nothing typed, the ghost words
+        // from their start.
+        el.scrollLeft = m.text ? el.scrollWidth : 0;
+    }
+
     function glyph(name) {
         var g = window.WhipGlyphs && window.WhipGlyphs.glyphs;
         return (g && name && g[name]) || (g && g.E) || '';
@@ -203,8 +211,8 @@ html, body {
     function paintCapsule(m) {
         document.getElementById('disc').innerHTML = glyph(m.icon);
         document.getElementById('capTitle').textContent = m.title || '';
-        document.getElementById('capLine').innerHTML = lineHtml(m);
         show('capsule');
+        showLine(document.getElementById('capLine'), m);
     }
 
     function placeCircle(c) {
@@ -225,7 +233,6 @@ html, body {
         panel.style.right = numpad ? 'auto' : '';
         document.getElementById('title').textContent = m.title || 'Type';
         document.getElementById('count').textContent = (m.max && !numpad) ? ((m.text || '').length + ' / ' + m.max) : '';
-        document.getElementById('keysLine').innerHTML = lineHtml(m);
 
         var a = m.area;
         var area = document.getElementById('area');
@@ -254,6 +261,7 @@ html, body {
             return '<span class="hint"><img src="../img/pad/' + esc(h[0]) + '.svg" alt="">' + esc(h[1]) + '</span>';
         }).join('');
         show('keys');
+        showLine(document.getElementById('keysLine'), m);
         placeCircle(m.circle);
     }
 
