@@ -391,10 +391,13 @@ Config.IdleCam = {
 --   Enabled   false: nobody can switch it on
 --   Default   what a player who never chose gets
 --   Shake     how much it shakes (0 never, 1 normal, up to 3)
+--   Style     the style a player who never chose gets: 'consistent' (the same all the time) or 'cinematic' (it frames
+--             the car by what it is doing: a jump, a drift, a burnout, nitrous)
 Config.DrivingCamera = {
     Enabled = true,
     Default = false,
     Shake = 1.0,
+    Style = 'consistent',
 }
 
 -- What a gamepad's buttons do outside menus. Players change their own in the pause menu (Controller).

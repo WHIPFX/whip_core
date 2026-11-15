@@ -9042,6 +9042,7 @@ exports.whip_core:StopCamera()</code></pre>
 
 <h3 id="driving-camera">The driving camera<span class="owner-tag">Server owners</span></h3>
 <p>A smooth chase camera for cars, motorbikes and quads, which each player switches on in the pause menu (Server Settings → Vehicles → <em>Smooth driving camera</em>); it's off unless you make it the default. It steps aside for aiming, GTA's cinematic camera, death and any other script's camera, then comes back, so nothing you write needs to know about it. Switch it off for everyone, change the default or set the shake in <code>Config.DrivingCamera</code> (<code>/whip</code> → Settings → Config → Vehicles).</p>
+<p>Each player also picks its <em>Camera style</em>. <strong>Consistent</strong> stays behind the car the same way all the time. <strong>Cinematic</strong> frames the car by what it's doing: back and up in the air so the landing is in frame, further back on softer springs in a drift, lower and closer with a wider view in a burnout from a stop, and closer and much wider on nitrous (any pull harder than a launch). <code>Config.DrivingCamera.Style</code> (<code>'consistent'</code> or <code>'cinematic'</code>) is the style a player who never chose gets.</p>
 <h2 id="client-camera">Camera API</h2>
 <p class="lede">Exports for scripted cameras. New to them? Read <a href="#guide-camera">Camera System</a> first. The play exports return <code>false, 'busy'</code> while another resource's camera is up; your own you may replace.</p>
 

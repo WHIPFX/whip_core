@@ -8,7 +8,7 @@
 --   orbit     round a SUBJECT (a car, a person, a prop, a point), at an angle, a height and a distance,
 --             looking at a point on it; `fit` measures the distance in "fills the screen", so one orbit
 --             frames a bike and a bus alike (whip_autos' showroom framing); `turn` spins it slowly
---   chase     behind a moving subject on a spring (nfsmw's chase camera): it leans into slides, looks
+--   chase     behind a moving subject on a spring: it leans into slides, looks
 --             ahead, pulls in when a wall is in the way, and widens with speed
 --   mounted   fixed to a subject: a bonnet, a bumper, a shoulder
 --   track     stands in one place and turns to keep a subject in frame
@@ -191,13 +191,14 @@ function CamShots.orbitPose(s, P, subjectName)
 end
 
 -- ============================================
--- Chase (nfsmw's mover, its chase half)
+-- Chase
 -- ============================================
 --
 -- dist, height   behind and above the subject     ahead   metres the view leads along its travel
--- slip           0 follow its nose, 1 follow where it is going (most of the "NFS feel")
+-- slip           0 follow its nose, 1 follow where it is going (most of how the chase feels)
 -- stiff          how tightly it follows (a spring's rate)   fovAdd  degrees wider at full speed
 -- collision      pull in when something is between the camera and the subject (default on)
+-- tilt           degrees it looks up past the subject (1.5; the driving camera's director changes it)
 
 local REF_SPEED, SPEED_CURVE = 62.0, 1.35   -- m/s counted as flat out, and how late the effects come in
 local FEED_FORWARD = 0.88                   -- cancels a spring's lag behind something moving steadily
@@ -210,7 +211,7 @@ end
 --- A chase shot this frame. Keeps its spring in `mem`; `dt` seconds since the last frame (large to snap).
 --- `look` = { yaw, pitch, amount, free }: a viewer looking round it (the driving camera): the camera swings
 --- round the car by yaw and up and over it by pitch, the look-ahead fades by `amount` (0..1), and while
---- `free` it answers the hand rather than trailing on its springs (nfsmw's free look).
+--- `free` it answers the hand rather than trailing on its springs.
 function CamShots.chase(shot, s, mem, dt, subjectName, look)
     local visual, speed = speedShare(s)
     local ax, ay, az = s.x, s.y, s.z + 0.55
@@ -258,7 +259,7 @@ function CamShots.chase(shot, s, mem, dt, subjectName, look)
     end
 
     local pitch, yaw = rotFromDir(lx - cx, ly - cy, lz - cz)
-    pitch = pitch + 1.5
+    pitch = pitch + (shot.tilt or 1.5)
     local rotRate = (shot.turnRate or 7.0)
     if look and look.free then rotRate = math.max(rotRate, 12.0) end
     local fovWant = (shot.fov or 50.0) + (shot.fovAdd or 8.0) * visual
