@@ -371,34 +371,6 @@ local function printErrors(only, perResource)
     end
 end
 
--- /w → Resources (tools/resources_page.lua): the server's half, per resource. What it registered (a count per
--- registry), its latest errors, and its refusals. Developer mode only.
-SecureCallback('whip_core:devtools:resources', {
-    rateLimit = 1000,
-    whileDead = true,
-}, function(source)
-    if not DevTools.isAllowed(source) then return false, 'Turn developer mode on (/w)' end
-    local regs, errors, refused = {}, {}, {}
-    for _, r in ipairs(Registry.list()) do
-        local owner = tostring(r.owner)
-        regs[owner] = regs[owner] or {}
-        regs[owner][r.registry] = (regs[owner][r.registry] or 0) + 1
-    end
-    for _, e in ipairs((ErrorTap.read({ max = 200 }) or {}).entries or {}) do
-        local owner = tostring(e.resource or '?')
-        local list = errors[owner] or {}
-        errors[owner] = list
-        list[#list + 1] = { text = (tostring(e.text):gsub('\n.*', '')):sub(1, 200), count = e.count or 1 }
-        if #list > 5 then table.remove(list, 1) end
-    end
-    for _, r in ipairs(Registry.refusals()) do
-        local list = refused[r.owner] or {}
-        refused[r.owner] = list
-        if #list < 10 then list[#list + 1] = r.why:sub(1, 200) end
-    end
-    return { regs = regs, errors = errors, refused = refused }
-end)
-
 -- whiperrors [resource]: the server console only.
 RegisterCommand('whiperrors', function(source, args)
     if source ~= 0 then return end

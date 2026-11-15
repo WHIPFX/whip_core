@@ -334,11 +334,6 @@ end
 --- The chosen walk's /walk name, or nil.
 function Emotes.walk() return chosenWalk end
 
---- The walk clipset on the player now: the newest override (a resource's, give mode's), else their chosen walk, else
---- nil for the game's own. The hand position editor walks its copy of you in it.
----@return string|nil
-function Emotes.wantedWalk() return wantedClipset() end
-
 --- A walk's clipset: a /walk name from the walks list ('trash'), or a clipset as it is ('clipset@move@...').
 ---@param walk string
 ---@return string|nil

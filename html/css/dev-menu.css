@@ -381,7 +381,7 @@
 }
 
 /* A header with no name ({ sep = '' }): only a gap, between rows that belong apart within a group
-   (Noclip, above the rest of the tools). */
+   (Debug, under the player's tools). */
 .dm-sep:empty {
     padding: 0;
     height: 10px;

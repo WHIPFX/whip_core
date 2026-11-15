@@ -33,10 +33,6 @@
 -- Saved on the item (server/item_holds.lua), it is where give mode holds it from then on, and a thrown one
 -- leaves the hand turned that way (client/inventory.lua).
 --
--- A RESOURCE'S HELD PROP (/w → Edit Held Prop: a pump's nozzle in your hand) opens the same editor on that prop:
--- HELD_POSES instead, its own bone, no list and no switches. Saved for its set's tag (server/held_props.lua), it
--- sits there in everyone's hand from then on. The prop in your own hand is hidden on your game meanwhile.
---
 -- HOW A PLACE IN THE WORLD BECOMES A PLACE IN THE HAND. The markers move a loose copy of the item in the world.
 -- An invisible marker is tied to the hand's bone with nothing added: it stands exactly as the bone does, so the
 -- copy's place is read off in the bone's own axes. Its turn becomes the three angles in the order the tie is
@@ -65,15 +61,6 @@ local POSES = {
     { label = 'Walking in place', hand = 'right', move = 1.0, look = 24818, cam = vector3(2.0, 1.8, 0.4) },
     { label = 'Jogging in place', hand = 'right', move = 2.0, look = 24818, cam = vector3(2.0, 1.8, 0.4) },
 }
--- A resource's held prop (Edit Held Prop, from /w): standing with the arm down as a carried bag hangs (the heist
--- trash-bag carry, its first frame), then walking and jogging on the spot in the walk the player has now: the
--- resource's own while they hold it (a pump's nozzle: the trash-bag walk). Tied to the resource's own bone.
-local HELD_POSES = {
-    { label = 'Standing', hand = 'right', dict = 'anim@heists@narcotics@trash', clip = 'idle', phase = 0.0,
-      cam = vector3(1.0, 0.8, 0.1) },
-    { label = 'Walking in place', hand = 'right', move = 1.0, look = 24818, cam = vector3(2.0, 1.8, 0.4) },
-    { label = 'Jogging in place', hand = 'right', move = 2.0, look = 24818, cam = vector3(2.0, 1.8, 0.4) },
-}
 local CAR = 'tailgater'   -- a four-door whose seats use the drive-by clips above (veh@drivebystd_*)
 
 -- Move's bar: these, and nothing else.
@@ -90,7 +77,7 @@ local SAME_M, SAME_COS = 0.001, math.cos(math.rad(0.1))
 -- { key, label, model, poses, pose, hand, holds = { right, left }, saved = { right, left }, visited, walk, savedWalk,
 --   double, car, frame, item, probe, busy (saving, swapping or changing pose), asking (the item the page is asking
 --   about), leave (Esc while busy: out once it is done), quiet (no keys until then), fromPanel (opened from /whip:
---   the panel comes back after), heldTag + bone (a resource's held prop, not an item: its set's tag, its bone) }
+--   the panel comes back after) }
 ---@class HandEditSession
 ---@field key string
 ---@field label string
@@ -116,16 +103,14 @@ local SAME_M, SAME_COS = 0.001, math.cos(math.rad(0.1))
 ---@field leave boolean|nil
 ---@field quiet integer|nil
 ---@field fromPanel boolean|nil
----@field heldTag string|nil
----@field bone integer|nil
 
 ---@type HandEditSession|nil
 local ed = nil
 -- What reads it below runs only while the editor is open (the way in checks it)
 ---@cast ed -nil
 
---- The bone the hand's hold is from: a held prop's own, else the pose's hand.
-local function boneNow() return ed.bone or HAND_BONES[ed.hand] end
+--- The bone the hand's hold is from: the pose's hand.
+local function boneNow() return HAND_BONES[ed.hand] end
 
 local function say(text, kind) UI.Notify(text, kind or 'info') end
 
@@ -282,12 +267,10 @@ local function holdStill(p)
 end
 
 --- The walk give mode puts on this item as the toggle has it, on the copy: the give walk, or with the toggle on
---- the game's own. A held prop: the walk the player has now (the resource's own while they hold it). Yields (the
---- walk loads).
+--- the game's own. Yields (the walk loads).
 local function walkNow()
     local d = ed.double
-    local clipset
-    if ed.heldTag then clipset = Emotes.wantedWalk() else clipset = not ed.walk and Inventory.giveWalkClipset(nil) or nil end
+    local clipset = not ed.walk and Inventory.giveWalkClipset(nil) or nil
     if clipset and LoadAnimSet(clipset, 1000) then
         SetPedMovementClipset(d, clipset, 0.25)
     else
@@ -446,18 +429,6 @@ local function saveHolds(e)
             say(('Saved, but it may sit %.0f° and %.0f mm off what you see (F8)'):format(off, apart * 1000), 'warning')
         end
     end
-    if e.heldTag then
-        -- A resource's held prop: one hold, saved for its tag and moved there in every hand holding it
-        local h = e.holds.right
-        if e.visited.right then
-            local o, r = h.offset, h.rot
-            local res, why = Callback('whip_core:heldHolds:save', e.heldTag, o[1], o[2], o[3], r[1], r[2], r[3])
-            if type(res) ~= 'table' then say(why or 'It was not saved', 'error') return false end
-            e.saved.right = h
-        end
-        say(e.label .. ': saved', 'success')
-        return true
-    end
     local held = false
     for _, hand in ipairs({ 'right', 'left' }) do
         local h = e.holds[hand]
@@ -560,8 +531,8 @@ local function nextPose()
     if e.leave then finish() end
 end
 
---- Open the editor on `e` ({ key, label, model, poses, holds, walk?, grab?, fromPanel?, heldTag?, bone? }: startItem,
---- startHeld): the copy of you in its first pose, the thing loose in its hand for the markers. Yields. False and why
+--- Open the editor on `e` ({ key, label, model, poses, holds, walk?, grab?, fromPanel? }: startItem): the copy of
+--- you in its first pose, the thing loose in its hand for the markers. Yields. False and why
 --- when it cannot (a refusal once `ed` is set leaves it for the caller's finish() to clear away).
 local function open(e)
     if IsPedInAnyVehicle(PlayerPedId(), false) then return false, 'Get out of the vehicle first' end
@@ -597,12 +568,8 @@ local function open(e)
 
     CreateThread(function()
         while ed == me do
-            -- You stand where the copy does, unseen while it is posed, and so is the prop in your own hand
+            -- You stand where the copy does, unseen while it is posed
             SetEntityLocallyInvisible(PlayerPedId())
-            if ed.heldTag then
-                local real = UI.ownHeldProp(ed.model, ed.heldTag)
-                if real then SetEntityLocallyInvisible(real) end
-            end
             holdStill(ed.poses[ed.pose])
             -- The camera flies only while the right mouse button is down (the markers have the cursor otherwise)
             FreeCam.setInputEnabled(IsDisabledControlPressed(0, 25) or IsControlPressed(0, 25))
@@ -635,37 +602,6 @@ local function startItem(key, label)
                      grab = grab })
     return true
 end
-
---- Start on the prop in your hand: a resource's own (/w → Edit Held Prop: a pump's nozzle). Saved for its tag, it
---- sits there in everyone's hand from then on (server/held_props.lua). No item list: one prop. Yields.
-local function startHeld()
-    if IsPedInAnyVehicle(PlayerPedId(), false) then return false, 'Get out of the vehicle first' end
-    local mine, why = Callback('whip_core:heldHolds:mine')
-    if type(mine) ~= 'table' then return false, why or 'Hold a resource\'s prop first (a pump\'s nozzle)' end
-    local hash = LoadModel(mine.model, 3000)
-    if not hash then return false, 'Its model would not load' end
-    local o, r = mine.offset or {}, mine.rot or {}
-    local hold = { offset = { tonumber(o[1]) or 0.0, tonumber(o[2]) or 0.0, tonumber(o[3]) or 0.0 },
-                   rot = { tonumber(r[1]) or 0.0, tonumber(r[2]) or 0.0, tonumber(r[3]) or 0.0 } }
-    return open({ key = mine.tag, label = mine.tag, model = hash, poses = HELD_POSES, holds = { right = hold },
-                  heldTag = mine.tag, bone = math.floor(tonumber(mine.bone) or 28422) })
-end
-
--- /w → Edit Held Prop (tools/core.lua): a one-off that opens the editor on what you hold.
-ToolHandlers['Edit Held Prop'] = {
-    enter = function()
-        if ed then return end
-        CreateThread(function()
-            local ok, why = startHeld()
-            if not ok then
-                if ed then finish() end
-                say(why or 'Could not start', 'error')
-            end
-        end)
-    end,
-    exit = function() end,
-    isActive = function() return false end,
-}
 
 RegisterNUICallback('ibHandEdit', function(data, cb)
     cb('ok')

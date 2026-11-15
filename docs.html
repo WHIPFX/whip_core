@@ -2116,7 +2116,7 @@ end)</code></pre>
 <tr><td>Two players at once</td><td>Two FiveM clients on one PC, same account, different characters. Turn off <code>Config.BlockOwnCharacterTransfers</code> on a test server to move money between them</td></tr>
 <tr><td>Dying, healing, a broken car</td><td><code>/w</code> → Kill Me, Restore Health &amp; Armour, Repair Vehicle (<a href="#guide-devtools">Dev Tools</a>)</td></tr>
 <tr><td>What your events did</td><td><code>/whip</code> → System → Monitor: each SecureEvent call, the reason for a refusal, and how long your handler took</td></tr>
-<tr><td>Errors you missed</td><td><code>/w</code> → Resources, or <code>whiperrors</code> in the server console; <a href="#geterrorlog"><code>GetErrorLog</code></a> in code</td></tr>
+<tr><td>Errors you missed</td><td><code>whiperrors</code> in the server console (F8 in developer mode); <a href="#geterrorlog"><code>GetErrorLog</code></a> in code</td></tr>
 </table>
 
 <h3 id="measuring">Measuring</h3>
@@ -8278,7 +8278,6 @@ exports.whip_core:PlayPress(vector3(x, y, z), { normal = vector3(0, -1, 0) })</c
 <tr><td>tag</td><td>string?</td><td>Default <code>'held'</code>, kept as <code>'&lt;resource&gt;:&lt;tag&gt;'</code></td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
 <pre><code class="lang-lua">exports.whip_core:HoldProps(source, { { model = 'prop_cs_police_torch', offset = { 0.1, 0.0, 0.0 } } }, 'torch')</code></pre>
-<div class="info-box tip"><strong>Keep the tag stable.</strong> An admin can place your prop by eye (<code>/w</code> → <a href="#guide-devtools">Edit Held Prop</a>), and that place then replaces your offset and rotation for the first prop of every set with your tag.</div>
 </div></div>
 
 <div class="export-card" id="held-dropheldprops" data-search="dropheldprops held props hand drop remove">
@@ -11631,10 +11630,7 @@ end</code></pre>
 <tr><td><strong>Kill Me</strong></td><td>Once: an ordinary death where you are. Noclip and God Mode go off first</td></tr>
 <tr><td><strong>Repair Vehicle</strong></td><td>Once: repairs the car you're in, driving or not</td></tr>
 <tr><td><strong>Coords</strong></td><td>X/Y/Z/heading on screen; <kbd>G</kbd> copies a <code>vector4()</code></td></tr>
-<tr><td><strong>Resources</strong></td><td>Every resource, errors first: what it registered on each side, its errors, its refused registrations, and a <code>/whipcost</code> row</td></tr>
-<tr><td><strong>Object Viewer</strong></td><td>Tags props, peds and vehicles within 20 m. The one you look at opens a card: picture, hash, position, heading and source. <kbd>G</kbd> (D-pad left) opens <a href="#ov-options">its options</a></td></tr>
-<tr><td><strong>Edit Held Prop</strong></td><td>Positions a resource's prop in your hand (<kbd>H</kbd> cycles stand, walk, jog; <kbd>R</kbd> turns). <strong>Confirm &amp; Exit</strong> saves it for everyone; saving is a permanent admin's</td></tr>
-<tr><td><strong>Debug</strong></td><td>Shows the debug tools: the three below and any resource's own (<a href="#registerdebugtool">RegisterDebugTool</a>)</td></tr>
+<tr><td><strong>Object Viewer</strong></td><td>Tags props, peds and vehicles within 20 m. The one you look at opens a card: picture, hash, position, heading and source. <kbd>G</kbd> (D-pad left) opens <a href="#ov-options">its options</a></td></tr><tr><td><strong>Debug</strong></td><td>Shows the debug tools: the three below and any resource's own (<a href="#registerdebugtool">RegisterDebugTool</a>)</td></tr>
 <tr><td><strong>Player Stats Debug</strong></td><td>Your stats live (the ped's reading beside each vital, amber when they disagree), rates, effects and changes; a card over players within 40 m</td></tr>
 <tr><td><strong>Vehicle Stats Debug</strong></td><td>Your car's stats, rates, change sources and data; a card over WHIP cars within 40 m</td></tr>
 <tr><td><strong>Ground Items Debug</strong></td><td>Piles in your ground cell and the eight around it: counts, droppers, ages, a beam and map mark per pile, and the grid laid on the ground</td></tr>

@@ -138,8 +138,9 @@ local function handOver(src, set, p, tick)
     end
 end
 
---- Where an admin set a resource's prop by eye (Edit Held Prop, below), or nil: only a resource's own tag
---- ('<resource>:<tag>'), never whip's own sets (an item's is the item's, server/item_holds.lua).
+--- Where an admin once set a resource's prop by eye, kept in whip_item_holds for its tag ('whip_fuel:nozzle', the
+--- hand 'right'), or nil: it replaces the offset and turn the resource gave its FIRST prop. Only a resource's own
+--- tag ('<resource>:<tag>'), never whip's own sets (an item's is the item's, server/item_holds.lua).
 local function savedHold(tag)
     if type(tag) ~= 'string' or not tag:find(':', 1, true) then return nil end
     return ItemHolds.get(tag, 'right')
@@ -166,7 +167,7 @@ local function make(src, list, tag)
             if ent and ent ~= 0 then
                 SetEntityRoutingBucket(ent, bucket)   -- at birth: the player's own world
                 SetEntityOrphanMode(ent, 2)           -- KeepEntity: this file decides when it goes
-                -- A resource's first prop sits where an admin set it by eye, when one has (Edit Held Prop, below)
+                -- A resource's first prop sits where an admin once set it by eye, when one has (savedHold)
                 local set_ = i == 1 and savedHold(tag)
                 local p = { ent = ent, model = hash, madeAt = now, bone = math.floor(tonumber(prop.bone) or 18905),
                             offset = set_ and xyz(set_.offset) or xyz(prop.offset),
@@ -354,63 +355,6 @@ Registry.addLister('heldProps', function()
         if owner then out[#out + 1] = { key = ('%s %s'):format(tostring(src), set.tag), owner = owner } end
     end
     return out
-end)
-
--- ============================================
--- Set by eye: Edit Held Prop (/w)
--- ============================================
---
--- An admin holding a resource's prop (a pump's nozzle) sets where it sits in the hand by eye, in the hand position
--- editor (tools/hand_edit.lua). It is saved for that set's tag in whip_item_holds (the item column holds the tag,
--- 'whip_fuel:nozzle', the hand 'right') and from then on replaces the offset and turn the resource gave its FIRST
--- prop, for everyone: in make(), and at once in every hand holding it now. The bone stays the resource's. Saving is
--- a permanent admin's, as an item's is.
-
-local MAX_HOLD_OFFSET = 1.0   -- metres from the bone: further out is a mistake
-
---- The prop the caller holds now, for the editor: { tag, model, bone, offset, rot, set } (`set`: it has a place of
---- its own already), or false and why. Only a resource's own set: whip's own (an emote, a bar, give mode) are not
---- this tool's.
-SecureCallback('whip_core:heldHolds:mine', {
-    ace = 'whip.devtools', rateLimit = 500, burst = 4,
-}, function(source)
-    local set = held[source]
-    if not set or type(set.tag) ~= 'string' or not set.tag:find(':', 1, true) then
-        return false, 'Hold a resource\'s prop first (a pump\'s nozzle)'
-    end
-    local p = set.props[1]
-    if not p then return false, 'Hold a resource\'s prop first (a pump\'s nozzle)' end
-    if #set.tag > 64 then return false, 'Its name is too long to save a place for' end
-    return { tag = set.tag, model = p.model, bone = p.bone, offset = p.offset, rot = p.rot,
-             set = savedHold(set.tag) ~= nil }
-end)
-
---- Save where the prop of `tag` sits, which the caller holds now, and move it there in every hand holding it.
-SecureCallback('whip_core:heldHolds:save', {
-    ace = 'whip.devtools', rateLimit = 1000, burst = 3,
-    params = {
-        { 'tag', 'string', 64 },
-        { 'ox', 'number', -MAX_HOLD_OFFSET, MAX_HOLD_OFFSET }, { 'oy', 'number', -MAX_HOLD_OFFSET, MAX_HOLD_OFFSET },
-        { 'oz', 'number', -MAX_HOLD_OFFSET, MAX_HOLD_OFFSET },
-        { 'rx', 'number', -360.0, 360.0 }, { 'ry', 'number', -360.0, 360.0 }, { 'rz', 'number', -360.0, 360.0 },
-    },
-}, function(source, _, tag, ox, oy, oz, rx, ry, rz)
-    if not Settings.mayEdit(source) then return false, 'Only a permanent admin can change how props are held' end
-    local mine = held[source]
-    if not mine or mine.tag ~= tag or not tag:find(':', 1, true) then return false, 'You are not holding it any more' end
-    local row, why = ItemHolds.store(tag, 'right', ox, oy, oz, rx, ry, rz, GetPlayerName(source))
-    if not row then return false, why end
-    -- Every hand holding it now, the editor's own included: its owner ties it again where it is now set
-    for src, set in pairs(held) do
-        local p = set.tag == tag and set.props[1]
-        if p and DoesEntityExist(p.ent) then
-            p.offset, p.rot = xyz(row.offset), xyz(row.rot)
-            p.acked, p.sentTo, p.sentAt = nil, nil, 0
-            byEnt[p.ent] = { src = src, p = p }
-            handOver(src, set, p, 0)
-        end
-    end
-    return row
 end)
 
 -- ============================================

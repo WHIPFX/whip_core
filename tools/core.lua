@@ -20,7 +20,6 @@ local menuIndex = 1
 -- features, Config.Experimental), under a header of its own at the end.
 local tools = {
     { name = 'Noclip', active = false, desc = 'Fly through anything; you land where you stop.' },
-    { sep = '' },
     -- tools/player.lua.
     { name = 'Invisible', active = false, desc = 'Nobody else sees you. You see yourself faded.' },
     { name = 'God Mode', active = false, desc = 'No damage; your health is kept full.' },
@@ -35,9 +34,6 @@ local tools = {
       desc = 'Repairs the car you are in, whether you are driving it or not.' },
     { name = 'Coords', active = false, desc = 'Where you stand and which way you face. G copies it.' },
     { name = 'Object Viewer', active = false, desc = 'Names the props, cars and people around you.' },
-    -- tools/hand_edit.lua.
-    { name = 'Edit Held Prop', active = false, kind = 'open',
-      desc = 'Set where the prop in your hand sits, a pump\'s nozzle, for everyone who holds it.' },
     { sep = '' },
     -- The rows marked `debug` show only while this is on: whip_core's, then other resources' (RegisterDebugTool),
     -- after the one marked `debugLast`.

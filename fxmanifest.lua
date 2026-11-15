@@ -402,7 +402,6 @@ client_scripts {
     'client/main.lua',
     'client/items/*.lua',
     'tools/core.lua',
-    'tools/resources_page.lua',
     -- After core.lua; before tools/panel_sections/*.lua, which register into the PanelSections table this file makes.
     'tools/whip_panel.lua',
     'tools/panel_sections/*.lua',
