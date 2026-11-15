@@ -2079,7 +2079,7 @@ function whip_core:GetItemSetting(item, key) end
 function whip_core:OnItemSettingChanged(item, key, fn) end
 
 -- ============================================
--- Player settings (each player's own: the pause menu's Settings page, under Server)
+-- Player settings (each player's own: the pause menu's Server Settings page)
 -- ============================================
 
 ---@class WhipPlayerSettingDef

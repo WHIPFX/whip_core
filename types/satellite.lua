@@ -136,7 +136,7 @@ function WhipSatellite.configPage(def) end
 ---@param fn fun(value: any, old: any, path: string)
 function WhipSatellite.onConfigChanged(path, fn) end
 
---- CLIENT. A row of yours on the pause menu's Settings page, under Server: a choice each player makes for
+--- CLIENT. A row of yours on the pause menu's Server Settings page: a choice each player makes for
 --- themselves, kept by your resource (get / set). Call it at file scope; it registers inside
 --- Whip.register itself. docs.html#whip-playersetting has every field.
 ---@param def WhipPlayerSettingDef

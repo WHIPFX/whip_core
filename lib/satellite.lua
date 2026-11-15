@@ -910,7 +910,7 @@ end
 -- Player settings (client side): Whip.playerSetting
 -- ============================================
 --
--- A row of your own on the pause menu's Settings page, under Server: a choice each PLAYER makes
+-- A row of your own on the pause menu's Server Settings page: a choice each PLAYER makes
 -- for themselves, not your server config (that is Whip.configPage). Your resource keeps the value as it already
 -- does (its own KVP); the page shows it and changes it through `get` and `set`. On the client:
 --

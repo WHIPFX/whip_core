@@ -3,8 +3,10 @@
 -- ============================================
 --
 -- Esc, P or a pad's Start open whip's pause menu, never GTA's: the whip logo and Resume / Map /
--- Settings / Quit on the left, a map on the right. Map makes the map full screen (drag, zoom,
--- double-click for a waypoint, a legend). Settings is GTA's own settings in whip's look (client/game_settings.lua);
+-- Game Settings / Server Settings / Quit on the left, a map on the right. Map makes the map full screen (drag, zoom,
+-- double-click for a waypoint, a legend). Game Settings is GTA's own settings menu; Server Settings is this server's
+-- settings page. With the experimental Combined Settings page on (Config.Experimental.combinedSettings) the two are
+-- one Settings page, GTA's settings in whip's look beside the server's (client/game_settings.lua).
 -- Quit leaves the server. The page is html/js/pause.js and pause-map.js.
 --
 -- The map is whip's, the data is GTA's. The picture is a tile set (whip_media_map/map/whip). What is
@@ -261,7 +263,9 @@ local function openMenu()
     PauseMenuOpen = true
     Focus.take('pause', { screen = true })
     TriggerScreenblurFadeIn(200)
-    SendNUIMessage({ action = 'pauseOpen' })
+    -- Read at each open, so the switch in /whip → Settings → Experimental features shows at the next one.
+    SendNUIMessage({ action = 'pauseOpen',
+        combinedSettings = type(Config.Experimental) == 'table' and Config.Experimental.combinedSettings == true })
     feedGen = feedGen + 1
     local gen = feedGen
     CreateThread(function() feed(gen) end)   -- first, so nothing below can stop it
@@ -315,8 +319,8 @@ RegisterNUICallback('pauseKeyBindings', function(_, cb)
     openGtaMenu('FE_MENU_VERSION_LANDING_KEYMAPPING_MENU')
 end)
 
---- GTA's own settings menu, as Settings opened before the Settings page: the way in when the page cannot read GTA's
---- (after a game update WHIP's copy of GTA's settings page is not built for), so Graphics, Display and Audio stay
+--- GTA's own settings menu: Game Settings, and with the Combined Settings page on, the way in when the page cannot read
+--- GTA's (after a game update WHIP's copy of GTA's settings page is not built for), so Graphics, Display and Audio stay
 --- reachable.
 RegisterNUICallback('pauseSettings', function(_, cb)
     cb('ok')

@@ -191,7 +191,7 @@ end
 --- The loading screen covers the join, and the picture goes black UNDER it before it is dismissed (see
 --- the end), so the spawn point is never on screen.
 local function CompleteJoinSpawn()
-    local sp = Config.DefaultSpawn or vector4(-360.96, 51.44, 54.43, 177.83)
+    local sp = Config.DefaultSpawn or vector4(-1023.03, -1660.96, 4.62, 44.92)
 
     -- + 0.0, as SpawnPlayer: natives read an integer in a float slot as raw bits.
     local x, y, z = sp.x + 0.0, sp.y + 0.0, sp.z + 0.0

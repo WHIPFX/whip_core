@@ -1,8 +1,10 @@
 // ========================================
-// SETTINGS — the pause menu's one Settings page (client/game_settings.lua, client/player_prefs.lua)
+// SETTINGS — the pause menu's Settings page (client/game_settings.lua, client/player_prefs.lua)
 //
 // The rail on the left has two groups of tabs: Game, GTA's own settings (read from GTA and changed through it, kept
-// for every server), and Server, each player's own choices for this server (kept on their PC). In the middle the
+// for every server), and Server, each player's own choices for this server (kept on their PC). Game is there only
+// with the experimental Combined Settings page on (pause.js): off, the page is Server Settings, the Server tabs alone,
+// and the pause menu's Game Settings is GTA's own settings menu. In the middle the
 // chosen tab's rows, each with what it is set to, to scan; on the right the inspector: the chosen row's whole control
 // (every choice side by side, or a slider), what it does, and what the tab can show beside it: on Graphics the video
 // memory and the changes waiting for Apply, on Minimap the minimap itself, on Audio the mix.
@@ -143,6 +145,7 @@ export class SettingsPage {
     constructor(root, onBack) {
         this.onBack = onBack;
         this.isOpen = false;
+        this.withGame = false;       // the Game tabs are here (the Combined Settings page), from open()
         this.tabKey = null;          // 'g:<GTA menu id>' or 's:<server group>': kept for next time
         this.sel = 0;
         this.game = { state: 'idle', tabs: [], tab: null, loading: false, unapplied: false, pending: [], failed: '' };
@@ -296,15 +299,18 @@ export class SettingsPage {
 
     // ---- open and close ----
 
-    open() {
+    /** @param {{ game?: boolean }} [opts]  game: GTA's tabs too (the Combined Settings page); without, the server's alone */
+    open(opts) {
         this.isOpen = true;
+        this.withGame = !!(opts && opts.game);
         this.note = '';
         this.question = null;
         this.confirmReset = false;
         this.server = null;
+        this.game = { state: 'idle', tabs: [], tab: null, loading: false, unapplied: false, pending: [], failed: '' };
         this.draw();
         nuiCallback('prefsState', {}).then((st) => this.setServer(st));
-        this.openGame();
+        if (this.withGame) this.openGame();
     }
 
     /** GTA's settings menu opened under the page: its tabs, and the game tab shown (if one is). */
@@ -344,7 +350,7 @@ export class SettingsPage {
         this.question = null;
         this.answering = false;
         this.syncPreview();
-        nuiCallback('gameSettingsClose', {});
+        if (this.withGame) nuiCallback('gameSettingsClose', {});
     }
 
     /** game_settings.lua's answer: the tab as GTA has it (kept when it is the one shown), the changes waiting. */
@@ -375,6 +381,8 @@ export class SettingsPage {
         for (const g of st.groups) if (!Array.isArray(g.rows)) g.rows = [];
         this.server = st;
         if (st.error) this.note = 'Not changed: ' + st.error;
+        // Server Settings alone: no tab yet, or a Game one from the Combined Settings page, is the first.
+        if (!this.withGame && !this.current()) { this.tabKey = this.tabs()[0]?.key ?? null; this.sel = 0; }
         if (this.current()?.section === 'server') {
             const rows = this.rows();
             const r = rows.findIndex((x) => x.id === rowId);
@@ -407,9 +415,10 @@ export class SettingsPage {
 
     // ---- what is shown ----
 
-    /** Every tab, Game's then Server's. */
+    /** Every tab, Game's (with the Combined Settings page) then Server's. */
     tabs() {
-        const game = this.game.tabs.map((t) => ({ key: 'g:' + t.id, section: 'game', id: t.id, label: t.label, keys: !!t.keys }));
+        const game = !this.withGame ? []
+            : this.game.tabs.map((t) => ({ key: 'g:' + t.id, section: 'game', id: t.id, label: t.label, keys: !!t.keys }));
         const server = (this.server?.groups || []).map((g) => ({ key: 's:' + g.id, section: 'server', id: g.id, label: g.label }));
         return game.concat(server);
     }
@@ -452,9 +461,10 @@ export class SettingsPage {
 
     drawHead() {
         const cur = this.current();
-        const where = cur
-            ? `${cur.section === 'game' ? 'Game' : 'Server'}${icon('right', 'st-crumb-ico')}<b>${escapeHtml(cur.label)}</b>`
-            : '';
+        // Server Settings alone has one group: its tab's name is enough.
+        const where = !cur ? ''
+            : !this.withGame ? `<b>${escapeHtml(cur.label)}</b>`
+            : `${cur.section === 'game' ? 'Game' : 'Server'}${icon('right', 'st-crumb-ico')}<b>${escapeHtml(cur.label)}</b>`;
         // A server tab's reset, and the game changes waiting for Apply (on any tab: they wait wherever you are).
         let side = '';
         if (cur && cur.section === 'server' && this.group()?.rows?.some((r) => r.changed)) {
@@ -474,7 +484,7 @@ export class SettingsPage {
         const status = this.working === 'apply' ? 'Applying' : this.working === 'undo' ? 'Putting it back'
             : this.working ? 'Changing' : '';
         this.headEl.innerHTML = `<button type="button" class="st-back" data-act="back">${icon('left', 'st-back-ico')}Menu</button>`
-            + '<h1 class="st-title">Settings</h1>'
+            + `<h1 class="st-title">${this.withGame ? 'Settings' : 'Server Settings'}</h1>`
             + `<div class="st-crumb">${where}</div><div class="st-fill"></div>`
             + (status ? `<span class="st-status">${status}</span>` : '') + side;
     }
@@ -502,7 +512,13 @@ export class SettingsPage {
         const server = tabs.filter((t) => t.section === 'server').map(item).join('')
             || '<div class="st-railnote st-breathe">Loading</div>';
         const glyphs = (g) => { const img = padGlyph(g, 'st-glyph'); return img ? img.outerHTML : ''; };
-        this.railEl.innerHTML = `<div class="st-grp"><span>Game</span><span class="st-grp-pad">${glyphs('lb')}${glyphs('rb')}</span></div>`
+        const pad = `<span class="st-grp-pad">${glyphs('lb')}${glyphs('rb')}</span>`;
+        if (!this.withGame) {
+            this.railEl.innerHTML = `<div class="st-grp"><span>Server</span>${pad}</div>`
+                + '<div class="st-grpsub">This server, kept on your PC</div>' + server;
+            return;
+        }
+        this.railEl.innerHTML = `<div class="st-grp"><span>Game</span>${pad}</div>`
             + '<div class="st-grpsub">GTA\'s own, for every server</div>' + game
             + '<div class="st-grp st-grp-2">Server</div><div class="st-grpsub">This server, kept on your PC</div>' + server;
     }
@@ -552,7 +568,9 @@ export class SettingsPage {
         const cur = this.current();
         const row = this.row();
         if (!cur || (cur.section === 'game' && !cur.keys && this.game.state !== 'ready')) {
-            this.inspEl.innerHTML = this.game.state === 'failed'
+            // Server Settings alone, its rows still coming: nothing of GTA's to wait for.
+            this.inspEl.innerHTML = !this.withGame ? ''
+                : this.game.state === 'failed'
                 ? '<div class="st-ihold"><h2 class="st-ititle st-small">Server tabs still work</h2>'
                     + '<p class="st-help">Controller, Vehicles, Map &amp; HUD, Minimap and Chat &amp; voice are WHIP\'s own and don\'t need GTA\'s menu.</p></div>'
                 : '<div class="st-ihold"><h2 class="st-ititle st-small">Reading GTA\'s settings</h2>'

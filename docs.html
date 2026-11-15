@@ -9004,7 +9004,7 @@ exports.whip_core:StopCamera()</code></pre>
 <p>Place your cameras in the Camera Creator (each key is one), press <kbd>F9</kbd> to play in game as your character, and record the screen with OBS or any recorder. <kbd>F5</kbd> rolls the timeline live (again to cut back), <kbd>Page Down</kbd> / <kbd>Page Up</kbd> or <kbd>Num 1</kbd>-<kbd>Num 9</kbd> cut between cameras, and <kbd>F9</kbd> returns to the editor. A rolling shot leaves a clean screen (<kbd>F6</kbd> hides chat), and with <em>Plays round</em> set to your vehicle, the cameras are placed round the car wherever it is.</p>
 
 <h3 id="driving-camera">The driving camera<span class="owner-tag">Server owners</span></h3>
-<p>A smooth chase camera for cars, motorbikes and quads, which each player switches on in the pause menu (Settings → Server → Vehicles → <em>Smooth driving camera</em>); it's off unless you make it the default. It steps aside for aiming, GTA's cinematic camera, death and any other script's camera, then comes back, so nothing you write needs to know about it. Switch it off for everyone, change the default or set the shake in <code>Config.DrivingCamera</code> (<code>/whip</code> → Settings → Config → Vehicles).</p>
+<p>A smooth chase camera for cars, motorbikes and quads, which each player switches on in the pause menu (Server Settings → Vehicles → <em>Smooth driving camera</em>); it's off unless you make it the default. It steps aside for aiming, GTA's cinematic camera, death and any other script's camera, then comes back, so nothing you write needs to know about it. Switch it off for everyone, change the default or set the shake in <code>Config.DrivingCamera</code> (<code>/whip</code> → Settings → Config → Vehicles).</p>
 <h2 id="client-camera">Camera API</h2>
 <p class="lede">Exports for scripted cameras. New to them? Read <a href="#guide-camera">Camera System</a> first. The play exports return <code>false, 'busy'</code> while another resource's camera is up; your own you may replace.</p>
 
@@ -9409,7 +9409,7 @@ end)</code></pre>
   <tr><td>keyKind / keyPattern / keyWhy</td><td>string|nil</td><td><code>map</code>: <code>keyKind = 'hash'</code> takes a model name and keeps its hash (as <code>GetEntityModel</code> returns). <code>'number'</code> keeps a digits-only key as a number (a mod slot, a wheel type). Name keys are checked against <code>keyPattern</code></td></tr></table>
 
 <h3 id="player-settings">Each player's own settings</h3>
-<p>A choice each player makes for their own screen (volume, units, shown or hidden) goes on the pause menu's <strong>Settings</strong> page, under <strong>Server</strong>, as a row of yours. Your resource stores the value (its own KVP, on the player's PC); the page calls your <code>get</code> and <code>set</code>. The row goes when your resource stops and comes back when whip_core restarts.</p>
+<p>A choice each player makes for their own screen (volume, units, shown or hidden) goes on the pause menu's <strong>Server Settings</strong> page, as a row of yours. Your resource stores the value (its own KVP, on the player's PC); the page calls your <code>get</code> and <code>set</code>. The row goes when your resource stops and comes back when whip_core restarts.</p>
 
 <div class="export-card" id="whip-playersetting" data-search="whip.playersetting playersetting registerplayersetting player setting preference pause menu settings server satellite helper">
 <div class="export-header"><span class="export-name">Whip.playerSetting(def)</span><span class="export-side side-client">CLIENT</span></div>
@@ -11316,7 +11316,7 @@ end</code></pre>
 <tr><td><code>DefaultAccountLabel</code></td><td><code>'Personal Account'</code></td><td>Name of the account made with a character</td></tr>
 <tr><td><code>MaxExtraAccounts</code></td><td><code>5</code></td><td>Savings and shared accounts per character (personal and job accounts don't count; <code>0</code> = none)</td></tr>
 <tr><td><code>BlockOwnCharacterTransfers</code></td><td><code>true</code></td><td>A player's characters can't move money to each other through the bank, so starting money can't be farmed. Cash handed over in the world isn't tracked</td></tr>
-<tr><td><code>DefaultSpawn</code></td><td><code>vector4(-360.96, 51.44, 54.43, 177.83)</code></td><td>Where new characters appear</td></tr>
+<tr><td><code>DefaultSpawn</code></td><td><code>vector4(-1023.03, -1660.96, 4.62, 44.92)</code></td><td>Where new characters appear</td></tr>
 </table>
 
 <h3>Joining</h3>
@@ -11344,7 +11344,7 @@ end</code></pre>
 <tr><td><code>AccessoryStrip</code></td><td><code>true</code></td><td>The phone, car key and cash strip beside the inventory (a key there goes in the ignition). <code>false</code>: its contents move to the inventory at next login. <em>Next restart</em>. Read pockets with <a href="#inventory"><code>GetPockets()</code></a></td></tr>
 <tr><td><code>ContainerSlots</code></td><td>player 30, accessory 5</td><td>Slots per player container</td></tr>
 <tr><td><code>MaxWeight</code></td><td>player 80, accessory 10</td><td>kg. <code>player</code> includes the strip; <code>accessory</code> is the strip alone</td></tr>
-<tr><td><code>WeightUnit</code></td><td><code>'kg'</code></td><td>What the inventory and shops show weights in until a player picks their own (Settings → Server → Map &amp; HUD): <code>'kg'</code> is grams under a kilo and kilograms from one up, <code>'lb'</code> ounces under a pound and pounds from one up. Weights in config.lua and <code>RegisterItem</code> are kilograms either way</td></tr>
+<tr><td><code>WeightUnit</code></td><td><code>'kg'</code></td><td>What the inventory and shops show weights in until a player picks their own (Server Settings → Map &amp; HUD): <code>'kg'</code> is grams under a kilo and kilograms from one up, <code>'lb'</code> ounces under a pound and pounds from one up. Weights in config.lua and <code>RegisterItem</code> are kilograms either way</td></tr>
 <tr><td><code>DropOnFullInventory</code></td><td><code>true</code></td><td><code>AddItem</code> drops what can't fit at the player's feet (<a href="#full-inventory">full inventories</a>). <code>false</code>: it returns <code>false</code> and creates nothing</td></tr>
 <tr><td><code>MaxGroundPilesPerDrop</code></td><td><code>50</code></td><td>Most piles one drop makes (one per slot's worth); past it, items are shared across this many</td></tr>
 <tr><td><code>EnableInventoryUI</code></td><td><code>true</code></td><td><code>false</code>: no WHIP inventory screen (<a href="#custom-inventory-ui">Replacing the inventory UI</a>); the system keeps running</td></tr>
@@ -11384,7 +11384,7 @@ end</code></pre>
 <h3>HUD, minimap and controls</h3>
 <table class="event-table">
 <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
-<tr><td><code>MinimapMask</code></td><td><code>'rounded'</code></td><td><code>'square'</code>, <code>'rounded'</code> or <code>'circle'</code>. The minimap is WHIP's own 3D map; players tune it in Settings → Server → <em>Minimap</em>. GTA's radar shows only in <code>/radardebug</code></td></tr>
+<tr><td><code>MinimapMask</code></td><td><code>'rounded'</code></td><td><code>'square'</code>, <code>'rounded'</code> or <code>'circle'</code>. The minimap is WHIP's own 3D map; players tune it in Server Settings → <em>Minimap</em>. GTA's radar shows only in <code>/radardebug</code></td></tr>
 <tr><td><code>HudSkin</code></td><td><code>'black'</code></td><td><code>'black'</code>: black discs in a draining white rim, a framed minimap, a blue route. <code>'classic'</code>: discs that fill white, in a capsule. Not the vehicle dial</td></tr>
 <tr><td><code>AimDot</code></td><td><code>true</code></td><td>A dot replaces GTA's reticle (not for melee or the petrol can), red when the muzzle is against a wall</td></tr>
 <tr><td><code>HudDeveloperMark</code></td><td><code>true</code></td><td>The amber developer-mode mark among the gauges. <code>false</code> hides it, for filming</td></tr>
@@ -11453,7 +11453,7 @@ end</code></pre>
 <tr><td><code>VehicleStatsTickInterval</code></td><td><code>1</code></td><td>Seconds between checks of stats with a <code>decay</code>. <em>Next restart</em></td></tr>
 <tr><td><code>VehiclePositionSaveInterval</code> / <code>VehiclePositionEpsilon</code></td><td><code>30</code> / <code>2.0</code></td><td>Seconds between car position saves; metres moved to save</td></tr>
 <tr><td><code>VehicleStorageKeepRange</code></td><td><code>5.5</code></td><td>How far a player can stray with the boot open. No effect below <code>VehicleTrunkRange</code> + 3.0</td></tr>
-<tr><td><code>DrivingCamera</code></td><td><code>{ Enabled = true, Default = false, Shake = 1.0 }</code></td><td>The <a href="#driving-camera">driving camera</a> in Settings → Server → Vehicles: <code>Enabled</code> (offered at all), <code>Default</code> (on for a player who never chose), <code>Shake</code> (0 to 3; 1 as made)</td></tr>
+<tr><td><code>DrivingCamera</code></td><td><code>{ Enabled = true, Default = false, Shake = 1.0 }</code></td><td>The <a href="#driving-camera">driving camera</a> in Server Settings → Vehicles: <code>Enabled</code> (offered at all), <code>Default</code> (on for a player who never chose), <code>Shake</code> (0 to 3; 1 as made)</td></tr>
 <tr><td><code>BikeAutoHelmet</code></td><td><code>false</code></td><td><code>true</code>: GTA's helmet on a motorbike</td></tr>
 <tr><td><code>ExperimentalDriveSync</code></td><td><code>false</code></td><td><code>true</code>: every game plays a <a href="#director">Director</a> car's recorded drive on its own copy</td></tr>
 <tr><td><code>InteractPress</code></td><td>table</td><td>The hand press (<a href="#interactions-press"><code>PlayPress</code></a>): <code>enabled</code>, <code>maxDistance</code> (2.5 m), <code>followHand</code></td></tr>
@@ -11605,7 +11605,7 @@ end</code></pre>
 <tr><td><strong>Admin Panel</strong></td><td>Opens <code>/whip</code></td></tr>
 <tr><td><strong>Dungeon Mode</strong></td><td>The world builder on the live world (<a href="#director-live">Dungeon Mode</a>)</td></tr>
 <tr><td><strong>A resource's page</strong></td><td>One row per page a resource added (<a href="#dev-pages">Your page in /w</a>); <kbd>Backspace</kbd> goes back</td></tr>
-<tr><td><strong>Experimental</strong></td><td>Features turned on in Config → Experimental features (Camera Creator, Systems Creator). Unfinished prototypes</td></tr>
+<tr><td><strong>Experimental</strong></td><td>Features turned on in Config → Experimental features (Camera Creator, Systems Creator, Combined Settings page). Unfinished prototypes</td></tr>
 </table>
 <p><code>/director</code> opens the Director in <code>/whip</code> for a Director builder.</p>
 

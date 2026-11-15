@@ -19,7 +19,7 @@ Config.MaxCharacters = 4      -- Characters per player, up to 30. Each has a her
                               -- one with no shot of its own shows another until it has one.
 
 -- Where a brand new character wakes up. vector4 is x, y, z, heading.
-Config.DefaultSpawn = vector4(-360.96, 51.44, 54.43, 177.83)
+Config.DefaultSpawn = vector4(-1023.03, -1660.96, 4.62, 44.92)
 
 Config.DefaultCash     = 500    -- Cash placed in their pockets
 Config.StartingBalance = 1000   -- Money in their bank account
@@ -50,7 +50,7 @@ Config.MaxWeight = {   -- Kilograms
     accessory = 10.0,   -- the strip on its own, inside the 80
 }
 
--- What the inventory and shops show weights in, until a player picks their own (Settings → Server → Map & HUD).
+-- What the inventory and shops show weights in, until a player picks their own (Server Settings → Map & HUD).
 --   'kg' = grams under a kilo, kilograms from one up
 --   'lb' = ounces under a pound, pounds from one up
 -- Weights in this file and in RegisterItem are kilograms either way.
@@ -385,7 +385,7 @@ Config.IdleCam = {
     ResetMs = 10000,
 }
 
--- A chase camera each player can switch on for themselves (pause menu: Settings → Server → Vehicles): it follows the
+-- A chase camera each player can switch on for themselves (pause menu: Server Settings → Vehicles): it follows the
 -- car on a spring, leans into slides, widens with speed and shakes a little. C looks behind; first person stays GTA's.
 --   Enabled   false: nobody can switch it on
 --   Default   what a player who never chose gets
@@ -1115,11 +1115,11 @@ Config.Interact3D = {
     previewScale = 3.4,
 
     -- The prompt's shape: 'keycap' is a rounded square (the default), 'classic' is a round disc. Players can pick
-    -- their own in the pause menu (Settings > Server > Map & HUD > Prompt shape).
+    -- their own in the pause menu (Server Settings > Map & HUD > Prompt shape).
     theme = 'keycap',
 
     -- Dark prompts: black with a white outline and symbol, black words with a white outline. Players can switch it
-    -- in the pause menu (Settings > Server > Map & HUD > Dark prompts).
+    -- in the pause menu (Server Settings > Map & HUD > Dark prompts).
     dark = false,
 
     -- Styles: a set of looks a prompt can wear. Everything above is the 'default' style; another style changes
@@ -1761,8 +1761,9 @@ Config.ZoneCellSize            = 50     -- Search grid size in metres
 -- Also in /whip > Settings > Experimental features.
 
 Config.Experimental = {
-    cameraCreator  = false,   -- the Camera Creator: camera shots and paths, a row at the end of /w
-    systemsCreator = false,   -- the Systems Creator: /systems
+    cameraCreator    = false,   -- the Camera Creator: camera shots and paths, a row at the end of /w
+    systemsCreator   = false,   -- the Systems Creator: /systems
+    combinedSettings = false,   -- one Settings page in the pause menu, GTA's settings and this server's together
 }
 
 

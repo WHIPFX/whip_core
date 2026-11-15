@@ -505,7 +505,7 @@ ConfigSchema = {
         settings = {
             { path = 'DrivingCamera.Enabled', type = 'bool',
               label = 'Smooth driving camera',
-              help = 'Lets players switch on the smooth driving camera for themselves (pause menu: Settings → Server → Vehicles): a chase camera on a spring that leans into slides and widens with speed. Off: nobody can, and anyone using it goes back to GTA\'s.' },
+              help = 'Lets players switch on the smooth driving camera for themselves (pause menu: Server Settings → Vehicles): a chase camera on a spring that leans into slides and widens with speed. Off: nobody can, and anyone using it goes back to GTA\'s.' },
             { path = 'DrivingCamera.Default', type = 'bool',
               shownWhen = { path = 'DrivingCamera.Enabled', equals = true },
               label = 'Smooth driving camera to start with',
@@ -725,7 +725,7 @@ ConfigSchema = {
                   { key = 'labelPx', type = 'number', min = 20, max = 200, step = 1, unit = 'px', label = 'Label size' },
               },
               label = 'Prompts',
-              help = 'How the E prompts in the world look to players who have not chosen their own (pause menu, Settings → Server → Map & HUD). Dark swaps black and white: a black square with a white outline and symbol, and black words with a white outline. The sizes are how tall the circle and its label are on screen at the distance a prompt can be used from (measured at 1440p); further away they shrink like any object.' },
+              help = 'How the E prompts in the world look to players who have not chosen their own (pause menu, Server Settings → Map & HUD). Dark swaps black and white: a black square with a white outline and symbol, and black words with a white outline. The sizes are how tall the circle and its label are on screen at the distance a prompt can be used from (measured at 1440p); further away they shrink like any object.' },
             { path = 'InteractVisibleRange', type = 'number', min = 1, max = 25, step = 0.5, unit = 'm',
               label = 'Prompt visible from',
               help = 'How far away an E prompt\'s circle appears. Keep it above the distance a prompt can be used from.' },
@@ -799,6 +799,9 @@ ConfigSchema = {
             { path = 'Experimental.systemsCreator', type = 'bool', warnOn = EXPERIMENTAL_WARNING,
               label = 'Systems Creator',
               help = 'Building game systems from cards. On: /systems opens it, and so does a row at the end of /w (developer mode). Off: /systems does not open. An unfinished prototype: leave it off.' },
+            { path = 'Experimental.combinedSettings', type = 'bool', warnOn = EXPERIMENTAL_WARNING,
+              label = 'Combined Settings page',
+              help = 'On: the pause menu has one Settings page, GTA\'s own settings and this server\'s side by side. Off: Game Settings opens GTA\'s own settings menu, and Server Settings this server\'s. An unfinished prototype: leave it off.' },
         },
     },
 }

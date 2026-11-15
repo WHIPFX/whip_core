@@ -2,8 +2,11 @@
 // PAUSE MENU — whip's, in place of GTA's (client/pause.lua)
 //
 // Left: the whip logo with its loading light, then Resume / Map / Controller / Swap Character /
-// Settings / Quit, and where the player is. Settings slides the menu away for the one Settings page (settings-page.js):
-// GTA's own settings and this server's, as Controller does. Behind it, filling the screen, the map — centred on the
+// Game Settings / Server Settings / Quit, and where the player is. Game Settings opens GTA's own settings menu in the
+// pause menu's place; Server Settings slides the menu away for the Settings page (settings-page.js) with this server's
+// settings, as Controller does. With the experimental Combined Settings page on (Config.Experimental.combinedSettings,
+// sent with each open) the two are one Settings item: that page with GTA's own settings beside the server's.
+// Behind it, filling the screen, the map — centred on the
 // player in the middle of the screen. Map slides the menu away and makes the map live: drag, zoom,
 // double-click for a waypoint, a legend. Controller slides it away too and hides the map for the
 // controller screen (pad-layout.js). Swap Character and Quit
@@ -23,8 +26,18 @@ import { logoMarkup, logoLight } from './logo-light.js';
 import { PadLayout } from './pad-layout.js';
 import { SettingsPage } from './settings-page.js';
 
-// Settings: GTA's own settings and each player's own choices for this server, one page (settings-page.js).
-const ITEMS = [
+// The menu, by the Combined Settings page switch: off, GTA's own settings menu and this server's settings apart;
+// on, one Settings page with both (settings-page.js).
+const MENU_APART = [
+    { id: 'resume', label: 'Resume' },
+    { id: 'map', label: 'Map' },
+    { id: 'controller', label: 'Controller' },
+    { id: 'swap', label: 'Swap Character' },
+    { id: 'gameSettings', label: 'Game Settings' },
+    { id: 'serverSettings', label: 'Server Settings' },
+    { id: 'quit', label: 'Quit' },
+];
+const MENU_COMBINED = [
     { id: 'resume', label: 'Resume' },
     { id: 'map', label: 'Map' },
     { id: 'controller', label: 'Controller' },
@@ -74,7 +87,7 @@ root.innerHTML = `
     </section>
     <aside class="pm-side">
         <div class="pm-logo" role="img" aria-label="whip">${logoMarkup('pm-clip')}</div>
-        <nav class="pm-menu">${ITEMS.map((it, i) => `<button class="pm-item" data-i="${i}">${it.label}</button>`).join('')}</nav>
+        <nav class="pm-menu"></nav>
         <div class="pm-confirm">
             <p class="pm-confirm-q"></p>
             <p class="pm-confirm-sub"></p>
@@ -84,7 +97,7 @@ root.innerHTML = `
     </aside>`;
 document.body.appendChild(root);
 
-const items = [...root.querySelectorAll('.pm-item')];
+const menuEl = root.querySelector('.pm-menu');
 const confirmBtns = [...root.querySelectorAll('.pm-confirm .pm-btn')];
 const confirmQ = root.querySelector('.pm-confirm-q');
 const confirmSub = root.querySelector('.pm-confirm-sub');
@@ -101,6 +114,9 @@ const settingsScreen = new SettingsPage(root, () => setMode('menu'));
 
 let open = false;
 let mode = 'menu';        // 'menu' | 'confirm' | 'map' | 'pad' (the controller screen) | 'settings'
+let combined = false;     // the Combined Settings page is on (pauseOpen)
+let menu = MENU_APART;    // the menu's items, by `combined`
+let items = [];           // their buttons
 let sel = 0;              // the menu's highlighted item
 let asking = null;        // which CONFIRMS entry the question is
 let confirmSel = 1;       // Stay, by default
@@ -142,10 +158,17 @@ function setMode(m, instant) {
     if (m === 'confirm') drawConfirm();
     if (m === 'pad') padScreen.open();
     else if (was === 'pad') padScreen.close();
-    if (m === 'settings') settingsScreen.open();
+    if (m === 'settings') settingsScreen.open({ game: combined });
     else if (was === 'settings') settingsScreen.close();
     drawMenu();
     NuiRouter.syncNavScope(true);   // the stick is numbers on the map and directions in the menu: tell Lua now
+}
+
+/** The menu's buttons, for the items `combined` asks for. */
+function buildMenu() {
+    menu = combined ? MENU_COMBINED : MENU_APART;
+    menuEl.innerHTML = menu.map((it, i) => `<button class="pm-item" data-i="${i}">${it.label}</button>`).join('');
+    items = [...menuEl.querySelectorAll('.pm-item')];
 }
 
 function drawMenu() {
@@ -167,11 +190,12 @@ function drawConfirm() {
 }
 
 function choose(i) {
-    const id = ITEMS[i].id;
+    const id = menu[i].id;
     if (id === 'resume') nuiCallback('pauseResume', {});
     else if (id === 'map') setMode('map');
     else if (id === 'controller') setMode('pad');
-    else if (id === 'settings') setMode('settings');
+    else if (id === 'settings' || id === 'serverSettings') setMode('settings');
+    else if (id === 'gameSettings') nuiCallback('pauseSettings', {});   // GTA's own, in the pause menu's place
     else if (CONFIRMS[id]) ask(id);
 }
 
@@ -298,9 +322,14 @@ map.onBlipClick = (b) => {
 
 // ---- mouse ----
 
-items.forEach((el, i) => {
-    el.addEventListener('mouseenter', () => { if (mode === 'menu') { sel = i; drawMenu(); } });
-    el.addEventListener('click', () => { if (mode === 'menu') { sel = i; choose(i); } });
+// On the menu, not each button: they are made again at each open (buildMenu).
+menuEl.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.pm-item');
+    if (el && mode === 'menu') { sel = Number(el.dataset.i); drawMenu(); }
+});
+menuEl.addEventListener('click', (e) => {
+    const el = e.target.closest('.pm-item');
+    if (el && mode === 'menu') { sel = Number(el.dataset.i); choose(sel); }
 });
 confirmBtns.forEach((el, i) => {
     el.addEventListener('mouseenter', () => { confirmSel = i; drawConfirm(); });
@@ -349,8 +378,8 @@ NuiRouter.registerKeyScope({
             else if (k === 'escape') setMode('menu');
             return;
         }
-        if (k === 'arrowup' || k === 'w') { sel = (sel + ITEMS.length - 1) % ITEMS.length; drawMenu(); }
-        else if (k === 'arrowdown' || k === 's') { sel = (sel + 1) % ITEMS.length; drawMenu(); }
+        if (k === 'arrowup' || k === 'w') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
+        else if (k === 'arrowdown' || k === 's') { sel = (sel + 1) % menu.length; drawMenu(); }
         else if (k === 'enter' || k === ' ') choose(sel);
         else if (k === 'escape') nuiCallback('pauseResume', {});
         else if (k === 'm') setMode('map');
@@ -381,8 +410,8 @@ NuiRouter.registerKeyScope({
             else if (nav === 'back') setMode('menu');
             return;
         }
-        if (nav === 'up') { sel = (sel + ITEMS.length - 1) % ITEMS.length; drawMenu(); }
-        else if (nav === 'down') { sel = (sel + 1) % ITEMS.length; drawMenu(); }
+        if (nav === 'up') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
+        else if (nav === 'down') { sel = (sel + 1) % menu.length; drawMenu(); }
         else if (nav === 'select') choose(sel);
         else if (nav === 'back') nuiCallback('pauseResume', {});
     },
@@ -412,9 +441,11 @@ NuiRouter.registerKeyScope({
 
 // ---- messages ----
 
-NuiRouter.register('pauseOpen', () => {
+NuiRouter.register('pauseOpen', (d) => {
     open = true;
     centred = false;
+    combined = !!(d && d.combinedSettings);
+    buildMenu();
     sel = 0;
     root.classList.add('open');
     light.start();

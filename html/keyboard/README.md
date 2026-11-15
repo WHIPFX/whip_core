@@ -14,7 +14,7 @@ English (`en`) comes with whip. To offer another language:
 2. Add its code to `Config.Keyboard.Languages` in `config.lua` (for example `{ 'en', 'fr' }`).
 3. Restart whip_core.
 
-Players then pick it in the pause menu (Settings → Server → Controller → Keyboard language), or switch with
+Players then pick it in the pause menu (Server Settings → Controller → Keyboard language), or switch with
 the language key on the keyboard. With the setting on "Game language" they get the language GTA is set to,
 when the server offers it.
 
