@@ -223,9 +223,20 @@ function layout() {
     return out;
 }
 
+/** A segment of the room on the screen [x1, y1, x2, y2], cut where it passes behind the camera; null when all of it
+ *  is behind. */
+const NEAR = 0.1;
+function projectSegment(cam, P, Q) {
+    const dp = dot(sub(P, cam.C), cam.f), dq = dot(sub(Q, cam.C), cam.f);
+    if (dp < NEAR && dq < NEAR) return null;
+    if (dp < NEAR) P = add(P, mul(sub(Q, P), (NEAR - dp) / (dq - dp)));
+    else if (dq < NEAR) Q = add(Q, mul(sub(P, Q), (NEAR - dq) / (dp - dq)));
+    const a = project(cam, P), b = project(cam, Q);
+    return a && b ? [a[0], a[1], b[0], b[1]] : null;
+}
+
 /** Grid-locked: the world grid at the snap step on the floor under the selection, round the grid point nearest the
- *  primary, as screen segments faded towards their ends [[x1, y1, x2, y2, fade], ...]. A line part behind the camera
- *  is left out. */
+ *  primary, as screen segments faded towards their ends [[x1, y1, x2, y2, fade], ...]. */
 function gridLines(cam) {
     const s = snap.move > 0 ? snap.move : 0.25;
     const A = view.a || view.o;
@@ -236,10 +247,10 @@ function gridLines(cam) {
     const out = [];
     for (let i = -n; i <= n; i++) {
         const fade = 1 - Math.abs(i) / (n + 1);
-        const a = project(cam, [cx + i * s, cy - ext, z]), b = project(cam, [cx + i * s, cy + ext, z]);
-        if (a && b) out.push([a[0], a[1], b[0], b[1], fade]);
-        const c = project(cam, [cx - ext, cy + i * s, z]), d = project(cam, [cx + ext, cy + i * s, z]);
-        if (c && d) out.push([c[0], c[1], d[0], d[1], fade]);
+        const along = projectSegment(cam, [cx + i * s, cy - ext, z], [cx + i * s, cy + ext, z]);
+        if (along) out.push([...along, fade]);
+        const across = projectSegment(cam, [cx - ext, cy + i * s, z], [cx + ext, cy + i * s, z]);
+        if (across) out.push([...across, fade]);
     }
     return out;
 }
@@ -652,7 +663,7 @@ if (svg) {
 
     svg.addEventListener('pointerup', (e) => { if (box) endBox(e.clientX, e.clientY); else endUnlessCarried(); });
     svg.addEventListener('pointercancel', () => { cancelBox(); endUnlessCarried(); });
-    svg.addEventListener('lostpointercapture', endUnlessCarried);
+    svg.addEventListener('lostpointercapture', () => { cancelBox(); endUnlessCarried(); });
     svg.addEventListener('pointerleave', () => { if (!drag && hot) { hot = null; render(); } });
 }
 

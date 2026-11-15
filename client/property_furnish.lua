@@ -1530,10 +1530,13 @@ local function selectAt(nx, ny, add)
     pushState()
 end
 
---- A box dragged over the room (0-1 across and down, either corner first): everything whose middle is inside it is
---- selected, through walls as any editor's box is. `add` (Ctrl): joins what is selected instead of replacing it.
+--- How far from the camera a box reaches: past it, the world builder's far-off things stay out of it.
+local BOX_REACH = 150.0
+
+--- A box dragged over the room (0-1 across and down, either corner first): everything within reach whose middle is
+--- inside it is selected, through walls as any editor's box is. `add` (Ctrl): joins what is selected instead of
+--- replacing it.
 local function selectBox(x0, y0, x1, y1, add)
-    if not multiOk() then return end
     local l, r, t, b = math.min(x0, x1), math.max(x0, x1), math.min(y0, y1), math.max(y0, y1)
     local c, rot = FreeCam.getCoord(), FreeCam.getRot()
     local kx, ky = viewKs()
@@ -1550,7 +1553,11 @@ local function selectBox(x0, y0, x1, y1, add)
         local it = items[i]
         if not inSet[it] then
             local mid = it.dims and (it.dims.mn.z + it.dims.mx.z) * 0.5 or 0.0
-            local sx, sy = FurnishView.project(it.x, it.y, it.z + mid, c.x, c.y, c.z, rot.x, rot.z, kx, ky)
+            local px, py, pz = it.x, it.y, it.z + mid
+            local sx, sy = nil, nil
+            if (px - c.x) ^ 2 + (py - c.y) ^ 2 + (pz - c.z) ^ 2 <= BOX_REACH * BOX_REACH then
+                sx, sy = FurnishView.project(px, py, pz, c.x, c.y, c.z, rot.x, rot.z, kx, ky)
+            end
             if sx and sx >= l and sx <= r and sy >= t and sy <= b then
                 count = count + 1
                 set[count] = it
@@ -1894,29 +1901,38 @@ RegisterNUICallback('furnishPick', function(data, cb)
     placeNew(model, nil, { carry = true })
 end)
 
---- A left click on the room (not on a marker — the page keeps those): select what is under it.
-RegisterNUICallback('furnishClick', function(data, cb)
-    cb('ok')
-    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
-    local nx, ny = tonumber(data.x), tonumber(data.y)
+--- A left click on the room at (nx, ny), 0-1 across and down: select what is under it.
+local function clickRoom(nx, ny, ctrl)
     if not nx or not ny or nx < 0 or nx > 1 or ny < 0 or ny > 1 then return end
     -- (Dungeon Mode's options are open: a click elsewhere puts them away.)
     if paused then liveCall('away') return end
     -- (The world builder's More > Door: this click picks the door under the pointer.)
     if FurnishBuilder.click(nx, ny) then return end
     -- Ctrl held: adds to the selection, or takes away.
-    selectAt(nx, ny, data.ctrl == true or ctrlHeld())
+    selectAt(nx, ny, ctrl or ctrlHeld())
     -- (In Dungeon Mode, a click on nothing of the builder's is on the world's thing there.)
     if not selected and liveOf() then liveCall('click', aimAt(nx, ny)) end
+end
+
+--- A left click on the room (not on a marker — the page keeps those).
+RegisterNUICallback('furnishClick', function(data, cb)
+    cb('ok')
+    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
+    clickRoom(tonumber(data.x), tonumber(data.y), data.ctrl == true)
 end)
 
 --- A box dragged over the room: { x0, y0, x1, y1 } its corners (0-1 across and down), `ctrl` held as it started.
 RegisterNUICallback('furnishSelectBox', function(data, cb)
     cb('ok')
-    if not FurnishModeActive or looking or paused or type(data) ~= 'table' then return end
+    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
     local x0, y0, x1, y1 = tonumber(data.x0), tonumber(data.y0), tonumber(data.x1), tonumber(data.y1)
     if not (x0 and y0 and x1 and y1) then return end
-    FurnishBuilder.cancelPick()
+    -- No box where only one may be selected, or while a click means something else (a door pick, Dungeon Mode's
+    -- options): a click where it went down, as a press that barely moved is.
+    if paused or FurnishBuilder.picking() or not multiOk() then
+        clickRoom(x0, y0, data.ctrl == true)
+        return
+    end
     selectBox(x0, y0, x1, y1, data.ctrl == true or ctrlHeld())
 end)
 
