@@ -145,7 +145,7 @@ Settings.same = same
 
 -- ---- Where a value lives ----
 --
--- A core path is a place in Config: 'DefaultCash', or 'Emotes.menuKey' for a field of a table. A
+-- A core path is a place in Config: 'DefaultCash', or 'Emotes.cancelKey' for a field of a table. A
 -- satellite's path is just a name in its own flat list.
 
 Settings.values = {}     -- [owner][path] = { v = value }, satellites only (wrapped: "none" is a value)

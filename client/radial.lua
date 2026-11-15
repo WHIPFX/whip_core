@@ -492,7 +492,7 @@ RegisterCommand('-whip_radial_pad', function() padHeld = false end, false)
 -- F1 by default, and rebindable: Settings -> Key Bindings -> FiveM -> "Radial Menu". The default
 -- only applies on a player's FIRST load; after that their own binding is kept.
 --
--- F2 is the inventory, F3 the emote menu, M the phone (whip_phone), F6 chat, F7 the debug overlays,
+-- F2 is the inventory, F3 the phone (whip_phone; the emote menu is on this wheel), F6 chat, F7 the debug overlays,
 -- and F8 belongs to the FiveM console.
 RegisterKeyMapping('whip_radial', 'Radial Menu', 'keyboard', 'F1')
 

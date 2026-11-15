@@ -1894,7 +1894,7 @@ function whip_core:KeyHint(keyText, button) end
 -- ============================================
 --
 -- The list of emotes, walk styles and moods is whip_core/shared/emote_list.lua. Players use /e,
--- /walk, /mood and the F3 menu; these are for a resource that wants to do the same from code.
+-- /walk, /mood and the emote menu on the F1 wheel; these are for a resource that wants to do the same from code.
 
 --- Play an emote on the player by its /e name (e.g. 'drink'). Returns true, or false and why
 --- (no such emote, dead, in a vehicle, a progress bar running, a weapon out...). Returns at once;

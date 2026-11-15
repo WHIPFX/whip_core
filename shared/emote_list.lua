@@ -1,4 +1,4 @@
--- The emotes, walk styles and expressions players can pick (/e, /walk, /mood and the F3 menu).
+-- The emotes, walk styles and expressions players can pick (/e, /walk, /mood and the emote menu on the F1 wheel).
 --
 -- LICENCE: THIS FILE IS UNDER THE GNU GENERAL PUBLIC LICENSE 3.0 (COPYING), not the LGPL like the rest of whip_core.
 -- Many of its emotes, their commands and their prop placements come from RPEmotes (GPL 3.0) by TayMcKenzieNZ,

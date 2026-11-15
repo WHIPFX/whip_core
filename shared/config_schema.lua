@@ -13,7 +13,7 @@
 -- physics, per-model fixes and debug switches stay in config.lua only, with their own comments.
 --
 -- AN ENTRY:
---   path     the setting's place in Config: 'DefaultCash', or 'Emotes.menuKey' for a field of a table
+--   path     the setting's place in Config: 'DefaultCash', or 'Emotes.cancelKey' for a field of a table
 --   type     'int' | 'number' | 'bool' | 'string' | 'enum' | 'vec3' | 'vec4' | 'list' | 'records' | 'map'
 --            | 'record' (one card of `fields`, each kept as a setting of its own: '<path>.<key>')
 --   label    its name in the panel           help   one or two plain sentences

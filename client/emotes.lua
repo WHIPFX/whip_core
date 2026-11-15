@@ -715,10 +715,9 @@ RegisterNUICallback('emoteMood', function(d, cb)
     say(Emotes.setMood(cmd ~= 'c' and cmd or nil))
 end)
 
+-- No key of its own: the menu is on the F1 wheel (below) and /emotes. F3 is the phone's (whip_phone).
 RegisterCommand('emotes', function() Emotes.openMenu() end, false)
 RegisterCommand('whip_emotes', function() Emotes.openMenu() end, false)
-RegisterKeyMapping('whip_emotes', 'Emotes: Open the emote menu', 'keyboard',
-    (Config.Emotes and Config.Emotes.menuKey) or 'F3')
 
 -- Anything that takes the player out of the world takes the menu with it.
 AddEventHandler('whip_core:player:died', function() Emotes.closeMenu() end)

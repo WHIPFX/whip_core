@@ -76,8 +76,8 @@ errors in one block.
 | **F2** | Inventory |
 | **Tab** | Hotbar; **1** to **5** use its slots |
 | **E** | Interact |
-| **F1** | Radial menu |
-| **F3** | Emote menu; **X** stops an emote |
+| **F1** | Radial menu, with the emote menu on it; **X** stops an emote |
+| **F3** | Phone (whip_phone) |
 | **L** | Lock or unlock your car |
 | **Mouse wheel** | Engine on (up) or off (down) |
 

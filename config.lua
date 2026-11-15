@@ -1411,9 +1411,9 @@ Config.ContainerDefaultSlots  = 20
 Config.ContainerDefaultWeight = 100.0
 Config.ContainerDefaultProp   = 'prop_cs_cardbox_01'
 
--- Emotes (/e, /walk, /mood); the emotes themselves are in shared/emote_list.lua.
+-- Emotes (/e, /walk, /mood); the emotes themselves are in shared/emote_list.lua. The emote menu opens from the F1
+-- wheel and /emotes.
 Config.Emotes = {
-    menuKey    = 'F3',    -- Opens the emote menu (players can rebind it in their key settings)
     cancelKey  = 'X',     -- Stops the current emote
     placeRange = 6.0,     -- How far away you can place an emote (metres)
 }
