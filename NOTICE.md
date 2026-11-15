@@ -4,8 +4,8 @@ Copyright (c) 2026 Whippy
 
 ## WHIP's own code
 
-whip_core and WHIP's own resources (whip_autos, whip_autos_shop, whip_chat, whip_fuel, whip_gunny,
-whip_loadingscreen, whip_phone, whip_rope, whip_voice) are licensed under the GNU Lesser General Public License 3.0:
+whip_core and WHIP's own resources (whip_autos, whip_autos_shop, whip_chat, whip_dealership, whip_fuel,
+whip_gunny, whip_loadingscreen, whip_phone, whip_rope, whip_voice) are licensed under the GNU Lesser General Public License 3.0:
 each resource's `COPYING.LESSER`, with the GPL 3.0 it builds on in `COPYING`. The code in the map packs
 (whip_graphics, whip_homes_mirrorpark) and the whip_media_* packs is under the same licence, in each pack's own
 `COPYING.LESSER` and `COPYING`.
