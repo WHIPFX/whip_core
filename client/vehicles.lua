@@ -2604,6 +2604,13 @@ function Vehicles.shutDoor(entity, doorIndex)
     requestVehicleDoor(entity, doorIndex, 'shut')
 end
 
+--- Open a door, and only open it (a second press while it swings open does not shut it).
+---@param entity number
+---@param doorIndex number
+function Vehicles.openDoor(entity, doorIndex)
+    requestVehicleDoor(entity, doorIndex, 'open')
+end
+
 -- The boot: one implementation for both ways in (the aim-target "Open Trunk" and View Trunk Inventory in
 -- client/vehicle_prompts.lua). Here because it touches drawVehicleStorage, vehicleStoragePending and trunkDoorEntity.
 
@@ -2635,9 +2642,10 @@ function Vehicles.openTrunk(entity)
         UI.Notify('You can only open the trunk on non-scene vehicles', 'error')
         return
     end
-    -- Open the trunk door (index 5). Only claim a lid we opened: `trunkDoorEntity` makes the watcher below shut
-    -- it when the panel closes, which is wrong for a lid the player left up.
-    if DoesEntityExist(entity) and not Vehicles.isDoorOpen(entity, 5) then
+    -- Open the trunk door (index 5), on a model that has one: a van's back doors are already open when this is
+    -- offered (client/vehicle_prompts.lua). Only claim a lid we opened: `trunkDoorEntity` makes the watcher below
+    -- shut it when the panel closes, which is wrong for a lid the player left up.
+    if DoesEntityExist(entity) and GetIsDoorValid(entity, 5) and not Vehicles.isDoorOpen(entity, 5) then
         requestVehicleDoor(entity, 5, 'open')
         trunkDoorEntity = entity
     end

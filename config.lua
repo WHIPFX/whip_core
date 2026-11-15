@@ -810,6 +810,20 @@ Config.VehiclePartHingeTopFrac = 0.52
 --     }
 Config.VehiclePartHinges = {}
 
+-- Vans whose back doors are GTA's rear doors (2 and 3), such as the Boxville and the Burrito: their back is the trunk,
+-- one circle between the doors that opens both and the trunk inventory, and those doors have no circles of their own.
+-- Found from where the doors hang, on the classes below only; set a model true (it has back doors) or false (it has
+-- not) when it is found wrong. true also works for a model of another class.
+--     Config.VehicleBackDoors = {
+--         [GetHashKey('boxville2')] = true,
+--     }
+Config.VehicleBackDoors = {}
+
+-- The vehicle classes looked at for back doors: 10 industrial, 11 utility, 12 vans, 17 service, 18 emergency (the
+-- ambulance, police vans), 19 military, 20 commercial (the Stockade, the Mule). Every other class (cars, SUVs,
+-- bikes...) keeps its rear doors as doors.
+Config.VehicleBackDoorClasses = { 10, 11, 12, 17, 18, 19, 20 }
+
 -- Which side of a car its fuel goes in, keyed by model hash. Few models mark their filler, so whip guesses a side
 -- above a rear wheel. Set the side for a model it guesses wrong; 'rear' puts it on the back. /vehpoints next to the
 -- car shows where the nozzle goes.

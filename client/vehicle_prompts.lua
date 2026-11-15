@@ -140,6 +140,9 @@ local function doorPart(key, bone, handleBone, doorIndex, side, isFront)
         side    = side,
         edgeDir = 'aft',
 
+        -- A rear door may be a van's back door, which has no circle of its own (backDoorsOf).
+        mayBeBack = doorIndex >= 2,
+
         -- No door, no prompt.
         onDetached = 'hide',
 
@@ -164,6 +167,7 @@ local function doorInsidePart(key, bone, handleBone, doorIndex, side)
         door       = doorIndex,
         side       = side,
         edgeDir    = 'aft',
+        mayBeBack  = doorIndex >= 2,
         face       = 'inside',
         onDetached = 'hide',
         can        = function(veh) return doorOpen(veh, doorIndex) end,
@@ -214,6 +218,103 @@ local function hasTrunkLid(veh)
 end
 local function trunkLid(veh) return askCar(veh, 'lid', hasTrunkLid) end
 
+-- Back doors: on a van such as the Boxville or the Burrito, GTA's rear doors (2 and 3) are the doors across its back,
+-- not doors down its sides. There the back is the trunk: its circle sits between them and opens both, and the doors
+-- have no circles of their own. Told from where the doors hang, once per model, on the classes
+-- Config.VehicleBackDoorClasses names; Config.VehicleBackDoors corrects a model told wrong.
+
+local BACK_DOOR_BONES = { [2] = { 'door_dside_r', 'handle_dside_r' }, [3] = { 'door_pside_r', 'handle_pside_r' } }
+local BACK_GAP = 1.0    -- metres: a back door's hinge is this close to the back of the model's box; a side door's is not
+local BACK_OUT = 0.05   -- metres: the circle stands this far off the doors
+
+--- [model] = { doors = { 2, 3 }, x, y, z, retryAt? } or false. `retryAt`: a door was open, so only a guess for now.
+local backDoorCache = {}
+
+--- Is this vehicle of a class that may have back doors (Config.VehicleBackDoorClasses)?
+local function backDoorClass(veh)
+    local class = GetVehicleClass(veh)
+    for _, c in ipairs(Config.VehicleBackDoorClasses or {}) do
+        if c == class then return true end
+    end
+    return false
+end
+
+--- Which of this model's rear doors are back doors, and where their circle goes in the model's own space.
+---@return table|false info
+---@return boolean settled  false: a back door was open, so its handle could not be read
+local function measureBackDoors(veh, model)
+    local override = (Config.VehicleBackDoors or {})[model]
+    if override == false then return false, true end
+    -- Only vans, trucks and their like; a car of another class keeps its rear doors.
+    if override ~= true and not backDoorClass(veh) then return false, true end
+    -- A model with a boot of its own keeps it.
+    if override ~= true and GetIsDoorValid(veh, 5) and GetEntityBoneIndexByName(veh, 'boot') ~= -1 then
+        return false, true
+    end
+    local minDim = GetModelDimensions(model)
+    if not minDim then return false, true end
+
+    local doors, settled = {}, true
+    local sx, sy, sz = 0.0, 0.0, 0.0
+    for i = 2, 3 do
+        local names = BACK_DOOR_BONES[i]
+        local bone = GetIsDoorValid(veh, i) and GetEntityBoneIndexByName(veh, names[1]) or -1
+        if bone ~= -1 then
+            -- The hinge stays where it is as the door swings.
+            local w = GetWorldPositionOfEntityBone(veh, bone)
+            local hinge = GetOffsetFromEntityGivenWorldCoords(veh, w.x, w.y, w.z)
+            local back = override == true or (hinge.y - minDim.y) < BACK_GAP
+            local at = hinge
+            local hb = back and GetEntityBoneIndexByName(veh, names[2]) or -1
+            if hb ~= -1 then
+                if GetVehicleDoorAngleRatio(veh, i) > 0.01 then
+                    settled = false
+                else
+                    local hw = GetWorldPositionOfEntityBone(veh, hb)
+                    at = GetOffsetFromEntityGivenWorldCoords(veh, hw.x, hw.y, hw.z)
+                    -- A side door's handle is behind its hinge; a back door's is across the back from it.
+                    if override ~= true and math.abs(at.x - hinge.x) <= math.abs(at.y - hinge.y) then back = false end
+                end
+            end
+            if back then
+                doors[#doors + 1] = i
+                sx, sy, sz = sx + at.x, sy + at.y, sz + at.z
+            end
+        end
+    end
+    local n = #doors
+    if n == 0 then return false, settled end
+    return { doors = doors, x = sx / n, y = sy / n - BACK_OUT, z = sz / n }, settled
+end
+
+--- This car's back doors ({ doors, x, y, z }), or false. Once per model; a guess made with a door open is asked
+--- again a second later.
+local function backDoorsOf(veh)
+    local model = GetEntityModel(veh)
+    local c = backDoorCache[model]
+    if c ~= nil and not (c and c.retryAt and GetGameTimer() >= c.retryAt) then return c end
+    local info, settled = measureBackDoors(veh, model)
+    if info and not settled then info.retryAt = GetGameTimer() + 1000 end
+    backDoorCache[model] = info
+    return info
+end
+local function backDoors(veh) return askCar(veh, 'backDoors', backDoorsOf) end
+
+local function backDoorsOpen(veh, back)
+    for _, i in ipairs(back.doors) do
+        if doorOpen(veh, i) then return true end
+    end
+    return false
+end
+
+--- Is a back door still on its hinges?
+local function backDoorsHung(veh, back)
+    for _, i in ipairs(back.doors) do
+        if not doorTorn(veh, i) then return true end
+    end
+    return false
+end
+
 local PARTS = {
     {
         key     = 'trunk',
@@ -225,28 +326,52 @@ local PARTS = {
         -- Holds still: the circle stays where the shut lid puts it.
         fixed   = true,
 
+        -- On a van with back doors the circle is theirs (backDoorsOf), and the lid is the pair of them.
+        onBackDoors = true,
+
         -- The storage is the car's, so the prompt stays without a lid, with only View Trunk Inventory.
         onDetached = 'fallback',
 
         -- The lid comes first, then the storage:
         --   lid shut: Open Trunk. lid open: Close Trunk, View Trunk Inventory.
         --   no lid (torn off, or no boot door): View Trunk Inventory. locked: nothing.
+        --   back doors: Open Back Doors, then Close Back Doors and View Trunk Inventory.
         -- The lid stays first so E keeps the same option under the player when the storage appears.
         options = {
             {
                 id = 'lid',
 
                 label = function(veh)
+                    local back = backDoors(veh)
+                    if back then
+                        local doors = #back.doors > 1 and 'Back Doors' or 'Back Door'
+                        return (backDoorsOpen(veh, back) and 'Close ' or 'Open ') .. doors
+                    end
                     return doorOpen(veh, 5) and 'Close Trunk' or 'Open Trunk'
                 end,
                 icon = 'trunk_lid',
 
                 -- No lid: this option drops out of the stack.
                 can = function(veh)
-                    if not trunkLid(veh) then return false end
+                    local back = backDoors(veh)
+                    if back then
+                        if not backDoorsHung(veh, back) then return false end
+                    elseif not trunkLid(veh) then
+                        return false
+                    end
                     return askCar(veh, 'trunkOk', Vehicles.canOpenTrunk)
                 end,
-                act = function(veh) Vehicles.toggleDoor(veh, 5) end,
+                act = function(veh)
+                    local back = backDoors(veh)
+                    if not back then return Vehicles.toggleDoor(veh, 5) end
+                    -- The pair together: shut if either is open, else open both.
+                    local shut = backDoorsOpen(veh, back)
+                    for _, i in ipairs(back.doors) do
+                        if not doorTorn(veh, i) then
+                            if shut then Vehicles.shutDoor(veh, i) else Vehicles.openDoor(veh, i) end
+                        end
+                    end
+                end,
                 press = true,
             },
             {
@@ -260,6 +385,8 @@ local PARTS = {
                 can = function(veh)
                     if not askCar(veh, 'trunkOk', Vehicles.canOpenTrunk) then return false end
                     if not askCar(veh, 'trunkHas', Vehicles.hasStorage, 'trunk') then return false end
+                    local back = backDoors(veh)
+                    if back then return not backDoorsHung(veh, back) or backDoorsOpen(veh, back) end
                     return not trunkLid(veh) or doorOpen(veh, 5)
                 end,
                 act = function(veh) Vehicles.openTrunk(veh) end,
@@ -455,6 +582,28 @@ local function partGeometry(part, veh, c)
         if not cached then return nil end
         -- `retryAt`: a door's skin not yet measured (doorSkin).
         if not cached.retryAt or GetGameTimer() < cached.retryAt then return cached end
+    end
+
+    -- A van's back doors (backDoorsOf): the trunk's circle goes between them, and they have none of their own.
+    if part.onBackDoors or part.mayBeBack then
+        local back = backDoorsOf(veh)
+        if back and part.mayBeBack then
+            for _, i in ipairs(back.doors) do
+                if i == part.door then
+                    -- A guess (a door was open) is asked again; an answer is kept.
+                    if not back.retryAt then cache[model] = false end
+                    return nil
+                end
+            end
+        elseif back then
+            local g = {
+                hx = back.x, hy = back.y, hz = back.z, ex = 0.0, ey = 0.0, ez = 0.0,
+                mode = 'down', dir = 1, heading = SIDES.rear.heading, faceSign = SIDES.rear.sign, vertical = false,
+                retryAt = back.retryAt,
+            }
+            cache[model] = g
+            return g
+        end
     end
 
     local bone = GetEntityBoneIndexByName(veh, part.bone)
@@ -1017,11 +1166,14 @@ end
 -- A car part setting changed: panels are worked out again and the prompts re-registered by the scan.
 local function partSettingsChanged()
     for _, p in ipairs(PARTS) do anchorCache[p.key] = {} end
+    for model in pairs(backDoorCache) do backDoorCache[model] = nil end
     clearPrompts(nil)
 end
 Settings.onChange('VehiclePartPrompts', partSettingsChanged)
 Settings.onChange('VehiclePartHingeTopFrac', partSettingsChanged)
 Settings.onChange('VehiclePartHinges', partSettingsChanged)
+Settings.onChange('VehicleBackDoors', partSettingsChanged)
+Settings.onChange('VehicleBackDoorClasses', partSettingsChanged)
 Settings.onChange('VehicleFillers', partSettingsChanged)   -- the filler's spot (client/vehicle_points.lua)
 
 -- Proximity: the scan decides which cars have a point in the grid, once a second; each part's own
