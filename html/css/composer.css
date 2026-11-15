@@ -6,7 +6,7 @@
    is the whole trick. If this stylesheet ever starts painting a background, the element stops
    reading as one thing transforming and starts reading as two things swapping.
 
-   ZOOM COMPOUNDS HERE. #status-hud carries `zoom: calc(var(--ui-scale) * 1.25)`, so every px
+   ZOOM COMPOUNDS HERE. #status-hud carries `zoom: calc(var(--hud-scale) * 1.25)`, so every px
    below renders 25% larger than it reads. Sizes here were picked against the RENDERED result,
    not against the numbers in the file — check any change on screen rather than in the editor.
 

@@ -81,8 +81,11 @@
 
        IT MOVES THE HUD SLIGHTLY TOO, and that is wanted rather than tolerated: zoom scales
        #statusHudWrapper's own bottom/left offsets, so the capsule drifts up and right as it
-       grows — toward the radar's left edge it is meant to sit under, instead of away from it. */
-    zoom: calc(var(--ui-scale) * 1.25);
+       grows — toward the radar's left edge it is meant to sit under, instead of away from it.
+
+       --hud-scale, not --ui-scale: the screen's height alone (utils.js), as the map's box above it follows, so the
+       gauges span the map on a 16:10 or 4:3 screen too. */
+    zoom: calc(var(--hud-scale, 1) * 1.25);
 }
 
 #status-hud.visible {

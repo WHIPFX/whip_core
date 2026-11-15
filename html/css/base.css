@@ -25,8 +25,10 @@
 /* ---------------------------------------- */
 :root {
     /* Resolution scaling — set by utils.js: the 2560 x 1440 design fitted to the window's height, or to its
-       width on a screen narrower than 16:9; not themeable. */
+       width on a screen narrower than 16:9; not themeable. --hud-scale is the height alone (the gauges under
+       the minimap, which follow the map's box). */
     --ui-scale: 1;
+    --hud-scale: 1;
 
     /* The inventory draws at this multiple of --ui-scale, and so do its popovers (the right-click
        menu, the tooltip, the split panel) so their text matches the panels they open from. Tune

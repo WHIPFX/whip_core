@@ -502,12 +502,16 @@ function layoutUnderFrame() {
     const fill = (k) => k > 1 ? Math.max(2, Math.min(24, (width - k * disc) / (k - 1))) : 0;
 
     const slots = Math.max(ROW_SLOTS, base);
-    const gap = fill(slots);                                                  // between discs, and under the frame
+    const gap = fill(slots);                                                  // between discs (under the frame: below)
     const rowWidth = slots * disc + (slots - 1) * gap;                        // a full row
 
     // The first disc where centring a full row under the frame puts it.
     const left = _frameBox.left * W / zoom + (width - rowWidth) / 2 - (border + padX + DISC_INSET);
-    const discTop = _frameBox.bottom * H + gap * zoom;                        // screen px
+    // Under the frame: the discs take the middle of the room left below it, as much space over them as under them,
+    // and never more over them than between them. The room below the frame is only a little taller than a disc, and
+    // the whole gap over them pushed their bottoms off the screen at every aspect ratio (16:10 most).
+    const room = H - _frameBox.bottom * H - disc * zoom;                     // screen px, over and under the discs
+    const discTop = _frameBox.bottom * H + Math.max(0, Math.min(gap * zoom, room / 2));   // screen px
     const capTop = discTop - (border + padY + DISC_INSET) * zoom;            // screen px
     const capHeight = ring + 2 * padY + 2 * border;                          // HUD px
     const bottom = (H - capTop) / zoom - capHeight;
