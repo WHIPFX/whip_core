@@ -274,24 +274,22 @@ function FreeCam.setPad(on, triggers)
     padTriggers = triggers ~= false
 end
 
---- Put the carried car down at `dest`: on the ground under it when there is ground (a car dropped from the camera
---- lands hard), facing `heading`, the player back in their seat, and the car shown, unfrozen and solid again. Waits.
+--- Put the carried car at `dest`, exactly, as the ped is put on foot (from up in the air it falls, as the ped does),
+--- facing `heading`, the player back in their seat, and the car shown, unfrozen and solid again. Its passengers
+--- ride in it the whole way: nothing here moves them. Waits.
 local function landCar(car, ped, dest, heading)
     local veh = car.veh
     SetEntityCoordsNoOffset(veh, dest.x, dest.y, dest.z, false, false, false)
-    -- Collision first, as for the ped in FreeCam.stop: the ground under it may not be streamed yet.
+    SetEntityHeading(veh, heading % 360.0)
+    -- Collision first, as for the ped in FreeCam.stop: what is under it may not be streamed yet.
     RequestCollisionAtCoord(dest.x, dest.y, dest.z)
     local timeout = 0
     while not HasCollisionLoadedAroundEntity(veh) and timeout < 2000 do
         Wait(10)
         timeout = timeout + 10
     end
-    local found, groundZ = GetGroundZFor_3dCoord(dest.x, dest.y, dest.z, false)
-    if found then SetEntityCoordsNoOffset(veh, dest.x, dest.y, groundZ + 0.5, false, false, false) end
-    SetEntityHeading(veh, heading % 360.0)
     if GetVehiclePedIsIn(ped, false) ~= veh then SetPedIntoVehicle(ped, veh, car.seat) end
     holdCar(veh, false)
-    if found then SetVehicleOnGroundProperly(veh) end
 end
 
 --- Put the camera back on the player.
