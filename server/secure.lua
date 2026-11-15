@@ -852,6 +852,15 @@ local function emQueue(entry)
     end)
 end
 
+--- What a dead player's call is told (refusedWhileDead). Callers and onReject get exactly this: it is
+--- documented, and callers compare it.
+local DEAD_REASON = 'Player is dead'
+
+--- The fix, said beside that refusal in the console and to a developer in game (sayDead). Dead
+--- players are refused by default, so an author who never read about the rule meets an event that
+--- does nothing while they are dead; this names the field.
+local DEAD_HINT = 'whileDead = true in its schema lets dead players through'
+
 --- @param eventName string
 --- @param src number
 --- @param status string   'ok' | 'rejected' | 'error'
@@ -884,8 +893,9 @@ local function logSecureEvent(eventName, src, status, reason, durationMs)
     if status == 'rejected' then announce, held = rejectionAnnounce(eventName, src) end
 
     if status == 'rejected' and announce and Config.LogSecureRejections ~= false then
-        print(('[whip_core:secure] REFUSED %s from %s (src %s): %s%s')
+        print(('[whip_core:secure] REFUSED %s from %s (src %s): %s%s%s')
             :format(eventName, playerName, tostring(src), tostring(reason or 'no reason given'),
+                reason == DEAD_REASON and (' (' .. DEAD_HINT .. ')') or '',
                 held > 0 and (' (+%d more held back in the last %ds)'):format(held, REJECT_LOG_WINDOW_MS // 1000) or ''))
     end
 
@@ -998,6 +1008,17 @@ end
 ---@return boolean
 local function refusedWhileDead(schema, player)
     return player ~= nil and player.isDead == true and not schema.whileDead and not schema.ace
+end
+
+--- Tell a developer an event refused them for being dead, and the fix (DEAD_HINT): in game, that
+--- refusal otherwise looks like an event that does nothing. Developer mode only, once per event per
+--- player every 5 s (the console line's throttle, on a key of its own).
+---@param name string  the event or callback
+---@param src number
+local function sayDead(name, src)
+    if not DevTools.isAllowed(src) then return end
+    if not rejectionAnnounce('dead:' .. tostring(name), src) then return end
+    ShowError(src, ('%s refused while dead: %s'):format(tostring(name), DEAD_HINT))
 end
 
 --- A position in any of the shapes a schema may use: three numbers, a vector3 or vector4, or a
@@ -1498,7 +1519,8 @@ function SecureEvent(eventName, schema, handler)
 
         -- Dead players act on nothing unless the schema says otherwise (refusedWhileDead).
         if refusedWhileDead(regSchema, player) then
-            refuseEvent(reg, eventName, src, 'Player is dead', args)
+            refuseEvent(reg, eventName, src, DEAD_REASON, args)
+            sayDead(eventName, src)
             return
         end
 
@@ -1693,7 +1715,8 @@ function SecureCallback(name, schema, handler)
 
         -- Dead players act on nothing unless the schema says otherwise (refusedWhileDead).
         if refusedWhileDead(schema, player) then
-            return refuse(reg, src, 'Player is dead')
+            sayDead(name, src)
+            return refuse(reg, src, DEAD_REASON)
         end
 
         -- Param validation (under pcall — see validateAll)

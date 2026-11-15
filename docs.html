@@ -2301,7 +2301,7 @@ end)</code></pre>
 
 <h3 id="guide-secure-who">Who may send it</h3>
 <ul>
-  <li><strong>Dead players are refused</strong> unless <code>whileDead = true</code> (closing a screen, respawn).</li>
+  <li><strong>Dead players are refused</strong> unless <code>whileDead = true</code> (closing a screen, respawn). The console line for that refusal names <code>whileDead</code>, and so does a toast with developer mode on.</li>
   <li><strong><code>ace = 'myresource.admin'</code></strong>: that ACE only, dead or alive. <code>whip.devtools</code> also needs developer mode on.</li>
   <li><strong><code>permission = 'mygarage.manage'</code></strong>: that <a href="#permissions">permission</a> only.</li>
   <li><strong><code>requirePlayer = false</code></strong>: also before a character loads; <code>player</code> is then <code>nil</code>.</li>
