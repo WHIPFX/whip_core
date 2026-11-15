@@ -369,7 +369,7 @@ local function enter(sess, pad)
         Focus.release(HOLD)
         SendNUIMessage({ action = 'promptTypingClose' })
         sess.layout = layoutOf(sess)
-        local first = keyNamed(sess, sess.focus) or keyNamed(sess, sess.numeric and '1' or 'q')
+        local first = keyNamed(sess, sess.focus) or keyNamed(sess, sess.numeric and '1' or 'q') or sess.layout.keys[1]
         sess.focus = first.k
         sess.cx, sess.cy = centre(first)
         sess.dir, sess.dirSince, sess.dirFired = nil, 0, 0
