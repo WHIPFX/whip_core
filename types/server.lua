@@ -706,7 +706,7 @@ function whip_core:GetTagged(tag) end
 ---     if not exports.whip_core:HasItem(source, 'wrench', 1) then return false, 'You need a wrench' end
 ---@param eventName string Event name to register
 ---@param schema WhipSecureSchema Validation schema
----@param handler fun(source: number, player: table, ...: any): (false?, string?) Event handler with sanitized params; `false, 'why'` refuses
+---@param handler fun(source: number, player: table, ...: any): (boolean?, string?) Event handler with sanitized params; `false, 'why'` refuses (anything else is ok)
 ---@return boolean ok
 ---@return string? reason
 function whip_core:SecureEvent(eventName, schema, handler) end

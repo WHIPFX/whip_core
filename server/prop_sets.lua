@@ -99,7 +99,7 @@ local function readProp(p, i, owner)
         if not num(d) or d < 1 or d > MAX_DRAW then
             return nil, ('prop %d: drawDistance is metres, 1 to %d'):format(i, MAX_DRAW)
         end
-        w.dd = math.floor(d)
+        w.dd = math.floor(d --[[@as number]])
     end
     if p.weapon ~= nil then
         if not WeaponCatalog.modelOf(p.weapon) then

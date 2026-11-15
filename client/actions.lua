@@ -773,7 +773,8 @@ local function mountPrompt(entry)
             follow = function()
                 local px, py, pz = ridePoint(at)
                 if not px then return nil end
-                return px, py, pz, (GetEntityHeading(entityOf(at)) + turn) % 360.0
+                -- (A point came back, so the entity is there.)
+                return px, py, pz, (GetEntityHeading(entityOf(at) --[[@as integer]]) + turn) % 360.0
             end
         else
             follow = function() return ridePoint(at) end

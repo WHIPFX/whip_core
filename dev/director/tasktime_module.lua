@@ -11,6 +11,7 @@ local at = { x = 1.0, y = 2.0, z = 3.0, heading = 0.0 }
 local function compile(kind, list)
     local plan, probs = DirectorTasks.compile(kind, { list = list, after = 'stop' }, {}, nil)
     assertNotNil(plan, 'compiled: ' .. tostring(type(probs) == 'table' and probs[1] and probs[1].why))
+    ---@cast plan -nil
     return plan.steps
 end
 
@@ -102,6 +103,7 @@ RegisterTestModule({
                 variants = { { id = 'v2', name = 'B', nodes = {}, links = {}, world = { thing('n2', 'npc', { { k = 'a', t = 'wait', sec = 0 } }) } } } }
             local doc = DirectorDoc.load(raw)
             assertNotNil(doc, 'it loads')
+            ---@cast doc -nil
             assertEqual(doc.taskTimes, DirectorDoc.TASK_TIMES, 'and is marked')
             assertEqual(raw.world[1].def.tasks.list[1].sec, 0, 'what was saved is not changed')
             local s = compile('npc', doc.world[1].def.tasks.list)
@@ -120,14 +122,14 @@ RegisterTestModule({
             local raw = { format = DirectorDoc.FORMAT, name = 'New', vars = {}, nodes = {}, links = {}, taskTimes = DirectorDoc.TASK_TIMES,
                 world = { { id = 'n1', kind = 'npc', def = { tasks = { list = { { k = 'a', t = 'shootAt', target = 'nearest', sec = 0 },
                                                                                { k = 'b', t = 'goTo', at = at, giveUp = 0 } } } } } } }
-            local doc = DirectorDoc.load(raw)
+            local doc = DirectorDoc.load(raw) --[[@as table]]
             local s = compile('npc', doc.world[1].def.tasks.list)
             assertEqual(s[1].ms, NO_END, 'a 0: no end')
             assertEqual(s[2].giveUpMs, NO_END, 'a give-up of 0: never')
             -- (The editor sends back what it was given, the mark with it: an old one, once read, is not read as old again.)
-            local old = DirectorDoc.load({ format = DirectorDoc.FORMAT, name = 'Old', vars = {}, nodes = {}, links = {}, world = {} })
+            local old = DirectorDoc.load({ format = DirectorDoc.FORMAT, name = 'Old', vars = {}, nodes = {}, links = {}, world = {} }) --[[@as table]]
             old.world[1] = { id = 'n1', kind = 'npc', def = { tasks = { list = { { k = 'a', t = 'shootAt', target = 'nearest', sec = 0 } } } } }
-            local again = DirectorDoc.load(old)
+            local again = DirectorDoc.load(old) --[[@as table]]
             assertEqual(compile('npc', again.world[1].def.tasks.list)[1].ms, NO_END, 'a 0 set after the mark: no end')
         end },
     },

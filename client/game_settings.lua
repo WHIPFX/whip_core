@@ -73,6 +73,7 @@ local wantRow = nil           -- 'tab:row' chosen on the page last: GTA's menu f
 local asked = nil             -- the hash of the question GTA is asking now, or nil
 local answering = false       -- an answer to GTA's question is being pressed: another waits for the next question
 local chosen = nil            -- the answer pressed to the question up: { question, ends }, until that question goes
+---@type table[]|nil
 local tabs = nil              -- GTA's tabs as read: { index, id, label }
 local labels = {}             -- [tab id] = { [row id] = name }: they do not change while the menu is up
 --- [tab id] = { [row id] = { count, texts, list } }: a row's options (a slider's: its top). A list's are read again after
@@ -606,6 +607,7 @@ RegisterNUICallback('gameSettingsOpen', function(data, cb)
     end
     cb(job(function(g)
         ensureOpen(g)
+        ---@cast tabs -nil   -- read by ensureOpen, which throws when it cannot
         local list = {}
         for i, t in ipairs(tabs) do list[i] = { id = t.id, label = t.label, keys = t.id == KEYS_TAB } end
         local first = tabArg(data)
@@ -698,6 +700,7 @@ end
 RegisterNUICallback('gameSettingsUndo', function(data, cb)
     cb(job(function(g)
         ensureOpen(g)
+        ---@cast tabs -nil   -- read by ensureOpen, which throws when it cannot
         local shown = tabArg(data)
         if type(data) == 'table' and data.all == true then
             for tab, rows in pairs(pending) do
