@@ -421,9 +421,14 @@ end, false)
 -- HUD visibility, pushed rather than polled:
 --   IsAnyScreenOpen()  client/inventory.lua fires whip_core:ui:stateChanged on every transition.
 --   PlayerIsDead       client/death.lua calls the function below after each write.
+--   frontendUp         GTA's own pause menu, which no event announces: the radar loop below looks five times a second.
 
 --- What the panel was last told, so an unchanged signal sends nothing.
 local hudLastHidden = false
+
+--- GTA's own pause menu is up (its frontend: the map, its settings pages). The game draws it under this page, so the
+--- gauges, the minimap and the vehicle dial (which follow the status HUD's fade) would sit on top of it.
+local frontendUp = false
 
 --- True between this file's own playerLoaded and playerLogout handlers. Not PlayerLoaded alone: handlers for
 --- one event run in no set order, so another file's logout handler could refresh the HUD back over character select.
@@ -436,8 +441,8 @@ function WhipRefreshHudVisibility()
     if not PlayerLoaded or not hudUp then return end
 
     -- A screen, not merely "busy": a progress bar leaves the HUD up. Asked as the HUD (true): a screen opened
-    -- with keepHud (the phone) leaves it up too.
-    local shouldHide = (IsAnyScreenOpen and IsAnyScreenOpen(true)) or PlayerIsDead
+    -- with keepHud (the phone) leaves it up too. GTA's pause menu hides it as one of whip's screens does.
+    local shouldHide = (IsAnyScreenOpen and IsAnyScreenOpen(true)) or PlayerIsDead or frontendUp
     if shouldHide == hudLastHidden then return end
 
     hudLastHidden = shouldHide
@@ -572,6 +577,13 @@ CreateThread(function()
             DisplayRadar(radarFor(want))
         end
         MinimapShow(want and not RadarDebugOpen and not IsPauseMenuActive())
+
+        -- GTA's pause menu came up or went (a BOOL native, as above): the HUD goes with it, or comes back.
+        local frontend = IsPauseMenuActive() and true or false
+        if frontend ~= frontendUp then
+            frontendUp = frontend
+            WhipRefreshHudVisibility()
+        end
 
         -- The health/armour hide is reasserted whether or not the radar is up. Scaleform calls are not cheap,
         -- so only on a model swap, on the radar coming back, and on a 5 s heartbeat.
