@@ -29,8 +29,8 @@
 // ========================================
 
 import { WhipPanel, WP } from '../whip-panel.js';
-import { nuiCallback, propImageUrl } from '../utils.js';
-import { propPicker, propPortrait, itemPicker, personList, knownCharName, avatar, inventoryPreview } from './pickers.js';
+import { nuiCallback, propImageUrl, itemImageUrl } from '../utils.js';
+import { propPicker, propPortrait, itemPicker, personList, knownCharName, avatar, inventoryPreview, iconInput } from './pickers.js';
 import { plural, fixed } from './format.js';
 
 let containers = {};     // keyed by String(containerId)
@@ -70,11 +70,31 @@ const SIZES = [
     { key: 'huge', title: 'Huge', slots: 80, weight: 500 },
 ];
 
+// 'one' and 'nobody' are the keys a container kept before there could be several (a draft's openBy).
 const OPEN_BY = [
     { key: 'anyone', title: 'Anyone near it', text: 'Whoever walks up to it can open it.' },
-    { key: 'one', title: 'One character', text: 'Only the character you pick. Everyone else is told no.' },
-    { key: 'nobody', title: 'Nobody: locked', text: 'Locked shut. Only an admin can open it, from this page.' },
+    { key: 'one', title: 'Specific players only', text: 'Only the players you pick. Everyone else is told no.' },
+    { key: 'nobody', title: 'Admin only', text: 'Locked shut. Only an admin can open it, from this page.' },
 ];
+
+/* WHO CAN OPEN IT, SEVERAL (Josh): its rules' `charIds`, any one of whom may open it (Containers.canAccess: the
+   doors' shape). An older one's single accessCharId joins them, and is cleared when it is saved. Any other rule a
+   resource gave it (jobs, items, ace) is kept as it is. */
+
+/** Its rules' charIds, as numbers, whichever shape they came in (a list; a set if a script wrote one). */
+function ruleIds(req) {
+    const ids = req && req.charIds;
+    if (!ids || typeof ids !== 'object') return [];
+    return (Array.isArray(ids) ? ids : Object.values(ids)).map(Number).filter((n) => n > 0);
+}
+
+/** Its rules other than who: a resource's, which the wizard never changes. null for none. */
+function otherRules(req) {
+    if (!req || typeof req !== 'object') return null;
+    const out = {};
+    for (const k of Object.keys(req)) if (k !== 'charIds') out[k] = req[k];
+    return Object.keys(out).length ? out : null;
+}
 
 // ---- the lists it reads ----
 
@@ -165,7 +185,7 @@ function newDraft(pos) {
         slots: 20,
         maxWeight: 100,
         openBy: 'anyone',
-        access: 0,
+        access: [],          // the charIds who may open it, when openBy is 'one' (Specific players only)
         owner: 0,
         onlyItems: false,
         allowed: [],
@@ -174,6 +194,7 @@ function newDraft(pos) {
 
 function draftFrom(c) {
     const allowed = allowedNames(c.allowedItems);
+    const access = [...new Set((Number(c.accessCharId) > 0 ? [Number(c.accessCharId)] : []).concat(ruleIds(c.requirements)))];
     return {
         editing: String(c.containerId),
         name: c.name || '',
@@ -185,8 +206,8 @@ function draftFrom(c) {
         here: null,
         slots: Number(c.slots) || 20,
         maxWeight: Number(c.maxWeight) || 100,
-        openBy: c.locked ? 'nobody' : (Number(c.accessCharId) > 0 ? 'one' : 'anyone'),
-        access: Number(c.accessCharId) || 0,
+        openBy: c.locked ? 'nobody' : (access.length ? 'one' : 'anyone'),
+        access,
         owner: Number(c.ownerCharId) || 0,
         onlyItems: allowed.length > 0,
         allowed,
@@ -213,7 +234,8 @@ function changedParts(d) {
     if (Math.abs(a.x - b.x) > 0.005 || Math.abs(a.y - b.y) > 0.005 || Math.abs(a.z - b.z) > 0.005
         || Math.abs(a.heading - b.heading) > 0.05) out.add('where');
     if (Number(d.slots) !== Number(o.slots) || Number(d.maxWeight) !== Number(o.maxWeight)) out.add('holds');
-    if (d.openBy !== o.openBy || (d.openBy === 'one' && d.access !== o.access) || d.owner !== o.owner) out.add('access');
+    const sameIds = (x, y) => x.slice().sort((m, n) => m - n).join() === y.slice().sort((m, n) => m - n).join();
+    if (d.openBy !== o.openBy || (d.openBy === 'one' && !sameIds(d.access, o.access)) || d.owner !== o.owner) out.add('access');
     if (d.onlyItems !== o.onlyItems || (d.onlyItems && d.allowed.slice().sort().join() !== o.allowed.slice().sort().join())) out.add('items');
     return out;
 }
@@ -226,8 +248,12 @@ function spotText(p) {
 }
 
 function openText(d, then) {
-    if (d.openBy === 'nobody') return 'nobody: locked (an admin can, from here)';
-    if (d.openBy === 'one') return d.access ? 'only ' + personText(d.access, then) : 'one character, not picked';
+    if (d.openBy === 'nobody') return 'admin only: locked (an admin can, from here)';
+    if (d.openBy === 'one') {
+        if (!d.access.length) return 'specific players, none picked yet';
+        const names = d.access.slice(0, 3).map((id) => personText(id, then));
+        return 'only ' + names.join(', ') + (d.access.length > 3 ? ', and ' + (d.access.length - 3) + ' more' : '');
+    }
     return 'anyone near it';
 }
 
@@ -238,8 +264,9 @@ function itemsText(d) {
     return 'only ' + names.join(', ') + (d.allowed.length > 4 ? ', and ' + (d.allowed.length - 4) + ' more' : '');
 }
 
-/** One row per part, each with `rowOpts(stepKey)`'s button (Change). `changed` marks what a Save writes. */
-function summaryRows(body, d, rowOpts, changed, then) {
+/** One row per part, each with `rowOpts(stepKey)`'s button (Change). `changed` marks what a Save writes. `noMap`: the
+ *  page shows its map beside the rows instead (a container's page), so none under Where. */
+function summaryRows(body, d, rowOpts, changed, then, noMap) {
     const mark = (key, text) => (changed && changed.has(key) ? text + '  ·  changed' : text);
     const row = (label, key, status, detail) => {
         body.appendChild(WP.statusRow({ label, status, detail: mark(key, detail), ...rowOpts(key) }));
@@ -249,12 +276,12 @@ function summaryRows(body, d, rowOpts, changed, then) {
     row('Model', 'model', d.prop || d.noProp ? 'ok' : 'err',
         d.noProp && !d.prop ? 'no prop: only its prompt' : propName(d.prop) + (propName(d.prop) !== d.prop ? '  ·  ' + d.prop : ''));
     row('Where', 'where', d.spot ? 'ok' : 'err', d.spot ? spotText(d.spot) : 'not set');
-    if (d.spot) body.appendChild(WP.place({ x: d.spot.x, y: d.spot.y, name: d.name.trim() || 'The container' }));
+    if (d.spot && !noMap) body.appendChild(WP.place({ x: d.spot.x, y: d.spot.y, name: d.name.trim() || 'The container' }));
     row('Holds', 'holds', 'ok', plural(Number(d.slots), 'slot') + ', up to ' + fixed(d.maxWeight, 0) + ' kg');
-    row('Who can open it', 'access', d.openBy === 'one' && !d.access ? 'err' : d.openBy === 'nobody' ? 'warn' : 'ok', openText(d, then));
+    row('Who can open it', 'access', d.openBy === 'one' && !d.access.length ? 'err' : d.openBy === 'nobody' ? 'warn' : 'ok', openText(d, then));
     row('Belongs to', 'access', d.owner ? 'ok' : 'off', d.owner ? personText(d.owner, then) : 'nobody in particular');
     row('Takes', 'items', d.onlyItems && !d.allowed.length ? 'err' : 'ok', itemsText(d));
-    if (d.requirements) {
+    if (otherRules(d.requirements)) {
         body.appendChild(WP.statusRow({ label: 'Set by a resource', status: 'warn',
             detail: 'it also has rules a resource gave it (who may open it); those stay as they are' }));
     }
@@ -344,9 +371,13 @@ function renderDetail() {
     left.style.flex = '1';
     left.style.minWidth = '0';
     left.appendChild(WP.el('div', 'wp-item-sub', 'Container #' + c.containerId + '  ·  Change opens the wizard on that part'));
-    summaryRows(left, d, (key) => ({ action: 'cmEdit', arg: key, actionLabel: 'Change' }), null, again);
+    summaryRows(left, d, (key) => ({ action: 'cmEdit', arg: key, actionLabel: 'Change' }), null, again, true);
     split.appendChild(left);
-    split.appendChild(propPortrait(d.prop, true, 'box'));
+    // On the right, its picture and, under it, where it is on the map (Josh: out from under Where).
+    const side = WP.el('div', 'cw-detail-side');
+    side.appendChild(propPortrait(d.prop, true, 'box'));
+    if (d.spot) side.appendChild(WP.place({ x: d.spot.x, y: d.spot.y, name: d.name.trim() || 'The container' }));
+    split.appendChild(side);
     body.appendChild(split);
 
     // Destructive far-left, the rest far-right — Delete never neighbours the others.
@@ -479,14 +510,15 @@ function choices(body, list, value, action) {
 
 // ---- step: name & model ----
 
+/** Its name's box, as the props' search looks (an icon, and what to type in it). */
 function nameField() {
-    const name = WP.input({ placeholder: 'e.g. Evidence locker', value: draft.name, inputAction: 'cwName' });
-    name.maxLength = 100;
-    return WP.field('Name', name);
+    const box = iconInput({ icon: 'name', placeholder: 'Name container…', value: draft.name, inputAction: 'cwName' });
+    box.querySelector('input').maxLength = 100;
+    return box;
 }
 
-/** Its name and its prop on one page (Josh): the Name box beside the props' search, then the props as the new-vehicle
- *  wizard shows its cars. */
+/** Its name and its prop on one page (Josh): the name, the props' search and a model typed on one row, then the props
+ *  as the new-vehicle wizard shows its cars. */
 function stepNameModel(body) {
     if (draft.noProp && !draft.prop) {
         body.appendChild(WP.statusRow({ label: 'No prop', status: 'warn',
@@ -509,7 +541,6 @@ function stepNameModel(body) {
         value: draft.prop,
         first: 'crates',
         lead: nameField(),
-        side: [hint(WP.el('div'), 'It is placed as it is pictured; Where puts it on the ground.')],
         onPick: (m) => { draft.prop = m; },
     });
     body.appendChild(pick.root);
@@ -521,9 +552,10 @@ function stepNameModel(body) {
 
 /** No catalog to show (it never arrived): the model by name. */
 function stepModelTyped(body) {
-    body.appendChild(nameField());
-    const prop = WP.input({ placeholder: DEFAULT_PROP, value: draft.prop, inputAction: 'cwProp' });
-    body.appendChild(WP.field('Model', prop, true));
+    const top = WP.el('div', 'wp-pick-top');
+    top.appendChild(nameField());
+    top.appendChild(iconInput({ icon: 'model', placeholder: 'Input model name…', value: draft.prop, inputAction: 'cwProp' }));
+    body.appendChild(top);
     hint(body, 'The props\' pictures could not be read, so type the model\'s name.');
 }
 
@@ -589,29 +621,63 @@ function stepHolds(body) {
 /** Which of the two the list on the right picks: 'access' (who can open it) or 'owner' (whose it is). */
 let whoFor = 'access';
 
-/** One of the two, on the left: their face and name, or that nobody is picked yet. A click points the list at it. */
-function whoRow(key, label, id, clearAction) {
+/** One of the two, on the left: the face and name of who is picked, or that nobody is. A click points the list at it.
+ *  `sub`: what it says under its name (who is picked, or what to do). */
+function whoRow(key, label, faceId, sub, clearAction) {
     const row = WP.el('div', 'wp-list-item wp-has-icon cw-who' + (whoFor === key ? ' active' : ''));
     row.dataset.action = 'cwWho';
     row.dataset.arg = key;
-    const name = id ? charName(id, paintAccess) : '';
-    row.appendChild(avatar(name || (id ? '#' + id : ''), undefined, id || undefined));
+    const name = faceId ? charName(faceId, paintAccess) : '';
+    row.appendChild(avatar(name || (faceId ? '#' + faceId : ''), undefined, faceId || undefined));
     const top = WP.el('div', 'wp-item-top');
     top.appendChild(WP.el('span', 'wp-item-title', label));
-    if (id) top.appendChild(WP.btn('Clear', clearAction, 'ghost'));
+    if (clearAction) top.appendChild(WP.btn('Clear', clearAction, 'ghost'));
     row.appendChild(top);
-    row.appendChild(WP.el('div', 'wp-item-sub', id ? personText(id, paintAccess)
-        : whoFor === key ? 'nobody yet: pick from the list' : 'nobody yet: click to pick'));
+    row.appendChild(WP.el('div', 'wp-item-sub', sub));
     return row;
 }
 
-/** Access's left column below the choices, and the list's title and lit row: after a pick, in place, so the list keeps
+/** A picked one's row (a player, an item): its picture and name. Over the picture it turns red and the name asks
+ *  "Remove?"; a click on the picture runs `action` with `arg` (Josh: no Remove button). */
+function removableRow(picture, name, action, arg, round) {
+    const row = WP.el('div', 'cw-picked-row');
+    const photo = WP.el('button', 'cw-picked-photo' + (round ? ' cw-picked-face' : ''));
+    photo.type = 'button';
+    photo.dataset.action = action;
+    photo.dataset.arg = arg;
+    photo.setAttribute('aria-label', 'Remove ' + name);
+    photo.appendChild(picture);
+    const label = WP.el('span', 'cw-picked-name', name);
+    photo.addEventListener('mouseenter', () => { label.textContent = 'Remove?'; row.classList.add('cw-removing'); });
+    photo.addEventListener('mouseleave', () => { label.textContent = name; row.classList.remove('cw-removing'); });
+    row.appendChild(photo);
+    row.appendChild(label);
+    return row;
+}
+
+/** One player who can open it, under its row. */
+function accessRow(id) {
+    const name = charName(id, paintAccess);
+    return removableRow(avatar(name || '#' + id, undefined, id), (name || 'Character') + '  #' + id, 'cwUnaccess', String(id), true);
+}
+
+/** Access's left column below the choices, and the list's title and lit rows: after a pick, in place, so the list keeps
  *  its scroll and its search. */
 function paintAccess() {
     if (!els.cwWho || !els.cwWho.isConnected) return;
     els.cwWho.innerHTML = '';
-    if (draft.openBy === 'one') els.cwWho.appendChild(whoRow('access', 'Can open it', draft.access, 'cwClearAccess'));
-    els.cwWho.appendChild(whoRow('owner', 'Belongs to (optional)', draft.owner, 'cwClearOwner'));
+    if (draft.openBy === 'one') {
+        const n = draft.access.length;
+        els.cwWho.appendChild(whoRow('access', 'Can open it', draft.access[0],
+            n ? plural(n, 'player') + (whoFor === 'access' ? ': click in the list to add or take away' : ': click to add more')
+              : whoFor === 'access' ? 'nobody yet: pick from the list' : 'nobody yet: click to pick',
+            n ? 'cwClearAccess' : null));
+        for (const id of draft.access) els.cwWho.appendChild(accessRow(id));
+    }
+    els.cwWho.appendChild(whoRow('owner', 'Belongs to (optional)', draft.owner,
+        draft.owner ? personText(draft.owner, paintAccess)
+            : whoFor === 'owner' ? 'nobody yet: pick from the list' : 'nobody yet: click to pick',
+        draft.owner ? 'cwClearOwner' : null));
     els.cwWhoTitle.textContent = whoFor === 'access' ? 'Pick who can open it' : 'Pick whose it is';
     if (els.cwPeople) els.cwPeople.refresh();
 }
@@ -627,7 +693,7 @@ function stepAccess(body) {
 
     choices(left, OPEN_BY, draft.openBy, 'cwOpenBy');
     left.appendChild(WP.el('div', 'wp-section-title', 'Who'));
-    els.cwWho = WP.el('div', 'wp-list wp-flush');
+    els.cwWho = WP.el('div', 'cw-who-list');   // not a .wp-list: that scrolls on its own; the column scrolls instead
     left.appendChild(els.cwWho);
     hint(left, 'Belongs to is a record, for you and for scripts. Who can open it is the rule above.');
 
@@ -635,10 +701,16 @@ function stepAccess(body) {
     right.appendChild(els.cwWhoTitle);
     els.cwPeople = personList({
         id: 'cw-people',
-        picked: (id) => id === (whoFor === 'access' ? draft.access : draft.owner),
+        picked: (id) => (whoFor === 'access' ? draft.access.indexOf(id) >= 0 : id === draft.owner),
         onPick: (p) => {
             charNames[p.charId] = p.name;
-            if (whoFor === 'access') draft.access = p.charId; else draft.owner = p.charId;
+            if (whoFor === 'access') {
+                // Several: a click adds them, a click again takes them off.
+                const at = draft.access.indexOf(p.charId);
+                if (at >= 0) draft.access.splice(at, 1); else draft.access.push(p.charId);
+            } else {
+                draft.owner = p.charId;
+            }
             paintAccess();
         },
         onLoad: paintAccess,   // the two rows' names, now known
@@ -649,7 +721,17 @@ function stepAccess(body) {
 
 // ---- step: items ----
 
-/** Items' side column: the choice, what it takes, and the items picked (a click takes one away). */
+/** One item picked: its picture and its name (removableRow, above). */
+function pickedRow(k) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.dataset.itemImg = '';   // the item icon's own two-step fallback (utils.js)
+    img.dataset.itemKey = k;
+    img.src = itemImageUrl(k, items[k] && items[k].img);
+    return removableRow(img, (items[k] && items[k].name) || k, 'cwUnpick', k, false);
+}
+
+/** Items' side column: the choice, then the items picked. */
 function paintItemsSide() {
     const side = els.cwItemsSide;
     if (!side || !side.isConnected) return;
@@ -658,18 +740,10 @@ function paintItemsSide() {
         { key: 'any', title: 'Anything', text: 'It takes whatever fits.' },
         { key: 'only', title: 'Only the items picked', text: 'Pick them from the pictures. Anything else is refused.' },
     ], draft.onlyItems ? 'only' : 'any', 'cwOnly');
-    side.appendChild(WP.statusRow({ label: 'Takes', status: draft.onlyItems && !draft.allowed.length ? 'err' : 'ok',
-        detail: itemsText(draft) }));
     if (!draft.onlyItems || !draft.allowed.length) return;
-    side.appendChild(WP.el('div', 'wp-section-title', 'Picked'));
     const scroll = WP.el('div', 'wp-pick-scroll');
-    const list = WP.el('div', 'wp-list wp-flush');
-    for (const k of draft.allowed) {
-        const row = WP.listItem({ title: (items[k] && items[k].name) || k, sub: k, pill: 'Remove' });
-        row.dataset.action = 'cwUnpick';
-        row.dataset.arg = k;
-        list.appendChild(row);
-    }
+    const list = WP.el('div', 'cw-picked');
+    for (const k of draft.allowed) list.appendChild(pickedRow(k));
     scroll.appendChild(list);
     side.appendChild(scroll);
 }
@@ -729,7 +803,7 @@ function canLeave(from) {
         if (!(w >= 0 && w <= 10000)) return 'Max weight is 0 to 10,000 kg';
         return true;
     }
-    if (from === 'access') return d.openBy !== 'one' || d.access ? true : 'Pick the character who can open it';
+    if (from === 'access') return d.openBy !== 'one' || d.access.length ? true : 'Pick at least one player who can open it';
     if (from === 'items') return !d.onlyItems || d.allowed.length ? true : 'Pick at least one item, or let it take anything';
     return true;
 }
@@ -743,7 +817,15 @@ function firstProblem() {
     return null;
 }
 
-/** What the server is sent: the old form's fields exactly (client/containers.lua passes them on). */
+/** Its rules as saved: a resource's own kept, and who may open it as their charIds. `false` clears them. Admin only
+ *  keeps its players, so unlocking it later hands it back to them. */
+function rulesOf(d) {
+    const others = otherRules(d.requirements);
+    if (d.openBy === 'anyone' || !d.access.length) return others || false;
+    return Object.assign({}, others || {}, { charIds: d.access.slice() });
+}
+
+/** What the server is sent (client/containers.lua passes it on). */
 function payloadOf(d) {
     return {
         containerId: d.editing,
@@ -752,9 +834,9 @@ function payloadOf(d) {
         slots: Number(d.slots),
         maxWeight: Number(d.maxWeight),
         ownerCharId: d.owner || 0,
-        // Locked keeps its access character (the server holds the two apart), so unlocking it later
-        // hands it back to that one character, as the old form did.
-        accessCharId: d.openBy === 'anyone' ? 0 : d.access,
+        // Who may open it is its rules' list now; the one-character column is cleared (its player is in the list).
+        accessCharId: 0,
+        requirements: rulesOf(d),
         locked: d.openBy === 'nobody',
         // A container made with no prop, still with none picked, keeps having none.
         prop: d.prop || (d.editing ? undefined : DEFAULT_PROP),
@@ -953,7 +1035,13 @@ WhipPanel.registerSection({
             redrawStep();
         },
         cwWho: (el) => { whoFor = el.dataset.arg === 'access' ? 'access' : 'owner'; paintAccess(); },
-        cwClearAccess: () => { if (draft) { draft.access = 0; whoFor = 'access'; paintAccess(); } },
+        cwClearAccess: () => { if (draft) { draft.access = []; whoFor = 'access'; paintAccess(); } },
+        cwUnaccess: (el) => {
+            if (!draft) return;
+            const at = draft.access.indexOf(Number(el.dataset.arg));
+            if (at >= 0) draft.access.splice(at, 1);
+            paintAccess();
+        },
         cwClearOwner: () => { if (draft) { draft.owner = 0; whoFor = 'owner'; paintAccess(); } },
         cwOnly: (el) => { if (draft) { draft.onlyItems = el.dataset.arg === 'only'; redrawStep(); } },
         cwUnpick: (el) => {

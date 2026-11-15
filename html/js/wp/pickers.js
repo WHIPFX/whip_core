@@ -60,6 +60,35 @@ function searchBox(placeholder, value, onInput) {
     return wrap;
 }
 
+/** Icons for a box's left end, the magnifier's size and weight (whip-panel.js SEARCH_ICON). Fixed, no data. */
+const BOX_ICONS = {
+    // A tag: what it is called.
+    name: '<svg viewBox="0 0 17 17" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"'
+        + ' stroke-linejoin="round" aria-hidden="true"><path d="M2.2 2.2h5.4l7.2 7.2-5.6 5.6-7.2-7.2z"/>'
+        + '<circle cx="5.3" cy="5.3" r="1.1"/></svg>',
+    // A box, three sides showing: a model.
+    model: '<svg viewBox="0 0 17 17" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"'
+        + ' stroke-linejoin="round" aria-hidden="true"><path d="M8.5 1.6l6.2 3.4v7l-6.2 3.4-6.2-3.4V5z"/>'
+        + '<path d="M2.3 5l6.2 3.4L14.7 5M8.5 8.4v7"/></svg>',
+};
+
+/**
+ *   row.appendChild(iconInput({ icon: 'name', placeholder: 'Name container…', value, inputAction: 'cwName' }));
+ *
+ * A box with an icon at its left end and what it is for in it: the search box's look, for anything typed (a name, a
+ * model), so boxes on one row read alike. `icon`: 'name' or 'model'. The input is the box's `input`.
+ */
+export function iconInput(opts) {
+    const wrap = WP.el('label', 'wp-search');
+    const icon = WP.el('span', 'wp-search-icon');
+    icon.innerHTML = BOX_ICONS[opts.icon] || '';
+    wrap.appendChild(icon);
+    const input = WP.input({ placeholder: opts.placeholder, value: opts.value, inputAction: opts.inputAction });
+    input.setAttribute('aria-label', opts.placeholder || '');
+    wrap.appendChild(input);
+    return wrap;
+}
+
 /** THE TILES FILL THE ROW: as many columns as fit at `min` px, each as wide as shares the row out (--wp-tile-w).
  *  Worked out here because the tiles are flex-wrap, not a grid (.wp-tiles: CEF's hit-testing in a zoomed grid). */
 function fillRow(grid, min) {
@@ -232,14 +261,15 @@ export function propPortrait(model, hasImage, glyph) {
  *       catalog: { categories, props }, // the furnisher's (Furnisher.catalog, via a section's call)
  *       value: 'prop_box_wood02a',      // the one picked, or ''
  *       first: 'crates',                // the chip it opens on, the first time
- *       lead: el,                       // optional: beside the search, on its row (the container wizard's Name)
+ *       lead: el,                       // optional: on the search's row, with the model's box after them (the
+ *                                       //   container wizard's Name); without it, the model's box is in the side
  *       side: [el, ...],                // under the large picture: the caller's buttons
  *       onPick(model),
  *   });
  *
  * The vehicle picker's way with props (Josh: the same layout as the new-vehicle wizard's): a search across everything,
- * the pictures filling the row, and beside them the one picked large, the Model box (a model the catalog does not list
- * can still be typed there) and small chips per category under it.
+ * the pictures filling the row, and beside them the one picked large with small chips per category under it. A model
+ * the catalog does not list can still be typed, in the model's box.
  */
 export function propPicker(opts) {
     const cat = opts.catalog || {};
@@ -268,11 +298,17 @@ export function propPicker(opts) {
         onChange: (k) => { state.chip = k; draw(); } });
     tabs.root.classList.add('wp-tabs-small');
     const search = searchBox('Search props…', state.search, (q) => { state.search = q; draw(); });
+    // Not in the catalog? Typed here: any model the game has (the server checks the name's shape,
+    // and the world step says plainly if it will not load).
+    const typedBox = iconInput({ icon: 'model', placeholder: 'Input model name…', value: byModel[value] ? '' : value });
+    const typed = typedBox.querySelector('input');
     if (opts.lead) {
-        // Two boxes on one row: the long search alone wasted most of it.
+        // Three boxes on one row, alike (Josh): the caller's (a name), the search, a model typed. The long search
+        // alone wasted most of it.
         const top = WP.el('div', 'wp-pick-top');
         top.appendChild(opts.lead);
         top.appendChild(search);
+        top.appendChild(typedBox);
         main.appendChild(top);
     } else {
         main.appendChild(search);
@@ -293,9 +329,6 @@ export function propPicker(opts) {
     const sub = WP.el('div', 'wp-item-sub');
     side.appendChild(sub);
 
-    // Not in the catalog? Typed here: any model the game has (the server checks the name's shape,
-    // and the world step says plainly if it will not load).
-    const typed = WP.input({ placeholder: 'or type a model name', value: byModel[value] ? '' : value });
     typed.addEventListener('change', () => {
         const m = typed.value.trim().toLowerCase();
         if (!/^[a-z0-9_]{3,80}$/.test(m)) return;
@@ -304,7 +337,7 @@ export function propPicker(opts) {
         drawHero();
         if (opts.onPick) opts.onPick(value);
     });
-    side.appendChild(WP.field('Model', typed, true));
+    if (!opts.lead) side.appendChild(typedBox);
     side.appendChild(tabs.root);
     for (const el of opts.side || []) side.appendChild(el);
 

@@ -1402,9 +1402,59 @@
 .cw-right > .wp-section-title:first-child, .cw-left > .wp-section-title:first-child { margin-top: 0; }
 /* The container opened, at about the inventory's own size: its column's width, not the whole pane's. */
 .cw-right .wp-inv-preview { max-width: 440px; }
-/* Who it is for, on the left of Access: a row each; the one the list on the right picks for is lit. */
+/* Who it is for, on the left of Access: a row each; the one the list on the right picks for is lit, its players under
+   it. All in the column's own scroll. */
+.cw-who-list { display: flex; flex-direction: column; gap: var(--ui-sp-2); flex: 0 0 auto; }
 .cw-who { cursor: pointer; }
 .cw-who.active, .cw-who.active:hover { background: var(--ui-slot-bg-chosen); border-color: var(--ui-ring); }
+/* A container's page: its picture, and under it where it is on the map, down the right of its summary. */
+.wp-info-split > .cw-detail-side { flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column; gap: var(--ui-sp-4); }
+.cw-detail-side > .wp-pick-hero.wp-hero-square { flex: 0 0 auto; height: 220px; align-items: center; padding: var(--ui-sp-5); box-sizing: border-box; }
+.cw-detail-side .wp-place { width: 100%; height: auto; aspect-ratio: 16 / 9; margin: 0; }
+/* Items' picked list (wp/containers.js pickedRow): each item's picture and name. Over the picture it goes red and the
+   name asks "Remove?"; a click on the picture takes it away. */
+.cw-picked { display: flex; flex-direction: column; gap: var(--ui-sp-3); }
+.cw-picked-row { display: flex; align-items: center; gap: var(--ui-sp-4); min-width: 0; }
+.cw-picked-photo {
+    position: relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    padding: var(--ui-sp-2);
+    box-sizing: border-box;
+    background: var(--ui-slot-bg-filled);
+    border: var(--ui-slot-line-w) solid var(--ui-slot-line-filled);
+    border-radius: var(--ui-radius-slot);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.16s var(--ui-ease);
+}
+.cw-picked-photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* A player's: their face, round. */
+.cw-picked-photo.cw-picked-face { padding: 0; border-radius: 50%; }
+.cw-picked-face > .wp-avatar { width: 100%; height: 100%; }
+.cw-who-list > .cw-picked-row { padding-left: var(--ui-sp-5); }
+.cw-picked-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ui-error);
+    opacity: 0;
+    transition: opacity 0.16s var(--ui-ease);
+}
+.cw-picked-photo:hover { border-color: var(--ui-error); }
+.cw-picked-photo:hover::after { opacity: 0.55; }
+.cw-picked-photo:focus-visible { outline: 2px solid var(--ui-ring); outline-offset: 1px; }
+.cw-picked-name {
+    min-width: 0;
+    font-size: var(--ui-fs-sm);
+    font-weight: var(--ui-fw-semibold);
+    color: var(--ui-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cw-removing .cw-picked-name { color: var(--ui-error); }
 
 /* Raw data, readable: an item's metadata where it is more than a few plain values. */
 .wp-code {
