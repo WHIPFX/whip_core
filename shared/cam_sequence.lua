@@ -26,7 +26,7 @@
 --   glide    a smooth curve to the next key, turning smoothly too. GLIDING KEYS IN A ROW ARE ONE MOVE:
 --            the camera flows through the keys between at speed, never stopping (still at each key at its
 --            time), and the first key's `ease` says how the whole glide starts and ends
---   spring   nfsmw's feel: quick at first, settling into the next shot (`rate`, about 3 gentle to 8 brisk)
+--   spring   quick at first, settling into the next shot (`rate`, about 3 gentle to 8 brisk)
 --   orbit    between two orbits of one subject: swings round it instead of cutting across
 --
 -- A move between two shots that both look at one subject keeps looking at it all the way. An orbit swing

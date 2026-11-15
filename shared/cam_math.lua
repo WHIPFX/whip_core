@@ -7,9 +7,8 @@
 -- client/cam_shots.lua (where each kind of shot puts the camera) and shared/cam_sequence.lua (a timeline
 -- of shots, and how the camera gets from one to the next).
 --
--- WHERE IT COMES FROM. The smoothing, the angle that never turns the long way round and the shake are
--- nfsmw_camera's (its Util and Shake, MW's own NearestAngle among them); the box fit is whip_autos'
--- showroom camera's; the curve through points is the old Camera Creator's (client/camera.lua).
+-- WHERE IT COMES FROM. The box fit is whip_autos' showroom camera's; the curve through points is the old
+-- Camera Creator's (client/camera.lua).
 --
 -- A ROTATION is GTA's camera rotation, order 2: pitch (x, up is positive), roll (y), yaw (z, heading,
 -- counter-clockwise). As a matrix that is Rz(yaw) * Rx(pitch) * Ry(roll) on the axes right = +x,
@@ -47,19 +46,13 @@ local lerp = CamMath.lerp
 function CamMath.wrap180(a) return (a + 180.0) % 360.0 - 180.0 end
 local wrap180 = CamMath.wrap180
 
---- Whichever of b, b + 360 and b - 360 is closest to a (MW's NearestAngle, speed.exe 0x0046B980):
---- the way to turn from a to b without going the long way round. Correct by one turn only, so keep b
---- in the same range as a (wrap180) when it can run away.
+--- b, give or take whole turns, as close to a as it can be: the way to turn from a to b without going the
+--- long way round.
 ---@param a number
 ---@param b number
 ---@return number
 function CamMath.nearestAngle(a, b)
-    local d0 = abs(a - b)
-    local bUp, bDn = b + 360.0, b - 360.0
-    local d1, d2 = abs(a - bUp), abs(a - bDn)
-    if d0 <= d1 and d0 <= d2 then return b end
-    if d1 <= d2 then return bUp end
-    return bDn
+    return a + wrap180(b - a)
 end
 local nearestAngle = CamMath.nearestAngle
 
@@ -68,7 +61,7 @@ function CamMath.lerpAngle(a, b, t)
     return wrap180(lerp(a, nearestAngle(a, wrap180(b)), t))
 end
 
---- Towards a target at `rate`, the same at any frame rate: what nfsmw's springs are made of. A higher
+--- Towards a target at `rate`, the same at any frame rate: what the camera's springs are made of. A higher
 --- rate is a tighter spring (about 63% of the way in 1/rate seconds).
 ---@param current number
 ---@param target number
@@ -331,7 +324,7 @@ end
 -- Shake
 -- ============================================
 --
--- nfsmw's: two sines a little out of tune on each axis, so it reads as a camera in hands (or on a car)
+-- Two sines a little out of tune on each axis, so it reads as a camera in hands (or on a car)
 -- rather than one clean wobble. On the turn, not the place: shaking where the camera IS pushes it
 -- through walls; shaking where it LOOKS reads the same on screen.
 

@@ -284,7 +284,7 @@ function Camera.letterbox()
     DrawRect(0.5, 1.0 - LETTERBOX * 0.5, 1.0, LETTERBOX, 0, 0, 0, 255)
 end
 
--- A viewer turning an orbit (`control`): nfsmw's feel. Look input turns it, the wheel (or a pad's
+-- A viewer turning an orbit (`control`). Look input turns it, the wheel (or a pad's
 -- triggers) zooms, and it eases after the hand rather than jumping with it.
 local CTL_YAW, CTL_PITCH = 16.0, 10.0          -- degrees per unit of mouse input
 local CTL_PAD_YAW, CTL_PAD_PITCH = 150.0, 75.0 -- degrees a second, a stick all the way over
