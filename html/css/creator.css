@@ -809,19 +809,14 @@
 
 /* ---- on a controller ----
    One legend or the other: the mouse's on a keyboard, the pad's buttons on a pad (creator.js,
-   buildPadLegend). The highlight is a white ring round the control, the inventory's look: it shows
-   only on a pad, so a mouse never sees it. */
+   buildPadLegend). The pad's mouse is the shared circle (css/pad-cursor.css): it rings what it is
+   over white, only on a pad, so a mouse never sees it. */
 .cr-pad-hints { display: none; }
 html[data-input="pad"] #creator .cr-mouse-hints { display: none; }
 html[data-input="pad"] #creator .cr-pad-hints { display: flex; }
 .cr-pad-hints .cr-hint { gap: 5px; }
 .cr-pad-hints .cr-hint[hidden] { display: none; }
 .cr-pad-glyph { display: block; flex: none; width: auto; height: 17px; }
-
-html[data-input="pad"] #creator .pad-focus {
-    outline: 2px solid var(--ui-pill);
-    outline-offset: 2px;
-}
 
 /* ---- the mouse ----
    Fills are the highlights and sit under the linework; .on lights one up while

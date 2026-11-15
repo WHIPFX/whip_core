@@ -20,13 +20,17 @@
 //       targets,              // a selector: what the circle can press
 //       floats?,              // a selector for the screen's boxes outside root (its menus, its search)
 //       modal?,               // () => a box the D-pad stays in, or null
+//       start?,               // () => where the circle first appears (the thing picked), else the screen's middle
 //       menu?,                // ({ at, items: [{ label, run }] }) => shows a list's choices; default: its own
-//       press?,               // (node) => true when A there is the screen's own business (nothing pressed)
+//       press?,               // (node) => true when A there is the screen's own business (nothing pressed);
+//                             //   asked first, before a field opens the keyboard (a slider the screen drags)
 //       label?, afterType?,   // (field) => the keyboard's title; (field) => after a field is typed into
 //       onGrid?, pan?, zoomAt?,   // a screen with a grid: (node) => on it?; (dx, dy); (x, y, k)
 //   });
 //   cur.analog(a)   cur.nav(nav) -> true if it was the cursor's   cur.hide()   cur.letGo()
 //   cur.on()   cur.over() -> the thing under the circle   cur.at() -> the node under it   cur.typeInto(field)
+//   cur.pos() -> { x, y }   cur.moveTo(node) puts the circle on it   cur.refresh() rings what is under it again
+//   (after the screen redrew under a still circle)
 //
 // Drawn by css/pad-cursor.css, only on a pad: .pad-cursor, and .pad-over on what it would press.
 // ========================================
@@ -166,8 +170,15 @@ export function createPadCursor(o) {
         if (st.on) return;
         st.on = true;
         live.add(gate);
-        st.x = innerWidth * 0.6;
-        st.y = innerHeight * 0.5;
+        const s = o.start && o.start();
+        if (s && s.getClientRects().length) {
+            const b = screenRect(s);
+            st.x = (b.left + b.right) / 2;
+            st.y = (b.top + b.bottom) / 2;
+        } else {
+            st.x = innerWidth * 0.6;
+            st.y = innerHeight * 0.5;
+        }
         el.classList.add('on');
         place();
     }
@@ -207,13 +218,13 @@ export function createPadCursor(o) {
         show();
         const n = hit();
         if (!n) return;
+        if (o.press && o.press(n)) { st.eaten = true; return; }
         const field = n.closest('input, textarea, select');
         if (field && !field.disabled && !field.readOnly && field.type !== 'checkbox' && field.type !== 'radio') {
             st.eaten = true;
             if (field.tagName === 'SELECT') pickFrom(field); else typeInto(field, true);
             return;
         }
-        if (o.press && o.press(n)) { st.eaten = true; return; }
         st.down = { x: st.x, y: st.y, target: n };
         el.classList.add('down');
         fire('mousedown', n, { button: 0, buttons: 1 });
@@ -280,6 +291,7 @@ export function createPadCursor(o) {
         openPadKeyboard({
             title: labelOf(field),
             value: field.value,
+            placeholder: field.placeholder || '',
             numeric: field.type === 'number',
             maxLength: field.maxLength > 0 ? field.maxLength : 0,
             fromA: fromA === true,
@@ -500,6 +512,18 @@ export function createPadCursor(o) {
         on: () => st.on,
         over: () => st.over,
         at: () => (st.on ? document.elementFromPoint(st.x, st.y) : null),
+        pos: () => ({ x: st.x, y: st.y }),
+        /** The circle onto a node (shown first if it is in a list that scrolls). */
+        moveTo(node) {
+            if (!node || !node.getClientRects().length) return;
+            show();
+            if (scrollerAt(node.parentElement)) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            const b = screenRect(node);
+            st.x = Math.min(innerWidth - 1, Math.max(0, (b.left + b.right) / 2));
+            st.y = Math.min(innerHeight - 1, Math.max(0, (b.top + b.bottom) / 2));
+            place();
+        },
+        refresh: reover,
         menuOpen: () => !!st.menu,
         typeInto,
     };

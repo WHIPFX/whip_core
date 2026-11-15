@@ -1,7 +1,8 @@
 import { NuiRouter } from './router.js';
 import { nuiCallback, clothingIconUrl, clothingPictureName, editorNamesUrl, tattooImageUrl, escapeHtml } from './utils.js';
 import { padGlyph } from './pad-glyphs.js';
-import { openPadKeyboard, padKeyboardOpen } from './pad-keyboard.js';
+import { padKeyboardOpen } from './pad-keyboard.js';
+import { createPadCursor } from './pad-cursor.js';
 import {
     GLYPHS, FEATURE_GROUPS, featureSign, CATEGORIES,
     CLUSTER_ORDER, CLUSTER_LABELS,
@@ -835,17 +836,6 @@ function disarmOutfitDelete() {
     outfitDeleteArmed = null;
     const el = $('cr-outfit-delete');
     if (el) { el.classList.remove('armed'); el.textContent = 'Delete outfit'; }
-}
-
-/** On a pad, the name is typed on whip's keyboard (the creator's key scope stands down while it is up). */
-function typeOutfitName(el) {
-    openPadKeyboard({
-        title: 'Outfit name', value: el.value, placeholder: el.placeholder, maxLength: OUTFIT_NAME_MAX,
-        onDone: (text) => {
-            const box = $('cr-outfit-name');
-            if (creatorOpen && box) box.value = text.trim();
-        },
-    });
 }
 
 /** What the active category's pictures are: { kind, slot } for clothing and hair, else null. */
@@ -1944,113 +1934,82 @@ function disarmCancel() {
 // ========================================
 // CONTROLLER
 //
-// A white ring is the highlight. The D-pad (or the left stick) steps it to the nearest control that
-// way — a group, a tab, a colour, a slider, a card, Undress, Cancel, Save — and A presses it with the
-// same click the mouse makes, so there is one path for both. On a slider, left and right move it.
-// LB / RB step through the categories (all of them, group to group). X is Undress. Y takes the ring
-// to Save and A then saves: never by accident, because Save hands a new character to the world. B is
-// Cancel, as Esc is (twice: the first press only asks). The right stick turns round the character and
-// moves the shot up and down it, the triggers zoom: the mouse's own camInput. The buttons are listed in
-// the panel's foot, where the mouse's are on a keyboard. A on an outfit's name box opens whip's keyboard
-// (typeOutfitName).
-//
-// The scope takes the sticks as numbers (analog), so the left stick's directions are made here, with
-// client/controller.lua's own pause and repeat.
+// A pad gets a mouse: the shared circle (pad-cursor.js), the inventory's, the shops' and /whip's. The left
+// stick moves it, slowing over anything it can press, and A presses what is under it with the mouse's own
+// click, so there is one path for both. The D-pad jumps it to the nearest control that way. Sliders and
+// the face's shape pad are dragged: A held on one, the circle moves it (it slows over it, for a fine
+// touch); left / right on the D-pad over a slider nudge it a step. LB / RB step through the categories
+// (all of them, group to group). X is Undress. Y puts the circle on Save and A then saves: never by
+// accident, because Save hands a new character to the world. B is Cancel, as Esc is (twice: the first
+// press only asks). The right stick scrolls the cards when the circle is on them and turns round the
+// character anywhere else (up and down the body too); the triggers zoom: the mouse's own camInput. An
+// outfit's name box opens whip's keyboard. The buttons are listed in the panel's foot, where the mouse's
+// are on a keyboard, and A's and the right stick's words follow what is under the circle.
 // ========================================
 
-const PAD_STICK = 0.6;          // the left stick past this is a direction, as the D-pad
-const PAD_REPEAT_DELAY = 380;   // a held direction: the pause before it repeats (as client/controller.lua)
-const PAD_REPEAT_RATE = 110;    // and how often after that
 const PAD_ORBIT = 520;          // the right stick at a full push turns the camera as a mouse drag of this many px a second
 const PAD_HEIGHT = 320;         // up and down the body, the same
 const PAD_ZOOM = 6;             // a trigger pulled all the way: this many mouse-wheel steps a second
-const PAD_SLIDE_FAST = 5;       // a slider held over: its step grows from 1 to this
+const PAD_SLIDE_FAST = 5;       // a slider nudged with the D-pad and held: its step grows from 1 to this
+const PAD_PAN = 1000;           // what pad-cursor.js hands pan() at a full push of the right stick, px a second (its PAN)
 
-const PAD_FOCUSABLE = '.cr-group, .cr-tab, .cr-subtab, .cr-tex, .cr-swatch, .cr-range, .cr-input, .cr-obtn, .cr-card, .cr-dress, .cr-btn';
+const PAD_TARGETS = '.cr-group, .cr-tab, .cr-subtab, .cr-tex, .cr-swatch, .cr-range, .cr-pad, .cr-input, .cr-obtn, .cr-card, .cr-dress, .cr-btn';
 
 const ctl = {
-    key: null,                                      // the highlighted control, as ctlKeyOf: a redraw keeps it
-    stick: { x: 0, y: 0, rx: 0, ry: 0, lt: 0, rt: 0 },
+    stick: { lt: 0, rt: 0 },    // the triggers: the camera's zoom
     raf: 0, last: 0,
-    dir: null, dirSince: 0, dirFired: 0,            // the left stick's direction and its repeat clock
-    slideAt: 0, slideRun: 0,                        // a slider's last step and how many in a row
+    drag: null,                 // A held on a slider or the shape pad: what the circle drags
+    dragAt: null,               // where the circle was when the drag was last applied
+    slideAt: 0, slideRun: 0,    // a slider's last nudge and how many in a row
+    legendQueued: false,
 };
 
-/** A control in words that outlive a redraw: the grid, the band and the rail are rebuilt all the time. */
-function ctlKeyOf(el) {
-    if (!el) return null;
-    if (el.id) return '#' + el.id;
-    const d = el.dataset;
-    return [d.action || d.input || '', d.cat || d.cluster || d.idx || d.value || d.key || '', d.target || ''].join('|');
-}
+const cursor = createPadCursor({
+    name: 'creator',
+    root: () => $('creator'),
+    shown: () => creatorOpen && !padKeyboardOpen(),
+    targets: PAD_TARGETS,
+    // First seen on the card worn, else the first card, else the category's tab.
+    start: () => {
+        const grid = $('cr-grid');
+        return grid.querySelector('.cr-card.selected') || grid.querySelector('.cr-card')
+            || document.querySelector('#cr-rail .cr-tab.active');
+    },
+    // A on a slider or the shape pad: held, the circle drags it (the mouse's pointer events do not come from
+    // a pad, and a slider is not typed into).
+    press: (n) => {
+        const el = n.closest('.cr-range, .cr-pad');
+        if (!el) return false;
+        ctl.drag = el;
+        ctl.dragAt = null;
+        dragTo();
+        ctlRun();
+        return true;
+    },
+    label: (field) => (field.id === 'cr-outfit-name' ? 'Outfit name' : null),
+    // The right stick off the cards: round the character, and up and down it.
+    pan: (dx, dy) => {
+        inOrbitX += -dx / PAD_PAN * PAD_ORBIT;
+        inPan += dy / PAD_PAN * PAD_HEIGHT;
+        queueCamInput();
+    },
+});
 
-/** Every control the ring can stop on now (shown, not disabled). */
-function ctlItems() {
-    return Array.from(document.getElementById('creator').querySelectorAll(PAD_FOCUSABLE))
-        .filter(el => !el.disabled && !el.hidden && el.getClientRects().length > 0);
-}
-
-function ctlFocusEl() {
-    if (!ctl.key) return null;
-    return ctlItems().find(el => ctlKeyOf(el) === ctl.key) || null;
-}
-
-/** Ring the highlighted control (and only it). Run again after anything redraws: the class goes with
- *  the old element. */
-function ctlMark() {
-    const el = ctlFocusEl();
-    document.querySelectorAll('#creator .pad-focus').forEach(x => { if (x !== el) x.classList.remove('pad-focus'); });
-    if (el) el.classList.add('pad-focus');
-}
-
-function ctlSetFocus(el) {
-    if (!el) return;
-    ctl.key = ctlKeyOf(el);
-    ctlMark();
-    const grid = $('cr-grid');
-    if (grid.contains(el)) { revealIn(grid, el, false); return; }
-    const body = el.closest('.cr-band-body');
-    if (body) revealIn(body, el, false);
-}
-
-/** Where the ring starts: the card worn, else the first card, else the category's tab. */
-function ctlStartEl() {
-    const grid = $('cr-grid');
-    return grid.querySelector('.cr-card.selected') || grid.querySelector('.cr-card')
-        || document.querySelector('#cr-rail .cr-tab.active') || ctlItems()[0] || null;
-}
-
-/** How far apart two ranges are along one axis: 0 when they overlap. */
-function ctlGap(a1, a2, b1, b2) { return Math.max(0, Math.max(a1, b1) - Math.min(a2, b2)); }
-
-/** The nearest control from `cur` in a direction: its distance that way, plus three times how far it
- *  is off to the side, so a grid steps along its row or column. One too far to the side is not "that
- *  way" at all (right at the grid's edge does not jump across the screen to Save). */
-function ctlNearest(cur, dir) {
-    const a = cur.getBoundingClientRect();
-    const ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2;
-    let best = null, bestScore = Infinity;
-    for (const el of ctlItems()) {
-        if (el === cur) continue;
-        const b = el.getBoundingClientRect();
-        const bx = (b.left + b.right) / 2, by = (b.top + b.bottom) / 2;
-        let along, across, reach;
-        if (dir === 'down' || dir === 'up') {
-            if (dir === 'down' ? by <= ay + 1 : by >= ay - 1) continue;
-            along = dir === 'down' ? b.top - a.bottom : a.top - b.bottom;
-            across = ctlGap(a.left, a.right, b.left, b.right);
-            reach = 3 * Math.max(a.width, b.width);
-        } else {
-            if (dir === 'right' ? bx <= ax + 1 : bx >= ax - 1) continue;
-            along = dir === 'right' ? b.left - a.right : a.left - b.right;
-            across = ctlGap(a.top, a.bottom, b.top, b.bottom);
-            reach = 3 * Math.max(a.height, b.height);
-        }
-        if (across > reach) continue;
-        const score = Math.max(0, along) + across * 3;
-        if (score < bestScore) { bestScore = score; best = el; }
-    }
-    return best;
+/** The slider or shape pad being dragged, to where the circle is now: a slider by its own input event
+ *  (the mouse's path), the pad as a pointer on it would. */
+function dragTo() {
+    const el = ctl.drag;
+    if (!el || !el.isConnected) { ctl.drag = null; return; }
+    const p = cursor.pos();
+    if (ctl.dragAt && ctl.dragAt.x === p.x && ctl.dragAt.y === p.y) return;
+    ctl.dragAt = p;
+    if (el.classList.contains('cr-pad')) { padApply(el, p.x, p.y); return; }
+    const r = el.getBoundingClientRect();
+    const min = Number(el.min), max = Number(el.max);
+    const v = Math.round(min + clamp((p.x - r.left) / (r.width || 1), 0, 1) * (max - min));
+    if (String(v) === el.value) return;
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 /** Move a slider one step (more when held), through its own input event: the mouse's path. */
@@ -2065,114 +2024,105 @@ function ctlSlide(el, sign) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function ctlStep(dir) {
-    const cur = ctlFocusEl();
-    if (!cur) { ctlSetFocus(ctlStartEl()); return; }
-    if (cur.classList.contains('cr-range') && (dir === 'left' || dir === 'right')) {
-        ctlSlide(cur, dir === 'right' ? 1 : -1);
-        return;
-    }
-    let next = ctlNearest(cur, dir);
-    // Down off the last row drawn: the next rows are drawn as the grid scrolls (appendGridChunk).
-    if (dir === 'down' && $('cr-grid').contains(cur) && gridRendered < gridCards.length
-        && !(next && $('cr-grid').contains(next))) {
-        appendGridChunk();
-        next = ctlNearest(cur, dir);
-    }
-    if (next) ctlSetFocus(next);
-}
-
-/** LB / RB: the category before or after, across the groups. The ring follows into the new grid (the
- *  card worn) unless it was on the tabs, where it stays on the new tab. */
+/** LB / RB: the category before or after, across the groups. The circle stays where it is (the tabs
+ *  are where they were; on the cards it is over the new category's); what is under it is ringed again. */
 function ctlCategory(step) {
     if (!activeCategory) return;
-    const cur = ctlFocusEl();
-    const onTabs = !!(cur && cur.closest('#cr-rail, #cr-groups'));
     const i = CATEGORIES.indexOf(activeCategory);
     selectCategory(CATEGORIES[(i + step + CATEGORIES.length) % CATEGORIES.length].id);
-    ctlSetFocus(onTabs ? document.querySelector('#cr-rail .cr-tab.active') : ctlStartEl());
+    requestAnimationFrame(() => cursor.refresh());
 }
 
 function ctlNav(nav) {
     if (!creatorOpen) return;
-    if (nav === 'up' || nav === 'down' || nav === 'left' || nav === 'right') { ctlStep(nav); return; }
-    if (nav === 'back') { attemptCancel(); return; }
-    if (nav === 'tabPrev') { ctlCategory(-1); return; }
-    if (nav === 'tabNext') { ctlCategory(1); return; }
+    const over = cursor.on() ? cursor.over() : null;
+    // Over a slider, left and right nudge it a step; the circle stays.
+    if (over && over.classList.contains('cr-range') && (nav === 'left' || nav === 'right')) {
+        ctlSlide(over, nav === 'right' ? 1 : -1);
+        return;
+    }
+    // Down from the last row of cards drawn: the next rows are drawn first (they come as the grid scrolls).
+    if (nav === 'down' && over && $('cr-grid').contains(over) && gridRendered < gridCards.length) appendGridChunk();
+    // X is Undress here (the cursor's X is a right click, which nothing in the creator has).
     if (nav === 'buttonX') {
         const dress = document.querySelector('#cr-undress .cr-dress');
         if (dress) dress.click();
         return;
     }
-    if (nav === 'buttonY') { ctlSetFocus($('cr-save')); return; }
-    if (nav === 'select') {
-        const el = ctlFocusEl();
-        if (!el) { ctlSetFocus(ctlStartEl()); return; }
-        if (el.classList.contains('cr-input')) { typeOutfitName(el); return; }
-        if (!el.classList.contains('cr-range')) el.click();   // a slider moves with left and right
-    }
+    if (cursor.nav(nav)) { ctlLegend(); return; }
+    if (nav === 'back') { cursor.letGo(); attemptCancel(); return; }
+    if (nav === 'tabPrev') { ctlCategory(-1); return; }
+    if (nav === 'tabNext') { ctlCategory(1); return; }
+    if (nav === 'buttonY') { cursor.moveTo($('cr-save')); ctlLegend(); return; }
+    // 'select' is A's press, which the cursor has from navAnalog's `a`, with its release.
 }
 
 // ---- the sticks and triggers ----
 
+/** The left stick, A and the right stick go to the circle; the triggers and a drag are the creator's. */
 function ctlAnalog(a) {
-    ctl.stick = { x: +a.x || 0, y: +a.y || 0, rx: +a.rx || 0, ry: +a.ry || 0, lt: +a.lt || 0, rt: +a.rt || 0 };
+    cursor.analog(a);
+    if (ctl.drag && a.a !== true) ctl.drag = null;   // A let go: the drag is over
+    ctl.stick = { lt: +a.lt || 0, rt: +a.rt || 0 };
     ctlRun();
+    ctlLegend();
 }
 
 function ctlRun() {
     if (ctl.raf || !creatorOpen) return;
-    const s = ctl.stick;
-    if (!(s.x || s.y || s.rx || s.ry || s.lt || s.rt) && !ctl.dir) return;
+    if (!(ctl.stick.lt || ctl.stick.rt) && !ctl.drag) return;
     ctl.last = performance.now();
     ctl.raf = requestAnimationFrame(ctlFrame);
 }
 
-/** The left stick as a direction (the D-pad's repeat), and the camera from the right stick and the
- *  triggers, folded into the mouse's camInput batch. Runs only while something is pushed. */
+/** The triggers' zoom, folded into the mouse's camInput batch, and a drag following the circle. Runs
+ *  only while a trigger is pulled or A holds a slider or the pad. */
 function ctlFrame(now) {
     ctl.raf = 0;
     if (!creatorOpen) return;
     const dt = Math.min(0.05, Math.max(0, (now - ctl.last) / 1000));
     ctl.last = now;
     const s = ctl.stick;
-
-    let dir = null;
-    if (Math.hypot(s.x, s.y) > PAD_STICK) {
-        dir = Math.abs(s.x) > Math.abs(s.y) ? (s.x > 0 ? 'right' : 'left') : (s.y > 0 ? 'up' : 'down');   // stick up is +y
-    }
-    if (dir !== ctl.dir) {
-        ctl.dir = dir;
-        ctl.dirSince = ctl.dirFired = now;
-        if (dir) ctlStep(dir);
-    } else if (dir && now - ctl.dirSince >= PAD_REPEAT_DELAY && now - ctl.dirFired >= PAD_REPEAT_RATE) {
-        ctl.dirFired = now;
-        ctlStep(dir);
-    }
-
-    if (s.rx || s.ry || s.lt || s.rt) {
-        inOrbitX += s.rx * PAD_ORBIT * dt;     // right: round the way a mouse dragged right goes
-        inPan += s.ry * PAD_HEIGHT * dt;       // up: the shot looks higher up the body
+    if (s.lt || s.rt) {
         inZoom += (s.lt - s.rt) * PAD_ZOOM * dt;   // RT in, LT out (the wheel down is out)
         queueCamInput();
     }
-
-    if (dir || s.rx || s.ry || s.lt || s.rt) {
-        ctl.raf = requestAnimationFrame(ctlFrame);
-    }
+    if (ctl.drag) dragTo();
+    if (s.lt || s.rt || ctl.drag) ctl.raf = requestAnimationFrame(ctlFrame);
 }
 
 // ---- the buttons, in the panel's foot ----
 
 const PAD_LEGEND = [
-    { b: ['a'], t: 'Choose' },
+    { b: ['ls'], t: 'Move' },
+    { b: ['a'], t: 'Choose', label: 'cr-pad-a' },
     { b: ['lb', 'rb'], t: 'Category' },
-    { b: ['rs'], t: 'Camera' },
+    { b: ['rs'], t: 'Camera', label: 'cr-pad-rs' },
     { b: ['lt', 'rt'], t: 'Zoom' },
     { b: ['x'], t: 'Undress', id: 'cr-pad-x' },
     { b: ['y'], t: 'Save' },
     { b: ['b'], t: 'Cancel', label: 'cr-pad-b' },
 ];
+
+/** A's and the right stick's words, for what is under the circle: a slider or the pad is dragged, the
+ *  name box typed into; over the cards (or the band's colours when they scroll) the right stick scrolls
+ *  them. Once a frame at most. */
+function ctlLegend() {
+    if (ctl.legendQueued) return;
+    ctl.legendQueued = true;
+    requestAnimationFrame(() => {
+        ctl.legendQueued = false;
+        const over = cursor.on() ? cursor.over() : null;
+        const at = cursor.at();
+        const a = ctl.drag || (over && over.matches('.cr-range, .cr-pad')) ? 'Drag'
+            : over && over.matches('.cr-input') ? 'Type' : 'Choose';
+        const list = at && at.closest('#cr-grid, .cr-band-body');
+        const rs = list && list.scrollHeight > list.clientHeight ? 'Scroll' : 'Camera';
+        const aEl = $('cr-pad-a'), rsEl = $('cr-pad-rs');
+        if (aEl && aEl.textContent !== a) aEl.textContent = a;
+        if (rsEl && rsEl.textContent !== rs) rsEl.textContent = rs;
+    });
+}
 
 (function buildPadLegend() {
     const box = $('cr-pad-hints');
@@ -2191,11 +2141,11 @@ const PAD_LEGEND = [
         item.appendChild(word);
         box.appendChild(item);
     }
-    // A redraw takes the ring's class with the old element: put it back on the new one.
+    // A redraw under a still circle takes the ring with the old element: ring what is there now.
     new MutationObserver(() => {
-        if (ctl.key && creatorOpen && !ctl.markQueued) {
+        if (creatorOpen && cursor.on() && !ctl.markQueued) {
             ctl.markQueued = true;
-            requestAnimationFrame(() => { ctl.markQueued = false; ctlMark(); });
+            requestAnimationFrame(() => { ctl.markQueued = false; cursor.refresh(); ctlLegend(); });
         }
     }).observe(document.querySelector('#creator .cr-scale'), { childList: true, subtree: true });
 })();
@@ -2233,7 +2183,7 @@ NuiRouter.register('openCreator', (d) => {
     delete paletteCache.makeup;
     disarmCancel();
     undressed = false;           // every open starts dressed
-    ctl.key = null;              // the ring starts on the card worn, at the first press
+    cursor.hide();               // the circle comes back on the card worn, at the first push or press
     buildUndress();
     loadNames();                 // the first open only: kept after that
     buildRail();
@@ -2277,8 +2227,9 @@ NuiRouter.register('creatorPictures', (d) => {
 NuiRouter.register('closeCreator', () => {
     creatorOpen = false;
     if (ctl.raf) { cancelAnimationFrame(ctl.raf); ctl.raf = 0; }
-    ctl.stick = { x: 0, y: 0, rx: 0, ry: 0, lt: 0, rt: 0 };
-    ctl.dir = null;
+    ctl.stick = { lt: 0, rt: 0 };
+    ctl.drag = null;
+    cursor.hide();
     disarmCancel();
     disarmOutfitDelete();
     document.getElementById('creator').classList.remove('open');
