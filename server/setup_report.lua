@@ -14,6 +14,8 @@ local SETTLE_MS, CAP_MS = 5000, 60000
 
 --- The oldest Legacy game build whip's car, prop and clothing lists are made for.
 local MIN_LEGACY_BUILD = 3407
+--- The build the Legacy recipe sets, which the report suggests when sv_enforceGameBuild is missing.
+local LEGACY_BUILD = 3889
 
 --- Resources that do a job whip does itself: running beside whip, each fights it.
 local CLASHES = {
@@ -109,7 +111,7 @@ local function gather()
         local build = tonumber(GetConvar('sv_enforceGameBuild', ''))
         if not build then
             add('fix', 'No sv_enforceGameBuild: players get FiveM\'s default game build, without the cars, props and clothes'
-                .. ' whip\'s lists name. Add to server.cfg: sv_enforceGameBuild %d (or a newer build)', MIN_LEGACY_BUILD)
+                .. ' whip\'s lists name. Add to server.cfg: sv_enforceGameBuild %d (or a newer build)', LEGACY_BUILD)
         elseif build < MIN_LEGACY_BUILD then
             add('fix', 'sv_enforceGameBuild is %d: whip\'s lists are made for %d or newer. Raise it in server.cfg', build,
                 MIN_LEGACY_BUILD)
