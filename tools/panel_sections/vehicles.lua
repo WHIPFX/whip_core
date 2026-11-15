@@ -136,7 +136,22 @@ RegisterNUICallback('vmCatalog', function(_, cb)
     end)
 end)
 
---- The wizard's Create: the car, its owner, its extras and where it goes, at once.
+--- The wizard's Owner step: everyone in the game, you first.
+RegisterNUICallback('vmOnlinePlayers', function(_, cb)
+    CreateThread(function()
+        local res = Callback('whip_core:vmOnlinePlayers')
+        cb(type(res) == 'table' and res or {})
+    end)
+end)
+
+--- Where you stand, for the wizard's map while the car is to be spawned here (your own game's reading: the server
+--- puts it there itself when it is made).
+RegisterNUICallback('vwHere', function(_, cb)
+    local c = GetEntityCoords(PlayerPedId())
+    cb({ x = c.x, y = c.y })
+end)
+
+--- The wizard's Create: the car, its owner and where it goes, at once.
 RegisterNUICallback('vmWizardCreate', function(data, cb)
     CreateThread(function()
         local res = Callback('whip_core:vmWizardCreate', data)

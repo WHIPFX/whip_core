@@ -1794,6 +1794,20 @@ button.pmg-car:hover .pmg-car-go { color: var(--ui-text); transform: translateX(
 .vm-stat-row > .wp-field { flex: 1 1 0; min-width: 0; margin: 0; }
 .vm-stat-row > .wp-btn { flex: 0 0 auto; }
 
+/* The new-vehicle wizard's Where and Create (wp/vehicles.js splitInto): what is chosen on the left, what it comes to
+   on the right: the map (your position, the garage), and on Create the car's picture and whose it will be side by
+   side over it, so the column fits the step without scrolling. */
+.vw-split { display: flex; gap: var(--ui-sp-7); align-items: flex-start; }
+/* Owner: who is in the game, as long as it is (a .wp-list fills its column), the search for anyone else under it. */
+.vw-people { flex: 0 0 auto; }
+.vw-main { flex: 1 1 0; min-width: 0; }
+.vw-side { flex: 0 0 520px; min-width: 0; display: flex; flex-direction: column; gap: var(--ui-sp-4); }
+.vw-side .wp-place { width: 100%; height: auto; aspect-ratio: 16 / 9; margin: 0; }
+.vw-glance { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--ui-sp-4); align-items: center; }
+.vw-glance .vw-car { width: 100%; max-width: none; height: auto; aspect-ratio: 16 / 9; object-fit: contain; }
+.vw-glance .vw-owner { padding: 0; min-width: 0; }
+.vw-glance .vm-owner-name { overflow-wrap: anywhere; }
+
 /* ---- Toggles: a few short things, each on or off (what a rank may do) ----
    Off is the mid grey, not the dim one: a choice that is off is still live, one click from on, and
    has to be read to be switched. Dim is for what cannot be used (:disabled, below). On is the

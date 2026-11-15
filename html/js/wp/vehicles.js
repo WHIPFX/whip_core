@@ -16,16 +16,19 @@
 // Mutation callbacks (vmSelect, vmAction, vmActOn, vmSetStat…) live in tools/panel_sections/vehicles.lua; the
 // server's half is server/vehicle_manager.lua.
 //
-// A NEW VEHICLE IS MADE WITH A WIZARD (the vehicle, the character, optional extras like model storage,
-// and the garage it goes into, if any), WP.stepper in the list's place as the garage and shop wizards are:
+// A NEW VEHICLE IS MADE WITH A WIZARD (the vehicle, the character, and where it goes), WP.stepper in the list's
+// place as the garage and shop wizards are:
 //
 //   Vehicle  every model the catalog has, as pictures, a chip per class (pickers.js vehiclePicker; vmCatalog)
-//   Owner    found by name or character id (pickers.js personSearch)
-//   Extras   optional: its own plate, and its own trunk and glovebox sizes — or its model's (the Vehicle Adjustments
-//            page: the model's row, its category's, else config.lua, shown in the boxes). Its stats start at their
-//            defaults (its page edits them)
-//   Where    in a garage (any; a property's only if the owner may use it), or out here beside you
-//   Create   the lot, checked: whip_core:vmWizardCreate, and the page opens on the new car
+//   Owner    everyone in the game, you first, as the Player Manager lists them (vmOnlinePlayers); anyone else found
+//            by name or character id (pickers.js personSearch)
+//   Where    spawned here beside you (the default), or in a garage (any; a property's only if the owner may use it):
+//            the choices on the left, the map on the right (your position, or the garage picked)
+//   Create   the lot, checked, on the left; on the right the car's picture, the map and whose it will be. Then
+//            whip_core:vmWizardCreate, and the page opens on the new car
+//
+// Its plate is made up for it and its trunk and glovebox are its model's (the Vehicle Adjustments page); its stats
+// start at their defaults (its page edits them).
 //
 // With nothing picked, the pane offers it (Set up a new vehicle). The old two-box form went with the toolbar's
 // + New vehicle; vmCreate stays for scripts.
@@ -33,7 +36,7 @@
 
 import { WhipPanel, WP, VERB_GLYPHS } from '../whip-panel.js';
 import { nuiCallback, vehicleImageUrl } from '../utils.js';
-import { avatar, personSearch, vehiclePicker, VEHICLE_CLASSES } from './pickers.js';
+import { avatar, personSearch, vehiclePicker, VEHICLE_CLASSES, BLIP_COLOURS } from './pickers.js';
 import { statValueText } from '../stat-display.js';
 import { weightLine } from '../inventory.js';
 
@@ -368,20 +371,16 @@ function renderDetail() {
 // ========================================
 
 const STEPS = [
-    { key: 'vehicle', label: 'Vehicle' }, { key: 'owner', label: 'Owner' }, { key: 'extras', label: 'Extras' },
+    { key: 'vehicle', label: 'Vehicle' }, { key: 'owner', label: 'Owner' },
     { key: 'where', label: 'Where' }, { key: 'review', label: 'Create' },
-];
-const STORAGE = [
-    { key: 'trunkSlots', label: 'Trunk slots', int: true }, { key: 'trunkMaxWeight', label: 'Trunk kg' },
-    { key: 'gloveboxSlots', label: 'Glovebox slots', int: true }, { key: 'gloveboxMaxWeight', label: 'Glovebox kg' },
 ];
 
 function newDraft() {
     return {
         model: '', owner: null,                  // owner: { charId, name, online }
-        plate: '',
-        ownStorage: false, storage: {},          // storage: key -> the typed number (own sizes only)
-        place: 'garage', garage: '',
+        place: 'here', garage: '',               // spawned here beside you, unless a garage is chosen
+        players: null,                           // who is in the game (vmOnlinePlayers), read when Owner opens
+        here: null,                              // where you stand ({ x, y }: vwHere), read when Where opens
         saving: false,
     };
 }
@@ -401,7 +400,7 @@ function loadCatalog() {
     catalogAsk = Promise.resolve(nuiCallback('vmCatalog', {})).then((res) => {
         catalogAsk = null;
         catalog = res && Array.isArray(res.vehicles) ? res : { vehicles: [], storage: {} };
-        if (wiz && (wiz.current() === 'vehicle' || wiz.current() === 'extras' || wiz.current() === 'review')) redrawStep();
+        if (wiz && (wiz.current() === 'vehicle' || wiz.current() === 'review')) redrawStep();
     });
 }
 
@@ -412,14 +411,6 @@ function carOf(model) {
 function carName(model) {
     const c = carOf(model);
     return (c && c.name) || model || 'nothing';
-}
-
-/** The size a new car of this model gets if not given its own: its model's row, then config.lua. */
-function modelSize(model, key) {
-    const s = (catalog && catalog.storage) || {};
-    const m = s.models && s.models[String(model || '').toLowerCase()];
-    if (m && m[key] !== undefined && m[key] !== null) return m[key];
-    return s.defaults ? s.defaults[key] : undefined;
 }
 
 function openWizard() {
@@ -457,7 +448,13 @@ function buildWizard(at) {
         id: 'vw-wizard',
         steps: STEPS,
         railInto: els.wizRail,
-        onGo: (k, from, body) => { wizAt = k; fillStep(k, body); },
+        onGo: (k, from, body) => {
+            wizAt = k;
+            // Read again on the way in: someone may have joined, and you may have walked off.
+            if (draft && k === 'owner') draft.players = null;
+            if (draft && (k === 'where' || k === 'review')) draft.here = null;
+            fillStep(k, body);
+        },
         canLeave: (from) => canLeave(from),
         onFinish: finish,
         finishLabel: 'Create vehicle',
@@ -474,7 +471,7 @@ function renderWizHead() {
 function fillStep(key, body) {
     if (!draft) return;
     body.innerHTML = '';
-    const fill = { vehicle: stepVehicle, owner: stepOwner, extras: stepExtras, where: stepWhere, review: stepReview }[key];
+    const fill = { vehicle: stepVehicle, owner: stepOwner, where: stepWhere, review: stepReview }[key];
     if (fill) fill(body);
 }
 
@@ -526,6 +523,39 @@ function stepVehicle(body) {
 
 // ---- step: owner ----
 
+/** Who is in the game (vmOnlinePlayers): you first, then everyone else by name, as the Player Manager lists them.
+ *  Read each time the step is gone to (buildWizard's onGo), so someone who joined meanwhile is there. */
+function loadPlayers() {
+    if (!draft || draft.playersAsk) return;
+    const d = draft;
+    d.playersAsk = Promise.resolve(nuiCallback('vmOnlinePlayers', {})).then((list) => {
+        d.playersAsk = null;
+        d.players = Array.isArray(list) ? list : [];
+        if (draft === d && wiz && wiz.current() === 'owner') redrawStep();
+    });
+}
+
+/** One person in the game, as the Player Manager's list has them: their face with the online light, their name,
+ *  and their server id and character. */
+function personRow(p) {
+    const item = WP.el('div', 'wp-list-item wp-has-icon');
+    item.dataset.action = 'vwOwnerPick';
+    item.dataset.arg = p.charId;
+    const face = avatar(p.name, true, p.charId);
+    const dot = face.querySelector('.wp-dot');
+    if (dot) dot.title = 'Online';
+    item.appendChild(face);
+    const top = WP.el('div', 'wp-item-top');
+    top.appendChild(WP.el('span', 'wp-item-title', p.name || 'Character #' + p.charId));
+    if (p.me) top.appendChild(WP.el('span', 'wp-pill wp-pill-accent', 'YOU'));
+    item.appendChild(top);
+    const sub = WP.el('div', 'wp-item-sub');
+    sub.appendChild(WP.el('span', 'wp-info-value-mono', '#' + p.source));
+    sub.appendChild(document.createTextNode(' · character #' + p.charId));
+    item.appendChild(sub);
+    return item;
+}
+
 function stepOwner(body) {
     hint(body, 'Whose it is: it is filed under them, they can store and bring it out at any garage they may use, '
         + 'and it is listed on their phone. You get a key too if it is yours.');
@@ -542,53 +572,26 @@ function stepOwner(body) {
         body.appendChild(line);
         return;
     }
+    // Everyone in the game first, as the player list has them, you at the top.
+    body.appendChild(WP.el('div', 'wp-section-title', 'In the game'));
+    const list = WP.el('div', 'wp-list wp-flush vw-people');
+    if (!draft.players) {
+        loadPlayers();
+        list.appendChild(WP.empty('Reading who is in the game…'));
+    } else if (!draft.players.length) {
+        list.appendChild(WP.empty('Nobody is in the game'));
+    } else {
+        for (const p of draft.players) list.appendChild(personRow(p));
+    }
+    body.appendChild(list);
+
+    // Anyone else, in the game or not, by name or character id.
+    body.appendChild(WP.el('div', 'wp-section-title', 'Someone else'));
     const find = personSearch({
         placeholder: 'Type a name or a character id…',
         onPick: (p) => { draft.owner = p; answered('owner'); redrawStep(); },
     });
     body.appendChild(find.root);
-    setTimeout(() => find.focus(), 0);
-}
-
-// ---- step: extras ----
-
-function stepExtras(body) {
-    hint(body, 'All of this can be left as it is: a plate is made up for it, its stats (fuel, if the server has it) '
-        + 'start at their defaults, and its trunk and glovebox are its model\'s (the Vehicle Adjustments page: the '
-        + 'model\'s own, else its category\'s, else config.lua).');
-    const cols = WP.el('div', 'wp-cols-2');
-    const plate = WP.input({ placeholder: 'made up for it', value: draft.plate, inputAction: 'vwPlate' });
-    plate.maxLength = 8;
-    els.vwPlate = plate;
-    cols.appendChild(WP.field('Plate', plate));
-    body.appendChild(cols);
-
-    body.appendChild(WP.el('div', 'wp-section-title', 'Trunk and glovebox'));
-    const row = WP.el('div', 'wp-choices');
-    const model = draft.model;
-    // Off for its model or category (Vehicle Adjustments): it has none, whatever its size.
-    const sizes = (k1, k2, has) => modelSize(model, has) === false ? 'none'
-        : (modelSize(model, k1) ?? '?') + ' slots / ' + (modelSize(model, k2) ?? '?') + ' kg';
-    row.appendChild(choice('vwStorage', 'model', !draft.ownStorage, 'Its model\'s',
-        'Trunk ' + sizes('trunkSlots', 'trunkMaxWeight', 'hasTrunk') + ', glovebox '
-        + sizes('gloveboxSlots', 'gloveboxMaxWeight', 'hasGlovebox') + '. Changes to the model\'s sizes reach it.'));
-    row.appendChild(choice('vwStorage', 'own', draft.ownStorage, 'Its own',
-        'Sizes of its own, whatever the model\'s are. A box left empty is the model\'s.'));
-    body.appendChild(row);
-    if (draft.ownStorage) {
-        const grid = WP.el('div', 'wp-cols-2 wp-after');
-        els.vwStore = {};
-        for (const f of STORAGE) {
-            const input = WP.input({ type: 'number', placeholder: String(modelSize(model, f.key) ?? ''),
-                value: draft.storage[f.key] ?? '', inputAction: 'vwStoreSize' });
-            input.dataset.field = f.key;
-            input.min = f.int ? 1 : 0.1;
-            if (!f.int) input.step = '0.1';
-            els.vwStore[f.key] = input;
-            grid.appendChild(WP.field(f.label, input));
-        }
-        body.appendChild(grid);
-    }
 }
 
 // ---- step: where ----
@@ -599,16 +602,67 @@ function garageList() {
             || String(a.g.name || a.key).localeCompare(String(b.g.name || b.key)));
 }
 
+/** Where you stand (vwHere: your game's own reading), for the map while it is to be spawned here. Read each time
+ *  Where or Create is gone to (buildWizard's onGo): you may have walked off meanwhile. */
+function loadHere() {
+    if (!draft || draft.hereAsk) return;
+    const d = draft;
+    d.hereAsk = Promise.resolve(nuiCallback('vwHere', {})).then((p) => {
+        d.hereAsk = null;
+        d.here = p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)) ? { x: Number(p.x), y: Number(p.y) } : false;
+        const at = wiz && wiz.current();
+        if (draft === d && (at === 'where' || at === 'review')) redrawStep();
+    });
+}
+
+/** A garage's mark: its own icon and colour, as the Garages page shows it. */
+function garageMark(key, g) {
+    const colour = BLIP_COLOURS.find((c) => c[0] === Number(g.blipColor));
+    return { x: Number(g.x), y: Number(g.y), name: g.name || key, sprite: Number(g.blipSprite) || 357,
+        colour: colour ? colour[2] : '#ffffff' };
+}
+
+/** The map of where it will be: your position when it is spawned here, the garage picked, or every garage while
+ *  none is (WP.place: the small map, Open map to see it big). */
+function whereMap() {
+    const d = draft;
+    if (d.place === 'here') {
+        if (d.here === null) { loadHere(); return WP.empty('Finding where you are…'); }
+        if (!d.here) return WP.empty('Where you stand could not be read');
+        return WP.place({ x: d.here.x, y: d.here.y, name: 'Here, beside you' });
+    }
+    const g = d.garage && garages[d.garage];
+    if (g && Number.isFinite(Number(g.x))) return WP.place(garageMark(d.garage, g));
+    const marks = garageList().filter(({ g }) => Number.isFinite(Number(g.x)) && Number.isFinite(Number(g.y)))
+        .map(({ key, g }) => garageMark(key, g));
+    if (!marks.length) return WP.empty('No garage on the map yet');
+    return WP.place({ name: 'Garages', marks });
+}
+
+/** A step in two: what is chosen on the left, what it comes to on the right (the map, the car, whose it is). */
+function splitInto(body) {
+    const split = WP.el('div', 'vw-split');
+    const main = WP.el('div', 'vw-main');
+    const side = WP.el('div', 'vw-side');
+    split.appendChild(main);
+    split.appendChild(side);
+    body.appendChild(split);
+    return { main, side };
+}
+
 function stepWhere(body) {
+    const { main, side } = splitInto(body);
+    side.appendChild(whereMap());
+
     const row = WP.el('div', 'wp-choices');
+    row.appendChild(choice('vwPlace', 'here', draft.place === 'here', 'Spawn here',
+        'Brought out where you stand, in the world. It is filed under the default garage for when it is put away.'));
     row.appendChild(choice('vwPlace', 'garage', draft.place === 'garage', 'In a garage',
         'Stored there: its owner takes it out at that garage\'s bays.'));
-    row.appendChild(choice('vwPlace', 'here', draft.place === 'here', 'Out here, beside me',
-        'Brought out where you stand, in the world. It is filed under the default garage for when it is put away.'));
-    body.appendChild(row);
+    main.appendChild(row);
     if (draft.place !== 'garage') return;
 
-    body.appendChild(WP.el('div', 'wp-section-title', 'Which garage'));
+    main.appendChild(WP.el('div', 'wp-section-title', 'Which garage'));
     const list = WP.el('div', 'wp-list wp-flush');
     const all = garageList();
     if (!all.length) list.appendChild(WP.empty('No garages yet: set one up in Vehicles → Garages, or bring it out here'));
@@ -621,33 +675,49 @@ function stepWhere(body) {
         if (draft.garage === key) item.classList.add('active');
         list.appendChild(item);
     }
-    body.appendChild(list);
+    main.appendChild(list);
 }
 
 // ---- step: create ----
 
-function storageText(d) {
-    if (!d.ownStorage) return 'its model\'s';
-    const v = (k) => (d.storage[k] !== undefined && d.storage[k] !== '' ? d.storage[k] : modelSize(d.model, k) ?? '?');
-    return 'its own: trunk ' + v('trunkSlots') + ' slots / ' + v('trunkMaxWeight') + ' kg, glovebox '
-        + v('gloveboxSlots') + ' slots / ' + v('gloveboxMaxWeight') + ' kg';
-}
-
 function stepReview(body) {
     const d = draft;
+    const { main, side } = splitInto(body);
+
+    // The ticks, on the left.
     const row = (label, key, status, detail) =>
-        body.appendChild(WP.statusRow({ label, status, detail, action: 'vwJump', arg: key, actionLabel: 'Change' }));
+        main.appendChild(WP.statusRow({ label, status, detail, action: 'vwJump', arg: key, actionLabel: 'Change' }));
     const c = carOf(d.model);
     row('Vehicle', 'vehicle', d.model ? 'ok' : 'err', d.model
         ? carName(d.model) + '  ·  ' + d.model + (c && VEHICLE_CLASSES[c.cls] ? '  ·  ' + VEHICLE_CLASSES[c.cls] : '')
         : 'none picked');
     row('Owner', 'owner', d.owner ? 'ok' : 'err', d.owner ? d.owner.name + '  ·  #' + d.owner.charId : 'nobody yet');
-    row('Plate', 'extras', 'ok', d.plate.trim() ? d.plate.trim().toUpperCase() : 'made up for it');
-    row('Storage', 'extras', 'ok', storageText(d));
     const g = d.garage && garages[d.garage];
-    row('Where', 'where', d.place === 'here' || g ? 'ok' : 'err', d.place === 'here' ? 'out here, beside you'
+    row('Where', 'where', d.place === 'here' || g ? 'ok' : 'err', d.place === 'here' ? 'spawned here, beside you'
         : g ? 'in ' + (g.name || d.garage) + (g.private ? ' (private)' : '') : 'no garage picked');
-    hint(body, 'Create makes it at once, and its page opens.').classList.add('wp-apart');
+    hint(main, 'Its plate is made up for it, and its trunk and glovebox are its model\'s (Vehicle Adjustments). '
+        + 'Create makes it at once, and its page opens.').classList.add('wp-apart');
+
+    // What it comes to, on the right: the car and whose it will be side by side, where it will be under them.
+    const glance = WP.el('div', 'vw-glance');
+    if (d.model) {
+        const img = WP.el('img', 'wp-info-media vw-car');
+        img.dataset.vehImg = '';   // utils.js's missing.png for a model with no picture
+        img.src = vehicleImageUrl(d.model);
+        img.alt = carName(d.model);
+        glance.appendChild(img);
+    }
+    if (d.owner) {
+        const who = WP.el('div', 'vm-owner vw-owner');
+        who.appendChild(avatar(d.owner.name, !!d.owner.online, d.owner.charId, true));
+        const text = WP.el('div', 'vm-owner-text');
+        text.appendChild(WP.el('div', 'vm-owner-name', d.owner.name));
+        text.appendChild(WP.el('div', 'wp-item-sub', 'Character #' + d.owner.charId + (d.owner.online ? '  ·  in the game now' : '')));
+        who.appendChild(text);
+        glance.appendChild(who);
+    }
+    side.appendChild(glance);
+    side.appendChild(whereMap());
 }
 
 // ---- leaving a step, and creating ----
@@ -657,21 +727,6 @@ function canLeave(from) {
     if (!d) return 'There is no vehicle being set up';
     if (from === 'vehicle') return d.model ? true : 'Pick a vehicle';
     if (from === 'owner') return d.owner ? true : 'Pick whose it is';
-    if (from === 'extras') {
-        const p = d.plate.trim();
-        if (p && !/^[A-Za-z0-9 ]{1,8}$/.test(p)) return 'A plate is up to 8 letters, numbers and spaces';
-        if (d.ownStorage) {
-            for (const s of STORAGE) {
-                const v = d.storage[s.key];
-                if (v === undefined || v === '') continue;
-                const n = Number(v);
-                if (!(n > 0) || (s.int && (n !== Math.floor(n) || n > 500))) {
-                    return s.label + (s.int ? ' is a whole number from 1 to 500' : ' must be more than 0');
-                }
-            }
-        }
-        return true;
-    }
     if (from === 'where') return d.place === 'here' || (d.garage && garages[d.garage]) ? true : 'Pick the garage it goes into';
     return true;
 }
@@ -686,15 +741,8 @@ function finish() {
     }
     const payload = {
         model: d.model, ownerCharId: d.owner.charId,
-        plate: d.plate.trim() || undefined,
         place: d.place, garage: d.place === 'garage' ? d.garage : undefined,
     };
-    if (d.ownStorage) {
-        for (const s of STORAGE) {
-            const v = d.storage[s.key];
-            if (v !== undefined && v !== '') payload[s.key] = Number(v);
-        }
-    }
     d.saving = true;
     wiz.say('Creating…');
     nuiCallback('vmWizardCreate', payload).then((res) => {
@@ -771,7 +819,7 @@ WhipPanel.registerSection({
         els.intro.appendChild(WP.el('div', 'wp-pane-title', 'Vehicles'));
         els.intro.appendChild(WP.el('div', 'wp-hint',
             'Pick a vehicle to see it and change it, or set a new one up: the wizard walks you through the model, '
-            + 'whose it is, its plate and storage, and which garage it goes into (or out beside you).'));
+            + 'whose it is, and where it goes (spawned beside you, or into a garage).'));
         const go = WP.el('div', 'wp-actions-row');
         go.appendChild(WP.btn('Set up a new vehicle', 'vwNew', 'primary'));
         els.intro.appendChild(go);
@@ -890,13 +938,15 @@ WhipPanel.registerSection({
             draft.owner = null;
             redrawStep();
         },
-        vwPlate: (el) => { if (draft) draft.plate = el.value; },
-        vwStorage: (el) => {
-            if (!draft) return;
-            draft.ownStorage = el.dataset.arg === 'own';
+        // Someone in the game, from the list (vmOnlinePlayers).
+        vwOwnerPick: (el) => {
+            if (!draft || !draft.players) return;
+            const p = draft.players.find((x) => Number(x.charId) === Number(el.dataset.arg));
+            if (!p) return;
+            draft.owner = { charId: Number(p.charId), name: p.name || 'Character #' + p.charId, online: true };
+            answered('owner');
             redrawStep();
         },
-        vwStoreSize: (el) => { if (draft) draft.storage[el.dataset.field] = el.value; },
         vwPlace: (el) => {
             if (!draft) return;
             draft.place = el.dataset.arg === 'here' ? 'here' : 'garage';

@@ -701,6 +701,28 @@ local function configStorage()
     }
 end
 
+--- Whose the wizard's new car could be, from those in the game: everyone with a character loaded, the asking admin
+--- first, then the rest by name (as the Player Manager lists them). Answers { { charId, name, source, me } }.
+SecureCallback('whip_core:vmOnlinePlayers', {
+    ace       = VM_ACE,
+    rateLimit = 500,
+    burst     = 3,
+}, function(source)
+    local list = {}
+    for src, p in pairs(Players) do
+        if p.charId then
+            list[#list + 1] = { charId = p.charId, name = p.fullName or ('Character #' .. p.charId), source = src,
+                                me = src == source }
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.me ~= b.me then return a.me end
+        if a.name ~= b.name then return a.name:lower() < b.name:lower() end
+        return a.source < b.source
+    end)
+    return list
+end)
+
 --- What the wizard picks from: every model the vehicle catalog has, and the storage a new car of each would get if
 --- not given its own (Vehicles.modelStorage: its model's row, its category's, config.lua; off is hasTrunk = false).
 --- Answers { vehicles = { { model, name, cls, img } }, storage = { defaults, models } }.
