@@ -13,9 +13,13 @@ import './assets.js';
 // Sets --ui-scale CSS variable, used as zoom on inner content containers
 // (not full-screen overlays). Backgrounds fill the screen, content scales,
 // text stays sharp, mouse coords unaffected.
+//
+// THE 2560 x 1440 DESIGN FITS THE SCREEN BOTH WAYS: by its height on a 16:9 screen or a wider one, by its width
+// on a narrower one (16:10, 5:4, 4:3), where scaling by the height alone made the 16:9 layouts wider than the
+// screen (the inventory ran off both sides at 2560 x 1600). ui.js's radial wheel works it out the same way.
 (function() {
     function applyScale() {
-        var s = window.innerHeight / 1440;
+        var s = Math.min(window.innerHeight / 1440, window.innerWidth / 2560);
         document.documentElement.style.setProperty('--ui-scale', s);
     }
     applyScale();

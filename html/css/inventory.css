@@ -136,7 +136,8 @@
 }
 
 /* THE SHELL'S WIDTH: 1880 at zoom 1.32 fills a 16:9 screen with ~39px each side; 1080p lands at
-   ~1861 of 1920, full-width without clipping.
+   ~1861 of 1920, full-width without clipping. A narrower screen (16:10, 4:3) gets the same: --ui-scale
+   follows its width there (utils.js), so the shell never runs off the sides.
 
    1880 = 118 rail + 20 gap + 1202 centre + 20 gap + 520 right block.
 

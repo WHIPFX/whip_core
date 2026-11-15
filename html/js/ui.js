@@ -1841,7 +1841,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
         _radCtl = null;
         _hk = null;
         _radScale = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'))
-            || (window.innerHeight / 1440)) * RAD.big;
+            || Math.min(window.innerHeight / 1440, window.innerWidth / 2560)) * RAD.big;   // utils.js's rule
 
         const act = radBuild(options, false);
         _radRoot = act.root;
