@@ -611,19 +611,14 @@ local function labelFor(data, opt)
     return resolveField(data, opt, 'label')
 end
 
--- Typing a number into a prompt: the label becomes the field while you type, E submits.
--- Digits are read as raw keys (a control is a list of bindings), which do not consume the input,
--- so the game's number-key controls are blocked while typing.
+-- Typing a value into a prompt (client/prompt_typing.lua): the prompt steps aside while it is typed into, and in its
+-- place stands a capsule (a keyboard: "Start typing", Enter gives it) or whip's on-screen keyboard (a pad). The
+-- prompt keeps the focus while it is in range, on screen or not (the player may look round), and its own keys
+-- (E, scroll, A) stand down: Enter or Done submits, Esc, B or Cancel leaves.
 
--- Windows virtual-key codes.
-local VK_BACK      = 0x08
-local VK_DIGIT_0   = 0x30   -- ..0x39, the top row
-local VK_NUMPAD_0  = 0x60   -- ..0x69
-
--- The caret is a pipe: the label font has no block characters.
+-- The caret, for a caller that shows the text itself (a conversation's dialog): a pipe, as the label font has no
+-- block characters. Half a second on, half a second off.
 local CARET = '|'
-
--- Half a second on, half a second off.
 local CARET_PERIOD_MS = 1000
 
 --- End the input for any reason (submit, cancel, blur, prompt gone, blocked) and tell the caller.
@@ -634,7 +629,9 @@ function endInput(fire)
 
     -- Cleared before the callback: onCancel may register prompts or start another input.
     inputState = nil
-    ControlBlocks.release('typing')   -- the number keys are weapons again
+    PromptTyping.close()
+    -- The key that ended it (Enter, A) is not a press on the prompt that comes back.
+    if promptsBackAt then promptsBackAt = GetGameTimer() end
 
     if fire and st.onCancel then
         local ok, err = pcall(st.onCancel)
@@ -645,31 +642,86 @@ function endInput(fire)
     end
 end
 
---- Start typing a number into a prompt: digits go into a buffer, E submits, and focus is pinned.
---- The caller's label function shows the field, e.g. 'Deposit  $' .. Interactions.inputText(id) ..
---- Interactions.inputCaret(). Call setOptions before this: it cancels a running input.
+--- Start typing into a prompt: it steps aside for the capsule or the keyboard (client/prompt_typing.lua) and keeps the
+--- focus until the value is given or left. Call setOptions before this: it cancels a running input.
 ---@param id string
----@param opts table { max? (digits, default 9), onSubmit (function(text)), onCancel? (function) }
+---@param opts table { max?, numeric? (default true: digits), title?, icon?, prefix?, commas?, placeholder?, value?,
+---                    capsule? (false: the caller shows the text on a keyboard), anchor?() -> x, y, z, hang?,
+---                    onChange?(text), onSubmit (function(text)), onCancel? (function) }
 function Interactions.beginInput(id, opts)
-    if not registry[id] then return false end
+    local data = registry[id]
+    if not data then return false end
     opts = opts or {}
 
     -- A running input is abandoned and told so.
     endInput(true)
 
-    inputState = {
+    -- What is being typed, by default the selected option's words and glyph, read before the input is up (a label
+    -- that shows the field reads as the option's own words here).
+    local sel = selectedOption(data)
+    local title = opts.title
+    if title == nil and sel then title = labelFor(data, sel) end
+    local icon = opts.icon
+    if icon == nil then icon = resolveField(data, sel, 'icon') end
+
+    local st = {
         id       = id,
         buffer   = '',
-        max      = math.max(1, math.floor(tonumber(opts.max) or 9)),
         onSubmit = opts.onSubmit,
         onCancel = opts.onCancel,
-
-        -- Edge detection by hand: one press types one digit.
-        held     = {},
+        onChange = opts.onChange,
     }
-    -- 157..165 are the number keys 1..9 on foot: blocked until endInput so typing "5" does not pick a weapon.
-    ControlBlocks.hold('typing', { controls = { 157, 158, 159, 160, 161, 162, 163, 164, 165 } })
+    inputState = st
+
+    PromptTyping.open({
+        -- Where it stands: the prompt's point, or the caller's own (a conversation's dialog).
+        anchor = opts.anchor or function()
+            local d = registry[id]
+            if not d then return nil end
+            return d.x, d.y, d.z
+        end,
+        numeric = opts.numeric ~= false, max = opts.max, value = opts.value,
+        title = title, icon = icon, prefix = opts.prefix, commas = opts.commas, placeholder = opts.placeholder,
+        capsule = opts.capsule, hang = opts.hang,
+        onChange = function(text)
+            if inputState ~= st then return end
+            st.buffer = text
+            if st.onChange then
+                local ok, err = pcall(st.onChange, text)
+                if not ok then print(('[whip_core:interact] ERROR in onChange for "%s": %s'):format(tostring(id), tostring(err))) end
+            end
+        end,
+        onDone = function(text)
+            if inputState ~= st then return end
+            Interactions.submitInput(text)
+        end,
+        onCancel = function()
+            if inputState ~= st then return end
+            endInput(true)
+        end,
+    })
+    st.buffer = PromptTyping.text() or ''
     return true
+end
+
+--- Give the typed value: onSubmit gets it (no onCancel). The typing's Enter or Done.
+---@param text string|nil  what was typed (the typing's own when nil)
+function Interactions.submitInput(text)
+    local st = inputState
+    if not st then return end
+    text = text or st.buffer
+    -- false: no onCancel, this is the successful exit.
+    endInput(false)
+    if st.onSubmit then
+        local ok, err = pcall(st.onSubmit, text)
+        if not ok then
+            print(('[whip_core:interact] ERROR in onSubmit for "%s": %s'):format(tostring(st.id), tostring(err)))
+        end
+    end
+    -- Giving the amount is a press too (the ATM).
+    local typedInto = registry[st.id]
+    if typedInto and typedInto.press then InteractPress.atPrompt(typedInto) end
+    -- Not logged: whatever this submits to writes its own row server-side.
 end
 
 --- Stop typing, firing onCancel.
@@ -689,7 +741,7 @@ function Interactions.inputActive(id)
     return inputState.id == id
 end
 
---- The digits typed so far; '' when none yet, nil when no input is running.
+--- What is typed so far; '' when nothing yet, nil when no input is running.
 ---@param id string|nil
 ---@return string|nil
 function Interactions.inputText(id)
@@ -697,13 +749,14 @@ function Interactions.inputText(id)
     return inputState.buffer
 end
 
---- Put a number in the field as if typed (digits only, cut to its length).
+--- Put a value in the field as if typed (cleaned and cut as typing is: a number's digits only).
 ---@param id string|nil
 ---@param text string|number
 ---@return boolean set
 function Interactions.setInputText(id, text)
     if not inputState or not Interactions.inputActive(id) then return false end
-    inputState.buffer = tostring(text or ''):gsub('%D', ''):sub(1, inputState.max)
+    PromptTyping.setText(text)
+    inputState.buffer = PromptTyping.text() or ''
     return true
 end
 
@@ -1453,8 +1506,10 @@ CreateThread(function()
                     if costCond then WhipCost.stop(conditionCostName(data._owner), costCond) end
 
                     if conditionOk then
-                        -- A prompt you cannot see is not shown, under either renderer.
-                        local onScreen = held or World3dToScreen2d(data.x, data.y, data.z)
+                        -- A prompt you cannot see is not shown, under either renderer. One being typed into
+                        -- stays (the player may look round while typing; it is the typing that is drawn).
+                        local onScreen = held or (inputState ~= nil and inputState.id == id)
+                            or World3dToScreen2d(data.x, data.y, data.z)
                         if onScreen then
                             local isActive = dist <= aRange
 
@@ -1687,18 +1742,22 @@ CreateThread(function()
             interactOpen = true
             if activeRenderer and activeRenderer.frame then
                 local drawn, drawnChanged = visible, changed
-                if holdState and holdState.hidden and visible[holdState.id] then
-                    -- The holder draws a hidden prompt, so the renderer gets everything else.
+                -- Not drawn: a hidden hold's prompt (its holder draws it) and the one being typed into (the
+                -- typing stands in its place). The renderer gets everything else.
+                local skipA = (holdState and holdState.hidden and visible[holdState.id]) and holdState.id or nil
+                local skipB = (inputState and visible[inputState.id]) and inputState.id or nil
+                if skipA or skipB then
                     drawn = heldScratch
                     for k in pairs(drawn) do drawn[k] = nil end
                     for k, e in pairs(visible) do
-                        if k ~= holdState.id then drawn[k] = e end
+                        if k ~= skipA and k ~= skipB then drawn[k] = e end
                     end
                     if changed then
                         drawnChanged = heldChanges
                         for i = #drawnChanged, 1, -1 do drawnChanged[i] = nil end
                         for i = 1, #changed do
-                            if changed[i].id ~= holdState.id then drawnChanged[#drawnChanged + 1] = changed[i] end
+                            local cid = changed[i].id
+                            if cid ~= skipA and cid ~= skipB then drawnChanged[#drawnChanged + 1] = changed[i] end
                         end
                     end
                 end
@@ -1712,45 +1771,12 @@ CreateThread(function()
         end
         local costKeys = interactOpen and WhipCost.start() or nil
 
-        -- Typing: read the digits while an input is live.
+        -- Typing has the keys (client/prompt_typing.lua): the prompts' own presses meanwhile are dropped, so a key
+        -- typed into the capsule (E, a scroll) never lands on a prompt after.
         if inputState then
-            local st   = inputState
-            local held = st.held
-
-            -- Every key's edge is updated before any is acted on, or a key already down would
-            -- read as a fresh press once a backspace made room.
-            local typed = nil
-            for d = 0, 9 do
-                local top, pad = VK_DIGIT_0 + d, VK_NUMPAD_0 + d
-
-                local dt = IsRawKeyPressed(top)
-                if dt and not held[top] and not typed then typed = d end
-                held[top] = dt
-
-                local dp = IsRawKeyPressed(pad)
-                if dp and not held[pad] and not typed then typed = d end
-                held[pad] = dp
-            end
-
-            local backDown = IsRawKeyPressed(VK_BACK)
-            local backEdge = backDown and not held[VK_BACK]
-            held[VK_BACK] = backDown
-
-            -- What was typed shows on the next pass.
-            if backEdge or typed then scoreSoon = true end
-            if backEdge then
-                if #st.buffer > 0 then
-                    st.buffer = st.buffer:sub(1, -2)
-                else
-                    -- Backspace on an empty field cancels (Escape is the pause menu).
-                    endInput(true)
-                end
-            elseif typed and #st.buffer < st.max then
-                -- No leading zeros.
-                if not (typed == 0 and st.buffer == '') then
-                    st.buffer = st.buffer .. tostring(typed)
-                end
-            end
+            InteractTakeNav('select')
+            InteractTakeNav('up')
+            InteractTakeNav('down')
         end
 
         -- Scroll: pick an option, only when the focused prompt has more than one. The wheel controls
@@ -1779,34 +1805,14 @@ CreateThread(function()
         promptBlock('promptScroll', scrolling)
 
         -- The bound key, or the pad's accept (control 201, read without a binding and gated on the pad:
-        -- on a keyboard 201 is Enter). Not while LB is held (LB + A is talk), nor in a preview.
-        if currentFocusId and not preview and (InteractTakeNav('select')
+        -- on a keyboard 201 is Enter). Not while LB is held (LB + A is talk), nor in a preview, nor while typing
+        -- (the typing gives its value itself: Enter or Done, Interactions.submitInput).
+        if currentFocusId and not preview and not inputState and (InteractTakeNav('select')
             or (WhipPadActive and not WhipPadModHeld and IsDisabledControlJustPressed(0, 201)
                 and pressIsTheirs(now))) then
-          if WhipPadDebugFire then WhipPadDebugFire('interact', 'select', currentFocusId) end
-          -- Whatever the press changes shows on the next pass.
-          scoreSoon = true
-          -- With a field open, E submits it; the option's callback is not run again.
-          if inputState and inputState.id == currentFocusId then
-            -- Read before endInput clears the state.
-            local text   = inputState.buffer
-            local submit = inputState.onSubmit
-
-            -- false: no onCancel, this is the successful exit.
-            endInput(false)
-
-            if submit then
-                local ok, err = pcall(submit, text)
-                if not ok then
-                    print(('[whip_core:interact] ERROR in onSubmit for "%s": %s')
-                        :format(tostring(currentFocusId), tostring(err)))
-                end
-            end
-            -- Entering the amount is a press too (the ATM).
-            local typedInto = registry[currentFocusId]
-            if typedInto and typedInto.press then InteractPress.atPrompt(typedInto) end
-            -- Not logged: whatever this submits to writes its own row server-side.
-          else
+            if WhipPadDebugFire then WhipPadDebugFire('interact', 'select', currentFocusId) end
+            -- Whatever the press changes shows on the next pass.
+            scoreSoon = true
             local data = registry[currentFocusId]
 
             -- The selected option's callback, else the prompt's own.
@@ -1823,7 +1829,6 @@ CreateThread(function()
                     fireSelected(data, opt, cb)
                 end
             end
-          end
         end
 
         -- Hold to use: runs while the same option of the same prompt stays focused and the key stays

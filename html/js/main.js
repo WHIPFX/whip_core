@@ -51,6 +51,7 @@ import './event-monitor.js';
 import './shops.js';
 import './status-hud.js';
 import './composer.js';      // the capsule's text-field state; capsule.js owns which state it is in
+import './prompt-typing.js'; // typing a value into a 3D prompt on a keyboard: the keys, to Lua (client/prompt_typing.lua)
 import './vehicle-dial.js';  // the bottom-right 3D rev dial and its stat gauges; the dial itself loads on first use
 import './vehicle-controls.js'; // a vehicle's pad buttons over the dial for a few seconds (client/pad.lua)
 import './stats-debug.js';

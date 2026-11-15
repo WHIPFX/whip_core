@@ -1,0 +1,280 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>typing into a prompt</title>
+<link rel="stylesheet" href="../css/fonts.css"> <!-- whip's typefaces: a DUI is its own document -->
+<script src="../js/caps.js"></script>
+<script src="../js/glyphs.js"></script> <!-- window.WhipGlyphs: the prompt's own glyph, in the capsule's disc -->
+<style>
+/* ============================================================================
+   TYPING INTO A PROMPT — what stands where a prompt was while a value is typed into it
+   (client/prompt_typing.lua, Interactions.beginInput).
+
+   A DUI texture, 1024 x 640, drawn as one quad facing the player. Lua sends everything it shows (a DUI
+   cannot answer), and the quad takes only the part of the page its look uses:
+     capsule  1024 x 160   a keyboard: the chat capsule's look, the prompt's glyph in the white disc,
+                           what is being typed and the text, "Start typing" until there is some.
+     keys     1024 x 640   a pad: whip's on-screen keyboard (css/pad-keyboard.css's keys), the circle
+                           the left stick moves, the highlighted key in the selection pill.
+     numpad    560 x 640   a pad typing a number: three keys across.
+   The key area's place is Lua's (KEY_AREA): it hit-tests the circle against the same boxes drawn here.
+   CEF 103: no :has, no color-mix, no nesting. Text only, never markup.
+   ============================================================================ */
+
+:root {
+    /* whip's tokens (html/css/base.css), copied: a DUI page cannot load that file's cascade. */
+    --ui-surface:        rgba(10, 12, 18, 0.82);
+    --ui-surface-solid:  rgb(10, 12, 18);
+    --ui-border:         rgba(255, 255, 255, 0.10);
+    --ui-border-hover:   rgba(255, 255, 255, 0.14);
+    --ui-text:           rgba(255, 255, 255, 0.93);
+    --ui-text-mid:       rgba(255, 255, 255, 0.5);
+    --ui-label:          rgba(255, 255, 255, 0.48);
+    --ui-accent:         #60a5fa;
+    --ui-pill:           rgba(255, 255, 255, 0.93);
+    --ui-ink:            rgb(10, 12, 18);
+    --ui-slot-bg:        rgba(255, 255, 255, 0.07);
+    --ui-slot-line:      rgba(255, 255, 255, 0.14);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 1024px; height: 640px;
+    background: transparent; overflow: hidden;
+    font-family: 'Barlow', 'Segoe UI', sans-serif; color: var(--ui-text);
+}
+.look { position: absolute; left: 0; top: 0; display: none; }
+.look.on { display: block; }
+
+/* ---- the capsule (a keyboard) ---- */
+#capsule { width: 1024px; height: 160px; }
+.cap {
+    position: absolute; left: 14px; top: 22px; width: 996px; height: 116px;
+    display: flex; align-items: center; gap: 22px;
+    padding: 0 30px 0 16px;
+    background: var(--ui-surface);
+    border: 1.5px solid var(--ui-border);
+    border-radius: 58px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), inset 0 1.5px 0 rgba(255, 255, 255, 0.06);
+}
+/* The capsule's top-edge highlight (status-hud.css .sh-capsule::before). */
+.cap::before {
+    content: ''; position: absolute; top: 0; left: 16%; right: 16%; height: 1.5px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+}
+/* The white disc: live and listening, as the chat capsule's bubble and the focused prompt's badge are. */
+.disc {
+    flex: 0 0 auto; width: 84px; height: 84px; border-radius: 50%;
+    background: var(--ui-pill); color: var(--ui-ink);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.55);
+}
+.disc svg { width: 46px; height: 46px; }
+.cap-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cap-title {
+    font-size: 24px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase;
+    color: var(--ui-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.line {
+    font-size: 46px; font-weight: 600; line-height: 1.15; white-space: pre; overflow: hidden;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.prefix { color: var(--ui-text-mid); }
+.ghost { color: var(--ui-text-mid); font-weight: 500; }
+.caret {
+    display: inline-block; width: 3px; height: 0.95em; margin: 0 2px; vertical-align: -0.1em;
+    background: var(--ui-accent); animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+/* Enter gives it: the one key, as a keycap at the end. */
+.keycap {
+    flex: 0 0 auto; padding: 8px 16px; border-radius: 12px;
+    border: 1.5px solid var(--ui-border-hover); background: rgba(255, 255, 255, 0.05);
+    font-size: 24px; font-weight: 700; color: var(--ui-text-mid); letter-spacing: 0.5px;
+}
+
+/* ---- the keyboard (a pad) ---- */
+#keys { width: 1024px; height: 640px; }
+.panel {
+    position: absolute; left: 6px; top: 6px; right: 6px; bottom: 6px;
+    background: var(--ui-surface-solid);
+    border: 1.5px solid var(--ui-border);
+    border-radius: 34px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.head {
+    position: absolute; left: 30px; right: 30px; top: 22px; height: 40px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+}
+.title { font-size: 28px; font-weight: 700; letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count { font-size: 20px; color: var(--ui-text-mid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.field {
+    position: absolute; left: 28px; right: 28px; top: 72px; height: 82px;
+    padding: 0 22px; display: flex; align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid var(--ui-border-hover);
+    border-radius: 14px;
+}
+.field .line { font-size: 38px; }
+.area { position: absolute; }
+.key {
+    position: absolute;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ui-slot-bg); border: 1.5px solid var(--ui-slot-line);
+    border-radius: 14px;
+    font-size: 30px; font-weight: 600; color: var(--ui-text);
+}
+.key.named { font-size: 22px; color: var(--ui-text-mid); }
+.key.on { background: rgba(255, 255, 255, 0.16); color: var(--ui-text); }
+.key.k-done { background: var(--ui-accent); border-color: var(--ui-accent); color: #fff; }
+/* The highlight: whip's selection pill. Over Done it stays blue, ringed white. */
+.key.focus { background: var(--ui-pill); border-color: var(--ui-pill); color: var(--ui-ink); transform: scale(1.04); }
+.key.k-done.focus { background: var(--ui-accent); color: #fff; box-shadow: 0 0 0 4px var(--ui-pill); }
+/* The circle the left stick moves (the inventory's pad circle). */
+.circle {
+    position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    border: 3.5px solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+.hints {
+    position: absolute; left: 30px; right: 30px; top: 572px; height: 44px;
+    display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: nowrap;
+    font-size: 21px; font-weight: 600; color: var(--ui-text-mid); white-space: nowrap;
+}
+.hint { display: flex; align-items: center; gap: 8px; }
+.hint img { width: 32px; height: 32px; }
+</style>
+</head>
+<body>
+<div id="capsule" class="look">
+    <div class="cap">
+        <div class="disc" id="disc"></div>
+        <div class="cap-body">
+            <div class="cap-title" id="capTitle"></div>
+            <div class="line" id="capLine"></div>
+        </div>
+        <div class="keycap">Enter</div>
+    </div>
+</div>
+<div id="keys" class="look">
+    <div class="panel" id="panel">
+        <div class="head"><span class="title" id="title"></span><span class="count" id="count"></span></div>
+        <div class="field"><div class="line" id="keysLine"></div></div>
+        <div class="area" id="area"></div>
+        <div class="hints" id="hints"></div>
+    </div>
+</div>
+<script>
+(function () {
+    'use strict';
+    var state = null;          // the last full message
+    var keyEls = {};           // [key name] = its element
+    var circleEl = null;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+    /** A number's digits, 1,250 (a typed amount, `commas`). */
+    function grouped(t) { return t.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+    /** The text: prefix, what is typed, the caret; with nothing typed, the caret and the ghost words. */
+    function lineHtml(m) {
+        var text = m.text || '';
+        if (m.commas) text = grouped(text);
+        var pre = m.prefix ? '<span class="prefix">' + esc(m.prefix) + '</span>' : '';
+        if (!text) return pre + '<i class="caret"></i><span class="ghost">' + esc(m.placeholder || 'Start typing') + '</span>';
+        return pre + esc(text) + '<i class="caret"></i>';
+    }
+
+    function glyph(name) {
+        var g = window.WhipGlyphs && window.WhipGlyphs.glyphs;
+        return (g && name && g[name]) || (g && g.E) || '';
+    }
+
+    function show(id) {
+        document.getElementById('capsule').classList.toggle('on', id === 'capsule');
+        document.getElementById('keys').classList.toggle('on', id === 'keys');
+    }
+
+    function paintCapsule(m) {
+        document.getElementById('disc').innerHTML = glyph(m.icon);
+        document.getElementById('capTitle').textContent = m.title || '';
+        document.getElementById('capLine').innerHTML = lineHtml(m);
+        show('capsule');
+    }
+
+    function placeCircle(c) {
+        if (!circleEl || !state || !state.area || !c) return;
+        circleEl.style.left = (c.x * state.area.w) + 'px';
+        circleEl.style.top = (c.y * state.area.h) + 'px';
+    }
+
+    function markFocus(k) {
+        for (var name in keyEls) keyEls[name].classList.toggle('focus', name === k);
+    }
+
+    function paintKeys(m) {
+        var numpad = m.look === 'numpad';
+        var panel = document.getElementById('panel');
+        // The number pad is the page's left 560 px (the quad takes only that part).
+        panel.style.width = numpad ? (560 - 12) + 'px' : '';
+        panel.style.right = numpad ? 'auto' : '';
+        document.getElementById('title').textContent = m.title || 'Type';
+        document.getElementById('count').textContent = (m.max && !numpad) ? ((m.text || '').length + ' / ' + m.max) : '';
+        document.getElementById('keysLine').innerHTML = lineHtml(m);
+
+        var a = m.area;
+        var area = document.getElementById('area');
+        // The panel is inset 6 px; the area's numbers are the page's.
+        area.style.left = (a.x - 6) + 'px';
+        area.style.top = (a.y - 6) + 'px';
+        area.style.width = a.w + 'px';
+        area.style.height = a.h + 'px';
+        var GAP = 5;   // half the gap between two keys
+        var html = '';
+        (m.keys || []).forEach(function (k) {
+            var cls = 'key' + (k.named ? ' named k-' + k.k : '') + (k.on ? ' on' : '') + (k.k === m.focus ? ' focus' : '');
+            html += '<div class="' + cls + '" data-k="' + esc(k.k) + '" style="left:' + (k.x0 * a.w + GAP) + 'px;top:'
+                + (k.y0 * a.h + GAP) + 'px;width:' + ((k.x1 - k.x0) * a.w - GAP * 2) + 'px;height:'
+                + ((k.y1 - k.y0) * a.h - GAP * 2) + 'px">' + esc(k.label) + '</div>';
+        });
+        html += '<div class="circle" id="circle"></div>';
+        area.innerHTML = html;
+        keyEls = {};
+        Array.prototype.forEach.call(area.querySelectorAll('.key'), function (el) { keyEls[el.getAttribute('data-k')] = el; });
+        circleEl = document.getElementById('circle');
+
+        var hints = document.getElementById('hints');
+        hints.style.justifyContent = numpad ? 'flex-start' : 'center';
+        hints.innerHTML = (m.hints || []).map(function (h) {
+            return '<span class="hint"><img src="../img/pad/' + esc(h[0]) + '.svg" alt="">' + esc(h[1]) + '</span>';
+        }).join('');
+        show('keys');
+        placeCircle(m.circle);
+    }
+
+    window.addEventListener('message', function (e) {
+        var m = e.data;
+        if (typeof m === 'string') { try { m = JSON.parse(m); } catch (err) { return; } }
+        if (!m) return;
+        if (m.cursor) {
+            // The circle moved, or the D-pad stepped: no repaint of the keys.
+            if (state && state.look !== 'capsule') {
+                state.focus = m.focus;
+                markFocus(m.focus);
+                placeCircle(m.circle);
+            }
+            return;
+        }
+        if (m.look === 'off') { state = null; show(null); return; }
+        state = m;
+        if (m.look === 'capsule') paintCapsule(m); else paintKeys(m);
+    });
+})();
+</script>
+</body>
+</html>

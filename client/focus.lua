@@ -135,6 +135,17 @@ function Focus.held(id)
     return holds[id] ~= nil
 end
 
+--- Is `id` the one hold, with nothing else holding the focus? (Typing into a prompt: its hold is the prompts' own.)
+---@param id string
+---@return boolean
+function Focus.onlyHeld(id)
+    if holds[id] == nil then return false end
+    for other in pairs(holds) do
+        if other ~= id then return false end
+    end
+    return true
+end
+
 --- Set the natives again from the holds, to win back a focus something outside whip_core took (the landing page).
 function Focus.reassert()
     apply()

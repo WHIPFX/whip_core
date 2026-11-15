@@ -39,14 +39,6 @@ local level = {}
 --- reads it to turn a selection back into an accountId.
 local accounts = {}
 
---- [promptId] = 'deposit' | 'withdraw' while a number is being typed.
----
---- WHICH FIELD IS THE FIELD. Deposit and Withdraw both ask whether an input is running in order to
---- draw themselves as one, and the input system only knows that a prompt is being typed into — not
---- which of its options asked. Without this, beginning a deposit would render BOTH options as live
---- fields showing the same digits.
-local typing = {}
-
 -- ============================================
 -- Money, written the way a player reads it
 -- ============================================
@@ -64,18 +56,6 @@ local function commas(n)
         if count % 3 == 0 and i > 1 then out = ',' .. out end
     end
     return out
-end
-
---- The same grouping, applied to a string of digits that is still being typed.
----
---- SEPARATE FROM commas BECAUSE AN EMPTY FIELD IS NOT ZERO. Running the buffer through commas would
---- turn "" into "0", so an untouched field would read "$0|" and look as though a zero had already
---- been typed — which is exactly the moment the player is deciding whether the thing is listening.
----@param digits string|nil
----@return string
-local function commasTyped(digits)
-    if digits == nil or digits == '' then return '' end
-    return commas(digits)
 end
 
 -- ============================================
@@ -104,7 +84,6 @@ function goRoot(promptId)
 
     level[promptId]    = 'root'
     accounts[promptId] = nil
-    typing[promptId]   = nil
 
     -- setOptions cancels any live input on this prompt, which is what collapses a half-typed
     -- amount when the player looks away. See Interactions.beginInput.
@@ -198,13 +177,7 @@ function actionOptions(promptId, row)
         out[#out + 1] = {
             id    = 'deposit',
             icon  = 'deposit',
-            label = function()
-                if Interactions.inputActive(promptId) and typing[promptId] == 'deposit' then
-                    return 'Deposit   $' .. commasTyped(Interactions.inputText(promptId))
-                        .. Interactions.inputCaret()
-                end
-                return 'Deposit'
-            end,
+            label = 'Deposit',
             callback = function() beginAmount(promptId, row, 'deposit') end,
         }
     end
@@ -213,13 +186,7 @@ function actionOptions(promptId, row)
         out[#out + 1] = {
             id    = 'withdraw',
             icon  = 'withdraw',
-            label = function()
-                if Interactions.inputActive(promptId) and typing[promptId] == 'withdraw' then
-                    return 'Withdraw   $' .. commasTyped(Interactions.inputText(promptId))
-                        .. Interactions.inputCaret()
-                end
-                return 'Withdraw'
-            end,
+            label = 'Withdraw',
             callback = function() beginAmount(promptId, row, 'withdraw') end,
         }
     end
@@ -231,46 +198,31 @@ end
 -- Typing an amount
 -- ============================================
 
---- Turn the selected option into a field.
+--- Type the amount: the machine's prompt steps aside for the typing (a capsule on a keyboard, the number pad on a
+--- pad: client/prompt_typing.lua), titled with what is being done, the amount shown as money.
 ---
---- NO setOptions CALL HERE, AND THAT IS THE POINT. The Deposit option's label already asks whether
---- an input is running and renders itself as a field when one is — so beginning the input is the
---- only thing that has to happen, and the menu does not rebuild underneath the player. Rebuilding
---- it would also cancel the input immediately (setOptions does that deliberately), which is the
---- trap this shape avoids rather than works around.
+--- NO setOptions CALL HERE: it would cancel the input it starts (setOptions does that deliberately).
 ---@param promptId string
 ---@param row table
 ---@param kind string 'deposit' | 'withdraw'
 function beginAmount(promptId, row, kind)
     Interactions.beginInput(promptId, {
         max = Config.AtmMaxDigits or 9,
+        title = ('%s · %s'):format(kind == 'deposit' and 'Deposit' or 'Withdraw', row.label or 'Account'),
+        prefix = '$', commas = true,
 
         onSubmit = function(text)
-            typing[promptId] = nil
-
             local amount = tonumber(text)
             if not amount or amount <= 0 then
-                -- AN EMPTY FIELD IS NOT AN ERROR WORTH A ROUND TRIP. Pressing E on nothing is
-                -- someone changing their mind, so it reads as a quiet cancel rather than a refusal.
+                -- AN EMPTY FIELD IS NOT AN ERROR WORTH A ROUND TRIP. Giving nothing is someone changing their
+                -- mind, so it reads as a quiet cancel rather than a refusal.
                 Interactions.setStatus(promptId, 'Cancelled', 1200)
                 return
             end
 
             submitAmount(promptId, row, kind, math.floor(amount))
         end,
-
-        onCancel = function()
-            typing[promptId] = nil
-        end,
     })
-
-    -- SET AFTER beginInput, NOT BEFORE, and the order is load-bearing. beginInput cancels whatever
-    -- input was already running — which fires that input's onCancel — and the onCancel above clears
-    -- this very flag. Setting it first therefore works right up until the moment a second amount is
-    -- started on the same machine, at which point the flag is wiped a microsecond after it is set
-    -- and NEITHER Deposit nor Withdraw renders as a field: the digits go in, and nothing on screen
-    -- moves.
-    typing[promptId] = kind
 end
 
 -- ============================================
@@ -390,7 +342,6 @@ PropPrompts.define({
     onRemove = function(rec)
         level[rec.id]    = nil
         accounts[rec.id] = nil
-        typing[rec.id]   = nil
     end,
 })
 

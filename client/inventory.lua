@@ -790,10 +790,17 @@ function IsGameInputFree(forPrompts, exceptBar, forHotbar)
     elseif screensOpen() or busy then
         return false
     end
-    -- Typing an amount into a prompt (ctx.beginInput): digits are read raw, so key mappings would fire too.
+    -- Typing into a prompt (ctx.beginInput, client/prompt_typing.lua): the keys are the typing's, and a key mapping
+    -- still fires under its KeepInput, so no hotkey acts on the world meanwhile.
     if not forPrompts and Interactions ~= nil and Interactions.inputActive ~= nil
         and Interactions.inputActive() then
         return false
+    end
+    -- For the prompts' own question, the typing's hold on the keyboard is theirs, not a screen: the prompt being typed
+    -- into stays up under it. Only while it holds the focus alone (a screen opening ends the typing).
+    if forPrompts and PromptTyping ~= nil and PromptTyping.holdsFocusAlone() then
+        if PlacingModeActive or ThrowModeActive then return false end
+        return true
     end
     if PlacingModeActive or ThrowModeActive then return false end
     -- Give mode too: the item in hand owns the keys until thrown.

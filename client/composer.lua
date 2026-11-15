@@ -256,6 +256,9 @@ local function OpenComposer(opts)
     -- Nor over another screen holding the focus. (Screens themselves are the caller's call: whip_chat
     -- asks IsAnyScreenOpen.)
     if FocusScreenUp ~= nil and FocusScreenUp('composer') then return false end
+    -- Nor while a value is typed into a prompt (client/prompt_typing.lua): its keys reach the game too, so chat's T,
+    -- typed into the capsule, would otherwise open chat over it.
+    if Interactions ~= nil and Interactions.inputActive ~= nil and Interactions.inputActive() then return false end
 
     _session  = opts
     _openedAt = GetGameTimer()

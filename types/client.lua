@@ -786,10 +786,10 @@ function whip_core:IsRadialOpen() end
 ---@field flash fun(r: number, g: number, b: number)|nil onSelect only. Tint the prompt for a moment (world prompts)
 ---@field status fun(text: string, ms: number|nil)|nil onSelect only. Say something on the prompt (a notification elsewhere)
 ---@field refuse fun(why: string|nil)|nil onSelect only. Amber flash and the reason (an error notification elsewhere)
----@field beginInput fun(opts: { max: number|nil, onSubmit: fun(text: string), onCancel: fun()|nil }): boolean|nil onSelect only. Type a number into the prompt
+---@field beginInput fun(opts: { max: number|nil, numeric: boolean|nil, title: string|nil, prefix: string|nil, commas: boolean|nil, placeholder: string|nil, value: string|nil, onSubmit: fun(text: string), onCancel: fun()|nil, onChange: fun(text: string)|nil }): boolean|nil onSelect only. Type a value: the prompt steps aside for a capsule (a keyboard: Enter gives it) or the 3D on-screen keyboard (a pad). A number by default (`numeric = false`: any text)
 ---@field cancelInput fun()|nil onSelect only
----@field inputText fun(): string|nil onSelect only. The digits typed so far, or nil when not typing
----@field typed string|false The digits and a blinking caret while typing, else false — for a label. A value, not a function
+---@field inputText fun(): string|nil onSelect only. What is typed so far, or nil when not typing
+---@field typed string|false What is typed and a blinking caret while typing, else false. A value, not a function (the prompt itself is hidden while it is typed into)
 ---@field under string|nil onSelect, an option in a menu: the id of the menu option it was chosen in
 ---@field model string|nil at.model: the prop's model name
 ---@field face 1|2|nil at.model: which face of the prop (2 on a two-sided prop's other side)

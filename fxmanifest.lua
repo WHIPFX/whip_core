@@ -301,6 +301,8 @@ client_scripts {
     'client/interact.lua',
     'client/interact_nui.lua',
     'client/interact_world.lua',
+    -- Typing a value into a prompt (Interactions.beginInput): after dui_page.lua (DuiPage.new at file scope).
+    'client/prompt_typing.lua',
     'client/bubbles.lua',
     'client/vision.lua',
     'client/ped_outfit.lua',

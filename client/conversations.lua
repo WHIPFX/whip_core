@@ -9,9 +9,11 @@
 --     or they go down.
 --   * An answer whose reply the server sent ahead (`next`) shows it at once; otherwise the capsule dims until the
 --     server speaks.
---   * An answer that takes an amount (`input`) becomes a field when chosen (Interactions.beginInput): digits go in,
---     E gives it, Backspace on an empty field steps back.
---   * A haggle (`haggle` on the line) draws a ruler over the answers; the amount starts mid-range and ← → move it.
+--   * An answer that takes an amount (`input`) becomes a field when chosen (Interactions.beginInput,
+--     client/prompt_typing.lua): on a keyboard the digits show in the answer's row (no capsule: the dialog is it),
+--     Enter gives it, Esc or Backspace on an empty field steps back; on a pad the number pad hangs under the dialog.
+--   * A haggle (`haggle` on the line) draws a ruler over the answers; the amount starts mid-range and ← → move it
+--     (a keyboard: the pad's D-pad is the number pad's).
 --
 -- One draw thread at frame rate, only while a conversation is open.
 
@@ -46,9 +48,9 @@ local function entityOf(netId)
     return ent
 end
 
-local TYPING_HINT = 'Type the amount · E to give it · Backspace to go back'
-local TEAM_TYPING_HINT = 'Type their character ID · E to ask them · Backspace to go back'
-local HAGGLE_TYPING_HINT = '← → or type it · E to ask · Backspace to go back'
+local TYPING_HINT = 'Type the amount · Enter to give it · Esc to go back'
+local TEAM_TYPING_HINT = 'Type their character ID · Enter to ask them · Esc to go back'
+local HAGGLE_TYPING_HINT = '← → or type it · Enter to ask · Esc to go back'
 
 --- What a typed answer shows while it is being typed: "$1250|".
 local function typedLabel(c)
@@ -68,7 +70,9 @@ local function paint()
         labels[i] = (conv.typing and conv.typing.id == o.id) and typedLabel(conv) or (o.label or '')
     end
     local team, haggle = conv.layer.team, conv.layer.haggle
-    local hint = conv.typing and (team and TEAM_TYPING_HINT or haggle and HAGGLE_TYPING_HINT or TYPING_HINT) or ''
+    -- The keys' words on a keyboard; on a pad the number pad under the dialog has its own.
+    local keyboard = PromptTyping.look() == 'capsule'
+    local hint = (conv.typing and keyboard) and (team and TEAM_TYPING_HINT or haggle and HAGGLE_TYPING_HINT or TYPING_HINT) or ''
     local asking = haggle and conv.typing and tonumber(Interactions.inputText(PROMPT) or '') or nil
     send({ layout = team and 'team' or haggle and 'haggle' or conv.layout, speaker = conv.speaker or '', line = conv.layer.line or '',
            options = labels, waiting = conv.waiting == true, hint = hint,
@@ -133,6 +137,15 @@ local function beginTyping(c, opt)
     c.typing = { id = opt.id, prefix = opt.input.prefix or '' }
     local started = Interactions.beginInput(PROMPT, {
         max = math.max(1, math.min(9, maxDigits)),
+        title = opt.label, prefix = opt.input.prefix,
+        -- On a keyboard the answer's row is the field (paint), so no capsule; on a pad the number pad hangs under
+        -- the dialog, from its lower edge (drawLoop keeps where that is).
+        capsule = false, hang = true,
+        anchor = function()
+            local at = conv == c and c.dialogAt or nil
+            if not at then return nil end
+            return at.x, at.y, at.z
+        end,
         onSubmit = function(text)
             if conv ~= c then return end
             c.typing = nil
@@ -231,9 +244,10 @@ local function drawLoop()
         local now = GetGameTimer()
         local dt = (now - last) / 1000
         last = now
-        -- A typed amount is repainted when it changes, not every frame.
+        -- A typed amount is repainted when it changes, not every frame. ← → nudge a haggle on a keyboard (on a pad
+        -- the D-pad is the number pad's).
         if conv.typing then
-            nudge(conv, now)
+            if PromptTyping.look() == 'capsule' then nudge(conv, now) end
             local shown = typedLabel(conv)
             if shown ~= conv.typing.shown then
                 conv.typing.shown = shown
@@ -284,6 +298,10 @@ local function drawLoop()
             WorldQuad.draw(TXD, TEX, qx, qy, qz,
                 rx, ry, 0.0, 0.0, 0.0, 1.0, w, w * 0.5,
                 0.0, (idx - 1) / 4, 1.0, idx / 4, 255, 255, 255, 255)
+            -- Its lower edge: where a pad's number pad hangs from while an amount is typed.
+            local at = conv.dialogAt or {}
+            at.x, at.y, at.z = qx, qy, qz - w * 0.25
+            conv.dialogAt = at
         end
         Wait(0)
     end

@@ -8168,7 +8168,7 @@ end)</code></pre>
 <tr><td><code>model</code>, <code>face</code>, <code>prop</code></td><td><code>at = { model }</code>: model name, face (1, or 2), and the prop's id</td></tr>
 <tr><td><code>player</code></td><td>On a person who is a real player: <code>{ serverId, playerIdx, activeJob, isDead }</code>; <code>nil</code> for an NPC. Name: <code>GetPlayerFullName(ctx.player.serverId)</code></td></tr>
 <tr><td><code>flash(r, g, b)</code>, <code>status(text, ms)</code>, <code>refuse(why)</code></td><td>Tint the prompt, say something on it, or flash amber with a reason (a notification off world prompts)</td></tr>
-<tr><td><code>beginInput(opts)</code>, <code>cancelInput()</code>, <code>inputText()</code></td><td>See <a href="#interactions-input">typing a number</a></td></tr>
+<tr><td><code>beginInput(opts)</code>, <code>cancelInput()</code>, <code>inputText()</code></td><td>See <a href="#interactions-input">typing into a prompt</a></td></tr>
 <tr><td><code>typed</code></td><td>What's typed so far with a caret, or <code>false</code>, for your label</td></tr>
 </table>
 <pre><code class="lang-lua">exports.whip_core:AddAction({
@@ -8310,19 +8310,35 @@ exports.whip_core:PlayPress(vector3(x, y, z), { normal = vector3(0, -1, 0) })</c
 <div class="return-info"><strong>Returns: </strong>nothing</div>
 </div></div>
 
-<h3 id="interactions-input">Typing a number into a prompt</h3>
-<p>A world prompt can take digits instead of the game, with <kbd>E</kbd> to submit. Start it from <code>onSelect</code> with <code>ctx.beginInput</code> and show it with <code>ctx.typed</code>.</p>
+<h3 id="interactions-input">Typing into a prompt</h3>
+<p>A world prompt can ask for a value: start it from <code>onSelect</code> with <code>ctx.beginInput</code>. The prompt steps aside, and what stands in its place depends on what the player is holding:</p>
+<ul>
+  <li><strong>A keyboard:</strong> a capsule in the chat capsule's look, with the option's glyph and words, saying "Start typing". The keys go to it while the mouse still looks round. <kbd>Enter</kbd> gives the value, <kbd>Esc</kbd> (or <kbd>Backspace</kbd> on nothing) leaves it.</li>
+  <li><strong>A pad:</strong> WHIP's on-screen keyboard, in 3D. The left stick moves a circle over the keys, the D-pad steps from key to key and A types; X deletes, Y is a space, LT turns to the symbols, RB or Done gives the value, B or Cancel leaves it. The right stick still looks round; walking is held off until it is done. A number gets the number pad.</li>
+</ul>
+<p>Both stand where the prompt was, facing the player, and stay there while they look round. Picking up a pad or putting it down while typing swaps them, keeping what was typed. By default the value is a number (digits only, no leading zero); <code>numeric = false</code> takes any text.</p>
 <pre><code class="lang-lua">exports.whip_core:AddAction({
-    id = 'deposit', at = { coords = vector3(150.2, -1040.1, 29.4) }, icon = 'deposit',
-    label = function(ctx) return ctx.typed and ('Deposit  $' .. ctx.typed) or 'Deposit' end,
+    id = 'deposit', at = { coords = vector3(150.2, -1040.1, 29.4) }, icon = 'deposit', label = 'Deposit',
     onSelect = function(ctx)
         ctx.beginInput({
-            max = 6,   -- most digits (default 9)
+            max = 6,            -- most characters (default 9 for a number, 64 for text)
+            prefix = '$', commas = true,   -- shown as $1,250
             onSubmit = function(text) TriggerServerEvent('bank:deposit', tonumber(text)) end,
-            onCancel = function() end,   -- backed out, or replaced by another input
+            onCancel = function() end,   -- left, or replaced by another input
         })
     end,
 })</code></pre>
+<table class="param-table"><tr><th>opts</th><th>Type</th><th>Description</th></tr>
+<tr><td>max</td><td>number?</td><td>The most characters: default 9 for a number, 64 for text</td></tr>
+<tr><td>numeric</td><td>boolean?</td><td><code>true</code> (default): digits only, the number pad on a controller. <code>false</code>: any text, the whole keyboard</td></tr>
+<tr><td>title</td><td>string?</td><td>What is being typed, over the text. Default: the option's own words</td></tr>
+<tr><td>prefix</td><td>string?</td><td>Shown before the text, such as <code>'$'</code></td></tr>
+<tr><td>commas</td><td>boolean?</td><td>A number shown in groups of three (1,250); what <code>onSubmit</code> gets stays digits</td></tr>
+<tr><td>placeholder</td><td>string?</td><td>What shows until something is typed. Default <code>'Start typing'</code></td></tr>
+<tr><td>value</td><td>string?</td><td>The text it starts with</td></tr>
+<tr><td>onSubmit</td><td>function(text)</td><td>The value was given</td></tr>
+<tr><td>onCancel</td><td>function?</td><td>It was left, the player walked off, or another input replaced it</td></tr>
+<tr><td>onChange</td><td>function(text)?</td><td>Each change of the text</td></tr></table>
 
 <h3 id="interactions-style">Styles</h3>
 <p>A style sets a world prompt's size, colour, visibility and motion, by name or as a table. What it leaves out comes from its <code>base</code>, then <code>'default'</code> (<code>Config.Interact3D</code>). WHIP ships <code>subtle</code> (smaller, hidden until in reach) and <code>lively</code>; server owners add styles in <code>Config.Interact3D.styles</code> and set every prompt under <code>styles.default</code>. WHIP's own prompts take one per group from <code>groupStyles</code>: <code>doors</code>, <code>vehicles</code>, <code>ground_items</code>, <code>garages</code>, <code>containers</code>, <code>properties</code>, <code>conversation</code>, <code>atm</code>, and <code>actions</code> for every <code>AddAction</code> and <code>AddPoint</code>. A prompt's own <code>style</code> wins; a misspelt one is warned about in F8.</p>
