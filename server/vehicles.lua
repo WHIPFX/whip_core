@@ -984,6 +984,17 @@ function Vehicles.normalisePlate(plate)
     return plate
 end
 
+--- The plate as the car wears it: centred in the game's 8-character plate field. Enhanced draws a
+--- short plate from the left edge (Legacy centres it), so the padding is put on here. Only the entity
+--- gets it: records and the plate index keep the trimmed plate, and every match ignores spaces.
+---@param plate string
+---@return string
+function Vehicles.displayPlate(plate)
+    plate = tostring(plate):gsub('^%s+', ''):gsub('%s+$', '')
+    local pad = math.max(0, 8 - #plate)
+    return (' '):rep(pad // 2) .. plate .. (' '):rep(pad - pad // 2)
+end
+
 function Vehicles.create(data)
     -- A model the game has (Vehicles.modelExists), before anything is written: a dealership sale
     -- refunds on this answer, and /whip shows it.
@@ -2776,7 +2787,7 @@ local function spawnLocked(vehicleId, def, x, y, z, heading)
     end
 
     if def.plate then
-        SetVehicleNumberPlateText(entity, def.plate)
+        SetVehicleNumberPlateText(entity, Vehicles.displayPlate(def.plate))
     end
 
     bindEntity(vehicleId, entity, def)
@@ -3500,7 +3511,7 @@ function Vehicles.spawnTemp(model, x, y, z, heading, opts, owner)
         DeleteEntity(entity)
         return nil, 'Vehicle did not network'
     end
-    SetVehicleNumberPlateText(entity, plate)
+    SetVehicleNumberPlateText(entity, Vehicles.displayPlate(plate))
 
     local vehicleId = newSessionRecord(plate, model, vehType)
     local def = Vehicles._records[vehicleId]

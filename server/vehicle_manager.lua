@@ -542,7 +542,7 @@ SecureEvent('whip_core:server:vmSave', {
     -- A car in the world wears its new plate at once: the record and the car must not differ.
     if ok and out.plate then
         local entity = Vehicles.getEntity(vehicleId)
-        if entity then SetVehicleNumberPlateText(entity, out.plate) end
+        if entity then SetVehicleNumberPlateText(entity, Vehicles.displayPlate(out.plate)) end
     end
 
     -- Ownership moving is worth announcing, because two client lists have to change and only one

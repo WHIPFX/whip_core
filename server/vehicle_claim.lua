@@ -248,7 +248,7 @@ function Vehicles.setPlate(vehicleId, plate)
         if not ok then return false, err or DB_ERROR end
     end
     local entity = Vehicles.getEntity(vehicleId)
-    if entity then SetVehicleNumberPlateText(entity, p) end
+    if entity then SetVehicleNumberPlateText(entity, Vehicles.displayPlate(p)) end
     -- Owned only: a street or temporary car's ownerCharId is 0, which is truthy, and its rows went under character 0
     -- (audit 20, VEH-11)
     if not def.session and def.ownerCharId and def.ownerCharId > 0 then
