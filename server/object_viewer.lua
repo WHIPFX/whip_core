@@ -599,8 +599,8 @@ ACTIONS['ply.escort'] = { kind = 'player', fn = function(source, _, sid)
 end }
 
 ACTIONS['ply.creator'] = { kind = 'player', fn = function(_, _, sid)
-    if Players[sid].isDead then return false, 'They are down' end
-    TriggerClientEvent('whip_core:client:ovSelf', sid, 'creator')
+    local ok, why = OpenCharacterEditorFor(sid)   -- server/events_misc.lua, the OpenCharacterEditor export's body
+    if not ok then return false, why end
     return true, 'Their character editor is open'
 end }
 

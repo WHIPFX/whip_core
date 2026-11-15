@@ -1509,8 +1509,8 @@ end)
 
 -- /charedit
 
---- Open the character editor on this character (/charedit, and the object viewer's Force Open Character
---- Editor, client/ov_effects.lua). Waits; call it from a thread.
+--- Open the character editor on this character (/charedit, and the server's OpenCharacterEditor export below).
+--- Waits; call it from a thread.
 ---@return boolean ok
 ---@return string|nil why
 function OpenCharacterEditor()
@@ -1558,6 +1558,17 @@ DevCommand('charedit', function()
             args = {'[whip_core]', why}
         })
     end
+end)
+
+-- The server opens it: the OpenCharacterEditor export and the object viewer's Force open character editor
+-- (OpenCharacterEditorFor, server/events_misc.lua).
+RegisterNetEvent('whip_core:client:openCharacterEditor', function()
+    if not PlayerLoaded then return end
+    CreateThread(function()
+        if Emotes then Emotes.stop() end
+        local ok, why = OpenCharacterEditor()
+        if not ok then print('[whip_core] the character editor the server opened did not open: ' .. tostring(why)) end
+    end)
 end)
 
 --- Change Model (object viewer, client/ov_effects.lua): the ped becomes `model` with its default look until

@@ -99,12 +99,6 @@ RegisterNetEvent('whip_core:client:ovSelf', function(what, arg)
     if not PlayerLoaded then return end
     if what == 'fire' then
         burn(PlayerPedId())
-    elseif what == 'creator' then
-        CreateThread(function()
-            if Emotes then Emotes.stop() end
-            local ok, why = OpenCharacterEditor()
-            if not ok then print('[whip_core] the character editor an admin opened did not open: ' .. tostring(why)) end
-        end)
     elseif what == 'model' then
         CreateThread(function() WearModel(type(arg) == 'string' and arg or nil) end)
     elseif what == 'walk' and Emotes then

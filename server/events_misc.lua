@@ -5,7 +5,7 @@
 -- Contains:
 --   - Death / revive (playerDied, interactionUsed, playerRespawned)
 --   - Escort (escortPlayer, releaseEscort, seatInVehicle, pullFromVehicle)
---   - Appearance (SanitizeAppearance export, saveAppearance)
+--   - Appearance (SanitizeAppearance and OpenCharacterEditor exports, saveAppearance)
 --   - Shop gameplay events (open, close, purchase, set price, stock)
 --   - UI Library Tester gate
 --   - Opening another player's inventory (open/close)
@@ -801,6 +801,27 @@ exports('SanitizeAppearance', function(appearance)
     local out, err = sanitizeAppearance(appearance)
     if not out then return false, err or 'invalid appearance' end
     return true, out
+end)
+
+--- Open a player's character editor on their own character, as /charedit does: Save keeps the new look, Cancel
+--- puts the old one back. The OpenCharacterEditor export and the object viewer's Force open character editor.
+--- Their game opens it (client/appearance.lua), and still refuses there if the editor is already open.
+---@param who number|table  a server id, or { charId = n } for a character who is online
+---@return boolean ok
+---@return string|nil why
+function OpenCharacterEditorFor(who)
+    local charId, found = WhoIs(who)
+    if not charId then return false, found end   -- WhoIs's own words
+    local player = found and Players[found]
+    if not player then return false, 'That character is not online' end
+    if player._inCreator then return false, 'They are still making their character' end
+    if player.isDead then return false, 'They are down' end
+    TriggerClientEvent('whip_core:client:openCharacterEditor', found)
+    return true
+end
+
+exports('OpenCharacterEditor', function(who)
+    return OpenCharacterEditorFor(who)
 end)
 
 SecureEvent('whip_core:server:saveAppearance', {

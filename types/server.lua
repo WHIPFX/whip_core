@@ -1556,6 +1556,14 @@ function whip_core:FlushActivityLog() end
 ---@return table|string result The sanitized appearance when ok, otherwise the reason it was refused
 function whip_core:SanitizeAppearance(appearance) end
 
+--- Open a player's character editor on their own character, as /charedit does: Save keeps the new look, Cancel
+--- puts the old one back. Refused for someone not online, still making their character, or down; their game also
+--- refuses it while the editor is already open.
+---@param who number|{ charId: number } A server id, or { charId = n } for a character who is online
+---@return boolean ok
+---@return string|nil why
+function whip_core:OpenCharacterEditor(who) end
+
 --- Register (or replace) one accessory-strip slot. Re-registration is
 --- idempotent, and a stopping resource's slots are unregistered automatically.
 --- `accepts` names the item key the slot takes, or a list of them; `keys = true` takes any ignition key

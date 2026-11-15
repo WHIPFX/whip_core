@@ -2901,6 +2901,17 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
   <tr><td>appearance</td><td>table</td><td>Appearance data to validate</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean ok, table|string result</code>: the cleaned appearance, or why it was refused</div>
 </div></div>
+
+<div class="export-card" data-search="opencharactereditor character editor creator appearance clothing barber surgeon open force">
+<div class="export-header"><span class="export-name">OpenCharacterEditor(who)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>Opens a player's character editor on their own character, as <code>/charedit</code> does: Save keeps the new look and Cancel puts the old one back. It's refused for someone who isn't online, is still making their character or is down, and their game also refuses it while the editor is already open. A clothing shop or a surgeon calls it once the player has paid.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>who</td><td>number|table</td><td>A server id, or <code>{ charId = n }</code> for a character who is online</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
+<pre><code class="lang-lua">local ok, why = exports.whip_core:OpenCharacterEditor(source)
+if not ok then exports.whip_core:NotifyPlayer(source, why, 'error') end</code></pre>
+</div></div>
 <h2 id="client-player">Player &amp; Status (Client)</h2>
 <p class="lede">Client exports about the local player: their sheet, stats and effects, body state, emotes and voice. For the server side, see <a href="#player">Player</a>.</p>
 
