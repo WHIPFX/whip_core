@@ -241,6 +241,11 @@ RegisterNUICallback('wpCharSearch', function(data, cb)
     cb(Callback('whip_core:wpCharSearch', q) or {})
 end)
 
+-- Everyone, for a page's list of people (pickers.js personList). Pure relay, as above.
+RegisterNUICallback('wpCharList', function(_, cb)
+    cb(Callback('whip_core:wpCharList') or {})
+end)
+
 -- The portraits of the people a section is showing (pickers.js avatar). Pure relay, as above:
 -- server/portraits.lua owns the ACE gate, the page size and the read.
 RegisterNUICallback('wpPortraits', function(data, cb)

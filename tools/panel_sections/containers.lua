@@ -47,13 +47,16 @@ end)
 
 -- ---- The wizard's Where step: put it in the world ----
 --
--- A see-through copy of the container's prop, where you aim; ←/→ turn it, E puts it there. It is
--- placed the way the real one will be (client/containers.lua SpawnContainerProp: at the spot, turned,
--- then settled on the ground), so where it stands now is where it will stand. Only this game sees it.
+-- A see-through copy of the container's prop, where you aim, and the in-world editors' card (EditorHud's house
+-- card, as the garage bays and the sign post have) saying the keys, a controller's when one is in hand. It is placed
+-- the way the real one will be (client/containers.lua SpawnContainerProp: at the spot, turned, then settled on the
+-- ground), so where it stands now is where it will stand. Only this game sees it.
 
-local PLACE_REACH = 10.0   -- metres: as far as you can aim it
-local PLACE_TURN = 90.0    -- degrees a second on ←/→ (Shift: a quarter of that)
-local KEY_LEFT, KEY_RIGHT, KEY_HERE, KEY_FINE = 174, 175, 38, 21
+local PLACE_REACH     = 10.0   -- metres: as far as you can aim it
+local PLACE_TURN      = 60.0   -- degrees a second: Q / E, or a trigger all the way down (the sign post's)
+local PLACE_TURN_FINE = 15.0   -- with Alt
+-- On a pad, held while it places: Menu (named, so the pause menu stands aside), X's jump, Y's get-in.
+local PLACE_PAD_BLOCK = { controls = { 199, 22, 23 } }
 
 RegisterNUICallback('cmPlace', function(data, cb)
     data = type(data) == 'table' and data or {}
@@ -68,72 +71,106 @@ RegisterNUICallback('cmPlace', function(data, cb)
         return
     end
 
-    local ghost = nil
-    local spot = nil
-    local nextHud = 0
+    local ghost, spot, aimed = nil, nil, false
+    local pad, padHeld = false, false
+
+    local function card()
+        return {
+            house = true, icon = 'bag', title = 'Container', sub = name,
+            chip = { text = prop },
+            rows = {
+                { label = 'Aim', value = aimed and ('facing %.0f°'):format(heading) or 'at the ground where it goes',
+                  tone = not aimed and 'warn' or nil },
+                { label = 'Here', value = spot and ('%.1f, %.1f, %.1f'):format(spot.x, spot.y, spot.z) or 'nowhere yet' },
+            },
+            hints = {
+                { key = 'Enter', pad = 'a', text = 'Put it here', off = spot == nil },
+                { key = 'Q / E', pad = { 'lt', 'rt' }, text = 'Turn it' },
+                { key = 'Alt', pad = false, text = 'Turn slowly' },
+                { key = 'C', pad = 'b', text = 'Cancel' },
+            },
+        }
+    end
+
+    local function holdPad(on)
+        if on == padHeld then return end
+        padHeld = on
+        if on then ControlBlocks.hold('placeContainerPad', PLACE_PAD_BLOCK) else ControlBlocks.release('placeContainerPad') end
+    end
+    -- A press on the device in hand only: a pad's buttons are keys on a keyboard too, and the reverse.
+    local pressed = WhipKeyPressed
 
     local started = PropertyEditor.start({
         name = 'Container spot',
-        hud = {
-            title = 'Where the container goes',
-            sub = name,
-            rows = {
-                { label = 'Aim', value = 'at the ground where it goes' },
-                { label = 'Model', value = prop },
-            },
-            hints = {
-                { key = 'E', text = 'Here' },
-                { key = '← →', text = 'Turn' },
-                { key = 'Esc', text = 'Back' },
-            },
-        },
-        onFrame = function()
-            -- The map only: the ghost itself must never be what the ray lands on.
-            local hit, coords = Interactions.aimRay(PLACE_REACH, 1)
-            if not hit then
-                local ped = PlayerPedId()
-                local p = GetEntityCoords(ped)
-                local h = math.rad(GetEntityHeading(ped))
-                coords = vector3(p.x - math.sin(h) * 1.5, p.y + math.cos(h) * 1.5, p.z - 0.95)
-            end
+        hud = card(),
+        -- What is read, held off so it does not also fire underneath: the wheel, attack and aim (a pad's
+        -- triggers), cover, Q / E (44, 38), reload, melee, Enter (201, 18), Alt (19). C (26) too.
+        block = { controls = { 14, 15, 16, 17, 24, 25, 26, 37, 38, 44, 45, 140, 141, 142, 201, 18, 19, 257, 263, 264 } },
+        onFrame = (function()
+            local nextHud, lastAimed = 0, nil
+            return function()
+                pad = WhipLastInputIsPad()
+                holdPad(pad)
+                local dt = GetFrameTime()
 
-            local rate = IsControlPressed(0, KEY_FINE) and PLACE_TURN * 0.25 or PLACE_TURN
-            if IsControlPressed(0, KEY_LEFT) then heading = (heading + rate * GetFrameTime()) % 360.0 end
-            if IsControlPressed(0, KEY_RIGHT) then heading = (heading - rate * GetFrameTime()) % 360.0 end
+                -- Turn it: Q / E held, or the triggers.
+                if pad then
+                    local t = WhipPadTrigger('rt') - WhipPadTrigger('lt')   -- RT turns it right, LT left
+                    if t ~= 0.0 then heading = (heading - t * PLACE_TURN * dt) % 360.0 end
+                else
+                    local rate = IsDisabledControlPressed(0, 19) and PLACE_TURN_FINE or PLACE_TURN
+                    if IsDisabledControlPressed(0, 44) then heading = (heading + rate * dt) % 360.0
+                    elseif IsDisabledControlPressed(0, 38) then heading = (heading - rate * dt) % 360.0 end
+                end
 
-            if not ghost or not DoesEntityExist(ghost) then
-                ghost = CreateObject(model, coords.x, coords.y, coords.z, false, false, false)
-                SetEntityAlpha(ghost, 170, false)
-                SetEntityCollision(ghost, false, false)
-                FreezeEntityPosition(ghost, true)
-            end
-            -- Stood as the real one will stand (client/containers.lua): a placed one exactly at its
-            -- spot, every other one snapped to the ground.
-            if placed then
-                SetEntityCoordsNoOffset(ghost, coords.x, coords.y, coords.z, false, false, false)
-                SetEntityHeading(ghost, heading)
-            else
-                SetEntityCoords(ghost, coords.x, coords.y, coords.z, false, false, false, false)
-                SetEntityHeading(ghost, heading)
-                PlaceObjectOnGroundProperly(ghost)
-            end
-            spot = coords
+                -- The map only: the ghost itself must never be what the ray lands on. Aimed at nothing (the sky),
+                -- it stands a step in front of you.
+                local hit, coords = Interactions.aimRay(PLACE_REACH, 1)
+                aimed = hit and true or false
+                if not hit then
+                    local ped = PlayerPedId()
+                    local p = GetEntityCoords(ped)
+                    local h = math.rad(GetEntityHeading(ped))
+                    coords = vector3(p.x - math.sin(h) * 1.5, p.y + math.cos(h) * 1.5, p.z - 0.95)
+                end
 
-            local now = GetGameTimer()
-            if now >= nextHud then
-                nextHud = now + 250
-                EditorHud.update({ rows = {
-                    { label = 'Here', value = ('%.1f, %.1f, %.1f'):format(coords.x, coords.y, coords.z) },
-                    { label = 'Facing', value = ('%.0f°'):format(heading) },
-                } })
-            end
+                if not ghost or not DoesEntityExist(ghost) then
+                    ghost = CreateObject(model, coords.x, coords.y, coords.z, false, false, false)
+                    SetEntityAlpha(ghost, 170, false)
+                    SetEntityCollision(ghost, false, false)
+                    FreezeEntityPosition(ghost, true)
+                end
+                -- Stood as the real one will stand (client/containers.lua): a placed one exactly at its
+                -- spot, every other one snapped to the ground.
+                if placed then
+                    SetEntityCoordsNoOffset(ghost, coords.x, coords.y, coords.z, false, false, false)
+                    SetEntityHeading(ghost, heading)
+                else
+                    SetEntityCoords(ghost, coords.x, coords.y, coords.z, false, false, false, false)
+                    SetEntityHeading(ghost, heading)
+                    PlaceObjectOnGroundProperly(ghost)
+                end
+                spot = coords
 
-            if IsControlJustPressed(0, KEY_HERE) and spot then
-                WhipPanelData('containers', 'spot', { x = spot.x, y = spot.y, z = spot.z, heading = heading })
-                return 'exit'
+                if pressed(201, 201) or (not pad and IsDisabledControlJustPressed(0, 18)) then
+                    WhipPanelData('containers', 'spot', { x = spot.x, y = spot.y, z = spot.z, heading = heading })
+                    return 'exit'
+                end
+                -- C / B: back to the wizard, nothing placed. Menu on a pad too (Esc is the mode's own).
+                if WhipCancelJustPressed() or (pad and pressed(199, 199)) then return 'exit' end
+
+                -- The card: at once when the aim finds or loses the ground, else five times a second.
+                local now = GetGameTimer()
+                if aimed ~= lastAimed then nextHud = 0 end
+                lastAimed = aimed
+                if now >= nextHud then
+                    nextHud = now + 200
+                    EditorHud.update(card())
+                end
             end
-        end,
+        end)(),
         onExit = function()
+            holdPad(false)
             if ghost and DoesEntityExist(ghost) then DeleteEntity(ghost) end
             ghost = nil
             SetModelAsNoLongerNeeded(model)

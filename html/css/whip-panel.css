@@ -1367,6 +1367,44 @@
 .wp-tiles-wide .wp-tile-img,
 .wp-tiles-wide .wp-tile-art { height: calc(var(--wp-tile-w, 200px) * 0.46); }
 .wp-tiles-wide .wp-tile-name { font-size: var(--ui-fs-sm); }
+/* Props and items, the same way (pickers.js fillRow): as wide as fills the row, squarer than a car's picture. */
+.wp-tiles-fill .wp-tile { width: var(--wp-tile-w, 108px); }
+.wp-tiles-fill .wp-tile-img,
+.wp-tiles-fill .wp-tile-art { height: calc(var(--wp-tile-w, 108px) * 0.6); }
+/* The prop picked, large, over its Model box and chips (pickers.js propPicker): a square, as tall as a car's. */
+.wp-pick-col .wp-pick-hero.wp-hero-square { height: 220px; align-items: center; padding: var(--ui-sp-5); box-sizing: border-box; }
+/* A picker's top row: a field beside its search (the container wizard's Name), the two sharing the row. */
+.wp-pick-top { flex: 0 0 auto; display: flex; align-items: stretch; gap: var(--ui-sp-4); }
+.wp-pick-top > * { flex: 1 1 0; min-width: 0; margin-bottom: 0; }
+.wp-pick-top > .wp-search { flex: 1 1 0; }
+/* Everyone, as a list (pickers.js personList): its search, then the people, scrolling on their own. */
+.wp-people { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ui-sp-4); }
+.wp-people > .wp-search { flex: 0 0 auto; }
+/* A container opened (pickers.js inventoryPreview): the Vehicle Adjustments preview's panel, its slots four across. */
+.wp-inv-preview.inv-panel { padding: var(--ui-sp-6); }
+.wp-inv-preview .inv-panel-header { margin-bottom: var(--ui-sp-5); }
+.wp-inv-preview .inv-slots-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--ui-sp-3);
+    max-height: 460px;
+    overflow-y: auto;
+}
+.wp-inv-preview-more { margin-top: var(--ui-sp-4); font-size: var(--ui-fs-sm); color: var(--ui-text-label); }
+
+/* ---- The container wizard (wp/containers.js) ----
+   Holds and Access: the choices down the left, what they make on the right (the container opened; everyone to pick
+   from). Each side scrolls on its own. Items is the prop picker's shape, its choices in the side column. */
+.cw-split { flex: 1; min-height: 0; display: flex; gap: var(--ui-sp-7); }
+.cw-left { flex: 0 0 380px; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.cw-right { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.cw-left .wp-choices, .wp-pick-col .wp-choices { flex-direction: column; }
+.cw-left .wp-choice, .wp-pick-col .wp-choice { flex: 0 0 auto; }
+.cw-right > .wp-section-title:first-child, .cw-left > .wp-section-title:first-child { margin-top: 0; }
+/* The container opened, at about the inventory's own size: its column's width, not the whole pane's. */
+.cw-right .wp-inv-preview { max-width: 440px; }
+/* Who it is for, on the left of Access: a row each; the one the list on the right picks for is lit. */
+.cw-who { cursor: pointer; }
+.cw-who.active, .cw-who.active:hover { background: var(--ui-slot-bg-chosen); border-color: var(--ui-ring); }
 
 /* Raw data, readable: an item's metadata where it is more than a few plain values. */
 .wp-code {

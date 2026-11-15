@@ -8,12 +8,14 @@
 // ONE WIZARD SETS CONTAINERS UP AND CHANGES THEM (the prop picked from a visual list, as NPCs and
 // shops are). WP.stepper, as the shop and property wizards use it, in the section's place:
 //
-//   Name     what it is called, and its kind (a label: a stash, a crate)
-//   Model    the furnisher's props as pictures (pickers.js propPicker), or a model typed in
-//   Where    put it in the world — a see-through copy where you aim, E to place — or where you stand
-//   Holds    how many slots and how much weight
-//   Access   who can open it: anyone near it, one character, or nobody (locked); and whose it is
-//   Items    anything, or only the items picked from the Item Browser's list
+//   Name & Model  what it is called, beside the props' search; the furnisher's props as pictures, the new-vehicle
+//                 wizard's way (pickers.js propPicker), or a model typed in. Every new one is a stash.
+//   Where    put it in the world — a see-through copy where you aim, the placer's card saying the keys — or where
+//            you stand
+//   Holds    how many slots and how much weight, down the left; the container opened, on the right
+//   Access   who can open it: anyone near it, one character, or nobody (locked); and whose it is. The choices down
+//            the left, everyone to pick from on the right (pickers.js personList)
+//   Items    anything, or only the items picked from their pictures (pickers.js itemPicker)
 //   Review   the lot, checked; Create / Save changes
 //
 // + New Container starts it empty, a step at a time. Change on a container's page opens it filled in
@@ -28,7 +30,7 @@
 
 import { WhipPanel, WP } from '../whip-panel.js';
 import { nuiCallback, propImageUrl } from '../utils.js';
-import { propPicker, propPortrait, itemList, personSearch } from './pickers.js';
+import { propPicker, propPortrait, itemPicker, personList, knownCharName, avatar, inventoryPreview } from './pickers.js';
 import { plural, fixed } from './format.js';
 
 let containers = {};     // keyed by String(containerId)
@@ -50,8 +52,7 @@ let pendingSelect = false;   // a container just made: opened when the server sa
 const DEFAULT_PROP = 'prop_cs_cardbox_01';   // Config.ContainerDefaultProp's
 
 const STEPS = [
-    { key: 'name', label: 'Name' },
-    { key: 'model', label: 'Model' },
+    { key: 'name', label: 'Name & Model' },
     { key: 'where', label: 'Where' },
     { key: 'holds', label: 'Holds' },
     { key: 'access', label: 'Access' },
@@ -59,12 +60,8 @@ const STEPS = [
     { key: 'review', label: 'Review' },
 ];
 
-/** The kinds a container is called. Only a label: what it does is the rest of the wizard. Trunk and
- *  glovebox are a car's; a container that already says one keeps it on offer. */
-const KINDS = [
-    { key: 'stash', title: 'Stash', text: 'Somewhere to keep things: a locker, a cupboard, a safe.' },
-    { key: 'crate', title: 'Crate', text: 'A box out in the world: loot, a delivery, a drop.' },
-];
+/** The step a summary row's part is on: its name and its model share one. */
+const stepOf = (part) => (part === 'model' ? 'name' : part);
 
 const SIZES = [
     { key: 'small', title: 'Small', slots: 10, weight: 50 },
@@ -110,6 +107,9 @@ function loadItems() {
 function charName(id, then) {
     id = Number(id);
     if (!(id > 0)) return '';
+    if (charNames[id]) return charNames[id];
+    const known = knownCharName(id);   // Access's list has read everyone
+    if (known) { charNames[id] = known; return known; }
     if (charNames[id] !== undefined) return charNames[id];
     charNames[id] = '';   // asked once
     nuiCallback('wpCharSearch', { q: String(id) }).then((list) => {
@@ -244,7 +244,8 @@ function summaryRows(body, d, rowOpts, changed, then) {
     const row = (label, key, status, detail) => {
         body.appendChild(WP.statusRow({ label, status, detail: mark(key, detail), ...rowOpts(key) }));
     };
-    row('Name', 'name', d.name.trim() ? 'ok' : 'err', (d.name.trim() || 'none') + '  ·  ' + d.type);
+    // Every one made here is a stash; one a script made as something else still says so.
+    row('Name', 'name', d.name.trim() ? 'ok' : 'err', (d.name.trim() || 'none') + (d.type && d.type !== 'stash' ? '  ·  ' + d.type : ''));
     row('Model', 'model', d.prop || d.noProp ? 'ok' : 'err',
         d.noProp && !d.prop ? 'no prop: only its prompt' : propName(d.prop) + (propName(d.prop) !== d.prop ? '  ·  ' + d.prop : ''));
     row('Where', 'where', d.spot ? 'ok' : 'err', d.spot ? spotText(d.spot) : 'not set');
@@ -284,7 +285,7 @@ function renderList() {
         shown += 1;
         const row = WP.listItem({
             title: c.name || 'Container',
-            sub: '#' + c.containerId + ' · ' + (c.type || 'stash') + ' · ' + plural(Number(c.slots) || 0, 'slot'),
+            sub: '#' + c.containerId + (c.type && c.type !== 'stash' ? ' · ' + c.type : '') + ' · ' + plural(Number(c.slots) || 0, 'slot'),
             pill: c.locked ? 'LOCKED' : null,
             pillClass: '',   // a plain state: neutral, the same LOCKED as doors and phones
             id: id,
@@ -424,7 +425,7 @@ function buildWizard(at) {
         finishLabel: draft.editing ? 'Save changes' : 'Create container',
     });
     els.wizBody.appendChild(wiz.root);
-    const target = STEPS.some((s) => s.key === at) ? at : 'name';
+    const target = STEPS.some((s) => s.key === stepOf(at)) ? stepOf(at) : 'name';
     if (draft.editing) {
         wiz.start('review');                 // the last step reached: every step can be jumped to
         if (target !== 'review') wiz.go(target);
@@ -445,7 +446,7 @@ function renderWizHead() {
 function fillStep(key, body) {
     if (!draft) return;
     body.innerHTML = '';
-    const fill = { name: stepName, model: stepModel, where: stepWhere, holds: stepHolds,
+    const fill = { name: stepNameModel, where: stepWhere, holds: stepHolds,
                    access: stepAccess, items: stepItems, review: stepReview }[key];
     if (fill) fill(body);
 }
@@ -476,30 +477,26 @@ function choices(body, list, value, action) {
     return row;
 }
 
-// ---- step: name ----
+// ---- step: name & model ----
 
-function stepName(body) {
+function nameField() {
     const name = WP.input({ placeholder: 'e.g. Evidence locker', value: draft.name, inputAction: 'cwName' });
     name.maxLength = 100;
-    body.appendChild(WP.field('Name', name, true));
-    body.appendChild(WP.el('div', 'wp-section-title', 'What it is'));
-    const kinds = KINDS.slice();
-    if (!kinds.some((k) => k.key === draft.type)) kinds.push({ key: draft.type, title: draft.type, text: 'Its kind as it was made.' });
-    choices(body, kinds, draft.type, 'cwKind');
-    hint(body, 'The kind is a label for you and for scripts. What it holds and who can open it come next.');
+    return WP.field('Name', name);
 }
 
-// ---- step: model ----
-
-function stepModel(body) {
+/** Its name and its prop on one page (Josh): the Name box beside the props' search, then the props as the new-vehicle
+ *  wizard shows its cars. */
+function stepNameModel(body) {
     if (draft.noProp && !draft.prop) {
         body.appendChild(WP.statusRow({ label: 'No prop', status: 'warn',
             detail: 'it was made with no prop (only its prompt shows): pick one to give it one' }));
     }
     if (!catalog) {
+        body.appendChild(nameField());
         hint(body, 'Reading the props…');
         loadCatalog().then((cat) => {
-            if (wiz && wiz.current() === 'model') {
+            if (wiz && wiz.current() === 'name') {
                 if (cat) redrawStep();
                 else { body.innerHTML = ''; stepModelTyped(body); }
             }
@@ -511,14 +508,20 @@ function stepModel(body) {
         catalog,
         value: draft.prop,
         first: 'crates',
+        lead: nameField(),
         side: [hint(WP.el('div'), 'It is placed as it is pictured; Where puts it on the ground.')],
         onPick: (m) => { draft.prop = m; },
     });
     body.appendChild(pick.root);
+    // A new one starts at its name.
+    if (!draft.name.trim()) {
+        setTimeout(() => { const i = body.querySelector('[data-input="cwName"]'); if (i) i.focus(); }, 0);
+    }
 }
 
 /** No catalog to show (it never arrived): the model by name. */
 function stepModelTyped(body) {
+    body.appendChild(nameField());
     const prop = WP.input({ placeholder: DEFAULT_PROP, value: draft.prop, inputAction: 'cwProp' });
     body.appendChild(WP.field('Model', prop, true));
     hint(body, 'The props\' pictures could not be read, so type the model\'s name.');
@@ -537,78 +540,164 @@ function stepWhere(body) {
     row.appendChild(WP.btn(draft.spot ? 'Place it again' : 'Place it in the world', 'cwPlace', 'primary'));
     body.appendChild(row);
     hint(body, 'Place it in the world: the panel steps aside and a see-through '
-        + (propName(draft.prop) || 'copy') + ' goes where you aim. ← → turn it, E puts it there, Esc comes back.');
+        + (propName(draft.prop) || 'copy') + ' goes where you aim. The card at the top right says the keys.');
 }
 
 // ---- step: holds ----
 
+/** Holds' right side: the container as the inventory will show it opened, at the size set. */
+function holdsPreview() {
+    const slots = Math.min(1000, Math.max(1, Math.round(Number(draft.slots)) || 1));
+    return inventoryPreview({ title: draft.name.trim() || 'New container', slots, kg: Math.max(0, Number(draft.maxWeight) || 0) });
+}
+
+function redrawHoldsPreview() {
+    if (!els.cwPreview || !els.cwPreview.isConnected) return;
+    els.cwPreview.innerHTML = '';
+    els.cwPreview.appendChild(holdsPreview());
+}
+
 function stepHolds(body) {
+    const split = WP.el('div', 'cw-split');
+    const left = WP.el('div', 'cw-left');
+    const right = WP.el('div', 'cw-right');
+    split.appendChild(left);
+    split.appendChild(right);
+    body.appendChild(split);
+
     const size = SIZES.find((s) => s.slots === Number(draft.slots) && s.weight === Number(draft.maxWeight));
-    choices(body, SIZES.map((s) => ({ key: s.key, title: s.title, text: s.slots + ' slots, up to ' + s.weight + ' kg' })),
+    choices(left, SIZES.map((s) => ({ key: s.key, title: s.title, text: s.slots + ' slots, up to ' + s.weight + ' kg' })),
         size ? size.key : '', 'cwSize');
-    const cols = WP.el('div', 'wp-cols-2 wp-apart');
+    const cols = WP.el('div', 'wp-cols-2');
     const slots = WP.input({ type: 'number', value: draft.slots, inputAction: 'cwSlots' });
     slots.min = 1; slots.max = 1000;
     const weight = WP.input({ type: 'number', value: draft.maxWeight, inputAction: 'cwWeight' });
     weight.min = 0; weight.max = 10000;
     cols.appendChild(WP.field('Slots', slots));
-    cols.appendChild(WP.field('Max weight (kg)', weight));
-    body.appendChild(cols);
-    hint(body, 'Or set your own: 1 to 1,000 slots, up to 10,000 kg.');
+    cols.appendChild(WP.field('Max kg', weight));
+    left.appendChild(cols);
+    hint(left, 'Or set your own: 1 to 1,000 slots, up to 10,000 kg.');
+
+    right.appendChild(WP.el('div', 'wp-section-title', 'Opened, it looks like this'));
+    els.cwPreview = WP.el('div');
+    els.cwPreview.appendChild(holdsPreview());
+    right.appendChild(els.cwPreview);
 }
 
 // ---- step: access ----
 
-function personRow(body, label, id, clearAction) {
-    const ctl = id ? [WP.btn('Clear', clearAction, 'ghost')] : null;
-    body.appendChild(WP.statusRow({ label, status: id ? 'ok' : 'off',
-        detail: id ? personText(id, redrawStep) : 'nobody picked', control: ctl || undefined }));
+/** Which of the two the list on the right picks: 'access' (who can open it) or 'owner' (whose it is). */
+let whoFor = 'access';
+
+/** One of the two, on the left: their face and name, or that nobody is picked yet. A click points the list at it. */
+function whoRow(key, label, id, clearAction) {
+    const row = WP.el('div', 'wp-list-item wp-has-icon cw-who' + (whoFor === key ? ' active' : ''));
+    row.dataset.action = 'cwWho';
+    row.dataset.arg = key;
+    const name = id ? charName(id, paintAccess) : '';
+    row.appendChild(avatar(name || (id ? '#' + id : ''), undefined, id || undefined));
+    const top = WP.el('div', 'wp-item-top');
+    top.appendChild(WP.el('span', 'wp-item-title', label));
+    if (id) top.appendChild(WP.btn('Clear', clearAction, 'ghost'));
+    row.appendChild(top);
+    row.appendChild(WP.el('div', 'wp-item-sub', id ? personText(id, paintAccess)
+        : whoFor === key ? 'nobody yet: pick from the list' : 'nobody yet: click to pick'));
+    return row;
+}
+
+/** Access's left column below the choices, and the list's title and lit row: after a pick, in place, so the list keeps
+ *  its scroll and its search. */
+function paintAccess() {
+    if (!els.cwWho || !els.cwWho.isConnected) return;
+    els.cwWho.innerHTML = '';
+    if (draft.openBy === 'one') els.cwWho.appendChild(whoRow('access', 'Can open it', draft.access, 'cwClearAccess'));
+    els.cwWho.appendChild(whoRow('owner', 'Belongs to (optional)', draft.owner, 'cwClearOwner'));
+    els.cwWhoTitle.textContent = whoFor === 'access' ? 'Pick who can open it' : 'Pick whose it is';
+    if (els.cwPeople) els.cwPeople.refresh();
 }
 
 function stepAccess(body) {
-    choices(body, OPEN_BY, draft.openBy, 'cwOpenBy');
-    if (draft.openBy === 'one') {
-        body.appendChild(WP.el('div', 'wp-section-title', 'The character who can open it'));
-        personRow(body, 'Can open it', draft.access, 'cwClearAccess');
-        const find = personSearch({ onPick: (p) => { charNames[p.charId] = p.name; draft.access = p.charId; redrawStep(); } });
-        body.appendChild(find.root);
-    }
-    body.appendChild(WP.el('div', 'wp-section-title', 'Whose it is (optional)'));
-    personRow(body, 'Belongs to', draft.owner, 'cwClearOwner');
-    const own = personSearch({ placeholder: 'Type a name or a character id, for its owner…',
-        onPick: (p) => { charNames[p.charId] = p.name; draft.owner = p.charId; redrawStep(); } });
-    body.appendChild(own.root);
-    hint(body, 'Belongs to is a record, for you and for scripts. Who can open it is the rule above.');
+    if (draft.openBy !== 'one' && whoFor === 'access') whoFor = 'owner';
+    const split = WP.el('div', 'cw-split');
+    const left = WP.el('div', 'cw-left');
+    const right = WP.el('div', 'cw-right');
+    split.appendChild(left);
+    split.appendChild(right);
+    body.appendChild(split);
+
+    choices(left, OPEN_BY, draft.openBy, 'cwOpenBy');
+    left.appendChild(WP.el('div', 'wp-section-title', 'Who'));
+    els.cwWho = WP.el('div', 'wp-list wp-flush');
+    left.appendChild(els.cwWho);
+    hint(left, 'Belongs to is a record, for you and for scripts. Who can open it is the rule above.');
+
+    els.cwWhoTitle = WP.el('div', 'wp-section-title');
+    right.appendChild(els.cwWhoTitle);
+    els.cwPeople = personList({
+        id: 'cw-people',
+        picked: (id) => id === (whoFor === 'access' ? draft.access : draft.owner),
+        onPick: (p) => {
+            charNames[p.charId] = p.name;
+            if (whoFor === 'access') draft.access = p.charId; else draft.owner = p.charId;
+            paintAccess();
+        },
+        onLoad: paintAccess,   // the two rows' names, now known
+    });
+    right.appendChild(els.cwPeople.root);
+    paintAccess();
 }
 
 // ---- step: items ----
 
-function stepItems(body) {
-    choices(body, [
+/** Items' side column: the choice, what it takes, and the items picked (a click takes one away). */
+function paintItemsSide() {
+    const side = els.cwItemsSide;
+    if (!side || !side.isConnected) return;
+    side.innerHTML = '';
+    choices(side, [
         { key: 'any', title: 'Anything', text: 'It takes whatever fits.' },
-        { key: 'only', title: 'Only some items', text: 'Pick them below. Anything else is refused.' },
+        { key: 'only', title: 'Only the items picked', text: 'Pick them from the pictures. Anything else is refused.' },
     ], draft.onlyItems ? 'only' : 'any', 'cwOnly');
-    if (!draft.onlyItems) return;
+    side.appendChild(WP.statusRow({ label: 'Takes', status: draft.onlyItems && !draft.allowed.length ? 'err' : 'ok',
+        detail: itemsText(draft) }));
+    if (!draft.onlyItems || !draft.allowed.length) return;
+    side.appendChild(WP.el('div', 'wp-section-title', 'Picked'));
+    const scroll = WP.el('div', 'wp-pick-scroll');
+    const list = WP.el('div', 'wp-list wp-flush');
+    for (const k of draft.allowed) {
+        const row = WP.listItem({ title: (items[k] && items[k].name) || k, sub: k, pill: 'Remove' });
+        row.dataset.action = 'cwUnpick';
+        row.dataset.arg = k;
+        list.appendChild(row);
+    }
+    scroll.appendChild(list);
+    side.appendChild(scroll);
+}
+
+function stepItems(body) {
     if (!items) {
         hint(body, 'Reading the items…');
         loadItems().then((it) => { if (it && wiz && wiz.current() === 'items') redrawStep(); });
         return;
     }
-    body.appendChild(WP.statusRow({ label: 'Takes', status: draft.allowed.length ? 'ok' : 'err', detail: itemsText(draft) }));
-    const list = itemList({
+    els.cwItemsSide = WP.el('div', 'cw-items-side');
+    els.cwItemsSide.style.cssText = 'display:flex;flex-direction:column;min-height:0;flex:1';
+    els.cwItems = itemPicker({
         id: 'cw-items',
         items,
-        picked: (k) => draft.allowed.indexOf(k) >= 0,
+        picked: (k) => draft.onlyItems && draft.allowed.indexOf(k) >= 0,
         onToggle: (k) => {
+            // A picture picked while it takes anything: it takes only the picked from now.
+            if (!draft.onlyItems) draft.onlyItems = true;
             const at = draft.allowed.indexOf(k);
             if (at >= 0) draft.allowed.splice(at, 1); else draft.allowed.push(k);
-            list.refresh();
-            const row = body.querySelector('.wp-status-row');
-            if (row) row.replaceWith(WP.statusRow({ label: 'Takes', status: draft.allowed.length ? 'ok' : 'err', detail: itemsText(draft) }));
+            els.cwItems.refresh();
+            paintItemsSide();
         },
+        side: [els.cwItemsSide],
     });
-    list.root.style.maxHeight = '420px';
-    body.appendChild(list.root);
+    body.appendChild(els.cwItems.root);
+    paintItemsSide();
 }
 
 // ---- step: review ----
@@ -629,8 +718,10 @@ function stepReview(body) {
 function canLeave(from) {
     const d = draft;
     if (!d) return 'There is no container being set up';
-    if (from === 'name') return d.name.trim() ? true : 'Give it a name';
-    if (from === 'model') return d.prop || d.noProp ? true : 'Pick its model';
+    if (from === 'name') {
+        if (!d.name.trim()) return 'Give it a name';
+        return d.prop || d.noProp ? true : 'Pick its model';
+    }
     if (from === 'where') return d.spot ? true : 'Put it somewhere';
     if (from === 'holds') {
         const s = Number(d.slots), w = Number(d.maxWeight);
@@ -824,9 +915,8 @@ WhipPanel.registerSection({
 
         // ---- the wizard ----
         cwDiscard: () => discardWizard(),
-        cwJump: (el) => { if (wiz) wiz.jump(el.dataset.arg); },
+        cwJump: (el) => { if (wiz) wiz.jump(stepOf(el.dataset.arg)); },
         cwName: (el) => { if (draft) { draft.name = el.value; renderWizHead(); } },
-        cwKind: (el) => { if (draft) { draft.type = el.dataset.arg; redrawStep(); } },
         cwProp: (el) => { if (draft) draft.prop = el.value.trim(); },
         cwPlace: () => {
             if (!draft) return;
@@ -853,11 +943,25 @@ WhipPanel.registerSection({
             draft.maxWeight = s.weight;
             redrawStep();
         },
-        cwSlots: (el) => { if (draft) draft.slots = parseInt(el.value, 10) || 0; },
-        cwWeight: (el) => { if (draft) draft.maxWeight = parseFloat(el.value) || 0; },
-        cwOpenBy: (el) => { if (draft) { draft.openBy = el.dataset.arg; redrawStep(); } },
-        cwClearAccess: () => { if (draft) { draft.access = 0; redrawStep(); } },
-        cwClearOwner: () => { if (draft) { draft.owner = 0; redrawStep(); } },
+        cwSlots: (el) => { if (draft) { draft.slots = parseInt(el.value, 10) || 0; redrawHoldsPreview(); } },
+        cwWeight: (el) => { if (draft) { draft.maxWeight = parseFloat(el.value) || 0; redrawHoldsPreview(); } },
+        cwOpenBy: (el) => {
+            if (!draft) return;
+            draft.openBy = el.dataset.arg;
+            // One character: the list picks them first.
+            if (draft.openBy === 'one') whoFor = 'access';
+            redrawStep();
+        },
+        cwWho: (el) => { whoFor = el.dataset.arg === 'access' ? 'access' : 'owner'; paintAccess(); },
+        cwClearAccess: () => { if (draft) { draft.access = 0; whoFor = 'access'; paintAccess(); } },
+        cwClearOwner: () => { if (draft) { draft.owner = 0; whoFor = 'owner'; paintAccess(); } },
         cwOnly: (el) => { if (draft) { draft.onlyItems = el.dataset.arg === 'only'; redrawStep(); } },
+        cwUnpick: (el) => {
+            if (!draft) return;
+            const at = draft.allowed.indexOf(el.dataset.arg);
+            if (at >= 0) draft.allowed.splice(at, 1);
+            if (els.cwItems) els.cwItems.refresh();
+            paintItemsSide();
+        },
     },
 });

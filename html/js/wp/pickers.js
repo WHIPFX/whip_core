@@ -17,6 +17,9 @@
 //               new-vehicle wizard).
 //   itemTiles   every item as a picture, searchable, with chips for groups of them (the Item Log's
 //               Economy: moved today / this week / this month).
+//   itemPicker  every item as a picture, several picked (the container wizard's Items).
+//   personList  every character, as the Player Manager lists people, searchable (the container wizard's Access).
+//   inventoryPreview  a container as the inventory shows it opened, empty (the container wizard's Holds).
 //   BLIP_COLOURS / blipTintFilter   a map blip's colours, and the filter that tints a blip's picture
 //               the map's way (the shop and garage wizards' Map steps; moved here from wp/shops.js).
 //
@@ -29,6 +32,8 @@ import { WP } from '../whip-panel.js';
 import { nuiCallback, pedImageUrl, itemImageUrl, propImageUrl, vehicleImageUrl } from '../utils.js';
 import { PED_CATEGORIES, PEDS } from '../builder-peds.js';
 import { GLYPHS } from '../furnisher-data.js';
+import { createSlotElement, weightLine } from '../inventory.js';
+import { ago } from './format.js';
 
 const PED_OF = {};
 for (const p of PEDS) PED_OF[p.model] = p;
@@ -53,6 +58,19 @@ function searchBox(placeholder, value, onInput) {
     input.value = value || '';
     input.addEventListener('input', () => onInput(input.value));
     return wrap;
+}
+
+/** THE TILES FILL THE ROW: as many columns as fit at `min` px, each as wide as shares the row out (--wp-tile-w).
+ *  Worked out here because the tiles are flex-wrap, not a grid (.wp-tiles: CEF's hit-testing in a zoomed grid). */
+function fillRow(grid, min) {
+    const fit = () => {
+        const w = grid.clientWidth;
+        if (!w) return;
+        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+        const cols = Math.max(1, Math.floor((w + gap) / (min + gap)));
+        grid.style.setProperty('--wp-tile-w', Math.floor((w - gap * (cols - 1)) / cols - 0.5) + 'px');
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(grid);
 }
 
 /** A picture that may not load: the tile (or hero) gets .wp-noimg and its glyph shows instead. */
@@ -195,6 +213,7 @@ export function pedPicker(opts) {
 // ---- the prop picker ----
 
 const propState = new Map();   // id -> { chip, search }
+const PROP_TILE_MIN = 132;     // px: the prop tiles' narrowest, as many across as fit (fillRow)
 
 /** A prop's picture, large: the picker's side, or a container's page. The category's glyph if none. */
 export function propPortrait(model, hasImage, glyph) {
@@ -213,12 +232,14 @@ export function propPortrait(model, hasImage, glyph) {
  *       catalog: { categories, props }, // the furnisher's (Furnisher.catalog, via a section's call)
  *       value: 'prop_box_wood02a',      // the one picked, or ''
  *       first: 'crates',                // the chip it opens on, the first time
+ *       lead: el,                       // optional: beside the search, on its row (the container wizard's Name)
  *       side: [el, ...],                // under the large picture: the caller's buttons
  *       onPick(model),
  *   });
  *
- * The NPC picker's way with props: a search across everything, a chip per category, the pictures as tiles, the one
- * picked shown large. A model the catalog does not list can still be typed under the picture.
+ * The vehicle picker's way with props (Josh: the same layout as the new-vehicle wizard's): a search across everything,
+ * the pictures filling the row, and beside them the one picked large, the Model box (a model the catalog does not list
+ * can still be typed there) and small chips per category under it.
  */
 export function propPicker(opts) {
     const cat = opts.catalog || {};
@@ -245,14 +266,24 @@ export function propPicker(opts) {
 
     const tabs = WP.tabs({ id: opts.id + '-chips', inline: true, active: state.chip, tabs: chips,
         onChange: (k) => { state.chip = k; draw(); } });
-    main.appendChild(searchBox('Search props…', state.search, (q) => { state.search = q; draw(); }));
-    main.appendChild(tabs.root);
+    tabs.root.classList.add('wp-tabs-small');
+    const search = searchBox('Search props…', state.search, (q) => { state.search = q; draw(); });
+    if (opts.lead) {
+        // Two boxes on one row: the long search alone wasted most of it.
+        const top = WP.el('div', 'wp-pick-top');
+        top.appendChild(opts.lead);
+        top.appendChild(search);
+        main.appendChild(top);
+    } else {
+        main.appendChild(search);
+    }
     const count = WP.el('div', 'wp-list-count wp-flush');
     main.appendChild(count);
     const scroll = WP.el('div', 'wp-pick-scroll');
-    const grid = WP.el('div', 'wp-tiles');
+    const grid = WP.el('div', 'wp-tiles wp-tiles-fill');
     scroll.appendChild(grid);
     main.appendChild(scroll);
+    fillRow(grid, PROP_TILE_MIN);
 
     let hero = null;
     const heroSlot = WP.el('div');
@@ -274,6 +305,7 @@ export function propPicker(opts) {
         if (opts.onPick) opts.onPick(value);
     });
     side.appendChild(WP.field('Model', typed, true));
+    side.appendChild(tabs.root);
     for (const el of opts.side || []) side.appendChild(el);
 
     function list() {
@@ -445,16 +477,7 @@ export function vehiclePicker(opts) {
     scroll.appendChild(grid);
     main.appendChild(scroll);
 
-    // THE TILES FILL THE ROW: as many columns as fit at VEHICLE_TILE_MIN, each as wide as shares the row out. Worked
-    // out here because the tiles are flex-wrap, not a grid (.wp-tiles: CEF's hit-testing in a zoomed grid).
-    const fitTiles = () => {
-        const w = grid.clientWidth;
-        if (!w) return;
-        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-        const cols = Math.max(1, Math.floor((w + gap) / (VEHICLE_TILE_MIN + gap)));
-        grid.style.setProperty('--wp-tile-w', Math.floor((w - gap * (cols - 1)) / cols - 0.5) + 'px');
-    };
-    if (window.ResizeObserver) new ResizeObserver(fitTiles).observe(grid);
+    fillRow(grid, VEHICLE_TILE_MIN);
 
     let hero = null;
     const heroSlot = WP.el('div');
@@ -650,6 +673,111 @@ export function itemTiles(opts) {
     return { root, focus: () => { const i = box.querySelector('input'); if (i) i.focus(); } };
 }
 
+// ---- the item pictures, several picked ----
+
+const itemPickState = new Map();   // id -> { chip, search }
+const ITEM_TILE_MIN = 112;         // px: the item tiles' narrowest (fillRow)
+
+/**
+ *   const pick = itemPicker({
+ *       id: 'cw-items',
+ *       items: { key: { name, img, resource } },   // every item (the Item Log's alSetup list)
+ *       picked: (key) => true | false,
+ *       onToggle(key),
+ *       side: [el, ...],                           // beside the pictures: the caller's
+ *   });
+ *   body.appendChild(pick.root);   pick.refresh()   (after the picked set changed elsewhere)
+ *
+ * The prop picker's way with items, picking several: a search across every item, a chip per resource (and Picked), the
+ * pictures filling the row, each picked one lit. A click picks or unpicks it.
+ */
+export function itemPicker(opts) {
+    const items = opts.items || {};
+    const label = (k) => (items[k] && items[k].name) || k;
+    const resourceOf = (k) => (items[k] && items[k].resource) || 'whip_core';
+    const resources = [...new Set(Object.keys(items).map(resourceOf))].sort();
+    const chips = [{ key: 'all', label: 'All' }, { key: 'picked', label: 'Picked' }]
+        .concat(resources.length > 1 ? resources.map((r) => ({ key: 'res:' + r, label: r })) : []);
+    const state = itemPickState.get(opts.id) || { chip: 'all', search: '' };
+    if (!chips.some((c) => c.key === state.chip)) state.chip = 'all';
+    itemPickState.set(opts.id, state);
+
+    const root = WP.el('div', 'wp-pick');
+    const main = WP.el('div', 'wp-pick-main');
+    const side = WP.el('div', 'wp-pick-col');
+    root.appendChild(main);
+    root.appendChild(side);
+
+    main.appendChild(searchBox('Search items…', state.search, (q) => { state.search = q; draw(); }));
+    const tabs = WP.tabs({ id: opts.id + '-chips', inline: true, active: state.chip, tabs: chips,
+        onChange: (k) => { state.chip = k; draw(); } });
+    tabs.root.classList.add('wp-tabs-small');
+    main.appendChild(tabs.root);
+    const count = WP.el('div', 'wp-list-count wp-flush');
+    main.appendChild(count);
+    const scroll = WP.el('div', 'wp-pick-scroll');
+    const grid = WP.el('div', 'wp-tiles wp-tiles-fill');
+    scroll.appendChild(grid);
+    main.appendChild(scroll);
+    fillRow(grid, ITEM_TILE_MIN);
+    for (const el of opts.side || []) side.appendChild(el);
+
+    function list() {
+        const q = state.search.trim().toLowerCase();
+        let keys = Object.keys(items);
+        // A search reaches across every item, whatever chip is open (the NPC picker's rule).
+        if (q) keys = keys.filter((k) => k.toLowerCase().includes(q) || label(k).toLowerCase().includes(q));
+        else if (state.chip === 'picked') keys = keys.filter((k) => opts.picked(k));
+        else if (state.chip.startsWith('res:')) keys = keys.filter((k) => 'res:' + resourceOf(k) === state.chip);
+        return keys.sort((a, b) => label(a).localeCompare(label(b)));
+    }
+
+    function tile(k) {
+        const b = WP.el('button', 'wp-tile' + (opts.picked(k) ? ' active' : ''));
+        b.type = 'button';
+        b.dataset.key = k;
+        b.title = k;
+        const img = document.createElement('img');
+        img.className = 'wp-tile-img';
+        img.alt = '';
+        img.loading = 'lazy';
+        img.dataset.itemImg = '';   // the item icon's own two-step fallback (utils.js)
+        img.dataset.itemKey = k;
+        img.src = itemImageUrl(k, items[k] && items[k].img);
+        b.appendChild(img);
+        b.appendChild(WP.el('span', 'wp-tile-name', label(k)));
+        return b;
+    }
+
+    function draw() {
+        const keys = list();
+        tabs.root.style.opacity = state.search.trim() ? '0.4' : '';
+        grid.innerHTML = '';
+        for (const k of keys) grid.appendChild(tile(k));
+        if (!keys.length) {
+            grid.appendChild(WP.empty(state.search.trim() ? 'No item matches that'
+                : state.chip === 'picked' ? 'Nothing picked yet: pick from All' : 'No items here'));
+        }
+        count.textContent = keys.length + (keys.length === 1 ? ' item' : ' items');
+    }
+
+    grid.addEventListener('click', (e) => {
+        const b = e.target.closest('.wp-tile');
+        if (!b || !grid.contains(b)) return;
+        if (opts.onToggle) opts.onToggle(b.dataset.key);
+        b.classList.toggle('active', !!opts.picked(b.dataset.key));
+    });
+
+    draw();
+    return {
+        root,
+        refresh: () => {
+            if (state.chip === 'picked' && !state.search.trim()) { draw(); return; }
+            for (const t of grid.children) if (t.dataset && t.dataset.key) t.classList.toggle('active', !!opts.picked(t.dataset.key));
+        },
+    };
+}
+
 // ---- finding a person ----
 
 // ---- a person's face ----
@@ -774,6 +902,185 @@ export function personSearch(opts) {
     root.appendChild(box);
     root.appendChild(results);
     return { root, focus: () => input.focus() };
+}
+
+// ---- everyone, as a list ----
+//
+// Every living character (wpCharList, server/devtools.lua), read once and kept a minute: online first, then the most
+// recently played. The server sends the most recent ones only when there are very many (`more`); then a search also
+// asks the name search (wpCharSearch) for anyone older.
+
+const CHAR_LIST_TTL_MS = 60 * 1000;
+let charList = null;       // { at, chars, more }
+let charListAsk = null;
+
+function loadCharList() {
+    if (charList && Date.now() - charList.at < CHAR_LIST_TTL_MS) return Promise.resolve(charList);
+    if (!charListAsk) {
+        charListAsk = Promise.resolve(nuiCallback('wpCharList', {})).catch(() => null).then((res) => {
+            charListAsk = null;
+            if (res && Array.isArray(res.chars)) charList = { at: Date.now(), chars: res.chars, more: !!res.more };
+            return charList;
+        });
+    }
+    return charListAsk;
+}
+
+const personListState = new Map();   // id -> { search }
+
+/**
+ *   const people = personList({
+ *       id: 'cw-people',
+ *       picked: (charId) => true | false,   // lit
+ *       onPick({ charId, name, online }),
+ *       onLoad(),                           // optional: everyone has been read (knownCharName now knows them)
+ *   });
+ *   col.appendChild(people.root);   people.refresh()   (after what is picked changed)
+ *
+ * Everyone, as the Player Manager lists people: their face, their name, online now or when they last played; a search
+ * by name or id; the list scrolls. A click picks one.
+ */
+export function personList(opts) {
+    const state = personListState.get(opts.id) || { search: '' };
+    personListState.set(opts.id, state);
+
+    const root = WP.el('div', 'wp-people');
+    const box = searchBox(opts.placeholder || 'Search everyone by name or id…', state.search, (q) => {
+        state.search = q;
+        draw();
+        askOlder();
+    });
+    box.querySelector('input').classList.remove('wp-section-search');
+    root.appendChild(box);
+    const count = WP.el('div', 'wp-list-count wp-flush');
+    root.appendChild(count);
+    const scroll = WP.el('div', 'wp-pick-scroll');
+    const list = WP.el('div', 'wp-list wp-flush');
+    scroll.appendChild(list);
+    root.appendChild(scroll);
+
+    let older = [];    // found by the name search, when the list was cut short
+    let timer = null;
+
+    function everyone() {
+        const all = charList ? charList.chars.slice() : [];
+        const have = new Set(all.map((p) => Number(p.charId)));
+        for (const p of older) if (!have.has(Number(p.charId))) all.push(p);
+        return all;
+    }
+
+    function shown() {
+        const q = state.search.trim().toLowerCase();
+        return everyone().filter((p) => !q || String(p.name || '').toLowerCase().includes(q)
+            || String(p.charId) === q.replace(/^#/, ''))
+            .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0) || (Number(b.lastPlayed) || 0) - (Number(a.lastPlayed) || 0));
+    }
+
+    function row(p) {
+        const item = WP.el('div', 'wp-list-item wp-has-icon' + (opts.picked(Number(p.charId)) ? ' active' : ''));
+        item.dataset.id = p.charId;
+        item.appendChild(avatar(p.name, undefined, p.charId));
+        const top = WP.el('div', 'wp-item-top');
+        top.appendChild(WP.el('span', 'wp-item-title', p.name || 'Character #' + p.charId));
+        if (p.online) top.appendChild(WP.el('span', 'wp-pill wp-pill-ok', 'ONLINE'));
+        item.appendChild(top);
+        item.appendChild(WP.el('div', 'wp-item-sub', '#' + p.charId
+            + (p.online ? '  ·  playing now' : p.lastPlayed ? '  ·  played ' + ago(p.lastPlayed) : '')));
+        return item;
+    }
+
+    function draw() {
+        list.innerHTML = '';
+        if (!charList) {
+            list.appendChild(WP.empty('Reading everyone…'));
+            count.textContent = '';
+            return;
+        }
+        const people = shown();
+        for (const p of people) list.appendChild(row(p));
+        if (!people.length) list.appendChild(WP.empty(state.search.trim() ? 'Nobody by that name' : 'Nobody has made a character yet'));
+        count.textContent = people.length + (people.length === 1 ? ' person' : ' people')
+            + (charList.more && !state.search.trim() ? ', the most recent: search for anyone older' : '');
+    }
+
+    function askOlder() {
+        if (timer) clearTimeout(timer);
+        const q = state.search.trim();
+        if (!charList || !charList.more || q.length < 2) return;
+        timer = setTimeout(() => {
+            nuiCallback('wpCharSearch', { q }).then((found) => {
+                if (state.search.trim() !== q || !Array.isArray(found)) return;
+                const have = new Set(older.map((p) => Number(p.charId)));
+                for (const p of found) if (p && p.charId && !have.has(Number(p.charId))) older.push(p);
+                draw();
+            });
+        }, 250);
+    }
+
+    list.addEventListener('click', (e) => {
+        const item = e.target.closest('.wp-list-item');
+        if (!item || !list.contains(item)) return;
+        const p = everyone().find((x) => String(x.charId) === item.dataset.id);
+        if (p && opts.onPick) opts.onPick({ charId: Number(p.charId), name: p.name || 'Character #' + p.charId, online: !!p.online });
+    });
+
+    draw();
+    if (!charList) {
+        loadCharList().then(() => {
+            if (!root.isConnected) return;
+            draw();
+            askOlder();
+            if (opts.onLoad) opts.onLoad();
+        });
+    } else {
+        askOlder();
+    }
+    return {
+        root,
+        refresh: () => {
+            for (const item of list.querySelectorAll('.wp-list-item')) {
+                item.classList.toggle('active', !!opts.picked(Number(item.dataset.id)));
+            }
+        },
+    };
+}
+
+/** The name the list has for a character, if it has read them: a page can say who without asking. */
+export function knownCharName(charId) {
+    const p = charList && charList.chars.find((x) => Number(x.charId) === Number(charId));
+    return p ? p.name : '';
+}
+
+// ---- a container, opened ----
+
+const PREVIEW_MAX_SLOTS = 300;   // drawn at most: more are said, not drawn (1,000 slot tiles at every key typed)
+
+/**
+ *   pane.appendChild(inventoryPreview({ title: 'Evidence locker', sub: 'Stash', slots: 40, kg: 250 }));
+ *
+ * A container as the inventory shows it opened (its right column's panel), drawn by the inventory's own parts
+ * (inventory.css's panel and slot tiles, inventory.js's slot and weight line), empty, as many slots as it has. The
+ * Vehicle Adjustments preview's way, so a change to how the inventory looks reaches this too.
+ */
+export function inventoryPreview(o) {
+    const panel = WP.el('div', 'inv-panel wp-inv-preview');
+    const header = WP.el('div', 'inv-panel-header');
+    const title = WP.el('div', 'inv-panel-title');
+    const words = WP.el('div');
+    words.appendChild(WP.el('span', null, o.title || 'Container'));
+    if (o.sub) words.appendChild(WP.el('div', 'inv-panel-subtitle', o.sub));
+    words.appendChild(WP.el('div', 'inv-panel-subtitle', weightLine(0, Number(o.kg) || 0)));
+    title.appendChild(words);
+    header.appendChild(title);
+    panel.appendChild(header);
+    const n = Math.max(1, Math.round(Number(o.slots) || 1));
+    const grid = WP.el('div', 'inv-slots-grid');
+    for (let i = 1; i <= Math.min(n, PREVIEW_MAX_SLOTS); i++) grid.appendChild(createSlotElement(i, 'wp-inv-preview'));
+    panel.appendChild(grid);
+    if (n > PREVIEW_MAX_SLOTS) {
+        panel.appendChild(WP.el('div', 'wp-inv-preview-more', 'and ' + (n - PREVIEW_MAX_SLOTS).toLocaleString('en-US') + ' more slots'));
+    }
+    return panel;
 }
 
 // ---- the item list ----

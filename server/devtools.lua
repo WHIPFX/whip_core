@@ -455,6 +455,47 @@ SecureCallback('whip_core:wpCharSearch', {
     return results
 end)
 
+-- Everyone, for a page's list of people to pick from (pickers.js personList: the container wizard's Access): every
+-- living character, the online ones flagged, the most recently played first. At most CHAR_LIST_MAX; `more` says there
+-- were others, and the page then also asks wpCharSearch, by name, for them.
+local CHAR_LIST_MAX = 500
+SecureCallback('whip_core:wpCharList', {
+    -- wpCharSearch's people, all at once: the same gate.
+    permission = 'director.admin',
+    whileDead = true,
+    rateLimit = 2000,
+    burst     = 2,
+}, function()
+    local online = {}
+    for _, p in pairs(Players) do
+        if p.charId then online[p.charId] = p.fullName or true end
+    end
+    local ok, rows = pcall(MySQL.query.await, [[
+        SELECT `charId`, `firstName`, `lastName`, UNIX_TIMESTAMP(`lastPlayed`) AS `lastPlayed` FROM `characters`
+         WHERE `deleted` IS NULL ORDER BY `lastPlayed` DESC LIMIT ?
+    ]], { CHAR_LIST_MAX + 1 })
+    -- Unread: an empty list that says there are more, so the page still finds people by name.
+    if not ok or type(rows) ~= 'table' then return { chars = {}, more = true } end
+    local chars, listed = {}, {}
+    for i, row in ipairs(rows) do
+        if i > CHAR_LIST_MAX then break end
+        chars[#chars + 1] = {
+            charId     = row.charId,
+            name       = ((row.firstName or '') .. ' ' .. (row.lastName or '')):gsub('^%s+', ''),
+            online     = online[row.charId] ~= nil,
+            lastPlayed = tonumber(row.lastPlayed),
+        }
+        listed[row.charId] = true
+    end
+    -- Anyone playing is listed, whatever the cut left out.
+    for charId, name in pairs(online) do
+        if not listed[charId] then
+            chars[#chars + 1] = { charId = charId, name = type(name) == 'string' and name or ('Character #' .. charId), online = true }
+        end
+    end
+    return { chars = chars, more = #rows > CHAR_LIST_MAX }
+end)
+
 
 -- Close manager.
 --
