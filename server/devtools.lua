@@ -918,12 +918,13 @@ SecureEvent('whip_core:server:devKillMe', {
     TriggerClientEvent('whip_core:client:devKillMe', source)
 end)
 
--- /w Restore Health & Armour (tools/player.lua). Stats.set clamps to each stat's own max, so an
--- over-large value is "full" without knowing the numbers.
+-- /w Restore All (tools/player.lua): health, armour, food and drink. Stats.set clamps to each stat's own max, so
+-- an over-large value is "full" without knowing the numbers (hunger and thirst are registered even when switched
+-- off in the config, so setting them is always safe).
 --
 -- Dead, it revives you first, the way /whip_revive does: MarkPlayerAlive (the server's record, full
 -- health, the revived hooks) and the client's revive, which stands the ped up and ends the death
--- screen before it returns. The full health and armour set after it land on the living ped.
+-- screen before it returns. The full stats set after it land on the living ped.
 -- (Accepted while dead: an `ace` event is an admin tool, not the character acting.)
 SecureEvent('whip_core:server:devRestore', {
     rateLimit = 1000,
@@ -934,12 +935,13 @@ SecureEvent('whip_core:server:devRestore', {
         MarkPlayerAlive(source, player, 'revive:admin')
         TriggerClientEvent('whip_core:client:revive', source)
         revived = true
-        print(('[whip_core] %s revived themselves (/w Restore Health & Armour)'):format(tostring(player.fullName)))
+        print(('[whip_core] %s revived themselves (/w Restore All)'):format(tostring(player.fullName)))
     end
-    for _, name in ipairs({ 'health', 'armour' }) do
+    for _, name in ipairs({ 'health', 'armour', 'hunger', 'thirst' }) do
         Stats.set(source, name, 1e9, 'devtools:restore')
     end
-    ShowSuccess(source, revived and 'Revived, with health and armour restored' or 'Health and armour restored')
+    ShowSuccess(source, revived and 'Revived, with health, armour, food and drink restored'
+        or 'Health, armour, food and drink restored')
 end)
 
 -- /w Repair Vehicle (tools/player.lua): the car the admin is in, DRIVING IT OR NOT.
