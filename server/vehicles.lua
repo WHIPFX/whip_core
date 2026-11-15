@@ -3803,25 +3803,48 @@ function Vehicles.keyFits(metadata, vehicleId)
     return true
 end
 
---- Check if an item is allowed in vehicle storage
+--- Is this a key of this car that its locks no longer take (cut before a change of locks, Vehicles.changeLocks, or
+--- before a temporary car was made secure)? Another car's key is not.
+---@param metadata table|nil
+---@param vehicleId number
+---@return boolean
+function Vehicles.keyDeactivated(metadata, vehicleId)
+    if type(metadata) ~= 'table' or tonumber(metadata.vehicleId) ~= vehicleId then return false end
+    local def = Vehicles._records[vehicleId]
+    return def ~= nil and def.keyToken ~= nil and metadata.token ~= def.keyToken
+end
+
+--- A key into this car's ignition: true when it fits, else false and the player's words when it is one of this car's
+--- keys whose locks have been changed since (nil words: the store's own "That item does not go there").
+---@return boolean ok
+---@return string|nil why
+local function keyGoesIn(metadata, vehicleId)
+    if Vehicles.keyFits(metadata, vehicleId) then return true end
+    if Vehicles.keyDeactivated(metadata, vehicleId) then return false, 'This key is deactivated.' end
+    return false
+end
+
+--- Check if an item is allowed in vehicle storage. A refusal can carry the player's words (a deactivated key).
 ---@param vehicleId number
 ---@param storageType string
 ---@param itemKey string
 ---@param metadata table|nil
+---@return boolean ok
+---@return string|nil why
 function Vehicles.isItemAllowed(vehicleId, storageType, itemKey, metadata)
     if storageType == 'key' then
         if itemKey == 'vehicle_key' then
             -- Regular key must match this vehicle
-            return Vehicles.keyFits(metadata, vehicleId)
+            return keyGoesIn(metadata, vehicleId)
         elseif itemKey == 'hacked_vehicle_key' then
             -- Unhacked (no vehicleId): allowed in any ignition
             if not metadata or not metadata.vehicleId then return true end
             -- Already hacked: only allowed in the vehicle it was hacked for
-            return Vehicles.keyFits(metadata, vehicleId)
+            return keyGoesIn(metadata, vehicleId)
         elseif Inventory.isIgnitionKey(itemKey) then
             -- A registered key type (RegisterIgnitionKey) follows the vehicle_key rule: cut for this car. A
             -- satellite wanting any-ignition behaviour models it in its own item logic.
-            return Vehicles.keyFits(metadata, vehicleId)
+            return keyGoesIn(metadata, vehicleId)
         end
         return false
     end

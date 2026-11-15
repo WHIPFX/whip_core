@@ -93,7 +93,8 @@ end
 --   get(handle, slot)             -> slotData|nil {item, amount, metadata}
 --   set(handle, slot, item, amount, metadata) -> boolean
 --   clear(handle, slot)
---   allows(handle, itemKey, metadata) -> boolean  optional item filter for the whole store
+--   allows(handle, itemKey, metadata) -> boolean, string|nil  optional item filter for the whole store; the second
+--                                    answer is the player's words for a refusal ("That item does not go there" else)
 --   allowsAt(handle, slot, itemKey, metadata) -> boolean, string|nil  optional per-slot filter; absent means
 --                                    every slot takes anything `allows` would
 --   persist(handle)               -> queries[]|nil  nil means "cannot persist right now"
@@ -617,8 +618,9 @@ local function readMoveEnds(fromStore, fromSlot, toStore, toSlot)
         return nil, ('Unknown item "%s" — its resource may be restarting'):format(tostring(liveFrom.item))
     end
 
-    if toKind.allows and not toKind.allows(toHandle, liveFrom.item, liveFrom.metadata) then
-        return nil, 'That item does not go there'
+    if toKind.allows then
+        local okIn, inWhy = toKind.allows(toHandle, liveFrom.item, liveFrom.metadata)
+        if not okIn then return nil, inWhy or 'That item does not go there' end
     end
     -- The slot filter lives here so callers that skip the storeMove hooks are covered too.
     if toKind.allowsAt then
@@ -658,8 +660,9 @@ function Stores.move(fromStore, fromSlot, toStore, toSlot)
 
     -- On a swap the returning item must be acceptable to the source store, and to the source slot (the beforeMove
     -- hooks only see the declared direction).
-    if toData and fromKind.allows and not fromKind.allows(fromHandle, toData.item, toData.metadata) then
-        return false, 'That item does not go there'
+    if toData and fromKind.allows then
+        local okBack, backWhy = fromKind.allows(fromHandle, toData.item, toData.metadata)
+        if not okBack then return false, backWhy or 'That item does not go there' end
     end
 
     if toData and fromKind.allowsAt then
@@ -932,8 +935,9 @@ function Stores.place(store, slot, itemKey, amount, metadata)
     if not def then return false, 'Unknown item' end
 
     if slot < 1 or slot > kind.slots(handle) then return false, 'Invalid slot' end
-    if kind.allows and not kind.allows(handle, itemKey, metadata) then
-        return false, 'That item does not go there'
+    if kind.allows then
+        local okIn, inWhy = kind.allows(handle, itemKey, metadata)
+        if not okIn then return false, inWhy or 'That item does not go there' end
     end
     if kind.allowsAt then
         local okAt, atReason = kind.allowsAt(handle, slot, itemKey, metadata)
@@ -4757,8 +4761,9 @@ function Stores.giveAt(addr, item, amount, metadata, opts)
         placed[1] = { slot = slot, amount = amount }
     else
         -- An item the store never takes says so, rather than "No room there".
-        if store.kind.allows and not store.kind.allows(store.handle, item, metadata) then
-            return false, 'That item does not go there'
+        if store.kind.allows then
+            local okIn, inWhy = store.kind.allows(store.handle, item, metadata)
+            if not okIn then return false, inWhy or 'That item does not go there' end
         end
         local remaining = amount
         while remaining > 0 do

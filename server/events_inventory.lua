@@ -286,8 +286,9 @@ SecureEvent('whip_core:server:quickMove', {
         -- Two reasons slotAccepting says no, and the player should hear which. The wording is the
         -- movers' own, so a shift-click and a drag refused for the same thing say the same thing.
         local kind = to.store.kind
-        if kind.allows and not kind.allows(to.store.handle, d.item, d.metadata) then
-            return refuse('That item does not go there')
+        if kind.allows then
+            local okIn, inWhy = kind.allows(to.store.handle, d.item, d.metadata)
+            if not okIn then return refuse(inWhy or 'That item does not go there') end
         end
         return refuse(kind.id == 'player' and 'No room in your pockets' or 'No room there')
     end
