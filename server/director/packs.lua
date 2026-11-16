@@ -330,9 +330,8 @@ local function bringBack(res)
 end
 
 function DirectorPacks.scanAll()
-    for i = 0, GetNumResources() - 1 do
-        local res = GetResourceByFindIndex(i)
-        if res and res ~= CORE and GetResourceState(res) == 'started' then
+    for _, res in ipairs(AllResources()) do   -- each once: a provided name is its provider (server/helpers.lua)
+        if res ~= CORE and GetResourceState(res) == 'started' then
             local ok, err = pcall(scan, res)
             if not ok then say('^1%s: its scenarios could not be read: %s^0', res, tostring(err)) end
         end

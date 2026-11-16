@@ -622,9 +622,8 @@ end
 --- no running pack answered for is closed.
 function PropertyPacks.scanAll()
     local applied = {}
-    for i = 0, GetNumResources() - 1 do
-        local res = GetResourceByFindIndex(i)
-        if res and GetResourceState(res) == 'started' then scanResource(res) end
+    for _, res in ipairs(AllResources()) do   -- each once: a provided name is its provider (server/helpers.lua)
+        if GetResourceState(res) == 'started' then scanResource(res) end
     end
     _ready = true
     -- A pack queued before boot is answered here, and a refusal is said: its caller was told
