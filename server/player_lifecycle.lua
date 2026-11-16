@@ -486,7 +486,7 @@ end
 SecureEvent('whip_core:server:selectCharacter', {
     rateLimit = 2000,
     requirePlayer = false,
-    params = { {'charId', 'id'}, {'spawnId', 'string', 40, 'last'} },
+    params = { {'charId', 'id'}, {'spawnId', 'string', SpawnChoices.ID_MAX, 'last'} },   -- server/spawn_choices.lua
 }, function(source, _, charId, spawnId)
     -- Loaded is asked first: EnsurePending would re-create a pending entry for a player who already
     -- has a character.

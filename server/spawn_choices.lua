@@ -16,6 +16,10 @@
 
 SpawnChoices = {}
 
+-- The longest choice id the game may send back (server/player_lifecycle.lua reads it at this length): a registered
+-- point's 'res:<resource>:<id>' is the longest, and is refused at registering when it would be longer.
+SpawnChoices.ID_MAX = 96
+
 --- GTA's heading (degrees, 0 = north, counter-clockwise) for a direction on the ground.
 local function headingOf(dx, dy)
     if dx == 0 and dy == 0 then return 0.0 end
@@ -85,6 +89,9 @@ function SpawnChoices.register(owner, id, def)
     if def.label ~= nil and type(def.label) ~= 'string' then return false, 'label is text' end
     if def.canUse ~= nil and not callable(def.canUse) then return false, 'canUse is a function(charId) that answers true' end
     local key = spawnReg:keyOf(owner, id)
+    if #key + 4 > SpawnChoices.ID_MAX then   -- 'res:' .. key
+        return false, ('"%s" and the resource name together are longer than %d characters: use a shorter id'):format(id, SpawnChoices.ID_MAX - 4)
+    end
     if registered[key] == nil then
         local n = 0
         for _ in pairs(registered) do n = n + 1 end

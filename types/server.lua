@@ -1568,7 +1568,7 @@ function whip_core:OpenCharacterEditor(who) end
 --- Your ids are your own; the same id again replaces it; it goes when your resource stops. canUse(charId), when
 --- given, keeps it to the characters it answers true for (checked again when picked; an error hides it).
 --- At most 30 registered at once across all resources.
----@param id string Letters, digits, - and _ (at most 24)
+---@param id string Letters, digits, - and _ (at most 24, and at most 92 with the resource's name)
 ---@param def { label?: string, pos: vector4|vector3|{ x: number, y: number, z: number, w?: number }, canUse?: fun(charId: number): boolean }
 ---@return boolean ok
 ---@return string|nil why
