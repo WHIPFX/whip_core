@@ -132,10 +132,18 @@ const mapOffset = () => legendOpen ? -legendEl.getBoundingClientRect().width / 2
 
 const onPad = () => document.documentElement.dataset.input === 'pad';
 
+// ---- sounds ----
+
+/** One of GTA's frontend sounds, by what happened: 'nav' (up and down), 'side' (across), 'select', 'back'.
+ *  client/pause.lua plays it; the waypoint's own sound, and the open and Resume sounds, are played there. */
+const sound = (name) => nuiCallback('pauseSound', { name });
+
 // ---- modes ----
 
 function setMode(m, instant) {
     const was = mode;
+    // Out of the menu to a screen (map, controller, settings, a confirm) is a select; back to it is a back.
+    if (!instant && m !== was) sound(m === 'menu' ? 'back' : 'select');
     mode = m;
     root.dataset.mode = m;
     map.setInteractive(m === 'map');
@@ -195,12 +203,12 @@ function choose(i) {
     else if (id === 'map') setMode('map');
     else if (id === 'controller') setMode('pad');
     else if (id === 'settings' || id === 'serverSettings') setMode('settings');
-    else if (id === 'gameSettings') nuiCallback('pauseSettings', {});   // GTA's own, in the pause menu's place
+    else if (id === 'gameSettings') { sound('select'); nuiCallback('pauseSettings', {}); }   // GTA's own, in the pause menu's place
     else if (CONFIRMS[id]) ask(id);
 }
 
 function answerConfirm(i) {
-    if (i === 0 && asking) nuiCallback(asking.callback, {});
+    if (i === 0 && asking) { sound('select'); nuiCallback(asking.callback, {}); }
     else setMode('menu');
 }
 
@@ -254,6 +262,7 @@ function drawLegend() {
         row.addEventListener('click', () => {
             const at = ((cycle.get(g.key) ?? -1) + 1) % g.blips.length;
             cycle.set(g.key, at);
+            sound('nav');
             pick(g.blips[at], { slide: true });
             if (map.zoom < 4.6) map.glide(mapOffset(), 4.6, GLIDE_MS);
         });
@@ -317,6 +326,7 @@ map.onSettle = settle;
 /** A click on a blip: it comes to the middle, lit in the legend. From the menu, the map opens. */
 map.onBlipClick = (b) => {
     if (mode !== 'map') setMode('map');
+    else sound('nav');
     pick(b, { slide: true, reveal: true });
 };
 
@@ -325,14 +335,14 @@ map.onBlipClick = (b) => {
 // On the menu, not each button: they are made again at each open (buildMenu).
 menuEl.addEventListener('mouseover', (e) => {
     const el = e.target.closest('.pm-item');
-    if (el && mode === 'menu') { sel = Number(el.dataset.i); drawMenu(); }
+    if (el && mode === 'menu' && Number(el.dataset.i) !== sel) { sel = Number(el.dataset.i); drawMenu(); sound('nav'); }
 });
 menuEl.addEventListener('click', (e) => {
     const el = e.target.closest('.pm-item');
     if (el && mode === 'menu') { sel = Number(el.dataset.i); choose(sel); }
 });
 confirmBtns.forEach((el, i) => {
-    el.addEventListener('mouseenter', () => { confirmSel = i; drawConfirm(); });
+    el.addEventListener('mouseenter', () => { if (confirmSel !== i) sound('side'); confirmSel = i; drawConfirm(); });
     el.addEventListener('click', () => answerConfirm(i));
 });
 root.querySelector('.pm-back').addEventListener('click', () => setMode('menu'));
@@ -358,7 +368,7 @@ function mapKey(e) {
     else if (k === '-' || k === 'q') map.zoomBy(-0.5);
     else if (k === 'c') map.centreOnPlayer();
     else if (k === 'v') map.setTilt(!map.tilted());
-    else if (k === 'l') setLegend(!legendOpen);
+    else if (k === 'l') { setLegend(!legendOpen); sound('side'); }
     else if (k === 'delete' && map.data.waypoint) { map.data.waypoint = null; map.data.route = null; map.render(); map.onWaypoint(null); }
 }
 
@@ -373,13 +383,13 @@ NuiRouter.registerKeyScope({
         if (mode === 'settings') { if (!settingsScreen.onKey(e)) setMode('menu'); return; }
         const k = e.key.toLowerCase();
         if (mode === 'confirm') {
-            if (k === 'arrowleft' || k === 'arrowright' || k === 'tab') { confirmSel = 1 - confirmSel; drawConfirm(); e.preventDefault(); }
+            if (k === 'arrowleft' || k === 'arrowright' || k === 'tab') { confirmSel = 1 - confirmSel; drawConfirm(); sound('side'); e.preventDefault(); }
             else if (k === 'enter' || k === ' ') answerConfirm(confirmSel);
             else if (k === 'escape') setMode('menu');
             return;
         }
-        if (k === 'arrowup' || k === 'w') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
-        else if (k === 'arrowdown' || k === 's') { sel = (sel + 1) % menu.length; drawMenu(); }
+        if (k === 'arrowup' || k === 'w') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); sound('nav'); }
+        else if (k === 'arrowdown' || k === 's') { sel = (sel + 1) % menu.length; drawMenu(); sound('nav'); }
         else if (k === 'enter' || k === ' ') choose(sel);
         else if (k === 'escape') nuiCallback('pauseResume', {});
         else if (k === 'm') setMode('map');
@@ -401,17 +411,17 @@ NuiRouter.registerKeyScope({
                 map.waypointAt(sx, sy);
             }
             else if (nav === 'buttonX') map.centreOnPlayer();
-            else if (nav === 'buttonY') setLegend(!legendOpen);
+            else if (nav === 'buttonY') { setLegend(!legendOpen); sound('side'); }
             return;
         }
         if (mode === 'confirm') {
-            if (nav === 'left' || nav === 'right') { confirmSel = 1 - confirmSel; drawConfirm(); }
+            if (nav === 'left' || nav === 'right') { confirmSel = 1 - confirmSel; drawConfirm(); sound('side'); }
             else if (nav === 'select') answerConfirm(confirmSel);
             else if (nav === 'back') setMode('menu');
             return;
         }
-        if (nav === 'up') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
-        else if (nav === 'down') { sel = (sel + 1) % menu.length; drawMenu(); }
+        if (nav === 'up') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); sound('nav'); }
+        else if (nav === 'down') { sel = (sel + 1) % menu.length; drawMenu(); sound('nav'); }
         else if (nav === 'select') choose(sel);
         else if (nav === 'back') nuiCallback('pauseResume', {});
     },
