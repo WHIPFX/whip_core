@@ -20,6 +20,8 @@ local menuIndex = 1
 -- features, Config.Experimental), under a header of its own at the end.
 local tools = {
     { name = 'Noclip', active = false, desc = 'Fly through anything; you land where you stop.' },
+    { name = 'Teleport to Waypoint', active = false, kind = 'run',
+      desc = 'To your map waypoint, on the ground; a car you drive comes along. Same as /tpm.' },
     -- tools/player.lua.
     { name = 'Invisible', active = false, desc = 'Nobody else sees you. You see yourself faded.' },
     { name = 'God Mode', active = false, desc = 'No damage; your health is kept full.' },

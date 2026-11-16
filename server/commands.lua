@@ -582,3 +582,68 @@ devCommand('whip_statebag', function(source, args)
         say(('  %-14s = %s | %s'):format(key, tostring(state[key]), tostring(Sentinel.getTruth(id, key))))
     end
 end)
+
+-- /tp and /tpm — move yourself while you build, test or help someone. In-game only (the console has no body).
+-- The move is the client's fade teleport (client/main.lua): behind a fade, onto the ground when no height is given,
+-- and with the car when you are driving one. Every teleport goes on the admin's activity log.
+local TP_LIMIT_XY, TP_Z_MIN, TP_Z_MAX = 10000.0, -200.0, 2700.0
+
+--- The numbers in what was typed, however it was copied: "x y z h", "x, y, z", "vector3(x, y, z)", "vec4(...)".
+--- Words go first, so the 4 of vec4 is not one of them.
+---@param typed string
+---@return number[]
+local function typedNumbers(typed)
+    local out = {}
+    for n in typed:gsub('%a[%w_]*', ' '):gmatch('-?%d+%.?%d*') do out[#out + 1] = tonumber(n) end
+    return out
+end
+
+local function logTeleport(source, detail)
+    local player = Players[source]
+    if player then Log.write(player.charId, 'teleport', { detail = detail }) end
+end
+
+-- /tp x y [z] [heading] — to coordinates (no z: onto the ground there); /tp <serverId> — to a player
+devCommand('tp', function(source, args, raw)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local n = typedNumbers((raw or ''):gsub('^%S+%s*', ''))
+
+    if #n == 1 and #args == 1 and math.type(n[1]) == 'integer' then
+        local target = n[1]
+        local ped = GetPlayerPed(target)
+        if target == source then return reply(source, 'That is you', 'error') end
+        if not Players[target] or not ped or ped == 0 then
+            return reply(source, ('No player with id %d in the world'):format(target), 'error')
+        end
+        if GetPlayerRoutingBucket(target) ~= GetPlayerRoutingBucket(source) then
+            return reply(source, 'They are in another world (routing bucket)', 'error')
+        end
+        local c = GetEntityCoords(ped)
+        TriggerClientEvent('whip_core:client:fadeTeleport', source, c.x, c.y, c.z, nil, true)
+        logTeleport(source, ('to %s [%d]'):format(Players[target].fullName or GetPlayerName(target), target))
+        return
+    end
+
+    if #n < 2 then
+        return reply(source, 'Use /tp x y [z] [heading], or /tp <server id>', 'error')
+    end
+    local x, y, z, h = n[1], n[2], n[3], n[4]
+    if math.abs(x) > TP_LIMIT_XY or math.abs(y) > TP_LIMIT_XY or (z and (z < TP_Z_MIN or z > TP_Z_MAX)) then
+        return reply(source, 'Those coordinates are off the map', 'error')
+    end
+    TriggerClientEvent('whip_core:client:fadeTeleport', source, x + 0.0, y + 0.0, z and z + 0.0, h and h + 0.0, true)
+    logTeleport(source, ('to %.1f, %.1f%s'):format(x, y, z and (', %.1f'):format(z) or ''))
+end)
+
+-- /tpm — to your map waypoint, onto the ground there (the waypoint is on your game: it goes from there)
+devCommand('tpm', function(source)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    TriggerClientEvent('whip_core:client:tpWaypoint', source)
+    logTeleport(source, 'to their map waypoint')
+end)

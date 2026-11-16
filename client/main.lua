@@ -82,11 +82,28 @@ RegisterNetEvent('whip_core:client:pmTeleport', function(x, y, z)
     SetEntityCoordsNoOffset(ped, x, y, z + 1.0, false, false, false)
 end)
 
+--- The ground under x, y, for a teleport given no height: the world there is streamed in first (GTA only knows the
+--- ground of what is loaded), then tried from high up down. nil when none was found.
+local function groundUnder(ent, x, y)
+    for _, probe in ipairs({ 1000.0, 800.0, 600.0, 400.0, 300.0, 200.0, 150.0, 100.0, 50.0, 25.0, 0.0 }) do
+        SetEntityCoordsNoOffset(ent, x, y, probe, false, false, false)
+        RequestCollisionAtCoord(x, y, probe)
+        local untilMs = GetGameTimer() + 400
+        repeat
+            local found, gz = GetGroundZFor_3dCoord(x, y, probe, false)
+            if found then return gz end
+            Wait(0)
+        until GetGameTimer() > untilMs
+    end
+    return nil
+end
+
 --- A teleport behind a fade: fade, move, wait for the ground, fade back. Waits are bounded, so the screen always returns.
+--- No z: onto the ground there. withVehicle: a car this player drives comes along (/tp, /tpm in server/commands.lua).
 local fadeTeleporting = false
-RegisterNetEvent('whip_core:client:fadeTeleport', function(x, y, z, heading)
+local function fadeTeleport(x, y, z, heading, withVehicle)
     x, y, z = tonumber(x), tonumber(y), tonumber(z)
-    if not (x and y and z) or fadeTeleporting then return end
+    if not (x and y) or fadeTeleporting then return end
     fadeTeleporting = true
 
     DoScreenFadeOut(250)
@@ -94,19 +111,43 @@ RegisterNetEvent('whip_core:client:fadeTeleport', function(x, y, z, heading)
     while not IsScreenFadedOut() and GetGameTimer() < t do Wait(0) end
 
     local ped = PlayerPedId()
-    RequestCollisionAtCoord(x, y, z)
-    SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
-    if tonumber(heading) then SetEntityHeading(ped, tonumber(heading) + 0.0) end
+    local veh = withVehicle and GetVehiclePedIsIn(ped, false) or 0
+    local car = veh ~= 0 and GetPedInVehicleSeat(veh, -1) == ped and veh or nil
+    local ent = car or ped
     PedHold.set('fadeTeleport', { frozen = true })
+    if car then FreezeEntityPosition(car, true) end
+    if not z then
+        NewLoadSceneStartSphere(x, y, 100.0, 80.0, 0)
+        local gz = groundUnder(ent, x, y)
+        NewLoadSceneStop()
+        if not gz then UI.Notify('No ground found there: you are left high up', 'error') end
+        z = (gz or 400.0) + (car and 0.5 or 1.0)
+    end
+    RequestCollisionAtCoord(x, y, z)
+    SetEntityCoordsNoOffset(ent, x, y, z, false, false, false)
+    if tonumber(heading) then SetEntityHeading(ent, tonumber(heading) + 0.0) end
     t = GetGameTimer() + 3000
-    while not HasCollisionLoadedAroundEntity(ped) and GetGameTimer() < t do
+    while not HasCollisionLoadedAroundEntity(ent) and GetGameTimer() < t do
         RequestCollisionAtCoord(x, y, z)
         Wait(0)
+    end
+    if car then
+        FreezeEntityPosition(car, false)
+        SetVehicleOnGroundProperly(car)
     end
     PedHold.release('fadeTeleport')   -- its own hold: a downed player stays frozen (client/ped_hold.lua)
 
     DoScreenFadeIn(250)
     fadeTeleporting = false
+end
+RegisterNetEvent('whip_core:client:fadeTeleport', fadeTeleport)
+
+-- /tpm: the waypoint is on this game's map only
+RegisterNetEvent('whip_core:client:tpWaypoint', function()
+    local blip = GetFirstBlipInfoId(8)
+    if not DoesBlipExist(blip) then return UI.Notify('Set a waypoint on the map first', 'error') end
+    local c = GetBlipInfoIdCoord(blip)
+    fadeTeleport(c.x, c.y, nil, nil, true)
 end)
 
 -- NUI callbacks
