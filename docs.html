@@ -11628,6 +11628,9 @@ end</code></pre>
 <p>In chat or F8 with developer mode on; the console ones in the server console.</p>
 <table class="event-table">
 <tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>/tp x y [z] [heading]</code></td><td>To coordinates, however they were copied (<code>x y z</code>, <code>x, y, z</code>, <code>vector3(...)</code>, <code>vector4(...)</code>). No height: onto the ground there. Behind a fade; a car you drive comes along. On your activity log</td></tr>
+<tr><td><code>/tpto &lt;server id&gt;</code></td><td>To a player (<code>/tp &lt;server id&gt;</code> does the same). Refused for a player in another world (routing bucket).</td></tr>
+<tr><td><code>/tpm</code></td><td>To your map waypoint, onto the ground there; also <strong>Teleport to Waypoint</strong> in <code>/w</code></td></tr>
 <tr><td><code>/whipcost [seconds]</code></td><td>Times every part of WHIP and every resource's <code>WhipCost</code> sections (20 s; 5 to 120), then prints the dearest first (<a href="#measuring">Measuring your resource</a>)</td></tr>
 <tr><td><code>/nativecost</code></td><td>Prices each call the controls loop makes</td></tr>
 <tr><td><code>/paddebug</code></td><td>A controller's chain live: controls down, their buttons, and what WHIP claimed</td></tr>
@@ -11651,6 +11654,7 @@ end</code></pre>
 <tr><th>Entry</th><th>Does</th></tr>
 <tr><td><strong>Developer mode</strong></td><td>The switch; with it off, the only row</td></tr>
 <tr><td><strong>Noclip</strong></td><td>Fly, invisible and invincible: WASD, <kbd>Space</kbd>/<kbd>Ctrl</kbd>, <kbd>Shift</kbd> for speed. In a car, the car comes too and you stay in your seat, unless another player is driving it</td></tr>
+<tr><td><strong>Teleport to Waypoint</strong></td><td>Once: to your map waypoint, onto the ground there, as <code>/tpm</code></td></tr>
 <tr><td><strong>Invisible</strong></td><td>Nobody sees you; you see yourself at half opacity</td></tr>
 <tr><td><strong>God Mode</strong></td><td>No damage; health kept full</td></tr>
 <tr><td><strong>Restore Player Cores</strong></td><td>Once: revives you if down (as <code>/whip_revive</code>), then fills your health, armour, food and drink</td></tr>

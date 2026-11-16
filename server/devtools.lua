@@ -862,6 +862,44 @@ SecureEvent('whip_core:server:pmSetStat', {
     pushUserDetail(source, target.userId)
 end)
 
+-- ---- Going to a player ----
+--
+-- One way for an admin to go to a player: /tp <id> and /tpto <id> (server/commands.lua) both call
+-- DevTools.goToPlayer. The move is the client's fade teleport (client/main.lua fadeTeleport): behind a fade, waiting
+-- for the ground there to load, and a car the admin is driving comes along. It is refused for a player in another
+-- world (routing bucket): the admin would land in an empty copy of the map. Each one is on the admin's activity log
+-- ('teleport').
+
+--- A teleport on the admin's own activity log: where they went, in words.
+---@param source number
+---@param detail string
+function DevTools.logTeleport(source, detail)
+    local player = Players[source]
+    if player then Log.write(player.charId, 'teleport', { detail = detail }) end
+end
+
+--- Take the admin `source` to the player `target`.
+---@param source number  the admin (a player in the world: the console has no body)
+---@param target number  the server id of the player to go to
+---@return boolean ok
+---@return string msg  what to tell the admin
+function DevTools.goToPlayer(source, target)
+    if target == source then return false, 'That is you' end
+    local ped = GetPlayerPed(target)
+    local them = Players[target]
+    if not them or not ped or ped == 0 then
+        return false, ('No player with id %d in the world'):format(target)
+    end
+    if GetPlayerRoutingBucket(target) ~= GetPlayerRoutingBucket(source) then
+        return false, 'They are in another world (routing bucket)'
+    end
+    local c = GetEntityCoords(ped)
+    TriggerClientEvent('whip_core:client:fadeTeleport', source, c.x, c.y, c.z, nil, true)
+    local who = ('%s [%d]'):format(them.fullName or GetPlayerName(target) or '?', target)
+    DevTools.logTeleport(source, 'to ' .. who)
+    return true, 'Going to ' .. who
+end
+
 -- Teleport admin to player
 SecureEvent('whip_core:server:pmTeleportTo', {
     rateLimit = 1000,

@@ -583,9 +583,11 @@ devCommand('whip_statebag', function(source, args)
     end
 end)
 
--- /tp and /tpm — move yourself while you build, test or help someone. In-game only (the console has no body).
+-- /tp, /tpto and /tpm — move yourself while you build, test or help someone. In-game only (the console has no body).
 -- The move is the client's fade teleport (client/main.lua): behind a fade, onto the ground when no height is given,
--- and with the car when you are driving one. Every teleport goes on the admin's activity log.
+-- and with the car when you are driving one. Every teleport goes on the admin's activity log (DevTools.logTeleport).
+-- Going to a player is DevTools.goToPlayer (server/devtools.lua).
+-- The third argument of each is its line in the staff's chat suggestions (a devCommand without them ignores it).
 local TP_LIMIT_XY, TP_Z_MIN, TP_Z_MAX = 10000.0, -200.0, 2700.0
 
 --- The numbers in what was typed, however it was copied: "x y z h", "x, y, z", "vector3(x, y, z)", "vec4(...)".
@@ -598,11 +600,6 @@ local function typedNumbers(typed)
     return out
 end
 
-local function logTeleport(source, detail)
-    local player = Players[source]
-    if player then Log.write(player.charId, 'teleport', { detail = detail }) end
-end
-
 -- /tp x y [z] [heading] — to coordinates (no z: onto the ground there); /tp <serverId> — to a player
 devCommand('tp', function(source, args, raw)
     if source == 0 then
@@ -611,19 +608,10 @@ devCommand('tp', function(source, args, raw)
     end
     local n = typedNumbers((raw or ''):gsub('^%S+%s*', ''))
 
+    -- One whole number: a player's server id (the same as /tpto <id>).
     if #n == 1 and #args == 1 and math.type(n[1]) == 'integer' then
-        local target = n[1]
-        local ped = GetPlayerPed(target)
-        if target == source then return reply(source, 'That is you', 'error') end
-        if not Players[target] or not ped or ped == 0 then
-            return reply(source, ('No player with id %d in the world'):format(target), 'error')
-        end
-        if GetPlayerRoutingBucket(target) ~= GetPlayerRoutingBucket(source) then
-            return reply(source, 'They are in another world (routing bucket)', 'error')
-        end
-        local c = GetEntityCoords(ped)
-        TriggerClientEvent('whip_core:client:fadeTeleport', source, c.x, c.y, c.z, nil, true)
-        logTeleport(source, ('to %s [%d]'):format(Players[target].fullName or GetPlayerName(target), target))
+        local ok, msg = DevTools.goToPlayer(source, n[1])
+        if not ok then reply(source, msg, 'error') end
         return
     end
 
@@ -635,8 +623,22 @@ devCommand('tp', function(source, args, raw)
         return reply(source, 'Those coordinates are off the map', 'error')
     end
     TriggerClientEvent('whip_core:client:fadeTeleport', source, x + 0.0, y + 0.0, z and z + 0.0, h and h + 0.0, true)
-    logTeleport(source, ('to %.1f, %.1f%s'):format(x, y, z and (', %.1f'):format(z) or ''))
-end)
+    DevTools.logTeleport(source, ('to %.1f, %.1f%s'):format(x, y, z and (', %.1f'):format(z) or ''))
+end, { help = 'Teleport: to x y [z] [heading], or to a player by server id (staff)', params = { { name = 'x y [z] or id', help = 'Coordinates, or a server id' } } })
+
+-- /tpto <server id> — to a player. The same as /tp <id>, under a name that cannot be read as coordinates.
+devCommand('tpto', function(source, args)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local id = math.tointeger(tonumber(args[1]))
+    if not id or id < 1 or args[2] ~= nil then
+        return reply(source, 'Use /tpto <server id>', 'error')
+    end
+    local ok, msg = DevTools.goToPlayer(source, id)
+    if not ok then reply(source, msg, 'error') end
+end, { help = 'Go to a player (staff)', params = { { name = 'id', help = 'Their server id' } } })
 
 -- /tpm — to your map waypoint, onto the ground there (the waypoint is on your game: it goes from there)
 devCommand('tpm', function(source)
@@ -645,5 +647,5 @@ devCommand('tpm', function(source)
         return
     end
     TriggerClientEvent('whip_core:client:tpWaypoint', source)
-    logTeleport(source, 'to their map waypoint')
-end)
+    DevTools.logTeleport(source, 'to their map waypoint')
+end, { help = 'Go to your map waypoint (staff)' })
