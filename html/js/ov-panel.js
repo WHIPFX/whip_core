@@ -18,12 +18,13 @@ import { nuiCallback, escapeHtml as e, pedImageUrl, vehicleImageUrl, propImageUr
 import { createPadCursor } from './pad-cursor.js';
 import { PED_CATEGORIES, PEDS } from './builder-peds.js';
 import { FurnishGizmo } from './furnisher-gizmo.js';
+import { ICON_PATH } from './ui-icons.js';
 
 const ICON = {
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
-    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
-    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-    open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATH.back + '</svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICON_PATH.close + '</svg>',
+    open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATH.forward + '</svg>',
 };
 const KIND_GLYPH = { object: 'object', npc: 'ped', player: 'ped', vehicle: 'car' };
 const BAN_FOR = [

@@ -12,23 +12,26 @@
    The interaction prompts' pictures (a door, a padlock, the car) are a different set: js/glyphs.js.
    ======================================== */
 
-const PATHS = {
+/** The paths, on a 24x24 grid centred on 12. Screens with their own <svg> (its size, its stroke) take the path from
+ *  here, so each shape is drawn in one place. */
+export const ICON_PATH = {
     back: '<path d="M15 5l-7 7 7 7"/>',
-    close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
-    up: '<path d="M6 14.5l6-6 6 6"/>',
-    down: '<path d="M6 9.5l6 6 6-6"/>',
-    check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
-    minus: '<path d="M6 12h12"/>',
-    plus: '<path d="M12 6v12M6 12h12"/>',
+    forward: '<path d="M9 5l7 7-7 7"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    up: '<path d="M6 15l6-6 6 6"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    minus: '<path d="M5 12h14"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
 };
 
 /**
  * One icon's markup: fixed, no data in it, so it is safe for innerHTML.
- * @param {'back'|'close'|'up'|'down'|'check'|'minus'|'plus'} name
+ * @param {keyof typeof ICON_PATH} name
  * @param {string} [cls] another class beside ui-ic (a page's own size)
  * @returns {string}
  */
 export function uiIcon(name, cls) {
     return '<svg class="ui-ic' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">'
-        + (PATHS[name] || '') + '</svg>';
+        + (ICON_PATH[name] || '') + '</svg>';
 }

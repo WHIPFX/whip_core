@@ -30,6 +30,9 @@
     --ui-scale: 1;
     --hud-scale: 1;
 
+    /* A select's chevron (js/ui-icons.js's down, in the muted text colour): every sheet's select uses this one. */
+    --ui-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3a9b6' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
     /* The inventory draws at this multiple of --ui-scale, and so do its popovers (the right-click
        menu, the tooltip, the split panel) so their text matches the panels they open from. Tune
        with care: the inventory shell's 1880px width is calibrated against it (see .inv-wrapper in
@@ -415,7 +418,7 @@ select option { background: var(--ui-select-option-bg); color: var(--ui-select-o
 select:not([multiple]) {
     appearance: none;
     -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3a9b6' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-image: var(--ui-chevron);
     background-repeat: no-repeat;
     background-position: right 9px center;
     background-size: 12px 12px;

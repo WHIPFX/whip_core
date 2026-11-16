@@ -15,12 +15,13 @@
 
 import { escapeHtml } from '../utils.js';
 import { screenRect } from '../pad-cursor.js';
+import { ICON_PATH } from '../ui-icons.js';
 
 const e = escapeHtml;
 const SEARCH_AT = 9;   // options from which the list has a search box
 
-const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-const TICK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON_PATH.down + '</svg>';
+const TICK = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON_PATH.check + '</svg>';
 
 let open = null;   // { el, anchor, close } while a list is up
 

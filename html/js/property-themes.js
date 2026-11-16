@@ -17,9 +17,10 @@
 
 import { NuiRouter } from './router.js';
 import { nuiCallback, escapeHtml } from './utils.js';
+import { ICON_PATH } from './ui-icons.js';
 
 const CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"'
-    + ' aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    + ' aria-hidden="true">' + ICON_PATH.close + '</svg>';
 const COLS = 2;
 const GREY = '#6b6b6b';
 
