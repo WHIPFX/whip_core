@@ -2923,6 +2923,21 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
 if not ok then exports.whip_core:NotifyPlayer(source, why, 'error') end</code></pre>
 </div></div>
 
+<div class="export-card" id="registerspawnpoint" data-search="registerspawnpoint removespawnpoint spawn picker spawn point choice arrive hideout depot hotel">
+<div class="export-header"><span class="export-name">RegisterSpawnPoint(id, def) · RemoveSpawnPoint(id)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>A place in the spawn picker beside <code>Config.SpawnPoints</code>: a gang's hideout, a job's depot, a hotel. Your ids are your own; the same id again replaces it, and it goes when your resource stops. Picked, it is read again live, so one removed (or no longer allowed) since the list was sent is refused. At most 30 registered at once.</p>
+  <table class="param-table"><tr><th>def</th><th>Type</th><th>Description</th></tr>
+  <tr><td>pos</td><td>vector4</td><td>Where they arrive and the way they face (a <code>vector3</code> faces north)</td></tr>
+  <tr><td>label</td><td>string?</td><td>Its name in the list (40 characters; the id when left out)</td></tr>
+  <tr><td>canUse</td><td>function?</td><td><code>(charId) → true</code> for the characters who may pick it; checked for the list and again when picked. An error hides it</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
+<pre><code class="lang-lua">exports.whip_core:RegisterSpawnPoint('hideout', {
+    label = 'The Hideout', pos = vector4(-1150.2, -1520.4, 4.4, 35.0),
+    canUse = function(charId) return isMember(charId) end,
+})</code></pre>
+</div></div>
+
 <p>A store (clothes, a barber, tattoos) opens the editor with <code>EditAppearance</code> on the player's game: only its tabs, the price of what changed on Save. Its server counts the changes with <code>GetAppearanceChanges</code>, charges, and keeps the look with <code>SetPlayerAppearance</code>. The tabs are the editor's category ids (<code>heritage features eyes hair eyebrows beard makeup skin chestHair</code>, <code>mask tops undershirt arms legs shoes accessory armor decal bag</code>, <code>hat glasses ear watch bracelet</code>, <code>tatHead tatTorso tatLeftArm tatRightArm tatLeftLeg tatRightLeg</code>, <code>outfits</code>) or their groups (<code>face apparel props tattoos outfits</code>). Any tattoo tab lets every tattoo change. Saved outfits only put clothes on, so offer <code>outfits</code> with <code>apparel</code> and <code>props</code>.</p>
 
 <div class="export-card" data-search="editappearance store shop clothing barber tattoo editor price pay appearance">
@@ -11501,7 +11516,7 @@ end</code></pre>
 <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
 <tr><td><code>Landing</code></td><td>table</td><td>The screen after loading: a camera shot, the WHIP logo and "Press any button to continue". <code>enabled = false</code> skips it. Also <code>camera</code>, <code>prompt</code>, <code>look</code> (sky and clock), fades, <code>streamMs</code>. <code>/logout</code> skips it</td></tr>
 <tr><td><code>CharSelect</code></td><td>table</td><td>The character screen. <code>slots</code>: a hero shot per character place (<code>camera</code>, <code>pos</code>, a <code>scenario</code>/<code>anim</code>/<code>emote</code>, <code>look</code>, <code>props</code>); a place without one reuses another, and shot 1 must exist. <code>quietBucket</code> (no traffic or people), <code>preloadShots</code>, <code>spawnPicker</code> (pick where to arrive on the 3D map; <code>false</code>: fade to black, as dead and new characters always get). Fades: <code>Config.CharSelectFades</code></td></tr>
-<tr><td><code>SpawnPoints</code></td><td>table</td><td>Extra spawn picker places, beside the last position and the character's properties: <code>{ id, label, pos }</code>, <code>pos</code> a <code>vector4</code>. Server only</td></tr>
+<tr><td><code>SpawnPoints</code></td><td>table</td><td>Extra spawn picker places, beside the last position and the character's properties: <code>{ id, label, pos }</code>, <code>pos</code> a <code>vector4</code>. Server only. A resource adds its own with <a href="#registerspawnpoint"><code>RegisterSpawnPoint</code></a></td></tr>
 <tr><td><code>Creator</code></td><td>table</td><td>Where a new character is made (<code>spawn</code>), <code>look</code>, fades and holds; saving sends them to <code>DefaultSpawn</code>. <code>maxOutfits</code> (20, up to 100): saved outfits per character (clothes and accessories only)</td></tr>
 <tr><td><code>ArrivalScenes</code></td><td>table</td><td>A GTA character-switch scene as the picture returns after picking a character. <code>enabled = false</code>: a plain fade</td></tr>
 </table>

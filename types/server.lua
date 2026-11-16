@@ -1564,6 +1564,22 @@ function whip_core:SanitizeAppearance(appearance) end
 ---@return string|nil why
 function whip_core:OpenCharacterEditor(who) end
 
+--- Add a place to the spawn picker, beside config.lua's spawn points: a gang's hideout, a job's depot, a hotel.
+--- Your ids are your own; the same id again replaces it; it goes when your resource stops. canUse(charId), when
+--- given, keeps it to the characters it answers true for (checked again when picked; an error hides it).
+--- At most 30 registered at once across all resources.
+---@param id string Letters, digits, - and _ (at most 24)
+---@param def { label?: string, pos: vector4|vector3|{ x: number, y: number, z: number, w?: number }, canUse?: fun(charId: number): boolean }
+---@return boolean ok
+---@return string|nil why
+function whip_core:RegisterSpawnPoint(id, def) end
+
+--- Take one of your spawn points out of the picker.
+---@param id string
+---@return boolean ok
+---@return string|nil why
+function whip_core:RemoveSpawnPoint(id) end
+
 --- What a store's customer changed (client EditAppearance): their saved look against `look`, by the editor's tabs.
 --- A count per category id ('tops' = 1, 'makeup' = 2 for two of its overlays) and `tattoos` for tattoos put on.
 --- Taking off an accessory or a tattoo counts nothing. `only` (the editor's category ids or groups) counts only those.
