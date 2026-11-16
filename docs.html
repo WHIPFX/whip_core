@@ -2959,7 +2959,7 @@ if not ok then exports.whip_core:NotifyPlayer(source, why, 'error') end</code></
 <div class="export-card" data-search="setplayerappearance store shop clothing barber tattoo save keep appearance look">
 <div class="export-header"><span class="export-name">SetPlayerAppearance(who, look, opts?)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Keeps a look for a playing character, checked as the editor's Save is, and sends it to their game. <code>opts.only</code> takes only those tabs' parts from <code>look</code> and keeps the rest of their saved look, so a barber can't change a face.</p>
+  <p>Keeps a look for a playing character, checked as the editor's Save is. <code>opts.only</code> takes only those tabs' parts from <code>look</code> and keeps the rest of their saved look, so a barber can't change a face. What they wear changes with the editor's Save (<code>EditAppearance</code>); called on its own, when they next load in.</p>
   <div class="return-info"><strong>Returns: </strong><code>true, look</code> (as kept), or <code>false, why</code></div>
 <pre><code class="lang-lua">SecureCallback('mybarber:buy', { params = { { 'look', 'any' }, { 'method', 'enum', { 'cash', 'bank' }, 'cash' } } },
     function(source, player, look, method)

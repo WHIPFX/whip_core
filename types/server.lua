@@ -1577,7 +1577,8 @@ function whip_core:OpenCharacterEditor(who) end
 function whip_core:GetAppearanceChanges(who, look, only) end
 
 --- Keep a look for a playing character, checked as the editor's Save is. opts.only takes only those tabs' parts
---- from `look` and keeps the rest of their saved look, so a barber can't change a face. Their game gets it at once.
+--- from `look` and keeps the rest of their saved look, so a barber can't change a face. What they wear changes with
+--- the editor's Save (EditAppearance), else when they next load in.
 ---
 ---     local ok, why = exports.whip_core:SetPlayerAppearance(source, look, { only = { 'hair', 'beard' } })
 ---@param who number|{ charId: number } A server id, or { charId = n } for a character who is playing
