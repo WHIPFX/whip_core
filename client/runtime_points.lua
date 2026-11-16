@@ -81,13 +81,17 @@ local function inherited(p, path)
     return out, reach
 end
 
---- An option held to a nearer reach than its prompt: offered only within `r` metres of it (the engine's own
---- measure, the character to the prompt). The server checks the same reach on the press.
-local function within(r)
-    return function(ctx)
-        local c = ctx and ctx.coords
-        if not c then return true end
-        return #(GetEntityCoords(PlayerPedId()) - vector3(c.x + 0.0, c.y + 0.0, c.z + 0.0)) <= r
+--- An option held to a nearer reach than its prompt: offered only within `r` metres of where the point is (`at`:
+--- its spot, or the entity it rides), measured as the server measures the press (server/runtime_points.lua).
+--- The engine's condition ctx carries no position, so the point's own is read here.
+local function within(r, at)
+    return function()
+        local c = at.coords
+        if at.entity then
+            if not DoesEntityExist(at.entity) then return false end
+            c = GetEntityCoords(at.entity)
+        end
+        return c ~= nil and #(GetEntityCoords(PlayerPedId()) - c) <= r
     end
 end
 
@@ -129,6 +133,16 @@ function mount(pointId, p, ent, spot)
         path, list = {}, p.options or {}
         level[pointId] = nil
     end
+    local at
+    if ent then
+        at = { entity = ent, offset = vec(p.offset), bone = p.bone }
+    elseif spot then
+        at = { coords = spot }
+    else
+        local c = vec(p)
+        if not c then return false end
+        at = { coords = c, heading = tonumber(p.heading) }
+    end
     local opts = {}
     -- (At the top the path is empty: nothing inherited.)
     local up, menuReach = inherited(p, path)
@@ -151,7 +165,7 @@ function mount(pointId, p, ent, spot)
         local oid = o.id
         local entry = { id = oid, label = o.label, icon = o.icon, require = withUp(up, o.requires) }
         local r = tonumber(o.reach) or levelReach
-        if r and r < promptReach - 0.01 then entry.canInteract = within(r) end
+        if r and r < promptReach - 0.01 then entry.canInteract = within(r, at) end
         if type(o.options) == 'table' and #o.options > 0 then
             -- A menu: named with a mark that says there is more behind it.
             entry.label = (type(o.label) == 'string' and o.label ~= '' and o.label or oid) .. '  ›'
@@ -182,16 +196,6 @@ function mount(pointId, p, ent, spot)
     if type(p.busy) == 'string' then
         local why = p.busy
         opts = { { id = 'busy', label = why, onSelect = function() UI.Notify(why, 'info') end } }
-    end
-    local at
-    if ent then
-        at = { entity = ent, offset = vec(p.offset), bone = p.bone }
-    elseif spot then
-        at = { coords = spot }
-    else
-        local c = vec(p)
-        if not c then return false end
-        at = { coords = c, heading = tonumber(p.heading) }
     end
     local ok, why = Actions.add(CORE, {
         id        = actionId(pointId),
