@@ -3308,7 +3308,7 @@ function whip_core:ClosePanel(source, panelId) end
 ---   slots, label (string or function(host)), storageKey (default 'slots'), action (default the
 ---   item's defaultAction), allowedItems (a list of names, or keyed by name), allowedFlag (also every
 ---   item whose definition has this field = true, read at each opening: the wallet's 'wallet'; plain
----   slot array only; HasItem, GetItemCount and FindItem look inside it for those items)
+---   slot array only; every count and take of what a player carries looks inside it for those items)
 ---   canOpen(host) -> ok, why       may it open at all?
 ---   read(host) -> items            what the panel shows
 ---   write(host, items) -> meta     how a change folds back into the item

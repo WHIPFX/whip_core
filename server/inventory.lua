@@ -1008,7 +1008,28 @@ end
 -- Cross-Container Helpers
 -- ============================================
 
---- Count total quantity of an item across every container the player carries
+--- The server's side of EachCarriedInside (shared/inventory_shape.lua): the holders are the panel items registered
+--- with an allowedFlag (their registration is the slot array's shape), and an item counts in one when its
+--- definition sets that flag.
+local function holdOf(holderItem)
+    local cfg = Panels and Panels.itemConfigs[holderItem]
+    return cfg and cfg.allowedFlag and cfg or nil
+end
+local function countsInside(holderItem, item)
+    local cfg, def = Panels.itemConfigs[holderItem], Config.Items[item]
+    return type(def) == 'table' and def[cfg.allowedFlag] == true
+end
+
+--- Each stack of `item` (every counted one, when nil) carried inside a holder in `cache` (EachCarriedInside).
+---@param cache table
+---@param item string|nil
+---@param fn fun(container: string, slot: number, place: number, data: table, inner: table, key: any): boolean|nil
+function Inventory.eachInside(cache, item, fn)
+    EachCarriedInside(cache, item, holdOf, countsInside, fn)
+end
+
+--- Count total quantity of an item across every container the player carries, and inside the holders that keep it
+--- theirs (a bank card in a wallet: shared/inventory_shape.lua).
 ---@param cache table
 ---@param item string
 ---@param only table|nil  count only the stacks carrying it (see removeItem)
@@ -1018,6 +1039,9 @@ function Inventory.getItemCountAcrossContainers(cache, item, only)
     for _, container in ipairs(PlayerContainers) do
         total = total + Inventory.getItemCount(cache, container, item, only)   -- in-slot only
     end
+    Inventory.eachInside(cache, item, function(_, _, _, data)
+        if not skips(only, data) then total = total + (tonumber(data.amount) or 1) end
+    end)
     return total
 end
 
@@ -1074,6 +1098,21 @@ function Inventory.removeItemAcrossContainers(cache, item, amount, only, taken)
         end
     end
 
+    -- Then from inside the holders that keep it the player's (a card in a wallet), as the count above counted it.
+    -- The holder's metadata changes in place: the save sees it, and an open panel of it re-reads it (the host wins:
+    -- Panels.refreshFromHost).
+    if remaining > 0 then
+        Inventory.eachInside(cache, item, function(_, _, _, data, inner, key)
+            if skips(only, data) then return false end
+            local n = tonumber(data.amount) or 1
+            local take = math.min(n, remaining)
+            if taken then taken[#taken + 1] = { amount = take, metadata = Inventory.copyMetadata(data.metadata) } end
+            if take >= n then inner[key] = nil else data.amount = n - take end
+            remaining = remaining - take
+            return remaining <= 0
+        end)
+    end
+
     return true
 end
 
@@ -1087,8 +1126,9 @@ end
 -- what it last announced, and fires one event per item that went up or down. A new path is covered
 -- the moment it pushes, and nothing fires twice.
 --
--- Counted: the player's own containers (pockets, accessory strip), not the insides of a bag they
--- carry (cash moved into a wallet is "removed" from the pockets).
+-- Counted: the player's own containers (pockets, accessory strip), and what stays theirs inside a holder (a bank
+-- card in a wallet: shared/inventory_shape.lua), not the rest of a bag's or wallet's insides (cash moved into a
+-- wallet is "removed" from the pockets).
 --
 -- The payload is one table: { source, item, amount, count = what they carry now, reason = the
 -- caller's reason, by = the resource that asked }. reason and by are known only for changes made
@@ -1119,6 +1159,10 @@ local function countCarried(cache)
             end
         end
     end
+    -- And what stays theirs inside a holder (a card in a wallet): moving it in is no change.
+    Inventory.eachInside(cache, nil, function(_, _, _, d)
+        counts[d.item] = (counts[d.item] or 0) + (tonumber(d.amount) or 1)
+    end)
     return counts
 end
 
@@ -1543,6 +1587,24 @@ end
 
 --- Build item definitions for NUI (stripped of server-only fields)
 ---@return table
+--- The holders an item stays the player's inside ({ [holder] = true }), or nil (EachCarriedInside).
+local function insideOfFor(def)
+    local out
+    for holder, cfg in pairs(Panels and Panels.itemConfigs or {}) do
+        if cfg.allowedFlag and def[cfg.allowedFlag] == true then
+            out = out or {}
+            out[holder] = true
+        end
+    end
+    return out
+end
+
+--- A holder's slot array as a game needs it ({ storageKey, slots }), or nil for an item that holds nothing counted.
+local function holdsFor(key)
+    local cfg = holdOf(key)
+    return cfg and { storageKey = cfg.storageKey or 'slots', slots = cfg.slots or 3 } or nil
+end
+
 function Inventory.getItemDefs()
     local defs = {}
     for key, def in pairs(Config.Items) do
@@ -1566,6 +1628,10 @@ function Inventory.getItemDefs()
             playerWalk     = def.playerWalk == true or nil,
             metaFields     = def.metaFields,
             defaultAction  = def.defaultAction,
+            -- Inside which holders it stays the player's, and a holder's slot array (shared/inventory_shape.lua):
+            -- a game's own counts (prompts' `item` requirement, its HasItem) look in a wallet too.
+            insideOf       = insideOfFor(def),
+            holds          = holdsFor(key),
             -- nil for whip_core's own items: the NUI then uses its built-in path.
             img            = Inventory.resolveItemImage(key, def),
             -- The pictures that depend on the item (server/item_options.lua), and the root of the
@@ -2248,6 +2314,9 @@ function Inventory.take(source, item, amount, reason, only, evenFrozen)
     if not amount then return false, Sanitize.AMOUNT_ERR end
     local ok, err = Inventory.removeItemAcrossContainers(player.inventory, item, amount, only)
     if ok then
+        -- Taken from inside a holder that is open on screen (a card out of the wallet): repainted now, not at its
+        -- next move. A panel whose host did not change re-reads nothing.
+        for _, session in pairs(Panels._sessions[source] or {}) do Panels.refreshFromHost(source, session) end
         -- An item leaving the game, logged with the resource that asked (Log.lost).
         Log.lost(player.charId, item, amount, why)
         -- The push announces whip_core:item:removed (Inventory.announceChanges).
@@ -2267,66 +2336,20 @@ exports('RemoveItem', function(source, item, amount, metadata, opts)
     return Inventory.take(source, item, amount, opts, metadata and Inventory.onlyStamped(metadata) or nil)
 end)
 
---- Each stack of `item` inside the panel items the player carries that take it by their allowedFlag (a bank card
---- in a wallet: the wallet's `allowedFlag = 'wallet'`, the card's `wallet = true`), pockets in order, then the
---- holder's slot, then the place inside it, as fn(pocket, slot, inside, data); fn answering true stops the walk.
---- Only an item that opts in by the flag: cash in a wallet is the money system's, never found here.
----@param player WhipPlayer
----@param item string
----@param fn fun(pocket: string, slot: number, inside: number, data: table): boolean|nil
-function Inventory.eachStackInside(player, item, fn)
-    local def = Config.Items[item]
-    if type(def) ~= 'table' or not Panels or not Panels.itemConfigs then return end
-    for _, p in ipairs(PlayerContainers) do
-        local slots = player.inventory[p]
-        if type(slots) == 'table' then
-            for slot = 1, (Config.ContainerSlots[p] or 0) do
-                local holder = slots[slot]
-                local cfg = holder and Panels.itemConfigs[holder.item]
-                local flag = cfg and cfg.allowedFlag
-                if flag and def[flag] == true and type(holder.metadata) == 'table' then
-                    -- The plain slot array (allowedFlag refuses read/write); JSON may have made its keys strings.
-                    local inner = holder.metadata[cfg.storageKey or 'slots']
-                    if type(inner) == 'table' then
-                        for i = 1, (cfg.slots or 3) do
-                            local data = inner[i] or inner[tostring(i)]
-                            if type(data) == 'table' and data.item == item and fn(p, slot, i, data) then return end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
---- How many of `item` are inside the panel items the player carries (Inventory.eachStackInside).
----@param player WhipPlayer
----@param item string
----@return number
-local function countInside(player, item)
-    local n = 0
-    Inventory.eachStackInside(player, item, function(_, _, _, data)
-        n = n + (tonumber(data.amount) or 1)
-    end)
-    return n
-end
-
 --- Does the player have at least `amount` of this item, anywhere on them? A wallet's cards count.
 exports('HasItem', function(source, item, amount)
     local player = Players[source]
     if not player or not player.inventory then return false, 'Player not loaded' end
     amount = Sanitize.amount(amount, 1)
     if not amount then return false, Sanitize.AMOUNT_ERR end
-    local have = Inventory.getItemCountAcrossContainers(player.inventory, item)
-    if have >= amount then return true end
-    return have + countInside(player, item) >= amount
+    return Inventory.getItemCountAcrossContainers(player.inventory, item) >= amount
 end)
 
 --- How many of this item is the player carrying, across every container? A wallet's cards count.
 exports('GetItemCount', function(source, item)
     local player = Players[source]
     if not player or not player.inventory then return 0, 'Player not loaded' end
-    return Inventory.getItemCountAcrossContainers(player.inventory, item) + countInside(player, item)
+    return Inventory.getItemCountAcrossContainers(player.inventory, item)
 end)
 
 -- The handler registries and registerOwned are declared further up, where runContextAction and
@@ -2986,6 +3009,15 @@ local function foundEntry(player, pocket, slot, data)
     }
 end
 
+--- The same for a stack inside a holder (Inventory.eachInside): no `addr`, as a place inside an item is no store
+--- address, and `inside = { addr, slot }`, the holder's address and the place in it.
+local function insideEntry(player, pocket, slot, place, data)
+    local e = foundEntry(player, pocket, slot, data)
+    e.inside, e.addr = { addr = e.addr, slot = place }, nil
+    e.amount = e.amount or 1
+    return e
+end
+
 --- Each slot of a pocket that holds `item`, LOWEST SLOT FIRST, as fn(slot, data); fn answering true stops the walk.
 ---
 --- In slot order (pairs() over sparse slots has no order, so "the first stack" would be arbitrary).
@@ -3018,15 +3050,13 @@ exports('FindItem', function(source, item, pocket)
         end)
         if found then return found end
     end
-    -- Not loose in the pockets: inside a wallet (an item that opts in, Inventory.eachStackInside), unless a
+    -- Not loose in the pockets: inside a wallet (an item that opts in, Inventory.eachInside), unless a
     -- pocket was named. No `addr` then: a place inside an item is no store address. `inside` says where:
     -- the holder's address and the place in it.
     if pocket == nil then
         local found = nil
-        Inventory.eachStackInside(player, item, function(p, slot, i, data)
-            found = foundEntry(player, p, slot, data)
-            found.inside, found.addr = { addr = found.addr, slot = i }, nil   -- the holder's address
-            found.amount = found.amount or 1
+        Inventory.eachInside(player.inventory, item, function(p, slot, place, data)
+            found = insideEntry(player, p, slot, place, data)
             return true
         end)
         return found
@@ -3045,6 +3075,12 @@ function Inventory.findAll(source, item, pocket)
     for _, p in ipairs(pockets) do
         eachStackOf(player, p, item, function(slot, data)
             results[#results + 1] = foundEntry(player, p, slot, data)
+        end)
+    end
+    -- And inside a wallet, as FindItem (no pocket named only).
+    if pocket == nil then
+        Inventory.eachInside(player.inventory, item, function(p, slot, place, data)
+            results[#results + 1] = insideEntry(player, p, slot, place, data)
         end)
     end
     return results

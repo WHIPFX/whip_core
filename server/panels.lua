@@ -701,6 +701,7 @@ local _panelItems = Registry.new('PanelItem', {
     same  = false,
     onRemove = function(itemKey)
         for _, byItem in pairs(_panelItemActions) do byItem[itemKey] = nil end
+        Inventory.invalidateItemDefs()   -- a holder gone: the games' copy of what counts inside one (holds, insideOf)
     end,
 })
 
@@ -1314,6 +1315,8 @@ function Panels.registerItem(itemKey, config, resource)
     -- believe in.
     local okItem, whyItem = _panelItems:add(resource, itemKey, config)
     if not okItem then return false, whyItem end
+    -- A holder of items that stay the player's: the games learn it with the item definitions (holds, insideOf).
+    if config.allowedFlag then Inventory.invalidateItemDefs() end
 
     return true
 end
