@@ -1131,13 +1131,13 @@ function Panels.registerItem(itemKey, config, resource)
     -- so another resource's card fits without whip_core naming it. Only for the plain slot array: a
     -- read/write registration keeps its own shape, which HasItem and FindItem cannot look into.
     if config.allowedFlag ~= nil then
-        if type(config.allowedFlag) ~= 'string' or not config.allowedFlag:match('^[%a_][%w_]*$') then
-            local reason = ('item "%s": allowedFlag must be the name of an item field (letters, digits, _)'):format(itemKey)
-            print(('[whip_core:panel] RegisterPanelItem FAILED: %s'):format(reason))
-            return false, reason
-        end
-        if config.read or config.write then
-            local reason = ('item "%s": allowedFlag needs the plain slot array (no read or write)'):format(itemKey)
+        local flag = config.allowedFlag
+        local why = (type(flag) ~= 'string' or not flag:match('^[%a_][%w_]*$'))
+                and 'allowedFlag must be the name of an item field (letters, digits, _)'
+            or (config.read or config.write) and 'allowedFlag needs the plain slot array (no read or write)'
+            or nil
+        if why then
+            local reason = ('item "%s": %s'):format(itemKey, why)
             print(('[whip_core:panel] RegisterPanelItem FAILED: %s'):format(reason))
             return false, reason
         end

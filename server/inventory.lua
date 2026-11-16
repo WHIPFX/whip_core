@@ -3024,12 +3024,9 @@ exports('FindItem', function(source, item, pocket)
     if pocket == nil then
         local found = nil
         Inventory.eachStackInside(player, item, function(p, slot, i, data)
-            found = {
-                item     = data.item,
-                amount   = data.amount or 1,
-                metadata = data.metadata and json.decode(json.encode(data.metadata)) or nil,
-                inside   = { addr = Inventory.pocketAddr(player.source, p, slot), slot = i },
-            }
+            found = foundEntry(player, p, slot, data)
+            found.inside, found.addr = { addr = found.addr, slot = i }, nil   -- the holder's address
+            found.amount = found.amount or 1
             return true
         end)
         return found
