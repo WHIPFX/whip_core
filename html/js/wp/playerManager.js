@@ -45,6 +45,11 @@ let search = '';
 let inlineForm = null;       // null | 'kick' | 'tempban' | 'permaban' | 'note' | 'selectchar'
 let els = {};
 
+/** An action card that needs them online: asks the server about the selected player (it checks everything again). */
+function toOnline(callback) {
+    if (detail && detail.online) nuiCallback(callback, { targetSource: detail.source });
+}
+
 // ---- formatting helpers (times, dates and money: wp/format.js) ----
 
 function fmtDuration(seconds) {
@@ -795,8 +800,12 @@ function renderDetail() {
     const say = (b, text) => { b._sub.textContent = text; };
     els.btnTeleport.disabled = !online;
     say(els.btnTeleport, online ? 'Go to them, #' + u.source : 'Offline');
-    els.btnBring.disabled = !online;
-    say(els.btnBring, online ? 'Pull them to you' : 'Offline');
+    // Revive, Heal and Kill at any time they are online: the server says when they are not down, or already are.
+    for (const [b, text] of [[els.btnBring, 'Pull them to you'], [els.btnRevive, 'Back up, fed and watered'],
+        [els.btnHeal, 'Health, food and drink'], [els.btnKill, 'Down them']]) {
+        b.disabled = !online;
+        say(b, online ? text : 'Offline');
+    }
     const invChars = u.characters || [];
     els.btnInventory.disabled = invChars.length === 0;
     say(els.btnInventory, invChars.length === 0 ? 'No characters'
@@ -1212,10 +1221,14 @@ WhipPanel.registerSection({
         const reach = WP.el('div', 'pmg-verb-set');
         els.btnTeleport = verb(glyph.pin, 'Teleport To', 'pmgTeleport');
         els.btnBring = verb(VERB_GLYPHS.bring, 'Bring Here', 'pmgBring');
+        els.btnRevive = verb(glyph.respawn, 'Revive', 'pmgRevive');
+        els.btnHeal = verb(glyph.eat, 'Heal', 'pmgHeal');
+        els.btnKill = verb(glyph.fail, 'Kill', 'pmgKill', true);
         els.btnInventory = verb(glyph.bag, 'Open Inventory', 'pmgInventory');
         els.btnUnban = verb(glyph.unlock, 'Unban', 'pmgUnbanActive');
         els.btnDevtools = verb(glyph.devtools, 'Give Dev Tools', 'pmgDevtools');
-        for (const b of [els.btnTeleport, els.btnBring, els.btnInventory, els.btnUnban, els.btnDevtools]) reach.appendChild(b);
+        for (const b of [els.btnTeleport, els.btnBring, els.btnRevive, els.btnHeal, els.btnKill, els.btnInventory,
+            els.btnUnban, els.btnDevtools]) reach.appendChild(b);
         verbs.appendChild(reach);
         const remove = WP.el('div', 'pmg-verb-set pmg-verb-remove');
         els.btnKick = verb(VERB_GLYPHS.kick, 'Kick', 'pmgKick', true);
@@ -1393,14 +1406,11 @@ WhipPanel.registerSection({
         pmgStatType: (el) => statTyped(el),
         pmgStatApply: (el) => applyStat(el.dataset.stat),
 
-        pmgTeleport: () => {
-            if (!detail || !detail.online) return;
-            nuiCallback('plmTeleportTo', { targetSource: detail.source });
-        },
-        pmgBring: () => {
-            if (!detail || !detail.online) return;
-            nuiCallback('plmBringPlayer', { targetSource: detail.source });
-        },
+        pmgTeleport: () => toOnline('plmTeleportTo'),
+        pmgBring: () => toOnline('plmBringPlayer'),
+        pmgRevive: () => toOnline('plmRevive'),
+        pmgHeal: () => toOnline('plmHeal'),
+        pmgKill: () => toOnline('plmKill'),
         pmgInventory: () => {
             // One character goes straight through; several open the picker (old selectchar).
             // Lua closes the shell before the inventory handoff — nothing to do here.

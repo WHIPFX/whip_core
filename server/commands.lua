@@ -601,6 +601,27 @@ devCommand('whip_reviveme', function(source)
     print(('[whip_core] %s [%d] self-revived via /whip_reviveme'):format(player.fullName, source))
 end)
 
+--- A command that runs DevTools[name] on the character whose charId is typed, as /whip_revive takes one.
+---@param name 'heal'|'kill'
+local function onCharacter(name)
+    return function(source, args)
+        local charId = tonumber(args[1])
+        if not charId then return reply(source, ('Usage: /whip_%s <charId>'):format(name), 'error') end
+        local target, targetSrc = GetPlayerByCharId(charId)
+        if not target then return reply(source, ('No active player with charId %d'):format(charId), 'error') end
+        ---@cast targetSrc -nil
+        local ok, msg = DevTools[name](source, targetSrc)
+        reply(source, msg, ok and 'success' or 'error')
+    end
+end
+local CHAR_PARAM = { { name = 'charId', help = 'Their character id' } }
+
+-- /whip_heal <charId> — Full health, food and drink for a character who is up (DevTools.heal)
+devCommand('whip_heal', onCharacter('heal'), { help = 'Heal a character (staff)', params = CHAR_PARAM })
+
+-- /whip_kill <charId> — Down a character through the normal death flow (DevTools.kill)
+devCommand('whip_kill', onCharacter('kill'), { help = 'Down a character (staff)', params = CHAR_PARAM })
+
 -- /whip_statebag [id] — Print all statebag values for a player
 devCommand('whip_statebag', function(source, args)
     local say = linesTo(source)

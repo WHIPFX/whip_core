@@ -94,6 +94,11 @@ ToolHandlers['Kill Me'] = {
 }
 
 RegisterNetEvent('whip_core:client:devKillMe', function()
+    -- Out of Noclip and God Mode first, as the Kill Me row does (tools/core.lua `ends`): God Mode would put the health
+    -- straight back, and /whip_kill or the Player Manager can down a staff member who has either on.
+    for _, name in ipairs({ 'Noclip', 'God Mode' }) do
+        if DevToolActive(name) then SetDevTool(name, false) end
+    end
     local ped = PlayerPedId()
     if not IsEntityDead(ped) then SetEntityHealth(ped, 0) end
 end)

@@ -565,6 +565,117 @@ local function accountRank(account)
     return rank
 end
 
+-- ---- Revive, heal and kill ----
+--
+-- One way each, for the Player Manager's Revive, Heal and Kill cards below and /whip_heal and /whip_kill
+-- (server/commands.lua). All go through whip's own flows: a revive is MarkPlayerAlive plus the client's revive, as
+-- /whip_revive and the RevivePlayer export do, then full food and drink; a heal is full health, food and drink
+-- through Stats, as /w Restore does (no armour: that is not healing); a kill drops the ped's health to 0 on its own
+-- game, as Kill Me does, so the death is reported, confirmed and logged like any other. Nobody downs a player
+-- of their own rank or above; the console may down anyone. Each one goes on the player's activity log, naming who
+-- did it.
+
+--- Full food and drink. Stats clamps 1e9 to each stat's top, as /w Restore does; hunger and thirst are registered
+--- even when they are turned off (server/stats.lua), so this is safe either way.
+---@param target number
+---@param why string  for the Stats change log
+local function fillNeeds(target, why)
+    Stats.set(target, 'hunger', 1e9, why)
+    Stats.set(target, 'thirst', 1e9, why)
+end
+
+--- Who did it, for the log and the console: 'the console', or 'Name [id]'.
+---@param src number
+---@return string
+local function actorName(src)
+    if src == 0 then return 'the console' end
+    local p = Players[src]
+    return ('%s [%d]'):format(p and p.fullName or GetPlayerName(src) or '?', src)
+end
+
+--- The player each of them acts on, and whether it is the one who asked.
+---@return table|nil player
+---@return boolean|string own  or why there is no player
+local function subjectOf(actor, target)
+    local player = Players[target]
+    if not player then return nil, actor == target and 'No character loaded' or 'They are not in the world' end
+    return player, actor == target
+end
+
+--- How each one ends: the activity log, the console, a notice to the player (unless it was their own), and what to
+--- tell the one who asked.
+---@param did string  'revived' | 'healed' | 'killed'
+---@param logKey string  the activity log's action
+---@param toThem string|nil  the notice for the player when someone else did it
+---@param toSelf string  what to tell a player who did it to themselves
+---@return boolean ok
+---@return string msg
+local function report(actor, target, player, own, did, logKey, toThem, toSelf)
+    Log.write(player.charId, logKey, { detail = own and (did .. ' themselves') or 'by ' .. actorName(actor) })
+    print(('[whip_core:admin] %s %s %s'):format(actorName(actor), did, own and 'themselves'
+        or ('%s [%d]'):format(player.fullName, target)))
+    if own then return true, toSelf end
+    if toThem then NotifyPlayer(target, toThem, 'success') end
+    return true, ('%s%s %s [%d]'):format(did:sub(1, 1):upper(), did:sub(2), player.fullName, target)
+end
+
+--- Bring a downed player back up where they lie.
+---@param actor number  who asked (0: the console)
+---@param target number  server id of the player
+---@return boolean ok
+---@return string msg  what to tell the one who asked
+function DevTools.revive(actor, target)
+    local player, own = subjectOf(actor, target)
+    if not player then return false, own end
+    if not player.isDead then
+        return false, own and 'You are not down' or ('%s is not down'):format(player.fullName)
+    end
+    local why = own and 'revive:self' or 'revive:admin'
+    MarkPlayerAlive(target, player, why)
+    fillNeeds(target, why)
+    TriggerClientEvent('whip_core:client:revive', target)
+    return report(actor, target, player, own, 'revived', 'revived', 'You were revived by an admin', 'You have been revived')
+end
+
+--- Full health, food and drink for a player who is up. A downed player is refused: a revive brings them up.
+---@param actor number  who asked (0: the console)
+---@param target number  server id of the player
+---@return boolean ok
+---@return string msg  what to tell the one who asked
+function DevTools.heal(actor, target)
+    local player, own = subjectOf(actor, target)
+    if not player then return false, own end
+    if player.isDead then
+        return false, own and 'You are down: use /whip_reviveme' or ('%s is down: revive them'):format(player.fullName)
+    end
+    local why = own and 'heal:self' or 'heal:admin'
+    Stats.set(target, 'health', 1e9, why)
+    fillNeeds(target, why)
+    return report(actor, target, player, own, 'healed', 'healed', 'You were healed by an admin', 'Health, food and drink restored')
+end
+
+--- Down a player: their game sets the ped's health to 0 and the normal death flow follows.
+---@param actor number  who asked (0: the console)
+---@param target number  server id of the player
+---@return boolean ok
+---@return string msg  what to tell the one who asked
+function DevTools.kill(actor, target)
+    local player, own = subjectOf(actor, target)
+    if not player then return false, own end
+    if player.isDead then
+        return false, own and 'You are already down' or ('%s is already down'):format(player.fullName)
+    end
+    if not own and actor ~= 0 then
+        local theirs = rankOfSource(target)
+        if not outranks(rankOfSource(actor), theirs) then
+            return false, theirs == 'permanent' and 'They are an admin in server.cfg: they cannot be killed by command'
+                or 'Only an admin from server.cfg can kill someone who has dev tools'
+        end
+    end
+    TriggerClientEvent('whip_core:client:devKillMe', target)
+    return report(actor, target, player, own, 'killed', 'admin_kill', nil, 'You are down')
+end
+
 -- Kick player
 --
 -- 'id', not 'int': the int type CLAMPS, and an id is an address (a clamped id kicks whoever holds
@@ -926,6 +1037,22 @@ SecureEvent('whip_core:server:pmBringPlayer', {
     TriggerClientEvent('whip_core:client:pmTeleport', targetSource, coords.x, coords.y, coords.z)
 end)
 
+-- Revive, Heal and Kill on their page: DevTools.revive, DevTools.heal and DevTools.kill (Revive, heal and kill, above).
+for event, act in pairs({
+    ['whip_core:server:pmRevive'] = DevTools.revive,
+    ['whip_core:server:pmHeal']   = DevTools.heal,
+    ['whip_core:server:pmKill']   = DevTools.kill,
+}) do
+    SecureEvent(event, {
+        rateLimit = 1000,
+        ace = 'whip.devtools',
+        params = { {'targetSource', 'id'} },  -- reject-don't-clamp: see pmKick
+    }, function(source, _, targetSource)
+        local ok, msg = act(source, targetSource)
+        NotifyPlayer(source, msg, ok and 'success' or 'error')
+    end)
+end
+
 -- A PICTURE OF THEIR GAME, for their page (html/js/wp/playerManager.js keeps it a few minutes): what they see, whip's
 -- interface (their HUD) drawn over the game, at about the pane's size; where they stood comes with it, for the map
 -- beside it. One ask per player at a time: an admin asking while one is on its way gets that one too. It goes to the
@@ -980,37 +1107,29 @@ SecureEvent('whip_core:server:pmShot', {
     end)
 end)
 
--- /w Kill Me (tools/player.lua): an admin's own client is told to drop its ped's health to zero. The death
--- that follows is an ordinary one, reported and checked against the ped like any other (MarkPlayerDead).
+-- /w Kill Me (tools/player.lua): DevTools.kill on yourself. The death that follows is an ordinary one,
+-- reported and checked against the ped like any other (MarkPlayerDead).
 SecureEvent('whip_core:server:devKillMe', {
     rateLimit = 1000,
     ace = 'whip.devtools',
-}, function(source, player)
-    if not player then return false, 'No character loaded' end
-    if player.isDead then return false, 'You are already down' end
-    print(('[whip_core] %s downed themselves (/w Kill Me)'):format(tostring(player.fullName)))
-    TriggerClientEvent('whip_core:client:devKillMe', source)
+}, function(source)
+    local ok, why = DevTools.kill(source, source)
+    if not ok then return false, why end
 end)
 
 -- /w Restore Player Cores (tools/player.lua): health, armour, food and drink. Stats.set clamps to each stat's own max, so
 -- an over-large value is "full" without knowing the numbers (hunger and thirst are registered even when switched
 -- off in the config, so setting them is always safe).
 --
--- Dead, it revives you first, the way /whip_revive does: MarkPlayerAlive (the server's record, full
--- health, the revived hooks) and the client's revive, which stands the ped up and ends the death
--- screen before it returns. The full stats set after it land on the living ped.
+-- Dead, it revives you first, as the Player Manager's Revive does (DevTools.revive): MarkPlayerAlive (the
+-- server's record, full health, the revived hooks) and the client's revive, which stands the ped up and ends
+-- the death screen before it returns. The full stats set after it land on the living ped.
 -- (Accepted while dead: an `ace` event is an admin tool, not the character acting.)
 SecureEvent('whip_core:server:devRestore', {
     rateLimit = 1000,
     ace = 'whip.devtools',
 }, function(source, player)
-    local revived = false
-    if player and player.isDead then
-        MarkPlayerAlive(source, player, 'revive:admin')
-        TriggerClientEvent('whip_core:client:revive', source)
-        revived = true
-        print(('[whip_core] %s revived themselves (/w Restore Player Cores)'):format(tostring(player.fullName)))
-    end
+    local revived = player ~= nil and player.isDead == true and DevTools.revive(source, source) == true
     for _, name in ipairs({ 'health', 'armour', 'hunger', 'thirst' }) do
         Stats.set(source, name, 1e9, 'devtools:restore')
     end
