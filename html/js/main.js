@@ -69,6 +69,7 @@ import './editor-hud.js';    // the generic one, built from what a mode sends (t
 import './death.js';
 // (The object viewer draws in the game now, from a DUI: html/interact3d/objview.html, tools/objectviewer.lua.)
 import './theme.js';
+import './ui-controls.js';   // whip's list for every <select>, and the stepper for every number box
 import './furnisher.js';   // the property furniture editor — player-facing, not a /whip section
 import './ov-panel.js';    // the object viewer's options (G) and its Move, on the furnisher's markers (tools/ov_panel.lua)
 import './hand-edit.js';   // the hand position editor's item list, beside Move (tools/hand_edit.lua)

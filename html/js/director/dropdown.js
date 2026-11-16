@@ -30,8 +30,11 @@ export function isDropdownOpen() { return !!open; }
 /** Its list down (a redraw, Esc from elsewhere). */
 export function closeDropdown() { if (open) open.close(); }
 
+/** The box (or select) the list is up from, or null. */
+export function dropdownAnchor() { return open ? open.anchor : null; }
+
 /** A select's choices as the list shows them: [{ group } | { value, label, pic, sub, disabled }]. */
-function choicesOf(sel) {
+export function choicesOf(sel) {
     const out = [];
     const add = (o) => out.push({ value: o.value, label: o.textContent, pic: o.dataset.pic || '', sub: o.dataset.sub || '',
                                   disabled: o.disabled });
@@ -102,7 +105,9 @@ export function watchSelects(target) {
 }
 
 /** A list of `items` ([{ group } | { value, label, pic, sub, disabled }]) under `anchor`; onPick(value). Used by the
- *  boxed selects and by any other box (a time field's units). o: { search, label }. */
+ *  boxed selects, by any other box (a time field's units) and by every other screen's selects (ui-controls.js).
+ *  o: { search, label, zoom }: zoom, when given, is the list's own instead of the Director's (--dr-zoom), so a list
+ *  opened from a screen zoomed otherwise (the /whip panel) is drawn at that screen's size. */
 export function openChoices(anchor, items, current, onPick, o = {}) {
     closeDropdown();
     const el = document.createElement('div');
@@ -121,6 +126,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     document.body.appendChild(el);
 
     const list = el.firstElementChild;
+    if (o.zoom > 0) list.style.zoom = String(o.zoom);
     const find = el.querySelector('.dr-dd-find');
     const opts = () => [...el.querySelectorAll('.dr-dd-opt')].filter((b) => !b.hidden && !b.disabled);
 

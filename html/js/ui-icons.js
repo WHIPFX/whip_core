@@ -1,7 +1,7 @@
 /* ========================================
    UI ICONS — the small controls' icons, in one place
 
-   Back, close, move up and down, and the tick: the controls every screen has. One family, drawn as
+   Back, close, move up and down, the tick, minus and plus: the controls every screen has. One family, drawn as
    the Settings page and the Object Viewer already draw their chevron: a 24x24 line, 2.4 wide, round
    ends, in currentColor. They replace the text characters these buttons used (‹ ← × ↑ ↓ ✓), which
    sat off the line and changed shape with the font.
@@ -18,11 +18,13 @@ const PATHS = {
     up: '<path d="M6 14.5l6-6 6 6"/>',
     down: '<path d="M6 9.5l6 6 6-6"/>',
     check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
+    minus: '<path d="M6 12h12"/>',
+    plus: '<path d="M12 6v12M6 12h12"/>',
 };
 
 /**
  * One icon's markup: fixed, no data in it, so it is safe for innerHTML.
- * @param {'back'|'close'|'up'|'down'|'check'} name
+ * @param {'back'|'close'|'up'|'down'|'check'|'minus'|'plus'} name
  * @param {string} [cls] another class beside ui-ic (a page's own size)
  * @returns {string}
  */
