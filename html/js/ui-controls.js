@@ -57,6 +57,7 @@ function openList(sel) {
     }, {
         search: sel.options.length >= SEARCH_AT,
         label: sel.getAttribute('aria-label') || '',
+        focus: sel,   // the keys go back to the select itself, not its capsule
         // The screen's own size where it is zoomed (the /whip panel); the Director's (--dr-zoom) elsewhere.
         zoom: Math.abs(z - 1) > 0.01 ? z : 0,
     });

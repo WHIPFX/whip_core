@@ -107,8 +107,9 @@ export function watchSelects(target) {
 
 /** A list of `items` ([{ group } | { value, label, pic, sub, disabled }]) under `anchor`; onPick(value). Used by the
  *  boxed selects, by any other box (a time field's units) and by every other screen's selects (ui-controls.js).
- *  o: { search, label, zoom }: zoom, when given, is the list's own instead of the Director's (--dr-zoom), so a list
- *  opened from a screen zoomed otherwise (the /whip panel) is drawn at that screen's size. */
+ *  o: { search, label, zoom, focus }: zoom, when given, is the list's own instead of the Director's (--dr-zoom), so a
+ *  list opened from a screen zoomed otherwise (the /whip panel) is drawn at that screen's size. focus: what has the keys
+ *  again once the list is put away (Esc or a pick), when the anchor cannot take them (a field's capsule). */
 export function openChoices(anchor, items, current, onPick, o = {}) {
     closeDropdown();
     const el = document.createElement('div');
@@ -145,6 +146,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     const pick = (b) => {
         const it = items[Number(b.dataset.i)];
         close();
+        if (o.focus) o.focus.focus();
         if (it) onPick(it.value);
     };
     const filter = () => {
@@ -172,7 +174,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     });
     // The list's own keys, before the page's (the router listens on the document, after this).
     el.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); close(); anchor.focus(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); close(); (o.focus || anchor).focus(); }
         else if (ev.key === 'ArrowDown') { ev.preventDefault(); ev.stopPropagation(); move(1); }
         else if (ev.key === 'ArrowUp') { ev.preventDefault(); ev.stopPropagation(); move(-1); }
         else if (ev.key === 'Enter') {
