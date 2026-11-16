@@ -993,7 +993,7 @@ function emRefreshEventsTable() {
 
 function viewHead(pane, title, sub) {
     const head = el('div', 'mon-card-head');
-    const back = WP.btn('← Live feed', null, 'ghost');
+    const back = WP.backBtn('Live feed', null);
     back.classList.add('wp-btn-sm');
     back.addEventListener('click', () => setView('feed'));
     head.appendChild(back);

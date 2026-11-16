@@ -334,7 +334,7 @@ export class PadLayout {
         wrap.className = 'pm-pad';
         wrap.innerHTML = `
             <header class="pl-head">
-                <button class="pm-back pl-back" type="button"><span class="pm-back-arrow">&#8592;</span> Menu</button>
+                <button class="pm-back pl-back" type="button"><svg class="pm-back-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Menu</button>
                 <div class="pl-title">Controller</div>
                 <nav class="pl-tabs">
                     <span class="pl-tab-glyph" data-g="lb"></span>

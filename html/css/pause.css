@@ -260,21 +260,33 @@
     transition-delay: 0.18s;
 }
 
+/* The way back to the menu, on the map and the Controller page: the Settings page's back button (settings-page.css
+   .st-back, the chevron WHIP's screens use for "back"), on the raised surface so it reads over the map. */
 .pm-back {
     top: 28px;
     left: 28px;
-    padding: 10px 18px 10px 14px;
-    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px 0 12px;
+    border-radius: 999px;
     color: var(--ui-text);
-    font-family: var(--ui-font);
-    font-size: 15px;
-    font-weight: 700;
+    font: 700 15px var(--ui-font);
     cursor: pointer;
 }
 
-.pm-back-arrow {
-    margin-right: 6px;
-    opacity: 0.7;
+.pm-back:hover { background: linear-gradient(var(--ui-surface-hover), var(--ui-surface-hover)), var(--ui-surface-raised); }
+
+.pm-back-ico {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .pm-keys {

@@ -907,6 +907,10 @@
 }
 .wp-btn-ghost:not(:disabled):hover { color: var(--ui-text); background: var(--ui-surface-hover); border-color: transparent; }
 
+/* WP.backBtn: the chevron, then the label, on one line. */
+.wp-btn-back { display: inline-flex; align-items: center; gap: var(--ui-sp-2); padding-left: var(--ui-sp-4); }
+.wp-btn-back svg { flex: none; width: 14px; height: 14px; }
+
 .wp-btn:disabled {
     opacity: 0.4;
     cursor: default;

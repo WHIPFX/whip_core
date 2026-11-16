@@ -77,7 +77,7 @@ root.id = 'pause';
 root.innerHTML = `
     <section class="pm-mapwrap">
         <div class="pm-map"></div>
-        <button class="pm-back" type="button"><span class="pm-back-arrow">&#8592;</span> Menu</button>
+        <button class="pm-back" type="button"><svg class="pm-back-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Menu</button>
         <aside class="pm-legend"><div class="pm-legend-head">Legend</div><div class="pm-legend-list"></div></aside>
         <div class="pm-keys">
             <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span>

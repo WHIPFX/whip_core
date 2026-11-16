@@ -939,7 +939,7 @@ function drawHead() {
     }
     const dirty = ed.history.isDirty(ed.doc);
     const testing = ed.test && ed.test.status === 'running';
-    setHtml(head, '<button class="dr-icon" data-act="back" title="Back to the list">‹</button>'
+    setHtml(head, '<button class="dr-icon" data-act="back" title="Back to the list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>'
         + `<div class="dr-head-main"><div class="dr-title">${e(ed.doc.name)}</div>`
         + `<div class="dr-sub">${e(ed.key)} · draft r${ed.baseRev}${ed.on ? ` · on r${ed.onRev}` : ''}`
         + `${dirty ? ' · <b class="dr-dirty">not saved</b>' : ''}${testing ? ' · <b class="sy-testing">testing</b>' : ''}</div></div>`
