@@ -220,6 +220,8 @@
 /* Dungeon Mode's world builder only: the bubble's Options (client/director_live.lua). */
 .fz-live-only { display: none; }
 #furnisher.fz-live .fz-live-only { display: inline-flex; align-items: center; }
+/* Ctrl+click Add: Dungeon Mode selects one thing at a time */
+#furnisher.fz-live .fz-multi-hint { display: none; }
 /* (The ring inside a panel or the window that scrolls: drawn inside its control's edge, or the list would clip it.) */
 html[data-input="pad"] #furnisher #fz-cfg-body .pad-focus,
 html[data-input="pad"] #furnisher #fz-bp .pad-focus { outline-offset: -2px; }

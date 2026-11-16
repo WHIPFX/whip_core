@@ -383,6 +383,18 @@ local function toGrid(v, step)
     return math.floor(v / step + 0.5) * step
 end
 
+--- The next line of a grid `step` apart from `v` going `dir` (1 or -1): a whole step on from one already on it.
+---@param v number
+---@param step number
+---@param dir number
+---@return number
+local function gridNext(v, step, dir)
+    if step <= 0 then return v + dir * step end
+    local n = v / step
+    local k = dir > 0 and math.floor(n + 1e-6) + 1 or math.ceil(n - 1e-6) - 1
+    return k * step
+end
+
 --- Did a ray hit? FiveM hands `hit` back as 1 on some builds and true on others.
 local function isHit(hit) return hit == 1 or hit == true end
 
@@ -1650,15 +1662,24 @@ local function padNudge(nav)
     local v = nav == 'up' and 1 or nav == 'down' and -1 or 0
     if mode == 'rotate' then
         local step = turnAmount()
-        if h ~= 0 then moveSelected({ i = selected, rz = it.rz - h * step }) end
-        if v ~= 0 and KINDS[kindOf(it)].tilt then moveSelected({ i = selected, rx = it.rx + v * step }) end
+        -- Grid-locked: onto the next whole step that way, as the mouse's rings turn.
+        if h ~= 0 then
+            moveSelected({ i = selected, rz = gridOn and gridNext(it.rz, step, -h) or it.rz - h * step })
+        end
+        if v ~= 0 and KINDS[kindOf(it)].tilt then
+            moveSelected({ i = selected, rx = gridOn and gridNext(it.rx or 0.0, step, v) or it.rx + v * step })
+        end
     else
         local yaw = math.rad(FreeCam.getRot().z)
         local dx = -math.sin(yaw) * v + math.cos(yaw) * h
         local dy = math.cos(yaw) * v + math.sin(yaw) * h
         if math.abs(dx) >= math.abs(dy) then dx, dy = dx > 0 and 1 or -1, 0 else dx, dy = 0, dy > 0 and 1 or -1 end
         local step = moveAmount()
-        moveSelected({ i = selected, x = it.x + dx * step, y = it.y + dy * step, z = it.z })
+        local x, y = it.x + dx * step, it.y + dy * step
+        -- Grid-locked: the axis it moves on lands on the next grid line that way, as the mouse's arrows do.
+        if gridOn and dx ~= 0 then x = gridNext(it.x, step, dx) end
+        if gridOn and dy ~= 0 then y = gridNext(it.y, step, dy) end
+        moveSelected({ i = selected, x = x, y = y, z = it.z })
     end
     blocked = false
     pushState()

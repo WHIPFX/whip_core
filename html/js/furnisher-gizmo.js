@@ -642,8 +642,12 @@ if (svg) {
             return;
         }
         // Not on a marker: a press on the room. Let go where it went down, a click, which selects whatever is under it (or
-        // nothing); dragged, a box (where the route has one: the object viewer's has not).
-        if (!route.box) { roomClick(e.clientX, e.clientY, e.ctrlKey); return; }
+        // nothing); dragged, a box (where the route has one: the object viewer's has not). Not where only one may be
+        // selected (Dungeon Mode) or a click means something else (a door pick), as Lua's multiOk: a press there is a click.
+        if (!route.box || root.classList.contains('fz-live') || root.classList.contains('fz-picking')) {
+            roomClick(e.clientX, e.clientY, e.ctrlKey);
+            return;
+        }
         box = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, ctrl: e.ctrlKey, on: false };
         try { svg.setPointerCapture(e.pointerId); } catch (_) { /* gone already */ }
     });
@@ -766,6 +770,8 @@ export const FurnishGizmo = {
     route(names) {
         cancelBox();
         endDrag();
+        // A borrower starts unsnapped (Shift still snaps a drag); the furnisher sets its own again as it opens.
+        if (names) snap.on = false;
         // (A borrower has no box unless it names one: a press on the room is a click.)
         route = names ? { ...FURNISH_ROUTE, box: null, ...names } : FURNISH_ROUTE;
     },

@@ -1954,7 +1954,7 @@ const BP_CONTROLS = ' #fz-bp-btn, .fz-bp-cards, .fz-bp-x, #fz-bp-pal-body .dr-pa
     + ' #fz-bp-pal-body .dr-pal-row, #fz-bp-body .dr-card,'
     // The Map window: its switch and X, + and -, and a mark's card's buttons (the marks are the mouse's).
     + ' #fz-map-btn, #fz-map .fz-bp-x, #fz-map-body .wp-place-zoom-btn, #fz-map-body .wp-place-info button';
-const PAD_SELECTOR = '#fz-catalog-btn, .fz-seg-btn, #fz-stepchip, .fz-sel-head button, #fz-sel-tools button, #fz-confirm button,'
+const PAD_SELECTOR = '#fz-catalog-btn, .fz-seg-btn, #fz-stepchip, #fz-grid-btn, .fz-sel-head button, #fz-sel-tools button, #fz-confirm button,'
     + ' #fz-pedname-input, #fz-pedname button,'
     + ' .fz-subtab, .fz-cluster, .fz-rail-chip, #fz-search, [data-fz="byname"], .fz-tile, .fz-row,'
     + ' #fz-extra .fz-btn, #fz-exit, #fz-save,' + BP_CONTROLS + ',' + CFG_CONTROLS;
