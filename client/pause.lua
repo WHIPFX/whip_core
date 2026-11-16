@@ -98,6 +98,7 @@ local function readBlips()
                             x = c.x, y = c.y, sprite = sprite,
                             colour = hudHex(blipHudColour(b)),
                             name = WhipBlipLabel and WhipBlipLabel(b) or nil,
+                            number = WhipBlipNumber and WhipBlipNumber(b) or nil,
                         }
                     else
                         -- Usually one attached to something this client cannot see right now.

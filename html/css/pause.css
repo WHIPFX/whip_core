@@ -493,6 +493,43 @@ html[data-input="pad"] #pause .pm-keys { display: none; }
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
 }
 
+/* A blip with a number (ShowBlip's `number`, pause-map.js blipImage): its icon filling the mark, the number in a
+   dark badge at the lower right, as GTA draws a numbered blip. The minimap's marks are the same (css/minimap.css). */
+.pmap-numbered > .pmap-blip-icon {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.pmap-numbered > .pmap-blip-icon.pmap-dot {
+    inset: auto;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+.pmap-blip-n {
+    position: absolute;
+    right: -30%;
+    bottom: -25%;
+    min-width: 1.35em;
+    height: 1.35em;
+    padding: 0 0.25em;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: rgba(10, 12, 18, 0.92);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75);
+    color: #fff;
+    font: 700 calc(var(--pmap-blip) * 0.42) / 1.35em var(--ui-font);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
 /* A mark drawn from one of whip's glyphs (PauseMap.glyphMark): a dark disc, the glyph in white. */
 .pmap-blip.pmap-glyph {
     display: flex;

@@ -19,6 +19,17 @@ function WhipBlipLabel(handle)
     return labelOf[handle]
 end
 
+--- [GTA blip handle] = the number on it (ShowBlip's `number`). GTA lets nothing read that back either, so whip's own
+--- maps (client/pause.lua, client/minimap.lua) ask here.
+local numberOf = {}
+
+--- The number on a whip blip, or nil.
+---@param handle number
+---@return integer|nil
+function WhipBlipNumber(handle)
+    return numberOf[handle]
+end
+
 --- Name, for the pause map, a blip whip_core made outside this file (/w Reveal Players); nil forgets it.
 --- GTA's own name for it is the caller's to set.
 ---@param handle number
@@ -31,7 +42,7 @@ local function kill(id)
     local b = blips[id]
     if not b then return end
     blips[id] = nil
-    if b.point then labelOf[b.point] = nil end
+    if b.point then labelOf[b.point] = nil; numberOf[b.point] = nil end
     if b.point and DoesBlipExist(b.point) then RemoveBlip(b.point) end
     if b.area and DoesBlipExist(b.area) then RemoveBlip(b.area) end
 end
@@ -54,6 +65,10 @@ local function make(id, w)
         SetBlipScale(b.point, w.scale or 0.9)
         SetBlipAsShortRange(b.point, w.shortRange == true)
         if w.flash then SetBlipFlashes(b.point, true) end
+        if w.number then
+            ShowNumberOnBlip(b.point, w.number)
+            numberOf[b.point] = w.number
+        end
         if w.label then
             BeginTextCommandSetBlipName('STRING')
             AddTextComponentSubstringPlayerName(w.label)

@@ -148,7 +148,7 @@ function whip_core:HidePlayerText(source) end
 --- yours alone. Gone when your resource stops or your run's tag is released. No frame loop.
 ---@param audience 'everyone'|{ people: (number|{ charId: number })[] }  who sees it (a charId follows them across relogs)
 ---@param id string|number  yours
----@param spec { coords: vector3|table, label?: string, sprite?: integer, color?: integer, route?: boolean, radius?: number, shortRange?: boolean, scale?: number, flash?: boolean, tag?: string }
+---@param spec { coords: vector3|table, label?: string, sprite?: integer, color?: integer, route?: boolean, radius?: number, shortRange?: boolean, scale?: number, flash?: boolean, number?: integer, tag?: string }  number: 0-99, on the dot (a route's stops in order)
 ---@return boolean ok
 ---@return string|nil reason
 function whip_core:ShowBlip(audience, id, spec) end

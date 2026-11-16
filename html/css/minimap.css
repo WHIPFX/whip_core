@@ -98,6 +98,11 @@
     left: calc(-4px * var(--mm-s));
     top: calc(-4px * var(--mm-s));
 }
+.mm .pmap-numbered > .pmap-blip-icon.pmap-dot {
+    width: calc(8px * var(--mm-s));
+    height: calc(8px * var(--mm-s));
+    margin: calc(-4px * var(--mm-s)) 0 0 calc(-4px * var(--mm-s));
+}
 .mm .mm-waypoint { z-index: 2; }
 .mm .pmap-blip.mm-flash { animation: mm-flash 0.9s steps(1, end) infinite; }
 
