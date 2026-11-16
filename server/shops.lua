@@ -1163,31 +1163,49 @@ end
 -- Config Seeding (garages pattern)
 -- ============================================
 
-function Shops.seedFromConfig()
-    if not Config.Shops then return end
+--- A shop config describes (a Config.Shops entry's shape), made under `key` when no shop has it.
+local function seedOne(key, data)
+    if Shops._keyIndex[key] then return end
+    local x, y, z, h = data.pos.x, data.pos.y, data.pos.z, data.pos.w or 0.0
+    Shops.create({
+        key        = key,
+        name       = data.name or 'Shop',
+        mode       = data.mode or 'npc',
+        jobId      = data.jobId,
+        containerId = data.containerId,
+        npcModel   = data.npcModel,
+        prop       = data.prop,
+        x          = x,
+        y          = y,
+        z          = z,
+        heading    = h,
+        blipSprite = data.blipSprite,
+        blipColor  = data.blipColor or 2,
+        catalog    = data.catalog,
+        settings   = data.settings,
+    })
+end
 
-    for key, data in pairs(Config.Shops) do
-        if not Shops._keyIndex[key] then
-            local x, y, z, h = data.pos.x, data.pos.y, data.pos.z, data.pos.w or 0.0
-            Shops.create({
-                key        = key,
-                name       = data.name or 'Shop',
-                mode       = data.mode or 'npc',
-                jobId      = data.jobId,
-                containerId = data.containerId,
-                npcModel   = data.npcModel,
-                prop       = data.prop,
-                x          = x,
-                y          = y,
-                z          = z,
-                heading    = h,
-                blipSprite = data.blipSprite,
-                blipColor  = data.blipColor or 2,
-                catalog    = data.catalog,
-                settings   = data.settings,
-            })
-        end
+--- GTA's own 24/7s and LTDs (server/gta_stores.lua), while Config.GtaStores is on: a keeper behind the till, a map
+--- icon, Config.GtaStoreCatalog. Called at start (seedFromConfig) and when the setting is turned on.
+function Shops.seedGtaStores()
+    if Config.GtaStores ~= true or type(GtaStores) ~= 'table' then return end
+    for _, s in ipairs(GtaStores) do
+        seedOne(s.key, { name = s.name, npcModel = 'mp_m_shopkeep_01', pos = s.pos, blipSprite = 52,
+                         catalog = Config.GtaStoreCatalog or { food = 50, drink = 30 } })
     end
+end
+
+-- Turned on in /whip > Settings: the ones not made yet, now (in a thread of its own: each is a database write). Not
+-- before start-up has read the shops (Shops.seeded): until then the start's own seeding makes them.
+Settings.onChange('GtaStores', function(on)
+    if on == true and Shops.seeded then CreateThread(Shops.seedGtaStores) end
+end)
+
+function Shops.seedFromConfig()
+    Shops.seedGtaStores()
+    Shops.seeded = true
+    for key, data in pairs(Config.Shops or {}) do seedOne(key, data) end
 end
 
 -- ============================================

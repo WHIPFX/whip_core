@@ -136,6 +136,7 @@ server_scripts {
     'server/vehicle_catalog_list.lua',
     'server/jobs.lua',
     'server/atm.lua',
+    'server/gta_stores.lua',   -- GTA's own 24/7s and LTDs (Config.GtaStores)
     'server/shops.lua',
     'server/prices.lua',
     'server/zones.lua',

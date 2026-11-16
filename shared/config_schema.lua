@@ -643,6 +643,10 @@ ConfigSchema = {
             { path = 'ShopTalk.enabled', type = 'bool', sides = 'server',
               label = 'Shop talk',
               help = 'At a shop, the shopper says what they are doing in a /me bubble ("I\'ll take x3 Water") and the shopkeeper answers. The lines are in config.lua.' },
+            -- server/shops.lua seedGtaStores: on makes GTA's stores that are not made yet; off deletes none.
+            { path = 'GtaStores', type = 'bool', sides = 'server',
+              label = 'GTA\'s own stores',
+              help = 'GTA\'s nine 24/7s and five LTDs as shops: a keeper behind the till, a map icon, and the shelf screen. Turning it on opens them now; turning it off makes no more but deletes none (delete them in Economy > Shops). Leave it off if another resource runs your stores, or each would get a second keeper.' },
             -- Live: every shop's prompt takes it at once (server/shop_counters.lua).
             { path = 'ShopInteractRange', type = 'number', min = 1, max = 15, step = 0.5, unit = 'm',
               label = 'Shop reach',
