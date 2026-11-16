@@ -1351,14 +1351,15 @@ function whip_core:AddItem(source, item, amount, metadata, opts) end
 ---@async
 function whip_core:RemoveItem(source, item, amount, metadata, opts) end
 
---- Check if player has an item across all containers.
+--- Check if player has an item across all containers, and inside a wallet they carry for an item registered
+--- with `wallet = true` (a bank card).
 ---@param source number Player server ID
 ---@param item string Item key
 ---@param amount? number Required amount (default: 1)
 ---@return boolean
 function whip_core:HasItem(source, item, amount) end
 
---- Count an item across all containers.
+--- Count an item across all containers, and inside a wallet they carry for an item with `wallet = true`.
 ---@param source number Player server ID
 ---@param item string Item key
 ---@return number count
@@ -1396,6 +1397,8 @@ function whip_core:GetPocketSlots(pocket) end
 function whip_core:GetPocketMaxWeight(pocket) end
 
 --- The first stack of an item the player carries (the lowest slot first), with its address — or nil.
+--- Not in the pockets, and no pocket named: the first inside a wallet they carry, for an item with
+--- `wallet = true`. That one has no `addr`; `inside` = { addr = the wallet's, slot = its place }.
 ---@param source number Player server ID
 ---@param item string Item key
 ---@param pocket? string Only this pocket; one that does not exist finds nothing
@@ -3303,7 +3306,9 @@ function whip_core:ClosePanel(source, panelId) end
 ---
 --- config:
 ---   slots, label (string or function(host)), storageKey (default 'slots'), action (default the
----   item's defaultAction), allowedItems (a list of names, or keyed by name)
+---   item's defaultAction), allowedItems (a list of names, or keyed by name), allowedFlag (also every
+---   item whose definition has this field = true, read at each opening: the wallet's 'wallet'; plain
+---   slot array only; HasItem, GetItemCount and FindItem look inside it for those items)
 ---   canOpen(host) -> ok, why       may it open at all?
 ---   read(host) -> items            what the panel shows
 ---   write(host, items) -> meta     how a change folds back into the item

@@ -2267,20 +2267,66 @@ exports('RemoveItem', function(source, item, amount, metadata, opts)
     return Inventory.take(source, item, amount, opts, metadata and Inventory.onlyStamped(metadata) or nil)
 end)
 
---- Does the player have at least `amount` of this item, anywhere on them?
+--- Each stack of `item` inside the panel items the player carries that take it by their allowedFlag (a bank card
+--- in a wallet: the wallet's `allowedFlag = 'wallet'`, the card's `wallet = true`), pockets in order, then the
+--- holder's slot, then the place inside it, as fn(pocket, slot, inside, data); fn answering true stops the walk.
+--- Only an item that opts in by the flag: cash in a wallet is the money system's, never found here.
+---@param player WhipPlayer
+---@param item string
+---@param fn fun(pocket: string, slot: number, inside: number, data: table): boolean|nil
+function Inventory.eachStackInside(player, item, fn)
+    local def = Config.Items[item]
+    if type(def) ~= 'table' or not Panels or not Panels.itemConfigs then return end
+    for _, p in ipairs(PlayerContainers) do
+        local slots = player.inventory[p]
+        if type(slots) == 'table' then
+            for slot = 1, (Config.ContainerSlots[p] or 0) do
+                local holder = slots[slot]
+                local cfg = holder and Panels.itemConfigs[holder.item]
+                local flag = cfg and cfg.allowedFlag
+                if flag and def[flag] == true and type(holder.metadata) == 'table' then
+                    -- The plain slot array (allowedFlag refuses read/write); JSON may have made its keys strings.
+                    local inner = holder.metadata[cfg.storageKey or 'slots']
+                    if type(inner) == 'table' then
+                        for i = 1, (cfg.slots or 3) do
+                            local data = inner[i] or inner[tostring(i)]
+                            if type(data) == 'table' and data.item == item and fn(p, slot, i, data) then return end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+--- How many of `item` are inside the panel items the player carries (Inventory.eachStackInside).
+---@param player WhipPlayer
+---@param item string
+---@return number
+local function countInside(player, item)
+    local n = 0
+    Inventory.eachStackInside(player, item, function(_, _, _, data)
+        n = n + (tonumber(data.amount) or 1)
+    end)
+    return n
+end
+
+--- Does the player have at least `amount` of this item, anywhere on them? A wallet's cards count.
 exports('HasItem', function(source, item, amount)
     local player = Players[source]
     if not player or not player.inventory then return false, 'Player not loaded' end
     amount = Sanitize.amount(amount, 1)
     if not amount then return false, Sanitize.AMOUNT_ERR end
-    return Inventory.getItemCountAcrossContainers(player.inventory, item) >= amount
+    local have = Inventory.getItemCountAcrossContainers(player.inventory, item)
+    if have >= amount then return true end
+    return have + countInside(player, item) >= amount
 end)
 
---- How many of this item is the player carrying, across every container?
+--- How many of this item is the player carrying, across every container? A wallet's cards count.
 exports('GetItemCount', function(source, item)
     local player = Players[source]
     if not player or not player.inventory then return 0, 'Player not loaded' end
-    return Inventory.getItemCountAcrossContainers(player.inventory, item)
+    return Inventory.getItemCountAcrossContainers(player.inventory, item) + countInside(player, item)
 end)
 
 -- The handler registries and registerOwned are declared further up, where runContextAction and
@@ -2955,7 +3001,8 @@ end
 
 --- The first stack of an item the player carries, the lowest slot first: `{ item, amount, metadata, addr }`, or nil.
 --- `addr` is the handle for GetItemAt / StoreTake / SetItemMetadata. `pocket` limits the search to
---- one of GetPockets(); a pocket that does not exist finds nothing.
+--- one of GetPockets(); a pocket that does not exist finds nothing. With no pocket, an item that opts into the
+--- wallet (`wallet = true`) is found inside one too: no `addr`, and `inside = { addr, slot }` instead.
 exports('FindItem', function(source, item, pocket)
     local player = Players[source]
     if not player or not player.inventory then return nil end
@@ -2970,6 +3017,22 @@ exports('FindItem', function(source, item, pocket)
             return true
         end)
         if found then return found end
+    end
+    -- Not loose in the pockets: inside a wallet (an item that opts in, Inventory.eachStackInside), unless a
+    -- pocket was named. No `addr` then: a place inside an item is no store address. `inside` says where:
+    -- the holder's address and the place in it.
+    if pocket == nil then
+        local found = nil
+        Inventory.eachStackInside(player, item, function(p, slot, i, data)
+            found = {
+                item     = data.item,
+                amount   = data.amount or 1,
+                metadata = data.metadata and json.decode(json.encode(data.metadata)) or nil,
+                inside   = { addr = Inventory.pocketAddr(player.source, p, slot), slot = i },
+            }
+            return true
+        end)
+        return found
     end
     return nil
 end)

@@ -1050,6 +1050,9 @@ end
 --   storageKey   = string (default 'slots'),
 --   allowedItems = { 'cash', 'id_card' } or { cash = {...}, id_card = true } (optional; only the
 --                  names count — a per-item maxPerSlot is not enforced, see the note below),
+--   allowedFlag  = string (optional): also every item whose definition has this field set to true
+--                  (the wallet's 'wallet'). Plain slot array only. HasItem, GetItemCount and FindItem
+--                  look inside such an item for the items its flag lets in.
 --
 --   -- How the contents are kept in the item. Both absent = a plain slot array at
 --   -- meta[storageKey], so a wallet stays four lines.
@@ -1122,6 +1125,22 @@ function Panels.registerItem(itemKey, config, resource)
         local reason = ('item "%s" stacks, and a panel item cannot: every split would copy its contents. Register it with stack = false'):format(itemKey)
         print(('[whip_core:panel] RegisterPanelItem FAILED: %s'):format(reason))
         return false, reason
+    end
+
+    -- allowedFlag: items whose definition carries this field take a place too (the wallet's `wallet = true`),
+    -- so another resource's card fits without whip_core naming it. Only for the plain slot array: a
+    -- read/write registration keeps its own shape, which HasItem and FindItem cannot look into.
+    if config.allowedFlag ~= nil then
+        if type(config.allowedFlag) ~= 'string' or not config.allowedFlag:match('^[%a_][%w_]*$') then
+            local reason = ('item "%s": allowedFlag must be the name of an item field (letters, digits, _)'):format(itemKey)
+            print(('[whip_core:panel] RegisterPanelItem FAILED: %s'):format(reason))
+            return false, reason
+        end
+        if config.read or config.write then
+            local reason = ('item "%s": allowedFlag needs the plain slot array (no read or write)'):format(itemKey)
+            print(('[whip_core:panel] RegisterPanelItem FAILED: %s'):format(reason))
+            return false, reason
+        end
     end
 
     -- Auto-generate empty metadata on item creation, only for the plain slot-array registrations
@@ -1211,6 +1230,16 @@ function Panels.registerItem(itemKey, config, resource)
         -- allowedItems, as a list of names or a keyed table — allowedSet reads both. Only the NAMES
         -- are enforced: a keyed shape's per-item options (maxPerSlot) are not implemented.
         panelConfig.allowedItems = allowedSet(config.allowedItems)
+        -- And every item that opts in by its allowedFlag field, read at each opening, so an item
+        -- registered after this one (another resource's card) fits too.
+        if config.allowedFlag then
+            panelConfig.allowedItems = panelConfig.allowedItems or {}
+            for key, def in pairs(Config.Items) do
+                if type(def) == 'table' and def[config.allowedFlag] == true then
+                    panelConfig.allowedItems[key] = true
+                end
+            end
+        end
 
         -- Open the panel (handles both fresh open and overlay). Asked first: opening a panel that
         -- is already open is a no-op in OpenPanelInternal, and this one then has to re-read its host.

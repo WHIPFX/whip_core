@@ -4142,7 +4142,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <div class="export-card" id="hasitem" data-search="hasitem has item check carrying">
 <div class="export-header"><span class="export-name">HasItem(source, item, amount)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Whether the player has at least <code>amount</code>, across both pockets.</p>
+<p>Whether the player has at least <code>amount</code>, across both pockets, and inside a wallet they carry for an item registered with <code>wallet = true</code> (a bank card).</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr>
@@ -4153,7 +4153,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <div class="export-card" id="getitemcount" data-search="getitemcount count item total how many">
 <div class="export-header"><span class="export-name">GetItemCount(source, item)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>How many of an item the player carries, across both pockets.</p>
+<p>How many of an item the player carries, across both pockets, and inside a wallet they carry for an item with <code>wallet = true</code>.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr></table>
@@ -4183,6 +4183,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <tr><td>item</td><td>string</td><td>Item key</td></tr>
 <tr><td>pocket</td><td>string?</td><td><code>'player'</code> or <code>'accessory'</code>; <code>nil</code> searches all. A pocket that doesn't exist finds nothing</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>{ item, amount, metadata, addr }</code> or <code>nil</code></div>
+<p>Not in the pockets and no <code>pocket</code> named: an item registered with <code>wallet = true</code> is found inside a wallet the player carries. That stack has no <code>addr</code> (a place inside an item is no store address); <code>inside = { addr, slot }</code> is the wallet's address and the place in it.</p>
 <pre><code class="lang-lua">local found = exports.whip_core:FindItem(source, 'lockpick')
 if found then exports.whip_core:StoreTake(found.addr, 1, { reason = 'lockpick snapped' }) end</code></pre>
 </div></div>
@@ -5247,6 +5248,7 @@ exports.whip_core:OpenPanel(source, {
   <tr><td>label</td><td>string | function</td><td>No</td><td>Header text, or <code>(host) → string</code> (a magazine's round count)</td></tr>
   <tr><td>storageKey</td><td>string</td><td>No</td><td>Metadata key for the items (default <code>'slots'</code>)</td></tr>
   <tr><td>allowedItems</td><td>table</td><td>No</td><td><code>{ 'cash', 'id_card' }</code> or <code>{ cash = true }</code>, fixed at registration</td></tr>
+  <tr><td>allowedFlag</td><td>string</td><td>No</td><td>Also every item whose definition has this field set to <code>true</code>, read each time it opens (the wallet's <code>'wallet'</code>: <code>RegisterItem('mybank_card', { ..., wallet = true })</code>). Plain slot array only (no <code>read</code>/<code>write</code>). <code>HasItem</code>, <code>GetItemCount</code> and <code>FindItem</code> look inside it for those items</td></tr>
   <tr><td>action</td><td>string</td><td>No</td><td>Default the item's <code>defaultAction</code>; several items may share one</td></tr>
   <tr><td>canOpen</td><td>function</td><td>No</td><td><code>(host) → ok, reason</code>, before <code>read</code>; fails closed</td></tr>
   <tr><td>read</td><td>function</td><td>No</td><td><code>(host) → items</code>. Default <code>metadata[storageKey]</code></td></tr>
