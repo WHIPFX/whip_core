@@ -752,8 +752,10 @@ RegisterNetEvent('whip_core:client:playerLoaded', function(data)
         -- origin on the floor), and they lay half in the ground.
         local myLoad = loadGen
         deadLoad = myLoad
-        -- A backstop in case the spawn never says so (it errored): dead, rather than standing up.
-        SetTimeout(20000, function() enterDeadLoad(myLoad) end)
+        -- A backstop in case the spawn never says so (it errored): dead, rather than standing up. Long enough for
+        -- the slowest real spawn (the appearance, then up to 10 s for the world and 2 s for the floor, client/spawn.lua),
+        -- so it never lays the body down before the spawn has placed it.
+        SetTimeout(60000, function() enterDeadLoad(myLoad) end)
     end
 end)
 
