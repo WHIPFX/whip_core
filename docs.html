@@ -2775,6 +2775,18 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>{ [charId] = 'First Last' }</code>, leaving out unknown ids</div>
 </div></div>
 
+<div class="export-card" id="getcharacterinfo" data-search="getcharacterinfo character info offline first last name date of birth dob gender id card licence records">
+<div class="export-header"><span class="export-name">GetCharacterInfo(charIds)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>What one name string can't carry, for up to 200 characters, online or not: an ID card, a licence, a records screen. Online characters come from their live sheet, the rest from one query. Deleted characters are left out. Check <a href="#canseeplayername"><code>CanSeePlayerName</code></a> before showing a stranger's.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>charIds</td><td>number[]</td><td>The characters</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>{ [charId] = { charId, firstName, lastName, fullName, dateOfBirth, gender, online } }</code> (<code>dateOfBirth</code> as <code>'YYYY-MM-DD'</code>, <code>gender</code> <code>'male'</code> or <code>'female'</code>), leaving out unknown and deleted ids; or <code>false, reason</code> if the database fails</div>
+<pre><code class="lang-lua">local info = exports.whip_core:GetCharacterInfo({ charId })
+local c = info and info[charId]
+if c then print(c.lastName, c.dateOfBirth) end</code></pre>
+</div></div>
+
 <div class="export-card" id="canseeplayername" data-search="canseeplayername name privacy shownames nearby hidden who see">
 <div class="export-header"><span class="export-name">CanSeePlayerName(viewer, target)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">

@@ -1167,6 +1167,50 @@ exports('GetCharacterNames', function(charIds)
     return ResolveCharNames(ids)
 end)
 
+--- Characters' details by charId, online or not: { [charId] = { charId, firstName, lastName, fullName, dateOfBirth,
+--- gender, online } }, dateOfBirth as 'YYYY-MM-DD' and gender 'male' | 'female', as a player's sheet has them.
+--- GetCharacterNames' companion for what one "First Last" string can't carry: an ID card, a licence, a records
+--- screen. A charId that names no character, or a deleted one, is left out. Online characters from their live
+--- record, the rest in one query. Up to 200 at a time. Waits (the query); false and why if the database fails.
+---@param charIds number[]
+---@return table<number, table>|false info
+---@return string|nil why
+exports('GetCharacterInfo', function(charIds)
+    if type(charIds) ~= 'table' then return {} end
+    local out, missing, seen, n = {}, {}, {}, 0
+    for _, v in ipairs(charIds) do
+        local id = Sanitize.id(v)
+        if id and not seen[id] then
+            seen[id] = true
+            n = n + 1
+            local p = PlayersByCharId[id]
+            if p then
+                out[id] = { charId = id, firstName = p.firstName, lastName = p.lastName, fullName = p.fullName,
+                            dateOfBirth = p.dateOfBirth, gender = p.gender, online = true }
+            else
+                missing[#missing + 1] = id
+            end
+            if n >= 200 then break end
+        end
+    end
+    if #missing == 0 then return out end
+    local marks = {}
+    for i = 1, #missing do marks[i] = '?' end
+    local ok, rows = pcall(MySQL.query.await,
+        "SELECT `charId`, `firstName`, `lastName`, DATE_FORMAT(`dateOfBirth`, '%Y-%m-%d') AS `dob`, `gender`"
+        .. ' FROM `characters` WHERE `deleted` IS NULL AND `charId` IN (' .. table.concat(marks, ',') .. ')', missing)
+    if not ok or type(rows) ~= 'table' then return false, 'Could not read the characters (database error)' end
+    for _, r in ipairs(rows) do
+        local id = math.tointeger(r.charId)
+        if id then
+            out[id] = { charId = id, firstName = r.firstName, lastName = r.lastName,
+                        fullName = (r.firstName or '') .. ' ' .. (r.lastName or ''),
+                        dateOfBirth = r.dob, gender = r.gender, online = false }
+        end
+    end
+    return out
+end)
+
 --- A client asking another player's name. Names are not on statebags (every client would get every
 --- name); the server answers under Config.ShowPlayerNames, the name rule MayKnowName (helpers.lua).
 --- Your own name you always get. The client export GetPlayerFullName caches what this answers.

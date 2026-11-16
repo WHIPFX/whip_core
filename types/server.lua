@@ -612,6 +612,15 @@ function whip_core:GetErrorLog(opts) end
 ---@async
 function whip_core:GetCharacterNames(charIds) end
 
+--- Characters' details by charId, online or not (up to 200): { [charId] = { charId, firstName, lastName, fullName,
+--- dateOfBirth, gender, online } }, dateOfBirth 'YYYY-MM-DD' and gender 'male' | 'female' as a player's sheet has
+--- them. A charId that names no character, or a deleted one, is left out. False and why if the database fails.
+---@param charIds number[]
+---@return table<number, { charId: number, firstName: string, lastName: string, fullName: string, dateOfBirth: string, gender: 'male'|'female', online: boolean }>|false info
+---@return string|nil why
+---@async
+function whip_core:GetCharacterInfo(charIds) end
+
 --- May `viewer` be shown `target`'s character name? whip's name rule, Config.ShowPlayerNames: 'nearby'
 --- (within PlayerNameRange, same world, not in the creator; an offline character is never nearby),
 --- 'always', or 'never' (only yourself).
