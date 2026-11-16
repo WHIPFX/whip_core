@@ -5,7 +5,8 @@
 -- For a position too far to find on a map: a see-through ghost (a small marker, or a ped for where someone stands)
 -- appears where the camera looks, or where the point already is, and the object viewer's Move takes over
 -- (tools/ov_move.lua): drag the centre dot over the world, the arrows along X / Y / Z, the ring to turn it (R).
--- Place (the bar's button) takes it; Esc leaves it. The ghost is this game's alone and goes when it is done.
+-- Place (the bar's button, A on a pad) takes it; Esc (B) leaves it. The ghost is this game's alone and goes when it
+-- is done.
 --
 -- The settings page offers it as Place (tools/place_point.lua). OvMove is a tool's (tools/ov_move.lua, loaded after
 -- this file): asked only when a point is placed.
@@ -73,22 +74,26 @@ function PlacePoint(opts)
     SetEntityAlpha(ghost, 170, false)
 
     local result, finished = nil, false
+    -- Place: the bar's button, or A on a pad (Move reads only B there, which leaves it)
+    local function take()
+        local p = GetEntityCoords(ghost)
+        result = { x = p.x, y = p.y, z = p.z, w = GetEntityHeading(ghost) }
+        OvMove.stop()
+    end
     local ok, why = OvMove.start({
         entity = ghost, kind = ped and 'npc' or 'object', tilt = false,
         name = type(opts.label) == 'string' and opts.label or 'Point',
-        caption = 'Placing', doneText = 'Place',
-        onDone = function()
-            local p = GetEntityCoords(ghost)
-            result = { x = p.x, y = p.y, z = p.z, w = GetEntityHeading(ghost) }
-            OvMove.stop()
-        end,
+        caption = 'Placing', doneText = 'Place', onDone = take,
     }, function() finished = true end)
     if not ok then
         DeleteEntity(ghost)
         placing = false
         return false, why
     end
-    while not finished do Wait(0) end
+    while not finished do
+        if WhipKeyPressed(nil, 201) then take() end
+        Wait(0)
+    end
     if DoesEntityExist(ghost) then DeleteEntity(ghost) end
     placing = false
     if not result then return false, 'cancelled' end

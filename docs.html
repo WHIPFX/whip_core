@@ -8802,7 +8802,7 @@ end)</code></pre>
 <div class="export-card" id="ui-placepoint" data-search="placepoint place point position gizmo arrows ghost marker ped heading">
 <div class="export-header"><span class="export-name">PlacePoint(opts?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>A point placed in the world with the object viewer's markers: a see-through ghost appears where the camera looks, and the player drags the centre dot over the world, the arrows along X, Y and Z, and the ring to turn it (R swaps). Place takes it; Esc leaves it. The settings page's <em>Place</em> is this (a <code>vec3</code> or <code>vec4</code> entry with <code>place</code>). Waits.</p>
+  <p>A point placed in the world with the object viewer's markers: a see-through ghost appears where the camera looks, and the player drags the centre dot over the world, the arrows along X, Y and Z, and the ring to turn it (R swaps). Place (A on a pad) takes it; Esc (B) leaves it. The settings page's <em>Place</em> is this (a <code>vec3</code> or <code>vec4</code> entry with <code>place</code>). Waits.</p>
   <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
   <tr><td>at</td><td>table?</td><td><code>{ x, y, z, w? }</code>: the point as it is; its heading is kept. It always starts on the surface the camera looks at (left out, facing the player)</td></tr>
   <tr><td>model</td><td>string?</td><td>The ghost: a prop, or a ped with <code>ped = true</code> (it stands and turns). Default a small marker</td></tr>

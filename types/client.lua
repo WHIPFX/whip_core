@@ -663,7 +663,8 @@ function whip_core:Input(title, fields) end
 function whip_core:PlaceObject(model, opts) end
 
 --- A point placed in the world with the object viewer's markers: a ghost where the camera looks (opts.at's heading), the
---- centre dot dragged over the world, the arrows along X / Y / Z, the ring to turn it; Place takes it, Esc leaves it.
+--- centre dot dragged over the world, the arrows along X / Y / Z, the ring to turn it; Place (A) takes it, Esc (B)
+--- leaves it.
 ---
 ---     local spot = exports.whip_core:PlacePoint({ model = 's_f_y_shop_mid', ped = true, label = 'Shopkeeper' })
 ---@param opts? { at?: { x: number, y: number, z: number, w?: number }, model?: string, ped?: boolean, label?: string }
