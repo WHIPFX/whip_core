@@ -1,3 +1,4 @@
+-- Modified for the unofficial JBC Garage bundle, 2026-11-15. See docs/default-garages.md.
 -- Vehicles: persistent ownership, storage, stats, garage and mod persistence (MySQL).
 
 Vehicles = {}
@@ -4895,3 +4896,22 @@ Sentinel.watch({
         return props
     end,
 })
+
+-- JBC garage transfer shares the native vehicle transition lock.
+function Vehicles.transferGarage(vehicleId, charId, fromKey, toKey)
+    if type(vehicleId) ~= 'number' or type(charId) ~= 'number' or type(fromKey) ~= 'string'
+        or type(toKey) ~= 'string' or fromKey == toKey then return false, 'Invalid garage transfer.' end
+    if Vehicles._transitionLocks[vehicleId] then return false, 'Vehicle is busy.' end
+    return underTransitionLock(vehicleId, 'transfer', function()
+        local vehicle = Vehicles.getDef(vehicleId)
+        if not vehicle or vehicle.ownerCharId ~= charId or vehicle.session or vehicle.temp
+            or vehicle.state ~= 'garaged' or vehicle.garage ~= fromKey or Vehicles.getEntity(vehicleId) then
+            return false, 'That vehicle is no longer stored at this garage under your character.'
+        end
+        if not Garages.get(fromKey) or not Garages.get(toKey) or Garages.isPrivate(fromKey) or Garages.isPrivate(toKey)
+            or toKey:lower():find('impound', 1, true) or toKey:lower():find('depot', 1, true) then
+            return false, 'Transfers require two available public garages.'
+        end
+        return Vehicles.persist(vehicleId, { garage = toKey })
+    end)
+end

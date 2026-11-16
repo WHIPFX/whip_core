@@ -1,3 +1,4 @@
+-- Modified for the unofficial JBC Garage bundle, 2026-11-15. See docs/default-garages.md.
 -- ============================================
 -- Vehicle & Garage Events (client → server)
 -- The garage bays, seats, session cars, keys, storage and locks. The vehicle EXPORTS live in
@@ -94,6 +95,78 @@ local function mayUseGarage(_, player, garageKey)
     return false, 'That garage is private'
 end
 
+local function transferPublic(key)
+    local garage = Garages.get(key)
+    return garage and not Garages.isPrivate(key) and not key:lower():find('depot', 1, true)
+        and not key:lower():find('impound', 1, true)
+        and (not garage.resource or GetResourceState(garage.resource) == 'started')
+end
+
+local function transferOptions(charId, key)
+    if not transferPublic(key) then return nil end
+    local vehicles, destinations = {}, {}
+    for _, v in ipairs(Vehicles.getByOwner(charId)) do
+        if v.state == 'garaged' and v.garage == key and not v.session and not v.temp and not Vehicles.getEntity(v.vehicleId) then
+            local row = garageRow(v, VehicleCatalog.rows)
+            vehicles[#vehicles + 1] = { value = tostring(v.vehicleId), label = ('%s · %s'):format(row.displayName or v.model, v.plate) }
+        end
+    end
+    if #vehicles == 0 then return nil end
+    local usable = {}
+    for _, bay in ipairs(GarageSpots.all()) do usable[bay.garageKey] = true end
+    for target, garage in pairs(Garages.getAll()) do
+        if target ~= key and usable[target] and transferPublic(target) then
+            destinations[#destinations + 1] = { value = target, label = garage.name }
+        end
+    end
+    if #destinations == 0 then return nil end
+    local function byLabel(a, b)
+        if a.label == b.label then return a.value < b.value end
+        return a.label < b.label
+    end
+    table.sort(vehicles, byLabel)
+    table.sort(destinations, byLabel)
+    return { garage = Garages.get(key).name, vehicles = vehicles, destinations = destinations }
+end
+
+local function transferOrigin(source, spotId)
+    if not Config.LinkPublicGarages or GetPlayerRoutingBucket(source) ~= 0 then
+        return nil, 'Public garage transfers are unavailable.'
+    end
+    local spot, ped = GarageSpots.get(spotId), GetPlayerPed(source)
+    if not spot or ped == 0 or GetVehiclePedIsIn(ped, false) ~= 0 or not transferPublic(spot.garageKey)
+        or #(GetEntityCoords(ped) - vector3(spot.x, spot.y, spot.z)) > 8.0 then
+        return nil, 'Stand at the public bay where your vehicle is parked.'
+    end
+    return spot.garageKey
+end
+
+SecureCallback('whip_core:jbcTransferOptions', {
+    rateLimit = 750, params = { { 'spot', 'id' } }, sheet = 'light'
+}, function(source, player, spotId)
+    local origin, why = transferOrigin(source, spotId)
+    if not origin then return false, why end
+    local options = transferOptions(player.charId, origin)
+    if not options then return false, 'No vehicle or destination is available for transfer.' end
+    return options
+end)
+
+SecureCallback('whip_core:jbcTransferCommit', {
+    rateLimit = 1500, params = { { 'spot', 'id' }, { 'vehicle', 'id' }, { 'destination', 'key', 60 } }, sheet = 'light'
+}, function(source, player, spotId, vehicleId, target)
+    local origin, why = transferOrigin(source, spotId)
+    if not origin then return false, why end
+    local options = transferOptions(player.charId, origin)
+    for _, destination in ipairs(options and options.destinations or {}) do
+        if destination.value == target then
+            local ok, err = Vehicles.transferGarage(vehicleId, player.charId, origin, target)
+            if not ok then return false, err end
+            return { name = destination.label }
+        end
+    end
+    return false, 'Choose an available destination garage.'
+end)
+
 SecureEvent('whip_core:server:garageSpotList', {
     rateLimit = 500,
     params = { {'spotId', 'id'} },
@@ -105,8 +178,9 @@ SecureEvent('whip_core:server:garageSpotList', {
     local may, mayWhy = mayUseGarage(source, player, spot.garageKey)
     if not may then return false, mayWhy end
 
+    local canTransfer = Config.LinkPublicGarages and transferOptions(player.charId, spot.garageKey) ~= nil
     TriggerClientEvent('whip_core:client:garageSpotList', source,
-        spotId, spot.garageKey, garagedRowsFor(player.charId, spot.garageKey))
+        spotId, spot.garageKey, garagedRowsFor(player.charId, spot.garageKey), canTransfer)
 end)
 
 --- What is standing in a bay, if anything — a vehicle, or a player other than the one asking. A car

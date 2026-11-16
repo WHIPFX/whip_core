@@ -1,3 +1,5 @@
+Config.LinkPublicGarages = Config.LinkPublicGarages == true
+
 -- ============================================
 -- ConfigSchema — what /whip → Settings → Config shows, and what it may change
 -- ============================================
@@ -503,6 +505,9 @@ ConfigSchema = {
     {
         id = 'vehicles', label = 'Vehicles',
         settings = {
+            { path = 'LinkPublicGarages', type = 'bool', sides = 'server',
+              label = 'Link public garages',
+              help = 'Adds Transfer vehicle to public garage bays. Stored cars can only be retrieved from their assigned garage.' },
             { path = 'DrivingCamera.Enabled', type = 'bool',
               label = 'Smooth driving camera',
               help = 'Lets players switch on the smooth driving camera for themselves (pause menu: Server Settings → Vehicles): a chase camera on a spring that leans into slides and widens with speed. Off: nobody can, and anyone using it goes back to GTA\'s.' },

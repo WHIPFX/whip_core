@@ -1,3 +1,4 @@
+-- Modified for JBC default garages, 2026-11-15. See docs/default-garages.md.
 -- ============================================
 -- Player Lifecycle — server/player_lifecycle.lua
 -- Connection, character selection, disconnect,
@@ -1453,6 +1454,8 @@ AddEventHandler('onResourceStart', function(resourceName)
     -- unit, owner and keys, and writes nothing where they already do.
     if not loaded('properties', Properties.loadAll) then return end
     Properties.reconcile()
+    local garageOk, garageErr = pcall(JbcGarageSetup)
+    if not garageOk then print(("[whip_core:garage] Automatic setup failed: %s"):format(garageErr)) end
     if not loaded('property furniture', PropertyObjects.loadAll) then return end
     -- Then every running resource's property pack (its manifest's whip_property_pack line). After
     -- the properties are loaded, because applying a pack updates them or makes new ones; an

@@ -1,3 +1,4 @@
+-- Modified for the unofficial JBC Garage bundle, 2026-11-15. See docs/default-garages.md.
 -- ============================================
 -- GARAGE SPOTS — Client
 -- Parking bays, and the list you scroll in one.
@@ -440,11 +441,32 @@ local function logoIconFor(model)
     return icon
 end
 
+local transferring = false
+local function transferFromBay(spotId)
+    local options, why = Callback('whip_core:jbcTransferOptions', spotId)
+    if not options then return UI.Notify(why or 'Transfer unavailable.', 'error') end
+    local fields = UI.Input('Transfer from ' .. options.garage, {
+        { label = 'Stored vehicle', type = 'select', options = options.vehicles, required = true },
+        { label = 'Destination garage', type = 'select', options = options.destinations, required = true },
+    })
+    if not fields then return end
+    local vehicleId = tonumber(fields[1])
+    if not vehicleId then return end
+    for _, destination in ipairs(options.destinations) do
+        if destination.value == fields[2] then
+            if not UI.Confirm('Confirm transfer', 'Move this vehicle to ' .. destination.label .. '?', 'Transfer', 'Cancel') then return end
+            local result, refusal = Callback('whip_core:jbcTransferCommit', spotId, vehicleId, destination.value)
+            if not result then return UI.Notify(refusal or 'Transfer failed.', 'error') end
+            return UI.Notify('Vehicle transferred to ' .. result.name .. '. Retrieve it there.', 'success')
+        end
+    end
+end
+
 --- The cars in this bay's garage, as a scrollable list.
 ---
 --- Arrives as an event, so `expanded` is set on the keypress and checked here: the player may have
 --- walked away meanwhile.
-RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, _, rows)
+RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, _, rows, canTransfer)
     if not expanded[spotId] then return end
 
     local spot = spots[spotId]
@@ -485,6 +507,27 @@ RegisterNetEvent('whip_core:client:garageSpotList', function(spotId, _, rows)
                 TriggerServerEvent('whip_core:server:garageSpotRetrieve', spotId, row.vehicleId)
                 -- Folded immediately: the car is about to appear in this bay anyway.
                 collapse(spotId)
+            end,
+        }
+    end
+
+    if canTransfer == true then
+        options[#options + 1] = {
+            id = 'garage_transfer',
+            icon = 'garage',
+            label = 'Transfer vehicle',
+            callback = function()
+                if transferring then return end
+                transferring = true
+                collapse(spotId)
+                CreateThread(function()
+                    local ok, err = pcall(transferFromBay, spotId)
+                    transferring = false
+                    if not ok then
+                        print(('[whip_core:garage] Transfer popup: %s'):format(err))
+                        UI.Notify('Could not open the transfer popup.', 'error')
+                    end
+                end)
             end,
         }
     end
