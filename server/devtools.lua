@@ -864,11 +864,15 @@ end)
 
 -- ---- Going to a player ----
 --
--- One way for an admin to go to a player: /tp <id> and /tpto <id> (server/commands.lua) both call
--- DevTools.goToPlayer. The move is the client's fade teleport (client/main.lua fadeTeleport): behind a fade, waiting
--- for the ground there to load, and a car the admin is driving comes along. It is refused for a player in another
--- world (routing bucket): the admin would land in an empty copy of the map. Each one is on the admin's activity log
--- ('teleport').
+-- ONE way for an admin to go to a player: /tp <id> and /tpto <id> (server/commands.lua) and the Player Manager's
+-- Teleport To all call DevTools.goToPlayer, so they cannot drift apart. The move is the client's fade teleport
+-- (client/main.lua fadeTeleport): behind a fade, waiting for the ground there to load, and a car the admin is driving
+-- comes along. It is refused for a player in another world (routing bucket): the admin would land in an empty copy
+-- of the map. Each one is on the admin's activity log ('teleport').
+--
+-- The Player Manager's Teleport To used to place the admin at once, one metre above the player, with no fade, no
+-- wait for the ground, no world check and no log line; it now goes the same way as the commands. Bring Here and
+-- the other uses of whip_core:client:pmTeleport are unchanged.
 
 --- A teleport on the admin's own activity log: where they went, in words.
 ---@param source number
@@ -900,19 +904,14 @@ function DevTools.goToPlayer(source, target)
     return true, 'Going to ' .. who
 end
 
--- Teleport admin to player
+-- Teleport admin to player: DevTools.goToPlayer, as /tp <id> and /tpto <id>.
 SecureEvent('whip_core:server:pmTeleportTo', {
     rateLimit = 1000,
     ace = 'whip.devtools',
     params = { {'targetSource', 'id'} },  -- reject-don't-clamp: see pmKick
 }, function(source, _, targetSource)
-    local tgtPed = GetPlayerPed(targetSource)
-    if not Players[targetSource] or not tgtPed or tgtPed == 0 then
-        NotifyPlayer(source, 'They are not in the world', 'error')
-        return
-    end
-    local coords = GetEntityCoords(tgtPed)
-    TriggerClientEvent('whip_core:client:pmTeleport', source, coords.x, coords.y, coords.z)
+    local ok, msg = DevTools.goToPlayer(source, targetSource)
+    if not ok then NotifyPlayer(source, msg, 'error') end
 end)
 
 -- Bring player to admin

@@ -586,7 +586,7 @@ end)
 -- /tp, /tpto and /tpm — move yourself while you build, test or help someone. In-game only (the console has no body).
 -- The move is the client's fade teleport (client/main.lua): behind a fade, onto the ground when no height is given,
 -- and with the car when you are driving one. Every teleport goes on the admin's activity log (DevTools.logTeleport).
--- Going to a player is DevTools.goToPlayer (server/devtools.lua).
+-- Going to a player is DevTools.goToPlayer (server/devtools.lua), shared with the Player Manager's Teleport To.
 -- The third argument of each is its line in the staff's chat suggestions (a devCommand without them ignores it).
 local TP_LIMIT_XY, TP_Z_MIN, TP_Z_MAX = 10000.0, -200.0, 2700.0
 
