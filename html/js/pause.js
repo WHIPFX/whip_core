@@ -20,6 +20,7 @@
 
 import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
+import { uiIcon } from './ui-icons.js';
 import { PauseMap } from './pause-map.js';
 import { BLIP_NAMES } from './blip-names.js';
 import { logoMarkup, logoLight } from './logo-light.js';
@@ -77,7 +78,7 @@ root.id = 'pause';
 root.innerHTML = `
     <section class="pm-mapwrap">
         <div class="pm-map"></div>
-        <button class="pm-back" type="button"><svg class="pm-back-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Menu</button>
+        <button class="pm-back" type="button">${uiIcon('back', 'pm-back-ico')}Menu</button>
         <aside class="pm-legend"><div class="pm-legend-head">Legend</div><div class="pm-legend-list"></div></aside>
         <div class="pm-keys">
             <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span>

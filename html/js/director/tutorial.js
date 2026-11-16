@@ -23,6 +23,7 @@
 // ========================================
 
 import { escapeHtml } from '../utils.js';
+import { uiIcon } from '../ui-icons.js';
 import { groupCards } from './search.js';
 
 const e = escapeHtml;
@@ -533,7 +534,7 @@ const MENU = [{
     extra: () => '<div class="dr-tut-stages">' + [1, 2, 3].map((n) => {
         const st = STAGES[n];
         const done = (bits & DONE[n]) === DONE[n];
-        return `<button class="dr-tut-stage" data-tut="stage" data-n="${n}"><span class="dr-tut-n">${done ? '✓' : n}</span>`
+        return `<button class="dr-tut-stage" data-tut="stage" data-n="${n}"><span class="dr-tut-n">${done ? uiIcon('check') : n}</span>`
             + `<span><b>${e(st.title)}</b><span>${e(st.blurb)}</span></span></button>`;
     }).join('') + '</div>',
 }];

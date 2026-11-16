@@ -13,6 +13,7 @@
 import { escapeHtml, propImageUrl, vehicleImageUrl, pedImageUrl, itemImageUrl } from '../utils.js';
 import { plural, dateTime, clock, money } from '../wp/format.js';
 import { GLYPHS } from '../furnisher-data.js';
+import { uiIcon } from '../ui-icons.js';
 import { getItemDefs } from '../core/item-defs.js';
 import { groupCards } from './search.js';
 import { findNode, findWorld, usesOfWorld, usesOfVar, problemCards, variantList } from './doc.js';
@@ -2644,9 +2645,9 @@ function variantsGroup(ed, s, variants) {
     }
     html += '<div class="dr-vorder">' + order.map((id, i) => `<div class="dr-vorder-row"><span class="dr-vorder-n">${numOf(id)}</span>`
         + `<span class="dr-vorder-name">${e(nameOf(id))}</span>`
-        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="-1" aria-label="Earlier"${i === 0 ? ' disabled' : ''}>↑</button>`
-        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="1" aria-label="Later"${i === order.length - 1 ? ' disabled' : ''}>↓</button>`
-        + `<button class="dr-ibtn" data-act="vorder-remove" data-i="${i}" aria-label="Take it out of the list">×</button></div>`).join('') + '</div>';
+        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="-1" aria-label="Earlier"${i === 0 ? ' disabled' : ''}>${uiIcon('up')}</button>`
+        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="1" aria-label="Later"${i === order.length - 1 ? ' disabled' : ''}>${uiIcon('down')}</button>`
+        + `<button class="dr-ibtn" data-act="vorder-remove" data-i="${i}" aria-label="Take it out of the list">${uiIcon('close')}</button></div>`).join('') + '</div>';
     const left = variants.filter((v) => !order.includes(v.id));
     if (left.length) {
         html += '<div class="dr-btns dr-btns-tight">' + left.map((v) => `<button class="dr-btn ghost" data-act="vorder-add" data-id="${e(v.id)}">+ ${numOf(v.id)} · ${e(nameOf(v.id))}</button>`).join('') + '</div>'

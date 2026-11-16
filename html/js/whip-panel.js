@@ -29,6 +29,7 @@ import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
 import { createPadCursor } from './pad-cursor.js';
 import { PauseMap } from './pause-map.js';
+import { uiIcon } from './ui-icons.js';
 
 // ---- registry ----
 
@@ -116,8 +117,6 @@ const WHIP_LOGO = '<svg viewBox="58 46 997 235" aria-hidden="true">'
     + '<path d="M369 50 H435 V157 H583 V50 H649 V277 H583 V223 H435 V277 H369 Z"/>'
     + '<rect x="677" y="50" width="66" height="227" rx="33"/>'
     + '<path d="M771 50 H1001 A50 50 0 0 1 1051 100 V173 A50 50 0 0 1 1001 223 H897 A33 33 0 0 1 897 157 H985 V116 H837 V277 H771 Z"/></svg>';
-/** WP.backBtn's chevron: the Settings page's and the Object Viewer's back icon. */
-const BACK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 const SEARCH_ICON = '<svg viewBox="0 0 17 17" width="17" height="17" fill="none" stroke="currentColor"'
     + ' stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5.5"/><path d="M11.2 11.2L15.5 15.5"/></svg>';
 
@@ -853,7 +852,8 @@ function placeArea(host, opts, pick) {
             // The box scrolls at the map's height; its inside is zoomed to the panel's size.
             const inner = WP.el('div', 'wp-place-info-in');
             info.appendChild(inner);
-            const x = WP.el('button', 'wp-place-info-x', '×');
+            const x = WP.el('button', 'wp-place-info-x');
+            x.innerHTML = uiIcon('close');
             x.type = 'button';
             x.setAttribute('aria-label', 'Close this card');
             x.addEventListener('click', shut);
@@ -1041,7 +1041,7 @@ export const WP = {
     backBtn(label, action, arg) {
         const b = WP.btn('', action, 'ghost', arg);
         b.classList.add('wp-btn-back');
-        b.innerHTML = BACK_ICON;   // a fixed icon, no data
+        b.innerHTML = uiIcon('back');   // a fixed icon, no data
         b.appendChild(document.createTextNode(label));
         return b;
     },
@@ -1179,7 +1179,7 @@ export const WP = {
             const on = picked.has(b.dataset.arg);
             b.classList.toggle('on', on);
             b.setAttribute('aria-checked', on ? 'true' : 'false');
-            b.textContent = on ? '✓' : '';
+            b.innerHTML = on ? uiIcon('check') : '';
         };
         const fillBar = (bar) => {
             const n = picked.size;
@@ -1455,8 +1455,8 @@ export const WP = {
                     + (n === i ? ' wp-step-current' : '')
                     + (status[s.key] ? ' wp-step-' + status[s.key] : '')
                     + (n > reached ? ' wp-step-locked' : '');
-                b.firstChild.textContent = status[s.key] === 'done' ? '✓'
-                    : status[s.key] === 'skipped' ? '–' : String(n + 1);
+                if (status[s.key] === 'done') b.firstChild.innerHTML = uiIcon('check');
+                else b.firstChild.textContent = status[s.key] === 'skipped' ? '–' : String(n + 1);
                 if (n === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
             });
             back.disabled = busy || i <= 0;

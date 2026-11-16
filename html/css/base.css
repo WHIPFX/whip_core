@@ -407,3 +407,16 @@ input, textarea, [contenteditable="true"] { user-select: text; }
 /* CEF paints <option> popups on its own ground — without this they render as black
    text on near-black. */
 select option { background: var(--ui-select-option-bg); color: var(--ui-select-option-fg); }
+
+/* js/ui-icons.js: back, close, up, down, the tick. As big as the text beside them (1em), in its colour. */
+.ui-ic {
+    flex: none;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

@@ -22,6 +22,7 @@
 // ========================================
 
 import { WhipPanel, WP, VERB_GLYPHS } from '../whip-panel.js';
+import { uiIcon } from '../ui-icons.js';
 import { nuiCallback } from '../utils.js';
 // Current Stats draws each stat as the HUD does (status-hud.js), named as Settings' gauge row names them.
 import { hudGauge, hudSkinClass } from '../status-hud.js';
@@ -553,7 +554,8 @@ function renderNotes(notes) {
             row.appendChild(WP.el('span', 'wp-info-value-mono', dateTime(note.createdAt, 'N/A')));
             row.appendChild(WP.el('span', null, note.note || ''));
             row.appendChild(WP.el('span', 'wp-actions-split'));
-            const del = WP.btn('×', 'pmgNoteDelete', 'ghost wp-btn-sm');
+            const del = WP.btn('', 'pmgNoteDelete', 'ghost wp-btn-sm');
+            del.innerHTML = uiIcon('close');
             del.dataset.id = note.noteId;
             del.setAttribute('aria-label', 'Delete this note');
             row.appendChild(del);

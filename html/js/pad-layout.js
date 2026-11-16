@@ -19,6 +19,7 @@
 
 import { nuiCallback, escapeHtml } from './utils.js';
 import { padGlyph } from './pad-glyphs.js';
+import { uiIcon } from './ui-icons.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -334,7 +335,7 @@ export class PadLayout {
         wrap.className = 'pm-pad';
         wrap.innerHTML = `
             <header class="pl-head">
-                <button class="pm-back pl-back" type="button"><svg class="pm-back-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Menu</button>
+                <button class="pm-back pl-back" type="button">${uiIcon('back', 'pm-back-ico')}Menu</button>
                 <div class="pl-title">Controller</div>
                 <nav class="pl-tabs">
                     <span class="pl-tab-glyph" data-g="lb"></span>

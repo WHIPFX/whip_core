@@ -18,6 +18,7 @@
    ======================================== */
 
 import { NuiRouter } from './router.js';
+import { uiIcon } from './ui-icons.js';
 import { nuiCallback, itemImageUrl } from './utils.js';
 import { showBasketQuantity, weightLine } from './inventory.js';
 import { weightText } from './weight.js';
@@ -778,7 +779,7 @@ function lineEl(line, amount) {
     total.className = 'inv-basket-line-total';
     total.textContent = priced ? priceText(line.price * amount) : '—';
 
-    row.append(art, info, qty, total, lineButton(line, 'remove', '×', 'Take it out'));
+    row.append(art, info, qty, total, lineButton(line, 'remove', uiIcon('close'), 'Take it out'));
     return row;
 }
 
@@ -790,7 +791,8 @@ function lineButton(line, act, text, label) {
     b.dataset.act = act;
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.textContent = text;
+    if (text.startsWith('<svg')) b.innerHTML = text;   // a ui-icons.js icon: fixed markup
+    else b.textContent = text;
     // Nothing more to add of something the shop no longer sells.
     if (act === 'inc' && (line.price === undefined || line.price === null)) b.disabled = true;
     return b;
@@ -948,7 +950,8 @@ function editButton(id, act, text, label, disabled) {
     b.dataset.act = act;
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.textContent = text;
+    if (text.startsWith('<svg')) b.innerHTML = text;   // a ui-icons.js icon: fixed markup
+    else b.textContent = text;
     b.disabled = !!disabled;
     return b;
 }
@@ -977,9 +980,9 @@ function renderEditor() {
         count.className = 'inv-edit-count';
         count.textContent = n === 1 ? '1 thing' : n + ' things';
         row.append(label, count,
-            editButton('inv-ed-cat-' + i + '-up', 'cat-up', '↑', 'Earlier', i === 0),
-            editButton('inv-ed-cat-' + i + '-down', 'cat-down', '↓', 'Later', i === editing.cats.length - 1),
-            editButton('inv-ed-cat-' + i + '-rm', 'remove', '×', 'Remove this tab'));
+            editButton('inv-ed-cat-' + i + '-up', 'cat-up', uiIcon('up'), 'Earlier', i === 0),
+            editButton('inv-ed-cat-' + i + '-down', 'cat-down', uiIcon('down'), 'Later', i === editing.cats.length - 1),
+            editButton('inv-ed-cat-' + i + '-rm', 'remove', uiIcon('close'), 'Remove this tab'));
         cats.appendChild(row);
     });
     document.getElementById('inv-edit-addcat').disabled = editing.cats.length >= MAX_TABS;
@@ -1023,8 +1026,8 @@ function renderEditor() {
         pick.value = editing.cat[item] || '';
 
         row.append(art, name, pick,
-            editButton('inv-ed-g-' + item + '-up', 'good-up', '↑', 'Earlier on the shelf', i === 0),
-            editButton('inv-ed-g-' + item + '-down', 'good-down', '↓', 'Later on the shelf', i === editing.order.length - 1));
+            editButton('inv-ed-g-' + item + '-up', 'good-up', uiIcon('up'), 'Earlier on the shelf', i === 0),
+            editButton('inv-ed-g-' + item + '-down', 'good-down', uiIcon('down'), 'Later on the shelf', i === editing.order.length - 1));
         goods.appendChild(row);
     });
 }
