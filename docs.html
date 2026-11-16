@@ -11656,7 +11656,7 @@ end</code></pre>
 </details>
 
 <h3>ATMs</h3>
-<p>WHIP finds these models wherever they stand; there's no list of machines. For a resource of your own that wants the player standing at a machine, the server knows where GTA's own are (<code>server/atm_positions.lua</code>, 121 read from the game's map): <code>IsNearAtm(source, range?)</code> answers <code>true, at</code> or <code>false, why</code>, and <code>GetNearestAtm(coords)</code> the machine and its distance. Machines a map mod or an MLO adds go in <code>Config.AtmExtraPositions</code> (<code>vector3</code> at the machine's base). WHIP's own ATMs don't ask this, so a machine missing from the list still works for them.</p>
+<p>WHIP finds these models wherever they stand; there's no list of machines.</p>
 <table class="event-table">
 <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
 <tr><td><code>AtmProps</code></td><td>4 models</td><td>ATM models. Add an MLO's machine here</td></tr>
@@ -11664,7 +11664,9 @@ end</code></pre>
 <tr><td><code>AtmVisibleRange</code> / <code>AtmActiveRange</code></td><td><code>3.0</code> / <code>1.4</code></td><td>Circle shows; circle works</td></tr>
 <tr><td><code>AtmBadgeOffset</code></td><td>table</td><td>The circle's spot per model (<code>side</code>, <code>out</code>, <code>up</code>, <code>yaw</code>), plus <code>default</code></td></tr>
 <tr><td><code>AtmMaxDigits</code></td><td><code>9</code></td><td>Longest amount ($999,999,999)</td></tr>
+<tr><td><code>AtmExtraPositions</code></td><td><code>{}</code></td><td>Machines a map mod or an MLO adds, for <code>IsNearAtm</code> and <code>GetNearestAtm</code> (a <code>vector3</code> at each one's base)</td></tr>
 </table>
+<p>For a resource of your own that wants the player standing at a machine, the server knows where GTA's own are (<code>server/atm_positions.lua</code>, 121 read from the game's map): <code>IsNearAtm(source, range?)</code> answers <code>true, at</code> or <code>false, why</code>, and <code>GetNearestAtm(coords)</code> the machine and its distance. Machines a map mod or an MLO adds go in <code>Config.AtmExtraPositions</code> (<code>vector3</code> at the machine's base). WHIP's own ATMs don't ask this, so a machine missing from the list still works for them.</p>
 
 <h3>Time and weather</h3>
 <table class="event-table">
