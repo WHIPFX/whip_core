@@ -11200,7 +11200,7 @@ TCP 7881           voices, when a player's network blocks UDP</code></pre>
 set whip_voice_key    "API..."
 set whip_voice_secret "..."
 set whip_voice_api    "https://your-project.livekit.cloud"   # where this FiveM server reaches its API</code></pre>
-<p>The voice bot is then yours to run (<code>whip_voice\service\voicebot</code>, with <code>whip_voicebot_url</code> and <code>whip_voicebot_token</code>). On a Windows server, <code>whip_voice\service\Setup voice server.bat</code> installs LiveKit, Caddy (HTTPS with a free certificate) and the voice bot as services and writes the lines into <code>server.cfg</code>. SETUP.md walks through it.</p>
+<p>Restart the server, then run <code>/voicecheck</code>. The voice bot (it plays a lore character's recorded line into a call) is then yours to run on this server's machine: <code>whip_voice\service\voicebot</code>, started with <code>node bot.mjs</code>, with <code>whip_voicebot_token</code> (and <code>whip_voicebot_url</code> when it listens somewhere other than <code>http://127.0.0.1:7899</code>). Without it voice works, and lore characters can't phone. whip_voice's <code>docs/SETUP.md</code> (Your own voice server) walks through it.</p>
 <h2 id="voice-lore-calls">Lore phone calls</h2>
 <p class="lede">A lore character (one of the Director's named NPCs) phones a player, and a recorded line plays into the call as them talking. It needs whip_voice and its voice bot (<a href="#voice-setup">Setting up whip_voice</a>).</p>
 
