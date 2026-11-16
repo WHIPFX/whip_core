@@ -1742,8 +1742,13 @@ function Shops.ensureShop(key, data, caller)
     local existing = Shops.getByKey(key)
     if not existing then
         fields.key = key
-        fields.settings = fields.settings or {}
-        fields.settings.ensured = ensured
+        -- A table of its own: fields.settings is the declaration's (d.settings), and the declaration is inside
+        -- `ensured`, so putting `ensured` into that same table made it contain itself (the save then failed with
+        -- "maximum table nesting depth exceeded" for any EnsureShop given settings).
+        local settings = {}
+        for k, v in pairs(type(fields.settings) == 'table' and fields.settings or {}) do settings[k] = v end
+        settings.ensured = ensured
+        fields.settings = settings
         return Shops.create(fields)
     end
 
