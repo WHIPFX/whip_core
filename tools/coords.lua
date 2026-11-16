@@ -86,22 +86,43 @@ end
 -- Copying
 -- ============================================
 
---- Put the current position on the clipboard as a vector4.
+--- Where the player stands, as config text: 'vector2', 'vector3', 'vector4' or 'heading'. The one format for the G key
+--- below and the /vector2, /vector3, /vector4 and /heading commands (server/commands.lua).
 ---
 --- READS THE PED RATHER THAN THE LAST SENT VALUE. What is on screen may be up to COORDS_EPSILON
 --- and one tick behind; what gets pasted into a config should be where the developer is standing
 --- at the moment they press the key, not what the readout happened to be showing.
+---@param kind string
+---@return string
+local function coordsText(kind)
+    local x, y, z, h = ReadHere()
+    if kind == 'vector2' then return ('vector2(%.2f, %.2f)'):format(x, y) end
+    if kind == 'vector3' then return ('vector3(%.2f, %.2f, %.2f)'):format(x, y, z) end
+    if kind == 'heading' then return ('%.2f'):format(h) end
+    return ('vector4(%.2f, %.2f, %.2f, %.2f)'):format(x, y, z, h)
+end
+
+--- Put the current position on the clipboard as a vector4.
 RegisterCommand('whip_coords_copy', function()
     -- The tool being open is the whole gate. Without it this would quietly claim G for every
     -- player on the server.
     if not coordsActive then return end
 
-    local x, y, z, h = ReadHere()
-    local text = ('vector4(%.2f, %.2f, %.2f, %.2f)'):format(x, y, z, h)
-
     -- tools/core.lua takes the focus the page needs for the clipboard, and gives back only that.
-    CopyToClipboard(text)
+    CopyToClipboard(coordsText('vector4'))
 end, false)
+
+--- /vector2, /vector3, /vector4, /heading: the server has checked whip.devtools and developer mode
+--- (server/commands.lua devCommand). The text also goes to F8, to type out if the copy could not happen.
+local COPY_KINDS = { vector2 = true, vector3 = true, vector4 = true, heading = true }
+RegisterNetEvent('whip_core:client:copyCoords', function(kind)
+    if not COPY_KINDS[kind] then return end
+    local text = coordsText(kind)
+    print('[whip_core] ' .. text)
+    CopyToClipboard(text, function(ok)
+        UI.Notify(ok and ('Copied ' .. text) or ('Could not copy; it is in F8: ' .. text), ok and 'success' or 'error')
+    end)
+end)
 
 --- G, as it always was — but bound rather than polled, so it costs nothing when the tool is shut
 --- and can be moved by anyone who wants G for something else.
