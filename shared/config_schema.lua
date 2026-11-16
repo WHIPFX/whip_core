@@ -175,6 +175,14 @@ local MODEL_WHY = 'must be a model name (letters, digits and _)'
 local RESOURCE = '^[%w_%-]+$'
 local RESOURCE_WHY = 'must be a resource name (letters, digits, _ and -)'
 
+--- An ATM can't be used from further out than its prompt shows (both ranges' rule).
+local function atmRangesCross(get)
+    if (get('AtmActiveRange') or 0) > (get('AtmVisibleRange') or 0) then
+        return false, 'an ATM must show its prompt at least as far out as it can be used'
+    end
+    return true
+end
+
 --- The weather list must keep every weather a scene names (the character screen, landing, creator,
 --- the first start's).
 local function weatherListCross(get)
@@ -310,6 +318,20 @@ ConfigSchema = {
             { path = 'BlockOwnCharacterTransfers', type = 'bool', sides = 'server',
               label = 'No money between a player\'s own characters',
               help = 'On: a player cannot send bank money from one of their characters to another of their own characters. Off: they can, like sending it to anyone else.' },
+            -- whip's ATMs (client/atm.lua): which machines have the prompt, and how near. atm.lua finds the machines
+            -- again when any of these change.
+            { path = 'AtmProps', type = 'list', minItems = 0, maxItems = 50,
+              item = { type = 'string', maxLen = 64, pattern = MODEL, patternWhy = MODEL_WHY },
+              label = 'ATM models',
+              help = 'The cash machines whip puts its ATM on, by model name, split by commas: prop_atm_01, prop_atm_02, prop_atm_03, prop_fleeca_atm are GTA\'s own. A machine an MLO adds works once its model is here. Empty: whip\'s ATMs are off, for a server that uses another ATM resource.' },
+            { path = 'AtmVisibleRange', type = 'number', min = 1, max = 30, step = 0.5, unit = 'm',
+              cross = atmRangesCross,
+              label = 'ATM prompt shows from',
+              help = 'How near a player must be for an ATM\'s prompt to appear.' },
+            { path = 'AtmActiveRange', type = 'number', min = 0.5, max = 10, step = 0.1, unit = 'm',
+              cross = atmRangesCross,
+              label = 'ATM usable from',
+              help = 'How near a player must be to use an ATM. No more than where its prompt shows from.' },
             { path = 'DefaultSpawn', type = 'vec4', limits = WORLD, here = true,
               label = 'New character spawn',
               help = 'Where a new character appears when they leave the creator, and the way they face. Characters who have played before come back where they left.' },
