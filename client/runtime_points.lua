@@ -62,9 +62,9 @@ end
 
 --- What the menus a level is under require, merged (the nearer one's words win): each option and Back needs
 --- it too. A menu for the downed (alive = false) or seated (vehicle = 'in') stays usable in that state; the
---- server checks every menu on the path anyway.
+--- server checks every menu on the path anyway. Second: the reach they give (the deepest that says), or nil.
 local function inherited(p, path)
-    local out, list = nil, p.options or {}
+    local out, reach, list = nil, nil, p.options or {}
     for _, id in ipairs(path) do
         local found
         for _, o in ipairs(list) do
@@ -75,9 +75,20 @@ local function inherited(p, path)
             out = out or {}
             for k, v in pairs(found.requires) do out[k] = v end
         end
+        reach = tonumber(found.reach) or reach
         list = type(found.options) == 'table' and found.options or {}
     end
-    return out
+    return out, reach
+end
+
+--- An option held to a nearer reach than its prompt: offered only within `r` metres of it (the engine's own
+--- measure, the character to the prompt). The server checks the same reach on the press.
+local function within(r)
+    return function(ctx)
+        local c = ctx and ctx.coords
+        if not c then return true end
+        return #(GetEntityCoords(PlayerPedId()) - vector3(c.x + 0.0, c.y + 0.0, c.z + 0.0)) <= r
+    end
 end
 
 local function withUp(up, own)
@@ -119,7 +130,12 @@ function mount(pointId, p, ent, spot)
         level[pointId] = nil
     end
     local opts = {}
-    local up = #path > 0 and inherited(p, path) or nil
+    -- (At the top the path is empty: nothing inherited.)
+    local up, menuReach = inherited(p, path)
+    -- Per-option reach (server/runtime_points.lua): the prompt reaches as far as its furthest option (p.reach);
+    -- an option with a nearer one (its own, a menu's above it, else the point's own, p.pointReach) is held to it.
+    local promptReach = tonumber(p.reach) or Config.InteractActiveRange or 2.0
+    local levelReach = menuReach or tonumber(p.pointReach)
     if #path > 0 then
         opts[1] = {
             id = BACK_ID, label = 'Back', icon = 'back', require = up,
@@ -134,6 +150,8 @@ function mount(pointId, p, ent, spot)
     for _, o in ipairs(list) do
         local oid = o.id
         local entry = { id = oid, label = o.label, icon = o.icon, require = withUp(up, o.requires) }
+        local r = tonumber(o.reach) or levelReach
+        if r and r < promptReach - 0.01 then entry.canInteract = within(r) end
         if type(o.options) == 'table' and #o.options > 0 then
             -- A menu: named with a mark that says there is more behind it.
             entry.label = (type(o.label) == 'string' and o.label ~= '' and o.label or oid) .. '  ›'

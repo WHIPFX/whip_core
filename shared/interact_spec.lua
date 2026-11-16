@@ -164,7 +164,7 @@ InteractSpec.POINT_AT = {
 }
 
 --- One of a point's options (and of a menu's, any level down).
-InteractSpec.POINT_OPTION = { id = true, label = true, icon = true, require = true, options = true }
+InteractSpec.POINT_OPTION = { id = true, label = true, icon = true, require = true, options = true, reach = true }
 
 --- The words a `require` may use, on an action and on a point.
 InteractSpec.REQUIRE = {

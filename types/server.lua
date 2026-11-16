@@ -3745,6 +3745,7 @@ function whip_core:IsPlaceableProp(model) end
 ---@field label string|nil Its text (the point's label when left out)
 ---@field icon string|nil A glyph name
 ---@field require WhipActionRequire|nil Its own requirements, on top of the point's (and of the menus above it)
+---@field reach number|nil Its own reach, 0.5-25 m (a menu's goes to its options unless they give theirs). The prompt reaches as far as the furthest option; a nearer one shows only within its own. On foot 2.5 and from the car 7 on one point
 ---@field options WhipPointOption[]|nil A menu: choosing it opens these, with a Back (at most 3 deep, 6 to a level, 40 in all). It is never pressed itself
 
 ---@class WhipPointUse
