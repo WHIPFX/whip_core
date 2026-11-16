@@ -135,6 +135,7 @@ server_scripts {
     'server/vehicle_catalog.lua',
     'server/vehicle_catalog_list.lua',
     'server/jobs.lua',
+    'server/atm_positions.lua',   -- GTA's own cash machines, for IsNearAtm (generated)
     'server/atm.lua',
     'server/shops.lua',
     'server/prices.lua',

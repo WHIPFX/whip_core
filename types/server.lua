@@ -1564,6 +1564,21 @@ function whip_core:SanitizeAppearance(appearance) end
 ---@return string|nil why
 function whip_core:OpenCharacterEditor(who) end
 
+--- Is this player standing at a cash machine? GTA's own machines (from the game's map) and Config.AtmExtraPositions.
+--- Measured across the ground from the machine's base, within 3 m of height. For a resource that wants the
+--- standing-at-a-machine rule; whip's own ATMs find machines by model and do not ask this.
+---@param source number
+---@param range? number Metres, 0.5-10; default Config.AtmActiveRange + 1
+---@return boolean near
+---@return vector3|string atOrWhy The machine's base, or why not
+function whip_core:IsNearAtm(source, range) end
+
+--- The cash machine nearest a place (GTA's own and Config.AtmExtraPositions), within 3 m of its height.
+---@param coords vector3|{ x: number, y: number, z: number }
+---@return vector3|nil at The machine's base
+---@return number|nil distance Across the ground
+function whip_core:GetNearestAtm(coords) end
+
 --- What a store's customer changed (client EditAppearance): their saved look against `look`, by the editor's tabs.
 --- A count per category id ('tops' = 1, 'makeup' = 2 for two of its overlays) and `tattoos` for tattoos put on.
 --- Taking off an accessory or a tattoo counts nothing. `only` (the editor's category ids or groups) counts only those.

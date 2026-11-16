@@ -683,6 +683,13 @@ Config.AtmProps = {
     'prop_fleeca_atm',
 }
 
+-- Cash machines the server should know besides GTA's own (server/atm_positions.lua): those a map mod or an MLO adds,
+-- as vector3 at the machine's base. Only IsNearAtm and GetNearestAtm read them (a resource checking a player stands at
+-- a machine); whip's own ATMs find machines by model, wherever they are.
+Config.AtmExtraPositions = {
+    -- vector3(149.9, -1040.7, 28.4),
+}
+
 -- How far out ATMs are looked for, in metres. Larger than the prompt range so a row of ATMs is found as you walk along it.
 Config.AtmSearchRange = 30.0
 
