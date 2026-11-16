@@ -105,9 +105,9 @@ function CashMarks.checkMove(from, _, detail)
     return LINKED
 end
 
---- `amount` of cash went out of the store at `key`: the mover's own line first, then, if what is left there is less
---- than the tally says (someone else took some), the oldest lines down to it.
-local function took(key, store, amount, p)
+--- `amount` of cash went out of the store at `key`, leaving `there` in it: the mover's own line first, then, if what is
+--- left there is less than the tally says (someone else took some), the oldest lines down to it.
+local function took(key, there, amount, p)
     local t = marks[key]
     if not t then return end
     if p and t[p.charId] then
@@ -116,7 +116,7 @@ local function took(key, store, amount, p)
         own.amount = own.amount - n
         touch(key, p.charId)
     end
-    local there, total, list = cashIn(store), 0, {}
+    local total, list = 0, {}
     for charId, m in pairs(t) do
         total = total + m.amount
         list[#list + 1] = { charId, m }
@@ -153,7 +153,7 @@ local function moved(fromStore, toStore, amount, source)
     local fromKey, toKey = markKey(fromStore), markKey(toStore)
     if fromKey == toKey then return end   -- within one container (or between two untracked stores)
     local p = mover(source)
-    if fromKey then took(fromKey, fromStore, amount, p) end
+    if fromKey then took(fromKey, cashIn(fromStore), amount, p) end
     if toKey and p then left(toKey, p, amount) end
 end
 
@@ -163,6 +163,38 @@ function CashMarks.noteMove(from, to, detail)
     if detail.item == CASH then moved(from.store, to.store, detail.amount, detail.source) end
     local back = detail.replacing
     if back and back.item == CASH then moved(to.store, from.store, back.amount, detail.source) end
+end
+
+-- Paying straight out of a wallet (server/money.lua): no move, no store, so the wallet is named by its item's uid.
+
+--- The tally key of a wallet (a carried item holding cash), by its uid, or nil without one.
+---@param uid any
+---@return string|nil
+function CashMarks.itemKey(uid)
+    return uid ~= nil and ('item:' .. tostring(uid)) or nil
+end
+
+--- How much of the cash at `key` this player may NOT spend: what their other characters left there. 0 with
+--- Config.BlockOwnCharacterTransfers off, or for a resource's own call.
+---@param key string|nil
+---@param source number|nil
+---@return number
+function CashMarks.blockedAt(key, source)
+    if Config.BlockOwnCharacterTransfers == false or not key or not marks[key] then return 0 end
+    local p = mover(source)
+    if not p then return 0 end
+    return blockedFor(key, p)
+end
+
+--- `amount` of cash was spent out of the wallet at `key`, leaving `there` in it: its tally shrinks as a move out would.
+---@param key string|nil
+---@param source number|nil
+---@param amount number
+---@param there number
+function CashMarks.spent(key, source, amount, there)
+    amount = tonumber(amount) or 0
+    if not key or amount <= 0 then return end
+    took(key, tonumber(there) or 0, amount, mover(source))
 end
 
 --- May this player pick up this ground pile? Answers why not, or nil. Cash dropped by another character of the same

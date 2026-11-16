@@ -2779,7 +2779,13 @@ end</code></pre>
 <div class="export-card" data-search="getplayercash cash money balance">
 <div class="export-header"><span class="export-name">GetPlayerCash(source)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Total cash in every container the character carries.</p>
+  <p>Total cash in every container the character carries: loose notes only, not what is in a wallet.</p>
+  <div class="return-info"><strong>Returns: </strong><code>number</code>; <code>0, 'Player not loaded'</code></div>
+</div></div>
+<div class="export-card" data-search="getspendablecash cash wallet money afford pay">
+<div class="export-header"><span class="export-name">GetSpendableCash(source)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>What a cash payment can take now: loose notes plus the cash in the wallets the character carries (in the pockets or on the strip). <code>ChargePlayer</code> and <code>HoldMoney</code> with <code>method = 'cash'</code> take loose notes first, then wallet cash. Use this, not <code>GetPlayerCash</code>, to check a price before charging. With <code>BlockOwnCharacterTransfers</code> on, notes another character of the same player left in a wallet are not counted.</p>
   <div class="return-info"><strong>Returns: </strong><code>number</code>; <code>0, 'Player not loaded'</code></div>
 </div></div>
 
