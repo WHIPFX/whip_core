@@ -958,7 +958,7 @@ Config.Shops = {
 -- once and then managed in /whip like any shop. Off unless server.cfg says `set whip_gta_stores true` (WHIP's txAdmin
 -- recipe does, for a new server), so a server that runs its own stores gets no second keeper. Also on /whip >
 -- Settings > World & gameplay: turning it on opens them at once; turning it off makes no more, and deletes none
--- (delete them in /whip > Economy > Shops).
+-- (delete them in /whip > Economy > Shops: one deleted is not made again).
 Config.GtaStores = GetConvar('whip_gta_stores', 'false') == 'true'
 
 -- What GTA's stores sell, item key = price in cash. A store's own catalog can be changed in /whip after it is made.
