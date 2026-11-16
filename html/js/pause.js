@@ -80,7 +80,7 @@ root.innerHTML = `
         <button class="pm-back" type="button"><span class="pm-back-arrow">&#8592;</span> Menu</button>
         <aside class="pm-legend"><div class="pm-legend-head">Legend</div><div class="pm-legend-list"></div></aside>
         <div class="pm-keys">
-            <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span>
+            <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span><span><b>Right-click</b> Clear it</span>
             <span><b>V</b> 3D</span><span><b>Right-drag</b> Turn</span>
             <span><b>C</b> Centre</span><span><b>L</b> Legend</span><span><b>Esc</b> Back</span>
         </div>

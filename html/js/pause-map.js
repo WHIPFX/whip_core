@@ -817,7 +817,13 @@ export class PauseMap {
         const end = () => { drag = null; turn = null; this.root.classList.remove('pmap-dragging'); };
         this.root.addEventListener('pointerup', end);
         this.root.addEventListener('pointercancel', end);
-        this.root.addEventListener('contextmenu', (e) => { if (this.turnable) e.preventDefault(); });
+        // A right CLICK clears the waypoint, as GTA's map does; a right-drag turns the map (above), and clears nothing.
+        this.root.addEventListener('contextmenu', (e) => {
+            if (this.turnable || this.interactive) e.preventDefault();
+            if (!this.interactive || !this.onWaypoint || !this.data.waypoint) return;
+            if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+            this.clearWaypoint();
+        });
         this.root.addEventListener('wheel', (e) => {
             if (!this.interactive) return;
             e.preventDefault();
@@ -854,11 +860,7 @@ export class PauseMap {
         const wp = this.data.waypoint;
         if (wp) {
             const [wx, wy] = this.screenOf(wp.x, wp.y);
-            if (Math.hypot(wx - sx, wy - sy) < 16) {
-                this.data.waypoint = null; this.data.route = null; this.render();
-                this.onWaypoint(null);
-                return;
-            }
+            if (Math.hypot(wx - sx, wy - sy) < 16) { this.clearWaypoint(); return; }
         }
         const at = this.worldAt(sx, sy);
         if (!at) return;
@@ -866,5 +868,12 @@ export class PauseMap {
         this.data.waypoint = { x, y };
         this.render();
         this.onWaypoint(x, y);
+    }
+
+    /** No waypoint (a right-click, Delete, or a double-click on it): off the map, and the game told. */
+    clearWaypoint() {
+        if (!this.data.waypoint) return;
+        this.data.waypoint = null; this.data.route = null; this.render();
+        if (this.onWaypoint) this.onWaypoint(null);
     }
 }
