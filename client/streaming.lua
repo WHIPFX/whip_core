@@ -29,20 +29,36 @@ local function waitFor(loaded, ms)
     return loaded() and true or false
 end
 
---- Load a model. Answers its hash once it is loaded, or nil: not a model the game has, or not
---- loaded within `timeoutMs` (default 5000). Release it with SetModelAsNoLongerNeeded when done.
+--- Models the game threw on when asked for (a native exception in RequestModel, seen with hundreds of piles of
+--- different props round one player): said once in F8, by name, and answered nil at once from then on.
+local threwOn = {}
+
+--- Load a model. Answers its hash once it is loaded, or nil and why: 'missing' (not a model the game has), 'timeout'
+--- (not loaded within `timeoutMs`, default 5000) or 'error' (the game threw when asked for it). Release it with
+--- SetModelAsNoLongerNeeded when done. The why is for whip_core's own callers: across the export it is cut at the
+--- nil, so satellites see the hash or nil.
 ---@param model string|number  a name or a hash
 ---@param timeoutMs number|nil
 ---@return number|nil hash
+---@return string|nil why  'missing' | 'timeout' | 'error'
 function LoadModel(model, timeoutMs)
     local hash = type(model) == 'number' and model or GetHashKey(tostring(model))
-    if not IsModelInCdimage(hash) then return nil end
+    if not IsModelInCdimage(hash) then return nil, 'missing' end
+    if threwOn[hash] then return nil, 'error' end
     if HasModelLoaded(hash) then return hash end
-    RequestModel(hash)
+    -- The game's request can throw rather than just never load. Answered, not thrown: thrown, it ended the caller's
+    -- thread, and the ground items' streaming with it.
+    local ok, err = pcall(RequestModel, hash)
+    if not ok then
+        threwOn[hash] = true
+        print(('^1[whip_core:streaming] the game threw loading model %s (%s): %s^7'):format(tostring(model),
+            tostring(hash), tostring(err)))
+        return nil, 'error'
+    end
     if waitFor(function() return HasModelLoaded(hash) end, tonumber(timeoutMs) or DEFAULT_MS) then
         return hash
     end
-    return nil
+    return nil, 'timeout'
 end
 
 --- Load an animation dictionary. Answers true once it is loaded, false if it did not load within

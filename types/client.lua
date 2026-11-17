@@ -578,8 +578,8 @@ function whip_core:IsComposerOpen() end
 function whip_core:Progress(label, duration, opts) end
 
 --- Load a model and wait for it — at most `timeoutMs` (default 5000). Returns the hash once loaded,
---- or nil (not a model the game has, or too slow). Release it with SetModelAsNoLongerNeeded. Waits:
---- call it from a thread.
+--- or nil (not a model the game has, too slow, or one the game threw on when asked: F8 names it once). Release it
+--- with SetModelAsNoLongerNeeded. Waits: call it from a thread.
 ---@param model string|number A name or a hash
 ---@param timeoutMs? number
 ---@return number|nil hash

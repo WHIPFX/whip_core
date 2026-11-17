@@ -8612,7 +8612,7 @@ end</code></pre>
 <div class="export-card" id="ui-loaders" data-search="loadmodel loadanimdict loadtexturedict loadanimset loadptfxasset requestmodel hasmodelloaded load model animation dictionary clipset walk style particle ptfx stream wait timeout">
 <div class="export-header"><span class="export-name">LoadModel(model, timeoutMs?) · LoadAnimDict(dict, timeoutMs?) · LoadTextureDict(dict, timeoutMs?) · LoadAnimSet(set, timeoutMs?) · LoadPtfxAsset(asset, timeoutMs?)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
-  <p>Loads something the game streams and waits, up to <code>timeoutMs</code> (default 5000). <code>LoadModel</code> takes a name or hash and returns the hash, or <code>nil</code> (at once for a model the game lacks); the others return a boolean. <code>LoadAnimSet</code> is a walk style's clip set, <code>LoadPtfxAsset</code> a particle asset. Call from a thread; from a satellite, <code>Whip.core:LoadModel(...)</code> returns <code>false</code> if whip_core restarts.</p>
+  <p>Loads something the game streams and waits, up to <code>timeoutMs</code> (default 5000). <code>LoadModel</code> takes a name or hash and returns the hash, or <code>nil</code>: at once for a model the game lacks, or for one the game threw on when asked (F8 names it once). The others return a boolean. <code>LoadAnimSet</code> is a walk style's clip set, <code>LoadPtfxAsset</code> a particle asset. Call from a thread; from a satellite, <code>Whip.core:LoadModel(...)</code> returns <code>false</code> if whip_core restarts.</p>
 <pre><code class="lang-lua">local hash = exports.whip_core:LoadModel('prop_beer_bottle')
 if not hash then return end
 local obj = CreateObject(hash, x, y, z, true, true, false)
