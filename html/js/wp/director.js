@@ -447,6 +447,7 @@ function renderDetail() {
     const row = WP.el('div', 'wp-actions-row');
     row.appendChild(WP.el('span', 'wp-actions-split'));
     if (admin()) row.appendChild(WP.btn('Export as a pack', 'wdExport', null, s.key));
+    row.appendChild(WP.btn('Share code', 'wdShare', null, s.key));   // share codes, below
     row.appendChild(WP.btn('Duplicate', 'wdCopy', null, s.key));
     if (s.on) row.appendChild(WP.btn('Start a run', 'wdRun', null, s.key));
     row.appendChild(WP.btn('Open Editor', 'wdEdit', 'primary', s.key));
@@ -926,6 +927,230 @@ async function act(op, args, okText, ending) {
     return r.data;
 }
 
+// ============================================================
+// Share codes
+// ============================================================
+// A share code is a whole scenario document: "WDS1." then the document's JSON, deflated and in URL-safe
+// base64 (or "WDS0." and the JSON not deflated, on a page without CompressionStream). Nothing is hosted,
+// so a code works on any WHIP server; whitespace in a pasted code is ignored. The server side is
+// server/director/hub.lua (shareDoc, importCode); an import is always a NEW draft, switched off.
+
+const CODE_RE = /^WDS([01])\.([A-Za-z0-9_-]+)$/;
+
+// The short-code hub (a Cloudflare Worker; source: github.com/ZextEU/zext-scenario-share, hub/): it stores a long code and hands back one like
+// ZX-4F9K2QH. Empty: no hub, so Share shows only the long code and Import takes only long ones. No trailing slash.
+const HUB_URL = 'https://zext-scenario-hub.whipshare.workers.dev';
+const SHORT_RE = /^ZX-?[0-9A-HJKMNP-TV-Z]{7}$/i;
+
+async function hub(path, init) {
+    let r;
+    try { r = await fetch(HUB_URL + path, init); } catch (e) { throw new Error('The scenario hub cannot be reached'); }
+    let body = null;
+    try { body = await r.json(); } catch (e) { body = null; }
+    if (!r.ok) throw new Error((body && body.error) || `The scenario hub said no (${r.status})`);
+    return body || {};
+}
+
+/** A short code into its long one, or throws with the words to show. */
+async function longCodeOf(short) {
+    const d = await hub('/v1/codes/' + encodeURIComponent(short.toUpperCase()));
+    if (typeof d.code !== 'string') throw new Error('The scenario hub sent back nothing usable');
+    return d.code;
+}
+
+function b64url(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unb64url(text) {
+    const s = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4));
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+}
+async function streamBytes(bytes, stream) {
+    const res = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+    return new Uint8Array(await res.arrayBuffer());
+}
+
+async function packCode(doc) {
+    const raw = new TextEncoder().encode(JSON.stringify(doc));
+    if (typeof CompressionStream === 'function') return 'WDS1.' + b64url(await streamBytes(raw, new CompressionStream('deflate')));
+    return 'WDS0.' + b64url(raw);
+}
+
+/** A code back into a document, or throws with the words to show. */
+async function unpackCode(text) {
+    const m = CODE_RE.exec(String(text || '').replace(/\s+/g, ''));
+    if (!m) throw new Error('That is not a scenario code (one starts with WDS1.)');
+    let bytes;
+    try { bytes = unb64url(m[2]); } catch (e) { throw new Error('That code is broken: part of it is missing'); }
+    if (m[1] === '1') {
+        if (typeof DecompressionStream !== 'function') throw new Error('This game cannot unpack that code');
+        try { bytes = await streamBytes(bytes, new DecompressionStream('deflate')); }
+        catch (e) { throw new Error('That code is broken: part of it is missing'); }
+    }
+    let doc;
+    try { doc = JSON.parse(new TextDecoder().decode(bytes)); } catch (e) { throw new Error('That code is broken: it does not read as a scenario'); }
+    if (!doc || typeof doc !== 'object' || !Array.isArray(doc.nodes)) throw new Error('That code does not hold a scenario');
+    return doc;
+}
+
+function copyText(area) {
+    area.focus();
+    area.select();
+    let done = false;
+    try { done = document.execCommand('copy'); } catch (e) { done = false; }
+    if (!done && navigator.clipboard) navigator.clipboard.writeText(area.value).then(() => {}, () => {});
+    return done || !!navigator.clipboard;
+}
+
+function codeArea(value, placeholder) {
+    const a = WP.el('textarea', 'wp-input');
+    a.rows = 6;
+    a.spellcheck = false;
+    a.style.cssText = 'width:100%;min-height:120px;resize:vertical;font-family:monospace;font-size:11px;word-break:break-all;';
+    if (placeholder) a.placeholder = placeholder;
+    if (value !== undefined) { a.value = value; a.readOnly = true; }
+    return a;
+}
+
+async function shareScenario(key) {
+    const r = await call('shareDoc', { key, rev: 0 });
+    if (!r.ok) { WP.result(r.why, 'err'); return; }
+    let code;
+    try { code = await packCode(r.data.doc); } catch (e) { WP.result('That scenario could not be packed into a code', 'err'); return; }
+    const box = WP.el('div', 'wd-form');
+    const area = codeArea(code);
+    box.appendChild(WP.field(`Code (${code.length.toLocaleString()} characters)`, area, true));
+    const copy = WP.btn('Copy code', null, 'primary');
+    copy.type = 'button';
+    copy.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        WP.result(copyText(area) ? 'Code copied' : 'Select the code and press Ctrl+C', 'ok');
+    });
+    box.appendChild(copy);
+    if (HUB_URL) {
+        // A short code: the long one goes up to the hub, where anyone with the short code can fetch it. Only on a press.
+        const shortBox = WP.el('div', 'wd-desc');
+        shortBox.textContent = 'Or get a short code: it puts this scenario on the public scenario hub.';
+        const get = WP.btn('Get short code', null, 'ghost');
+        get.type = 'button';
+        get.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            get.disabled = true;
+            shortBox.textContent = 'Uploading…';
+            try {
+                const d = await hub('/v1/codes', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: code });
+                shortBox.textContent = '';
+                const shortIn = WP.input({ value: d.id });
+                shortIn.readOnly = true;
+                shortIn.style.cssText = 'font-family:monospace;font-size:20px;letter-spacing:2px;text-align:center;';
+                shortBox.appendChild(WP.field('Short code', shortIn, true));
+                const copyShort = WP.btn('Copy short code', null, 'primary');
+                copyShort.type = 'button';
+                copyShort.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    WP.result(copyText(shortIn) ? 'Short code copied' : 'Select the code and press Ctrl+C', 'ok');
+                });
+                shortBox.appendChild(copyShort);
+                get.remove();
+            } catch (err) {
+                shortBox.textContent = err.message;
+                get.disabled = false;
+            }
+        });
+        box.appendChild(shortBox);
+        box.appendChild(get);
+    }
+    const shown = WP.confirm({ title: `Share ${r.data.name}`, confirmLabel: 'Done', noCancel: true, wide: true, content: box,
+        body: `Revision ${r.data.rev}, with where its things are placed. Anyone with Director access on a WHIP server `
+            + 'pastes it into Scenarios > Import code. Recorded drives and lore characters stay on this server.' });
+    setTimeout(() => { area.focus(); area.select(); }, 50);
+    await shown;
+}
+
+async function importScenario() {
+    const used = new Set(scenarios().map((s) => s.key));
+    const box = WP.el('div', 'wd-form');
+    const area = codeArea(undefined, HUB_URL ? 'Paste a code here (ZX-… or WDS1.…)' : 'Paste a code here (WDS1.…)');
+    box.appendChild(WP.field('Code', area, true));
+    const about = WP.el('div', 'wd-desc');
+    box.appendChild(about);
+    const name = WP.input({ placeholder: 'from the code' });
+    const key = WP.input({ placeholder: 'from the name' });
+    box.appendChild(WP.field('Name', name, true));
+    box.appendChild(WP.field('Key', key, true));
+    const why = WP.el('div', 'wd-form-why');
+    box.appendChild(why);
+    let doc = null, reading = 0;
+    const keyOf = () => key.value.trim() || slug(name.value);
+    area.addEventListener('input', async () => {
+        const mine = ++reading;
+        doc = null;
+        about.textContent = '';
+        why.dataset.code = '';
+        if (!area.value.trim()) { why.textContent = ''; return; }
+        let d = null, err = '';
+        try {
+            let long = area.value.replace(/\s+/g, '');
+            if (SHORT_RE.test(long)) {
+                if (!HUB_URL) throw new Error('This server has no scenario hub set up for short codes');
+                about.textContent = 'Looking it up…';
+                long = await longCodeOf(long);
+            }
+            d = await unpackCode(long);
+        } catch (e) { err = e.message; }
+        if (mine !== reading) return;   // (a newer paste is being read)
+        doc = d;
+        if (!d) about.textContent = '';
+        if (d) {
+            const world = Array.isArray(d.world) ? d.world.length : 0;
+            const vars = Array.isArray(d.variants) && d.variants.length > 1 ? ` · ${d.variants.length} variants` : '';
+            about.textContent = `${d.name || 'A scenario'}: ${plural(d.nodes.length, 'card')}, ${plural(world, 'placed thing')}${vars}`
+                + (d.description ? ` — ${d.description}` : '');
+            if (!name.value.trim()) name.value = String(d.name || '').slice(0, 80);
+            if (!key.value.trim()) {
+                let k = slug(d.key || d.name || 'imported') || 'imported', i = 2;
+                const base = k;
+                while (used.has(k)) k = base + '_' + (i++);
+                key.value = k;
+            }
+        }
+        why.dataset.code = err;
+        // (The dialog asks canConfirm again on a change: the reading finished after its own input check.)
+        area.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const whyNot = () => {
+        if (why.dataset.code) return why.dataset.code;
+        if (!doc) return '';
+        if (!name.value.trim()) return 'It needs a name';
+        if (!KEY_OK.test(keyOf())) return 'A key is 2 to 64 letters, digits, _ and -';
+        if (used.has(keyOf())) return `${keyOf()} is taken`;
+        return '';
+    };
+    const ok = await WP.confirm({
+        title: 'Import a scenario', confirmLabel: 'Import', wide: true, content: box,
+        body: 'It arrives as a new scenario, switched off. Look through its cards (Pay, Give Item, Charge) and run a Test before you switch it on.',
+        canConfirm: () => { why.textContent = whyNot(); return !!doc && !why.textContent; },
+    });
+    if (!ok || !doc) return;
+    const r = await nuiCallback('wpDirectorImport', { doc, key: keyOf(), name: name.value.trim() });
+    if (!r || !r.ok) { WP.result((r && r.why) || 'No answer from the server', 'err'); return; }
+    await refresh();
+    openScenario(keyOf());
+    const m = (r.data && r.data.missing) || {};
+    const lacks = [];
+    if (arr(m.items).length) lacks.push('items: ' + arr(m.items).join(', '));
+    if (arr(m.cards).length) lacks.push('cards: ' + arr(m.cards).join(', '));
+    if (lacks.length) WP.result(`Imported, but this server has no ${lacks.join('; ')}. Fix those in its editor before switching it on.`, 'warn');
+    else WP.result(`${name.value.trim()} imported, switched off`, 'ok');
+}
+
 /** Make one (New scenario, Duplicate), and show it. A new one opens in the world at once. */
 async function makeScenario(copyOf) {
     const a = await askScenario(copyOf);
@@ -942,6 +1167,8 @@ const actions = {
     wdRefresh: () => refresh(true),
     wdNew: () => makeScenario(null),
     wdCopy: (el) => makeScenario(el.dataset.arg),
+    wdShare: (el) => shareScenario(el.dataset.arg),
+    wdImport: () => importScenario(),
     wdSearch: (el) => { st.search = el.value || ''; renderList(); },
     wdSelect: (el) => { st.sel = el.dataset.id; renderList(); renderDetail(); },
     wdEdit: (el) => nuiCallback('wpDirectorEdit', { key: el.dataset.arg }),
@@ -1125,7 +1352,9 @@ const PAGES = [
       onEnter() { renderLive(); } },
     { id: SEC.scenarios, label: 'Scenarios', order: 20,
       render(root) {
-          const sc = split(root, listBar('New scenario', 'wdNew', 'Search scenarios…', 'wdSearch'));
+          const bar = listBar('New scenario', 'wdNew', 'Search scenarios…', 'wdSearch');
+          bar.insertBefore(WP.btn('Import code', 'wdImport', 'ghost'), bar.children[1] || null);
+          const sc = split(root, bar);
           els.count = sc.count;
           els.list = sc.list;
           els.detail = sc.detail;

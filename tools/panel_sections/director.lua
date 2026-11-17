@@ -39,6 +39,7 @@ local OPS = {
     delete     = { 'key' },
     abort      = { 'runId' },
     export     = { 'key', 'rev' },
+    shareDoc   = { 'key', 'rev' },   -- a scenario as a share code (Import: wpDirectorImport below)
     packs      = {},
     accept     = { 'resource', 'file' },
     refuse     = { 'resource', 'file' },
@@ -67,6 +68,21 @@ RegisterNUICallback('wpDirector', function(d, cb)
     else
         cb({ ok = true, data = res })
     end
+end)
+
+-- Import code (wp/director.js). The page unpacks the code into a document; it goes up as a
+-- latent event, as the editor's Save does (big documents get lost as plain events), and the hub makes a new
+-- draft from it (server/director/hub.lua importCode). Its tokens start high so they never meet the editor's.
+local importToken = 900000000
+RegisterNUICallback('wpDirectorImport', function(d, cb)
+    if type(d) ~= 'table' or type(d.doc) ~= 'table' or type(d.key) ~= 'string' or type(d.name) ~= 'string' then
+        cb({ ok = false, why = 'Nothing to import' }) return
+    end
+    importToken = importToken + 1
+    TriggerLatentServerEvent('whip_core:server:directorDoc', 500000, importToken, d.doc)
+    local res, why = Callback('whip_core:director:importCode', d.key, d.name, importToken)
+    if res == nil or res == false then cb({ ok = false, why = why or 'No answer from the server' })
+    else cb({ ok = true, data = res }) end
 end)
 
 -- Into the world builder on a scenario (`key`).
