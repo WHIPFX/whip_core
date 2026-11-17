@@ -980,11 +980,30 @@ local function blocked(x1, y1, z1, x2, y2, z2, ped)
     return hit == 1, at
 end
 
+--- From inside a vehicle the rays below stop at its own body, so the spot is outside instead: beside the door on the
+--- side of the player's seat, a little clear of it, along the cabin. Never further from the player than the server
+--- takes a drop (GroundItemPickupRange). nil when there is no floor under it.
+---@return number|nil x, number|nil y, number|nil z
+local function vehicleDropSpot(ped, vehicle)
+    local p = GetEntityCoords(ped)
+    local off = GetOffsetFromEntityGivenWorldCoords(vehicle, p.x, p.y, p.z)
+    local mn, mx = GetModelDimensions(GetEntityModel(vehicle))
+    local reach = math.max(0.8, (Config.GroundItemPickupRange or 2.0) - 0.2)
+    local x = off.x > 0.0 and math.min(mx.x + 0.45, off.x + reach) or math.max(mn.x - 0.45, off.x - reach)
+    local y = math.max(mn.y + 0.3, math.min(mx.y - 0.3, off.y + (math.random() - 0.5) * 0.4))
+    local spot = GetOffsetFromEntityInWorldCoords(vehicle, x, y, 0.0)
+    local floor, at = blocked(spot.x, spot.y, spot.z + 1.5, spot.x, spot.y, spot.z - 3.0, vehicle)
+    if not floor then return nil end
+    return spot.x, spot.y, at.z
+end
+
 --- A clear spot to drop on, as x, y, z (the floor), or nil when there is none.
 ---@return number|nil x, number|nil y, number|nil z
 local function findDropSpot()
     local ped = PlayerPedId()
     if ped == 0 then return nil end
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    if vehicle ~= 0 then return vehicleDropSpot(ped, vehicle) end
     local p = GetEntityCoords(ped)            -- the pelvis, about 1 m up
     local heading = GetEntityHeading(ped)
     local chest, knee = p.z + 0.3, p.z - 0.5
@@ -1029,13 +1048,21 @@ end
 -- opId rides along on all three: the NUI opens an optimistic operation for every ground
 -- gesture, and the server echoes the id on refusal so the revert unwinds exactly that
 -- gesture (storeMove's contract).
+--- Drop a stack from the pockets on a clear spot (findDropSpot). With no spot, "Nowhere to place!" goes to the page.
+--- Also the fallback of a drop by hand (client/inventory_gestures.lua) that cannot be animated.
+---@param container string
+---@param slot number
+---@param amount number|nil  nil: the whole stack
+---@param opId number|nil    the page's optimistic op, when it opened one
+function DropToGround(container, slot, amount, opId)
+    local x, y, z = findDropSpot()
+    if not x then return nowhereToPlace(opId) end
+    TriggerServerEvent('whip_core:server:dropToGround', container, slot, amount, opId or 0, x, y, z)
+end
+
 RegisterNUICallback('dropToGround', function(data, cb)
     cb('ok')
-    local x, y, z = findDropSpot()
-    if not x then return nowhereToPlace(data.opId) end
-    TriggerServerEvent('whip_core:server:dropToGround',
-        data.fromContainer, data.fromSlot, data.amount, data.opId or 0, x, y, z
-    )
+    DropToGround(data.fromContainer, data.fromSlot, data.amount, data.opId)
 end)
 
 RegisterNUICallback('pickupGroundItem', function(data, cb)

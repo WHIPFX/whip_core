@@ -790,6 +790,61 @@ export function place(at) {
 }
 
 // ------------------------------------------
+// Gestures: onto your character, out of the inventory
+// ------------------------------------------
+
+/** The strip slot an item on the person would be equipped into: a typed one (it names what it takes, or keys) that
+ *  takes it, empty first, else holding the same item (they stack), else the first (a swap). Null when none takes it
+ *  or the item is already in the strip. Untyped slots take anything, so they are not "where it goes". */
+function equipSlotFor(at, d) {
+    if (at.container === 'accessory') return null;
+    const typed = slotConfig.accessorySlots.filter(c => (c.accepts || c.keys) && slotTakesItem(c, d.item));
+    if (!typed.length) return null;
+    const strip = inv.state.accessory || {};
+    const free = typed.find(c => !strip[String(c.slot)]);
+    const same = typed.find(c => strip[String(c.slot)] && strip[String(c.slot)].item === d.item);
+    return (free || same || typed[0]).slot;
+}
+
+/** What letting go on your character would do with this item: 'equip' (into the strip), 'use', or null (nothing:
+ *  not on the person, or neither usable nor with a default action). For the ring's label while dragging. */
+export function equipKind(at) {
+    const d = onPerson(at);
+    if (!d) return null;
+    if (equipSlotFor(at, d) !== null) return 'equip';
+    const def = defOf(d.item);
+    return def && (def.usable || def.defaultAction) ? 'use' : null;
+}
+
+/**
+ * ON YOUR CHARACTER (Config.InventoryDragToBody): equip the item, else use it. Into the accessory strip when a typed
+ * slot there takes it (cash, a wallet, keys); otherwise its use, which is where a weapon is drawn, clothing worn and
+ * food eaten (its use handler, else its default action). Pockets only.
+ */
+export function equip(at) {
+    const d = onPerson(at);
+    if (!d) return no();
+    const slot = equipSlotFor(at, d);
+    if (slot !== null) return move(at, { container: 'accessory', slot });
+    if (!equipKind(at)) return no(nameOf(d.item) + " can't be used");
+    return use(at);
+}
+
+/**
+ * OUT OF THE INVENTORY (Config.InventoryDragOutDrops): drop the whole stack from the hand. On foot the player puts it
+ * down; in a vehicle they toss it out of their window. The item stays in its slot until it leaves the hand, then the
+ * server's push takes it off. Pockets only; answers { ok: false, reason? } when the gesture is off (config.lua, or a
+ * script's BlockInventoryGesture, whose words are the reason).
+ * @returns {Promise<{ok: boolean, reason?: string}>}
+ */
+export function dropOut(at) {
+    const d = onPerson(at);
+    if (!d) return Promise.resolve(no());
+    return nuiCallback('dropByHand', { container: at.container, slot: Number(at.slot), amount: d.amount || 1, item: d.item })
+        .then(r => (r && r.ok === true ? ok : no(r && r.reason ? r.reason : undefined)));
+}
+
+// ------------------------------------------
 // The right-click menu
 // ------------------------------------------
 

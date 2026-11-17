@@ -29,6 +29,7 @@ import * as invState from './inv-state.js';
 import { invEvents } from './emitter.js';
 import * as ops from './inv-ops.js';
 import * as actions from './inv-actions.js';
+import * as body from './inv-body.js';
 import { getItemDefs } from './item-defs.js';
 import { whenMet } from './item-rules.js';
 import { nuiCallback, itemImageUrl, setItemImage, decodeTextEntities } from '../utils.js';
@@ -114,12 +115,12 @@ export function defaultSeated() {
 // freely; change slots through `actions`, or through the ops contract by hand); `actions` is every
 // player gesture as one call (core/inv-actions.js); `getItemDefs`/`itemImageUrl`/`setItemImage`/
 // `whenMet`/`decodeTextEntities` are what a slot needs to be drawn; `ops` is the optimistic engine;
-// `events` is the announcement stream; `slotConfig`/`isIgnitionKeyItem` are the server-registered
+// `body` is the ring over the player's character while dragging (core/inv-body.js); `events` is the announcement stream; `slotConfig`/`isIgnitionKeyItem` are the server-registered
 // slot registries, and `slotTakesItem` a strip slot's rule; `nuiCallback` is the plain outbound wire. closeInventory is deliberately NOT here:
 // inv-wire imports this file for the seat, so the renderer-loader passes it to custom renderers as
 // `close` instead (keeps the graph a DAG). A custom renderer gets a COPY of this module from its loader,
 // with its own `events` and `setViewRenderHook`, so swapping it out undoes what it subscribed.
 export {
-    inv, shop, invEvents as events, ops, actions, slotConfig, isIgnitionKeyItem, slotTakesItem,
+    inv, shop, invEvents as events, ops, actions, body, slotConfig, isIgnitionKeyItem, slotTakesItem,
     nuiCallback, getItemDefs, itemImageUrl, setItemImage, whenMet, decodeTextEntities,
 };

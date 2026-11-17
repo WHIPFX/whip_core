@@ -1394,6 +1394,19 @@ Config.GroundItemPickupRange = 2.0     -- How close before dropped items show in
 Config.GroundItemStreamRange = 100.0   -- How far away dropped items still appear in the world (door lock changes ride this too: keep it 50 or more)
 Config.PlaceItemRange        = 10.5    -- How far away you can set an item down (metres, from the camera)
 
+-- Two inventory gestures (client/inventory_gestures.lua), extras on top of clicking Use, the use keys, a drag onto
+-- Nearby and shift-click, which always work. Each on its own; false leaves the gesture doing nothing. A script can
+-- also switch one off for a while: exports.whip_core:BlockInventoryGesture(id, 'body'|'dropOut'|nil, label).
+-- Drag onto your character: while an item from the pockets is dragged, a ring shows over the player's own character
+-- in the world; letting go on it uses the item, or equips it (into the accessory strip when it fits there; a weapon
+-- is drawn and clothing worn by their own use).
+Config.InventoryDragToBody   = true
+-- Drag out to drop: letting go of an item outside every panel drops the stack, from the hand. On foot the player puts
+-- it down; in a vehicle they toss it out of their window, moving or not. It falls with physics and lies where it stops.
+Config.InventoryDragOutDrops = true
+Config.InventoryDragOutInVehicle = true   -- false: not from inside a vehicle (on foot only)
+Config.InventoryDragOutAnimated  = true   -- false: no put-down / toss animation; it lands on a clear spot at once
+
 -- How the player moves while holding an item out to give it: `walk` is a /walk name ('trash'), or nil for their own
 -- walk; `speed` is 'jog' (no sprint), 'walk' (no running) or nil (as fast as they like). A resource can set its own
 -- with SetGiveModeStyle. One item can keep the player's own walk: "Allow player walk animation" on its /whip Items page.

@@ -1893,3 +1893,54 @@ html[data-input="pad"] #inv-split-panel .inv-split-input-row { padding-block: 0.
 
 /* The character's name and id live in hidden #inv-name / #inv-charid. */
 
+/* ============================================================================
+   ON YOUR CHARACTER: the ring over the player's own character while an item is dragged (js/core/inv-body.js,
+   Config.InventoryDragToBody). Placed by a transform at the chest Lua projects; over every panel, under the
+   dragged item (10001). Lit (.hot) while the pointer is on it.
+   ============================================================================ */
+.inv-body-target {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 10000;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    will-change: transform;
+}
+.inv-body-target[hidden] { display: none; }
+.inv-body-ring {
+    display: block;
+    width: 34px;
+    height: 34px;
+    margin-top: -17px;   /* the ring's centre on the point, the label below it */
+    border-radius: 50%;
+    border: 2px solid var(--ui-accent);
+    background: radial-gradient(circle, var(--ui-accent-medium) 0 22%, transparent 24%);
+    box-shadow: 0 0 0 4px var(--ui-accent-glow), 0 0 14px var(--ui-accent-medium);
+    animation: inv-body-pulse 1.4s ease-in-out infinite;
+}
+.inv-body-label {
+    padding: 3px 9px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    font-family: var(--ui-font);
+    font-size: var(--ui-fs-sm);
+    font-weight: var(--ui-fw-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+.inv-body-target.hot .inv-body-ring {
+    animation: none;
+    transform: scale(1.25);
+    background: radial-gradient(circle, var(--ui-accent) 0 30%, transparent 32%);
+}
+.inv-body-target.hot .inv-body-label { opacity: 1; }
+@keyframes inv-body-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px var(--ui-accent-glow), 0 0 14px var(--ui-accent-medium); }
+    50%      { box-shadow: 0 0 0 9px var(--ui-accent-subtle), 0 0 18px var(--ui-accent-medium); }
+}

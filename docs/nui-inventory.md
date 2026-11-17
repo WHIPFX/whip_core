@@ -116,6 +116,9 @@ whip puts the state back, calls your `render`, and tells the player why (`notify
 | `split(at, amount)` | Split `amount` off into the first free slot (on the ground, a new pile) |
 | `destroy(at)` | Developer mode only |
 | `use(at)`, `give(at, amount?)`, `place(at)` | Items on your person. Give asks who to; Place closes the inventory and starts placing |
+| `equip(at)` | On your person: into the accessory strip when a typed slot there takes it (cash, a wallet, keys), else its use (a weapon drawn, clothing worn, food eaten). What letting go on the character does (below) |
+| `equipKind(at)` | `'equip'`, `'use'` or `null`: what `equip` would do, for a label |
+| `dropOut(at)` | On your person: drop the whole stack from the hand (put down on foot, tossed out of the window in a vehicle). Answers a Promise of `{ ok }`; `ok: false` when `Config.InventoryDragOutDrops` is off. The item leaves its slot when it leaves the hand, through the server's push |
 | `menuFor(at)` | The slot's right-click menu as whip shows it: `{ title, options: [{ action, label, group, amount? }] }`, or null. `group` is `'own'`, `'shared'` or `'danger'` |
 | `runOption(at, action, { amount })` | Run one of its options (Give and Split take `amount`) |
 | `refused(from, to)` | Would that drop be refused before sending? For a red slot while dragging |
@@ -125,6 +128,46 @@ whip puts the state back, calls your `render`, and tells the player why (`notify
 const r = api.actions.move({ container: 'player', slot: 3 }, { container: 'container', slot: 1 });
 if (!r.ok && r.reason) toast(r.reason);
 redraw();
+```
+
+## Gestures on the world: onto the character, out of the inventory
+
+Two gestures whip's own inventory has, that a custom UI gets by calling the same things. They are extras: clicking
+Use, the use keys, a drag onto Nearby and shift-click work as before. Each can be switched off:
+
+| Setting (config.lua, also on `/whip` → Config) | Default | Off |
+| --- | --- | --- |
+| `InventoryDragToBody` | `true` | No ring |
+| `InventoryDragOutDrops` | `true` | Letting go outside the panels does nothing |
+| `InventoryDragOutInVehicle` | `true` | The same, but only from inside a vehicle |
+| `InventoryDragOutAnimated` | `true` | No put-down / toss: it lands on a clear spot at once |
+
+And for a while, from a script (client exports): `BlockInventoryGesture(id, 'body' | 'dropOut' | nil, label?)` until
+`UnblockInventoryGesture(id)` or your resource stops, for a cell, handcuffs or a zone. `label` is shown to a player
+who tries the drop. `InventoryGestureAllowed(gesture)` answers whether one may be used now, for a renderer that brings
+its own gestures.
+
+- **Onto the character** (`Config.InventoryDragToBody`). While an item from the pockets is dragged, a ring shows over
+  the player's own character in the world, wherever they are on screen; letting go on it is `actions.equip`. whip
+  draws the ring (over everything, under your dragged item) and Lua moves it with the character every frame. You only
+  tell it about the drag, with `api.body`:
+
+  | Call | When |
+  | --- | --- |
+  | `body.begin(at, labels?)` | A drag of `at` starts. No ring for an item with nothing to do, or with the gesture off. `labels` (`{ equip, use }`) are the ring's words, for your language |
+  | `body.over(x, y)` | The pointer moves (screen px). Lights the ring when on it, and answers `true` then: light no slot of yours |
+  | `body.hit(x, y)` | At the release, before your own targets: `true` means call `actions.equip(at)` |
+  | `body.end()` | The drag ended, however (whip also ends it when the inventory closes) |
+
+- **Out of the inventory** (`Config.InventoryDragOutDrops`). Letting go of a pockets item where none of your panels
+  are (the game shows there) is `actions.dropOut(at)`. You decide what counts as outside; whip's own counts anything
+  that is not a panel, the accessory strip, a menu or a tooltip.
+
+```js
+// at the release of a drag of `from`
+if (api.body.hit(e.clientX, e.clientY)) { const r = api.actions.equip(from); if (!r.ok && r.reason) toast(r.reason); }
+else if (!slotUnder && outsideMyPanels) api.actions.dropOut(from);
+api.body.end();
 ```
 
 ## What whip calls on you

@@ -315,6 +315,8 @@ client_scripts {
     'client/zones.lua',
     'client/doors.lua',
     'client/ground.lua',
+    -- After ground.lua (DropToGround) and inventory.lua (Inventory.isOpen, Inventory.itemPropModel).
+    'client/inventory_gestures.lua',
     'client/placing.lua',
     'client/interior_rooms.lua',
     'client/viewport_room.lua',

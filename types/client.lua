@@ -132,6 +132,27 @@ function whip_core:UnblockHands(id) end
 ---@return string? label
 function whip_core:AreHandsBlocked(what) end
 
+--- Switch an inventory gesture off until UnblockInventoryGesture(id) or your resource stops: 'body' (drag onto your
+--- character), 'dropOut' (drag out of the inventory to drop), or nil for both. Clicking Use, the use keys and the
+--- ground panel keep working. `label` is what a player trying it is told.
+---@param id string
+---@param gesture 'body'|'dropOut'|nil
+---@param label string|nil
+---@return boolean ok
+---@return string? reason
+function whip_core:BlockInventoryGesture(id, gesture, label) end
+
+---@param id string
+---@return boolean ok
+---@return string? reason
+function whip_core:UnblockInventoryGesture(id) end
+
+--- May the player use an inventory gesture now (config.lua and every block)? False and the block's words when not.
+---@param gesture 'body'|'dropOut'
+---@return boolean allowed
+---@return string? why
+function whip_core:InventoryGestureAllowed(gesture) end
+
 --- What the player's body is doing that work in the hands cannot be done in: under water (swimming under, or in a sunk
 --- car), swimming, or falling (a fall, a skydive), the first that applies, and the words for it. False when none.
 --- A progress bar takes the same states as `notWhile`.

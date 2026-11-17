@@ -14,6 +14,8 @@ import {
 import { beginOp, extendOp, emit, commitOp, settleUnsentOp } from './core/inv-ops.js';
 import { registerRenderer, getRenderer, defaultSeated, setViewRenderHook } from './core/inventory.js';
 import { closeInventory } from './core/inv-wire.js';
+import * as body from './core/inv-body.js';
+import { equip, dropOut } from './core/inv-actions.js';
 import { padGlyph } from './pad-glyphs.js';
 import { pref } from './prefs.js';
 import { weightText, weightLine } from './weight.js';
@@ -1210,6 +1212,9 @@ function startDrag(item, slot, x, y) {
 
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
+
+    // From the pockets, the ring over the character shows (core/inv-body.js): letting go on it equips or uses.
+    if (isPocketGrid(slot.dataset.container)) body.begin({ container: slot.dataset.container, slot: parseInt(slot.dataset.slot) });
 }
 
 function onDragMove(e) {
@@ -1217,7 +1222,9 @@ function onDragMove(e) {
     dragGhost.style.left = e.clientX + 'px';
     dragGhost.style.top = e.clientY + 'px';
 
-    const found = getSlotUnderCursor(e.clientX, e.clientY);
+    // On the ring, the ring is the target: no slot under it lights.
+    const onBody = body.over(e.clientX, e.clientY);
+    const found = onBody ? null : getSlotUnderCursor(e.clientX, e.clientY);
     const target = (found && found !== dragSourceSlot) ? found : null;
     if (target === dragHoverSlot) return;   // still over the same slot: nothing to redraw
 
@@ -1365,7 +1372,25 @@ function dragEndBody(e) {
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
 
+    // ON YOUR CHARACTER (Config.InventoryDragToBody): the ring is over the panels, so it is asked first.
+    if (body.hit(e.clientX, e.clientY)) {
+        const at = { container: dragSourceSlot.dataset.container, slot: parseInt(dragSourceSlot.dataset.slot) };
+        const r = equip(at);
+        if (!r.ok && r.reason) uiNotify({ text: r.reason, type: 'error', duration: 3000 });
+        cancelDrag();
+        return;
+    }
+
     const target = getSlotUnderCursor(e.clientX, e.clientY);
+
+    // OUT OF THE INVENTORY (Config.InventoryDragOutDrops): let go of a pocket's item outside every panel, and it is
+    // dropped from the hand. Lua refuses it when the gesture is off, and the item stays where it was.
+    if (!target && !shop.open && isPocketGrid(dragSourceSlot.dataset.container) && outsidePanels(e.clientX, e.clientY)) {
+        dropOut({ container: dragSourceSlot.dataset.container, slot: parseInt(dragSourceSlot.dataset.slot) })
+            .then((r) => { if (!r.ok && r.reason) uiNotify({ text: r.reason, type: 'error', duration: 3000 }); });
+        cancelDrag();
+        return;
+    }
 
     if (target && target !== dragSourceSlot) {
         const fromContainer = dragSourceSlot.dataset.container;
@@ -1882,7 +1907,14 @@ function dragEndBody(e) {
     if (invHotbarHooks) invHotbarHooks.syncHotbar();
 }
 
+/** Is (x, y) on none of the inventory's panels (the game shows there)? */
+function outsidePanels(x, y) {
+    const el = hitAt(x, y);
+    return !(el && el.closest('.inv-panel, .inv-accessory-panel, #inv-context-menu, .inv-tooltip'));
+}
+
 function cancelDrag() {
+    body.end();
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
     if (dragItem) dragItem.classList.remove('dragging');
