@@ -15,6 +15,25 @@ function DevCommand(name, fn)
     end, false)
 end
 
+-- /car: into the driver's seat of the car the server just made (server/commands.lua). From the server only: other
+-- clients cannot send to this one. The car exists here only once it has streamed in, so it is waited for (5 s).
+RegisterNetEvent('whip_core:client:devSeatInCar', function(netId)
+    netId = tonumber(netId)
+    if not netId then return end
+
+    local veh, giveUp = 0, GetGameTimer() + 5000
+    while GetGameTimer() < giveUp do
+        if NetworkDoesNetworkIdExist(netId) then
+            veh = NetworkGetEntityFromNetworkId(netId)
+            if veh ~= 0 and DoesEntityExist(veh) then break end
+        end
+        Wait(100)
+    end
+    if veh == 0 or not DoesEntityExist(veh) then return end
+
+    SetPedIntoVehicle(PlayerPedId(), veh, -1)
+end)
+
 --- For satellites: is developer mode on for this player? Only for what a client tool shows; the server's HasDevTools(source) is authoritative.
 exports('HasDevTools', function()
     return (DevToolsOn and DevToolsOn()) == true
