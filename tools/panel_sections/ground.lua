@@ -200,8 +200,27 @@ RegisterNUICallback('gimDeleteItem', function(data, cb)
     cb('ok')
 end)
 
---- Delete the piles picked in the list, in one go
+--- "Select items within 50 m": the ids of the piles within `range` metres of you (from the cache the page's own list
+--- came with), for the page to pick.
+RegisterNUICallback('gimNear', function(data, cb)
+    local range = tonumber(type(data) == 'table' and data.range or nil) or 50.0
+    range = math.max(1.0, math.min(range, 1000.0))
+    local me = GetEntityCoords(PlayerPedId())
+    local ids = {}
+    for id, c in pairs(gimItemCache) do
+        local dx, dy, dz = c.x - me.x, c.y - me.y, c.z - me.z
+        if dx * dx + dy * dy + dz * dz <= range * range then ids[#ids + 1] = id end
+    end
+    cb({ ok = true, ids = ids })
+end)
+
+--- At most this many ids in one gimDeleteItems (its 'list' param refuses a longer one), and the time between two
+--- (its default rate limit: 10 at once, then one a tenth of a second)
+local DELETE_BATCH, DELETE_BATCH_GAP_MS = 200, 120
+
+--- Delete the piles picked in the list, in one go (in batches of DELETE_BATCH: a throw test leaves hundreds)
 RegisterNUICallback('gimDeleteItems', function(data, cb)
+    cb('ok')
     local ids = {}
     for _, v in ipairs(type(data) == 'table' and type(data.ids) == 'table' and data.ids or {}) do
         local id = tonumber(v)
@@ -215,8 +234,13 @@ RegisterNUICallback('gimDeleteItems', function(data, cb)
             gimMarkers[id] = nil
         end
     end
-    if #ids > 0 then TriggerServerEvent('whip_core:server:gimDeleteItems', ids) end
-    cb('ok')
+    if #ids == 0 then return end
+    CreateThread(function()
+        for from = 1, #ids, DELETE_BATCH do
+            if from > 1 then Wait(DELETE_BATCH_GAP_MS) end
+            TriggerServerEvent('whip_core:server:gimDeleteItems', { table.unpack(ids, from, math.min(from + DELETE_BATCH - 1, #ids)) })
+        end
+    end)
 end)
 
 --- Delete all ground items

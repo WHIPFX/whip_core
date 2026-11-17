@@ -1154,8 +1154,9 @@ export const WP = {
      *                         actions: [{ label: (n) => 'Remove ' + n, action: 'gwBaysRemove', kind: 'danger' }] });
      *   body.appendChild(pk.bar());     // drawn with the list, for what is picked now
      *   row.prepend(pk.box(key));       // each row's box (a span: it may sit inside a list row's button)
-     *   pk.keys()   pk.clear()   pk.keep(keysStillThere)
+     *   pk.keys()   pk.clear()   pk.keep(keysStillThere)   pk.add(keys)
      *
+     * add() picks several by a rule of the section's own (the piles near you), drawn once.
      * The picks live in the widget, by id, so a list drawn again keeps them; keep() drops the ones gone from it.
      * The boxes and Clear are the shell's (wpPickToggle / wpPickClear); the actions are the section's, reading keys().
      */
@@ -1197,6 +1198,10 @@ export const WP = {
                 w.paint();
             },
             clear() { picked.clear(); w.paint(); },
+            add(keys) {
+                for (const k of keys) picked.add(String(k));
+                w.paint();
+            },
             keep(keys) {
                 const live = new Set(keys.map(String));
                 for (const k of [...picked]) if (!live.has(k)) picked.delete(k);

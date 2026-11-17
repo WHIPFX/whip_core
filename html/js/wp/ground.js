@@ -11,9 +11,12 @@
 // on the map, and the grid of squares round you on the ground), switched from here; a pile's own blip
 // and marker pick out that one pile.
 //
+// "Select items within 50 m" picks every pile near you in the list (gimNear: the Lua half knows where you
+// stand), for the picks bar's Delete.
+//
 // The destructive actions go through WP.confirm({danger:true}) — the shell dialog is the one confirm
 // idiom. Mutation callbacks (gimTeleport, gimToggleBlip, gimToggleMarker, gimDebug, gimDeleteItem,
-// gimDeleteAll, gimDeleteCell) live in tools/panel_sections/ground.lua.
+// gimDeleteItems, gimDeleteAll, gimDeleteCell) and gimNear live in tools/panel_sections/ground.lua.
 // ========================================
 
 import { WhipPanel, WP } from '../whip-panel.js';
@@ -29,6 +32,7 @@ let cellSize = 50;       // grid cell size, forwarded by the Lua half with the s
 let selectedId = null;
 let search = '';
 let debugOn = false;     // the /w Ground Items Debug
+const NEAR_M = 50;       // "Select items within 50 m": how far from you a pile may lie
 const blipOn = {};       // [id] = true: that pile's blip is on
 const markerOn = {};     // [id] = true: that pile's marker is on
 let els = {};
@@ -315,8 +319,11 @@ WhipPanel.registerSection({
         els.debugBtn.dataset.action = 'gimDebug';
         els.debugBtn.title = 'Every pile marked to the sky and on your map, and the squares round you on the ground: '
             + 'the same as /w Ground Items Debug';
+        // Every pile near you picked at once, for the picks bar's Delete (a throw test's clean-up)
+        const nearBtn = WP.btn('Select items within ' + NEAR_M + ' m', 'gimPickNear');
+        nearBtn.title = 'Pick every pile within ' + NEAR_M + ' m of you in the list, to delete them together';
         root.appendChild(WP.toolbar({
-            left: [els.debugBtn],
+            left: [els.debugBtn, nearBtn],
             search: { inputAction: 'gimFilter', placeholder: 'Item, who dropped it, id…', id: 'wp-gim-search' },
         }));
 
@@ -396,6 +403,19 @@ WhipPanel.registerSection({
                 debugOn = !!(result && result.on);
                 paintToggles();
             });
+        },
+        // The piles within NEAR_M of you, by the Lua half (it knows where you stand): they replace what was picked,
+        // the search clears so every one shows in the list, and the picks bar offers to delete them.
+        gimPickNear: async () => {
+            const res = await nuiCallback('gimNear', { range: NEAR_M });
+            if (!res || !res.ok) { WP.result('Could not tell where you are', 'err'); return; }
+            const near = listOf(res.ids).map(String).filter((id) => items[id]);
+            pilePicks.clear();
+            if (!near.length) { WP.result('Nothing on the ground within ' + NEAR_M + ' m of you', 'ok'); return; }
+            pilePicks.add(near);
+            if (search) { search = ''; els.search.value = ''; }
+            renderList();
+            WP.result('Picked ' + near.length + (near.length === 1 ? ' pile' : ' piles') + ' within ' + NEAR_M + ' m', 'ok');
         },
         gimDeleteCell: async () => {
             const ok = await WP.confirm({
