@@ -7,7 +7,7 @@
 -- registered, thrown by the server's export with `by` = you, so your game flies it when you stand near the point.
 --
 --   G held / RT held      throw: one at once, and while it stays down, one every frame after HOLD_MS
---   ↑ ↓ or Scroll / D-pad ↑ ↓   the power, up or down by 5, from 0 to 40 (a player throws at 18)
+--   ↑ ↓ / D-pad ↑ ↓       the power, up or down by 5, from 0 to 40 (a player throws at 18)
 --   F / X                 place the point it is thrown from, with the object viewer's markers (PlacePoint)
 --   X / Y                 place the target the same way; its ring turns how an item lies when it is put down
 --   Delete / RB           take back what this test threw that still lies on the ground
@@ -19,7 +19,9 @@
 -- enough, or no launch in time), and says the last item or why it failed.
 --
 -- An admin mode (PropertyEditor.start): Esc, death and a resource stop end it the same way. While a point is being
--- placed the mode's keys wait, its Esc too: PlacePoint's Esc and B are PlacePoint's.
+-- placed the mode's keys wait, its Esc too: PlacePoint's Esc and B are PlacePoint's. The world's prompts stay up
+-- (`prompts = true`), so what it threw can be picked up with E or A without leaving: none of its keys is E, A or the
+-- scroll wheel, which are the prompts'.
 
 local POWER_STEP = 5
 local POWER_MAX  = 40          -- ThrowGroundItem's most (server/ground.lua THROW_FOR_POWER)
@@ -29,12 +31,12 @@ local LOOK_REACH = 40.0        -- where you look, for the first target
 local ARC_STEPS  = 24
 local CARD_MS    = 100
 
--- Everything the mode reads, held off so the game does not act on it as well: the wheel (16, 17), G (47), F (23),
--- X (73), the phone's up and down (172, 173), Delete (178), the triggers (24, 25), and a pad's X, Y, RB and B
--- underneath their frontend buttons (22 jump, 23, 44 cover, 45 / 140-142 reload and melee). `mode`: the prompts,
--- the hotbar and the pad's world buttons stand down.
-local BLOCK = { mode = true, groups = { 'weaponWheel' },
-                controls = { 16, 17, 22, 23, 24, 25, 37, 44, 45, 47, 73, 140, 141, 142, 172, 173, 178 } }
+-- Everything the mode reads, held off so the game does not act on it as well: G (47), F (23), X (73), the phone's up
+-- and down (172, 173), Delete (178), the triggers (24, 25), and a pad's X, Y, RB and B underneath their frontend
+-- buttons (22 jump, 23, 44 cover, 45 / 140-142 reload and melee). No `mode`: that would stand the prompts down too.
+-- The hotbar and the pad's world buttons stand down anyway, for any PropertyEditor mode (IsGameInputFree).
+local BLOCK = { groups = { 'weaponWheel' },
+                controls = { 22, 23, 24, 25, 37, 44, 45, 47, 73, 140, 141, 142, 172, 173, 178 } }
 
 local active = false
 local S = nil   -- the test while it runs: { from, target, power, placing, quietUntil, heldSince, sent, flown, put, failed, last, lastTone }
@@ -191,8 +193,8 @@ local function onFrame()
 
     -- Power
     local step = 0
-    if WhipKeyPressed(172, 188) or (not pad and IsDisabledControlJustPressed(0, 17)) then step = POWER_STEP end
-    if WhipKeyPressed(173, 187) or (not pad and IsDisabledControlJustPressed(0, 16)) then step = -POWER_STEP end
+    if WhipKeyPressed(172, 188) then step = POWER_STEP end
+    if WhipKeyPressed(173, 187) then step = -POWER_STEP end
     if step ~= 0 then S.power = math.max(0, math.min(POWER_MAX, S.power + step)) end
 
     -- The two points (PlacePoint waits)
@@ -218,6 +220,7 @@ local function start()
         name = 'Throw test',
         hud = card(),
         block = BLOCK,
+        prompts = true,   -- the piles it throws can be picked up without leaving
         onFrame = onFrame,
         -- Esc while a point is placed is PlacePoint's
         onEscape = function() return not (S and (S.placing or GetGameTimer() < S.quietUntil)) end,

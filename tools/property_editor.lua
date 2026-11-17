@@ -12,6 +12,8 @@
 --       hud      = { title = ..., rows = ..., hints = ... },   -- EditorHud.show
 --       solo     = 'group',        -- optional: Interactions.setSolo for the mode's own prompts
 --       block    = { controls = { 24, 25 } },   -- optional: held off for the mode (ControlBlocks), never by hand
+--       prompts  = true,           -- optional: the world's prompts stay up and usable under the mode (it reads
+--                                  -- neither E/A nor the scroll wheel: the throw test, where piles are picked up)
 --       onFrame  = function() end, -- every frame; return 'exit' to finish
 --       onEscape = function() end, -- optional; return false to stay in the mode
 --       onExit   = function(reason) end,  -- 'done' | 'back' | 'died' | 'replaced' | 'error' | 'stopped'
@@ -64,6 +66,11 @@ end
 
 function PropertyEditor.isActive()
     return mode ~= nil
+end
+
+--- Does the running mode leave the world's prompts up (`prompts = true`)? IsGameInputFree asks it for the prompts.
+function PropertyEditor.promptsUp()
+    return mode ~= nil and mode.prompts == true
 end
 
 --- Started with a mode, ended when none is left.

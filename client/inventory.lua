@@ -784,8 +784,12 @@ exports('IsAnyScreenOpen', IsAnyScreenOpen)
 function IsGameInputFree(forPrompts, exceptBar, forHotbar)
     local busy = UI ~= nil and UI.IsBusy ~= nil and UI.IsBusy()
         and not (exceptBar and UI.IsProgressActive ~= nil and UI.IsProgressActive())
-    -- An editor with its own prompt group (Interactions.setSolo) is not a screen for the prompts' question.
-    if forPrompts and Interactions ~= nil and Interactions.getSolo ~= nil and Interactions.getSolo() ~= nil then
+    -- An editor with its own prompt group (Interactions.setSolo), or an admin mode that leaves the world's prompts up
+    -- (PropertyEditor.start{ prompts = true }), is not a screen for the prompts' question.
+    local editorLeavesPrompts = forPrompts and (
+        (Interactions ~= nil and Interactions.getSolo ~= nil and Interactions.getSolo() ~= nil)
+        or (PropertyEditor ~= nil and PropertyEditor.promptsUp ~= nil and PropertyEditor.promptsUp()))
+    if editorLeavesPrompts then
         if screensOpen(true) or busy then return false end
     elseif screensOpen() or busy then
         return false
