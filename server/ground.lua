@@ -1001,7 +1001,8 @@ end
 local function askThrow(flier, item, amount, metadata, createdBy, path)
     throwAskToken = throwAskToken + 1
     local token = throwAskToken
-    local ask = { flier = flier, charId = Players[flier] and Players[flier].charId, promise = promise.new() }
+    local ask = { flier = flier, charId = Players[flier] and Players[flier].charId, promise = promise.new(),
+                  from = path.from }
     throwAsks[token] = ask
     TriggerClientEvent('whip_core:client:throwFor', flier, token, item, path.from, path.vel)
     SetTimeout(THROW_FOR_ANSWER_MS, function()
@@ -1012,7 +1013,7 @@ local function askThrow(flier, item, amount, metadata, createdBy, path)
     end)
     local netId = Citizen.Await(ask.promise)
     if not netId then
-        return nil, ('no launch from the thrower\'s game within %g s'):format(THROW_FOR_ANSWER_MS / 1000)
+        return nil, ask.failed or ('no launch from the thrower\'s game within %g s'):format(THROW_FOR_ANSWER_MS / 1000)
     end
 
     -- The object, checked as a player's throw is (throwLaunched): the flier's own, of the item's model, and
@@ -1046,7 +1047,10 @@ end
 --- asked, once, as the character asked; anything else, a launch after the ask gave up included, is dropped
 --- by that game.
 SecureEvent(LAUNCH_EVENT, {
-    rateLimit = 100, burst = 20,   -- a script may throw several at once (a spray of cash)
+    -- Not rate limited: a launch only answers an ask this server made of that game, once, and a script may ask
+    -- dozens a second (a spray of cash; the throw test held down). Refused, the throw was put down at the target
+    -- after its flight was seen.
+    rateLimit = false,
     whileDead = true,              -- the flier may be down: their game still runs the throw
     params = { {'token', 'id'}, {'netId', 'id'} },
 }, function(source, player, token, netId)
@@ -1057,7 +1061,28 @@ SecureEvent(LAUNCH_EVENT, {
         return
     end
     throwAsks[token] = nil
+    -- Every game near where it is thrown from watches it (a player's own throw says this itself: throwStarted)
+    SendToPlayers(PlayersInRange(ask.from.x, ask.from.y), 'whip_core:client:playerThrew', source, netId)
     ask.promise:resolve(netId)
+end)
+
+--- The flier's game could not throw it (throwFor): no model, no object, or no network id for it (too many in the air
+--- at once). The item is put down at once, with that said, rather than when the ask runs out.
+local FAILED_WHY = {
+    model   = 'the thrower\'s game could not load its model',
+    object  = 'the thrower\'s game could not make the object',
+    network = 'the thrower\'s game could not give the object a network id (too many in the air at once)',
+}
+SecureEvent('whip_core:server:throwForFailed', {
+    rateLimit = false,   -- as the launch: it only answers an ask this server made of that game, once
+    whileDead = true,
+    params = { {'token', 'id'}, {'why', 'enum', { 'model', 'object', 'network' }} },
+}, function(source, player, token, why)
+    local ask = throwAsks[token]
+    if not ask or ask.flier ~= source or ask.charId ~= player.charId then return end
+    throwAsks[token] = nil
+    ask.failed = FAILED_WHY[why]
+    ask.promise:resolve(false)
 end)
 
 --- Throw an item from a point at a target, as a player throws one: it flies, anyone in reach can grab it out of

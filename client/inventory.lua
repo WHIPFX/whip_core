@@ -2344,24 +2344,40 @@ local function letFly(obj, vx, vy, vz)
     SetEntityAngularVelocity(obj, twist(), twist(), twist())
 end
 
+--- How long a thrown object may take to become a networked one. Many in the air at once (a script's spray, the
+--- throw test held down) can leave the game without a network id for it for a moment, or for good.
+local THROW_NET_WAIT_MS = 2000
+
 --- Follow a thrown object to rest. `launch(netId)` tells the server it is in the air: throwLaunched for this
 --- player's own throw, throwForLaunched for a script's. Either way the server answers throwAccepted or
---- throwRefused.
+--- throwRefused. `announce`: this game tells the players nearby (throwStarted), for a player's own throw; a script's
+--- is told by the server when the launch reaches it. `lost()`, when given, hears that the object never got a
+--- network id: it is deleted here and nothing is launched.
 ---@param obj number  the networked object, already flying
 ---@param launchVel vector3  the velocity it left the hand with
 ---@param launch fun(netId: number)
-local function TrackThrow(obj, launchVel, launch)
+---@param announce boolean
+---@param lost fun()|nil
+local function TrackThrow(obj, launchVel, launch, announce, lost)
     -- The hit check starts at the hand with the launch speed, so someone a metre or two ahead still counts (throwHitCheck)
     local mn, mx = GetModelDimensions(GetEntityModel(obj))
     local knock = { hit = {}, pos = GetEntityCoords(obj), vel = launchVel, ahead = KNOCK_AHEAD + #(mx - mn) * 0.5 }
     CreateThread(function()
         -- The server finds the pile's object by network id; it lands where this game saw it land.
-        local waitUntil = GetGameTimer() + 1000
+        local waitUntil = GetGameTimer() + THROW_NET_WAIT_MS
         while not NetworkGetEntityIsNetworked(obj) and GetGameTimer() < waitUntil do Wait(0) end
+        -- Never networked: no id to name (asking for one warns, and the server refuses a 0). It was never anyone's
+        -- but this game's, so it goes, and the item with it: a player's stays in their pockets, a script's is put down.
+        if not NetworkGetEntityIsNetworked(obj) then
+            if DoesEntityExist(obj) then DeleteEntity(obj) end
+            if lost then lost() end
+            return
+        end
         local netId = NetworkGetNetworkIdFromEntity(obj)
         SetNetworkIdCanMigrate(netId, false)
-        -- Every game nearby: hide GTA's tennis ball and watch this object (watchThrows), at once; the pile below reaches them later.
-        TriggerServerEvent('whip_core:server:throwStarted', netId)
+        -- Every game nearby: hide GTA's tennis ball and watch this object (watchThrows), at once; the pile below reaches
+        -- them later.
+        if announce then TriggerServerEvent('whip_core:server:throwStarted', netId) end
         local t = {}
         pendingThrows[netId] = t
         launch(netId)
@@ -2401,21 +2417,22 @@ end
 
 --- The server asks this game to throw an item for a script (ThrowGroundItem, server/ground.lua), because this
 --- player is near where it is thrown from. Made at `from` and let go at `vel` as this player's own throws are,
---- then followed to rest the same way. Nothing is said back when it cannot be made: with no launch, the server
---- puts the item down itself.
+--- then followed to rest the same way. When it cannot be thrown (its model, the object, or a network id for it), this
+--- game says so at once (throwForFailed) and the server puts the item down itself, rather than waiting out the ask.
 RegisterNetEvent('whip_core:client:throwFor', function(token, itemKey, from, vel)
     if type(token) ~= 'number' or type(itemKey) ~= 'string' then return end
     if type(from) ~= 'vector3' or type(vel) ~= 'vector3' then return end
+    local function failed(why) TriggerServerEvent('whip_core:server:throwForFailed', token, why) end
     CreateThread(function()
         local model = LoadModel(Inventory.itemPropModel(itemKey), 2000)
-        if not model then return end
+        if not model then return failed('model') end
         local obj = CreateObject(model, from.x, from.y, from.z, true, true, false)
         SetModelAsNoLongerNeeded(model)
-        if not obj or obj == 0 then return end
+        if not obj or obj == 0 then return failed('object') end
         letFly(obj, vel.x, vel.y, vel.z)
         TrackThrow(obj, vel, function(netId)
             TriggerServerEvent('whip_core:server:throwForLaunched', token, netId)
-        end)
+        end, false, function() failed('network') end)
     end)
 end)
 
@@ -2558,7 +2575,7 @@ local function giveTick()
                         local container, slot, amount = giveContainer, giveSlot, giveItemAmount
                         TrackThrow(obj, vector3(vx, vy, vz), function(netId)
                             TriggerServerEvent('whip_core:server:throwLaunched', container, slot, amount, netId)
-                        end)
+                        end, true, function() UI.Notify('The throw was lost', 'error') end)   -- (the item stays)
                         CancelGiveMode()
                     else
                         -- Prop creation failed: raycast fallback.

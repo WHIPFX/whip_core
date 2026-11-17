@@ -116,8 +116,11 @@ local function card()
             { label = 'From', value = ('%.1f m from you'):format(fromMe),
               tone = fromMe > FLIER_RANGE and 'warn' or nil },
             { label = 'Target', value = ('%.1f m from the start'):format(#(vector3(t.x, t.y, t.z) - f)) },
-            { label = 'Thrown', value = ('%d flew · %d put down%s'):format(S.flown, S.put,
-                waiting > 0 and (' · %d waiting'):format(waiting) or '') },
+            -- Every throw asked for, then how each went: flown by a game, or put down at the target by the server
+            -- (and failed, a refused ask). Waiting: asked, the server's answer not back yet (up to ~6 s each).
+            { label = 'Thrown', value = waiting > 0 and ('%d (%d waiting)'):format(S.sent, waiting) or tostring(S.sent) },
+            { label = 'Landed', value = ('%d flew · %d put down%s'):format(S.flown, S.put,
+                S.failed > 0 and (' · %d failed'):format(S.failed) or '') },
             { label = 'Last', value = S.last or 'Nothing yet', tone = S.lastTone or false },
         },
         hints = {
