@@ -245,8 +245,17 @@ RegisterNetEvent('whip_core:client:throwTestResult', function(how, label, why)
         S.flown = S.flown + 1
         S.last, S.lastTone = tostring(label), false
     elseif how == 'ground' then
+        -- Put down at the target by the server, not flown: why, word for word (server/ground.lua askThrow), so a
+        -- pile seen to snap to the target says which check it failed
+        -- (The card cuts a long row short: the why goes to its status line, and to F8 once per new reason.)
         S.put = S.put + 1
-        S.last, S.lastTone = ('%s (put down: nobody flew it)'):format(tostring(label)), 'warn'
+        S.last, S.lastTone = ('%s · put down'):format(tostring(label)), 'warn'
+        local said = tostring(why or 'not flown')
+        if said ~= S.lastWhy then
+            S.lastWhy = said
+            EditorHud.status('Put down at the target: ' .. said, 'warn')
+            print(('[whip_core:throwtest] put down at the target: %s'):format(said))
+        end
     else
         S.failed = S.failed + 1
         S.last, S.lastTone = ('%s: %s'):format(tostring(label or 'No item'), tostring(why or 'failed')), 'err'

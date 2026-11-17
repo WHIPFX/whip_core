@@ -994,9 +994,10 @@ local function throwPath(from, target, power)
              apex = ThrowAim.apex(from, vz), roll = THROW_ROLL * math.max(1.0, speed / THROW_V) }
 end
 
---- Ask `flier`'s game to fly it along `path`, and wait for the launch: the pile, flying, or nil (no launch in
---- time, or not the object asked for, which its game is told to drop).
+--- Ask `flier`'s game to fly it along `path`, and wait for the launch: the pile, flying, or nil and why (no launch in
+--- time, or not the object asked for, which its game is told to drop). The why is said with the put-down pile.
 ---@return table|nil row
+---@return string|nil why
 local function askThrow(flier, item, amount, metadata, createdBy, path)
     throwAskToken = throwAskToken + 1
     local token = throwAskToken
@@ -1010,27 +1011,33 @@ local function askThrow(flier, item, amount, metadata, createdBy, path)
         end
     end)
     local netId = Citizen.Await(ask.promise)
-    if not netId then return nil end
+    if not netId then
+        return nil, ('no launch from the thrower\'s game within %g s'):format(THROW_FOR_ANSWER_MS / 1000)
+    end
 
     -- The object, checked as a player's throw is (throwLaunched): the flier's own, of the item's model, and
     -- somewhere along its path.
-    local function refuse(recorded)
+    local function refuse(recorded, why)
         if recorded then RecordEventRejection(LAUNCH_EVENT, flier, recorded) end
         TriggerClientEvent('whip_core:client:throwRefused', flier, netId)
-        return nil
+        return nil, why
     end
     local entity = GroundItems.awaitEntity(netId, 1500)
-    if not entity then return refuse() end
+    if not entity then return refuse(nil, 'the server did not see the thrown object within 1.5 s') end
     if GetEntityType(entity) ~= 3 or NetworkGetEntityOwner(entity) ~= flier then
-        return refuse('not their own thrown object')
+        return refuse('not their own thrown object', 'the thrown object was not the thrower\'s own')
     end
-    if not GroundItems.isItemObject(entity, item) then return refuse('the thrown object is not that item') end
+    if not GroundItems.isItemObject(entity, item) then
+        return refuse('the thrown object is not that item', 'the thrown object was not that item\'s model')
+    end
     local at = GetEntityCoords(entity)
-    if not onPath(path, at) then return refuse('thrown object off its path') end
+    if not onPath(path, at) then
+        return refuse('thrown object off its path', 'the thrown object was off its path when the server looked')
+    end
 
     local row = GroundItems.create(item, amount, metadata, at.x, at.y, at.z, GetEntityHeading(entity), createdBy,
         nil, { netId = netId, owner = flier, path = path })
-    if not row then return refuse() end
+    if not row then return refuse(nil, 'the pile could not be made') end
     TriggerClientEvent('whip_core:client:throwAccepted', flier, netId, row.id)
     return row
 end
@@ -1066,8 +1073,8 @@ end)
 --- throw should come down (the target, when it reaches; a vector4 target's w is its heading), lying still.
 --- `metadata`, `reason` and `createdBy` as CreateGroundItem's.
 ---
---- Returns the row and how it went, 'thrown' (flying now) or 'ground' (put down), or `false, reason`. It waits
---- for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most.
+--- Returns the row and how it went, 'thrown' (flying now) or 'ground' (put down, and why), or `false, reason`. It
+--- waits for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most.
 ---@param t table { item, amount?, from, target, power?, by?, metadata?, reason?, createdBy? }
 function GroundItems.throwItem(t)
     -- Who asked, read BEFORE anything waits (see createItem).
@@ -1097,7 +1104,12 @@ function GroundItems.throwItem(t)
     local path = throwPath(from, target, power)
     local how = 'thrown'
     local flier = throwFlier(t.by, from)
-    local row = flier and askThrow(flier, t.item, amount, metadata, t.createdBy, path) or nil
+    local row, putDownWhy
+    if flier then
+        row, putDownWhy = askThrow(flier, t.item, amount, metadata, t.createdBy, path)
+    else
+        putDownWhy = ('nobody within %g m of where it is thrown from'):format(THROW_FOR_RANGE)
+    end
     if not row then
         how = 'ground'
         local at = path.rest
@@ -1114,6 +1126,7 @@ function GroundItems.throwItem(t)
         detail  = askedBy .. (how == 'thrown' and ' · thrown' or ' · on the ground'),
         x = row.x, y = row.y, z = row.z,
     })
+    if how == 'ground' then return row, how, putDownWhy end
     return row, how
 end
 exports('ThrowGroundItem', GroundItems.throwItem)
@@ -1176,7 +1189,7 @@ SecureEvent('whip_core:server:throwTest', {
     end
     local def = Config.Items[key]
     local label = type(def) == 'table' and def.label or key
-    local row, how = GroundItems.throwItem({
+    local row, how, putDownWhy = GroundItems.throwItem({
         item = key, amount = 1, from = vector3(fx, fy, fz), target = vector4(tx, ty, tz, tw), power = power,
         by = source, reason = 'Throw test',
     })
@@ -1191,7 +1204,7 @@ SecureEvent('whip_core:server:throwTest', {
     local mine = testThrown[source]
     if not mine then mine = {} testThrown[source] = mine end
     mine[row.id] = true
-    TriggerClientEvent('whip_core:client:throwTestResult', source, how, label)
+    TriggerClientEvent('whip_core:client:throwTestResult', source, how, label, putDownWhy)
 end)
 
 SecureEvent('whip_core:server:throwTestClear', {

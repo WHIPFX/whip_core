@@ -4851,7 +4851,7 @@ if not ok then exports.whip_core:NotifyPlayer(source, reason, 'error') end</code
   <tr><td>by</td><td>number|table?</td><td>Whose game flies it: a server ID or <code>{ charId = n }</code></td></tr>
   <tr><td>metadata</td><td>table?</td><td>Custom metadata</td></tr>
   <tr><td>reason</td><td>string?</td><td>For the activity log, beside your resource's name</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>table, how</code>: the ground item and <code>'thrown'</code> (in the air now) or <code>'ground'</code> (put down), or <code>false, reason</code> (not a table, an unknown item, a bad amount, no <code>from</code> or <code>target</code>, a power outside 0 to 40)</div>
+  <div class="return-info"><strong>Returns: </strong><code>table, how</code>: the ground item and <code>'thrown'</code> (in the air now) or <code>'ground'</code> (put down, and why: nobody near enough, or that game's throw could not be checked), or <code>false, reason</code> (not a table, an unknown item, a bad amount, no <code>from</code> or <code>target</code>, a power outside 0 to 40)</div>
   <p>It waits for the flying player's game to make the throw, so several calls in a row come out one after another. A very hard throw can pass straight through thin walls and floors, as GTA objects do at speed.</p>
 <pre><code class="lang-lua">-- The ATM spits the cash out on the pavement in front of it
 local atm = vector4(147.4, -1035.8, 29.3, 160.0)   -- where it stands and the way it faces
