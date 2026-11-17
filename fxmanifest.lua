@@ -441,6 +441,7 @@ client_scripts {
     'tools/property_wizard.lua',
     'tools/property_scale.lua',
     'tools/property_probe.lua',
+    'tools/throw_test.lua',   -- /throwtest: ThrowGroundItem tried in the world (a PropertyEditor mode)
 
     -- Last: it announces whip_core:onReady, which has to mean every file above has run.
     'client/ready.lua',

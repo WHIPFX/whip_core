@@ -1135,6 +1135,83 @@ function GroundItems.deleteItem(id)
 end
 exports('DeleteGroundItem', GroundItems.deleteItem)
 
+-- ============================================
+-- The throw test (/throwtest, tools/throw_test.lua)
+-- ============================================
+--
+-- A developer trying ThrowGroundItem in the world: each ask throws one item, picked at random from every item any
+-- resource has registered, from their point at their target at their power, exactly as a script's call would, with
+-- `by` = them (their own game flies it when they are near the point). The tool asks every frame while its key is
+-- held, so this is not rate limited: developer mode only. Clear takes back what the test threw that still lies on
+-- the ground. The answer of each throw goes back to the tool's card, never as a toast (held down, that is dozens a
+-- second).
+
+local TEST_REACH = 20000.0   -- metres either way a test point may be (the map is well inside that)
+
+--- [source] = { [ground item id] = true }: what each developer's test threw, for Clear
+local testThrown = {}
+
+--- One registered item's key, any resource's, at random.
+---@return string|nil
+local function randomItemKey()
+    local keys = {}
+    for key in pairs(Config.Items) do keys[#keys + 1] = key end
+    if #keys == 0 then return nil end
+    return keys[math.random(#keys)]
+end
+
+SecureEvent('whip_core:server:throwTest', {
+    ace = 'whip.devtools',
+    rateLimit = false,   -- held down, the tool asks every frame: as fast as it can, on purpose
+    params = {
+        {'fx', 'number', -TEST_REACH, TEST_REACH}, {'fy', 'number', -TEST_REACH, TEST_REACH}, {'fz', 'number', -500, 3000},
+        {'tx', 'number', -TEST_REACH, TEST_REACH}, {'ty', 'number', -TEST_REACH, TEST_REACH}, {'tz', 'number', -500, 3000},
+        {'tw', 'number', -360, 720, 0}, {'power', 'number', 0, THROW_FOR_POWER},
+    },
+}, function(source, player, fx, fy, fz, tx, ty, tz, tw, power)
+    local key = randomItemKey()
+    if not key then
+        TriggerClientEvent('whip_core:client:throwTestResult', source, false, nil, 'No items are registered')
+        return
+    end
+    local def = Config.Items[key]
+    local label = type(def) == 'table' and def.label or key
+    local row, how = GroundItems.throwItem({
+        item = key, amount = 1, from = vector3(fx, fy, fz), target = vector4(tx, ty, tz, tw), power = power,
+        by = source, reason = 'Throw test',
+    })
+    if not row then
+        TriggerClientEvent('whip_core:client:throwTestResult', source, false, label, tostring(how))
+        return
+    end
+    -- (The throw waited on their game: kept for Clear only while it is still them, or a dropped source's list
+    -- would come back for whoever gets that id next)
+    local now = Players[source]
+    if not now or now.charId ~= player.charId then return end
+    local mine = testThrown[source]
+    if not mine then mine = {} testThrown[source] = mine end
+    mine[row.id] = true
+    TriggerClientEvent('whip_core:client:throwTestResult', source, how, label)
+end)
+
+SecureEvent('whip_core:server:throwTestClear', {
+    ace = 'whip.devtools',
+    rateLimit = 1000, burst = 2,
+}, function(source)
+    local mine = testThrown[source]
+    testThrown[source] = nil
+    local removed = 0
+    for id in pairs(mine or {}) do
+        -- (One a player picked up, or removed already, is not there to remove: false, and not counted)
+        if GroundItems.cache[id] and GroundItems.deleteItem(id) then removed = removed + 1 end
+    end
+    TriggerClientEvent('whip_core:client:throwTestCleared', source, removed)
+end)
+
+AddEventHandler('playerDropped', function()
+    testThrown[source] = nil
+end)
+
 --- Ground items within `range` metres. `GetGroundItemsNearby(x, y, z, range)` or
 --- `GetGroundItemsNearby(coords, range)`. The range defaults to 10 m.
 ---@return table[]  the rows: { id, item, amount, metadata, x, y, z, heading, ... }
