@@ -915,7 +915,9 @@ exports('CreateGroundItem', GroundItems.createItem)
 -- object, so an item is never both put down and flying.
 
 local THROW_FOR_RANGE     = 50.0   -- metres from `from` to the player whose game flies it
-local THROW_FOR_ANSWER_MS = 4000   -- no launch by then: put down instead
+-- No launch by then: put down instead. The flier may take up to 2 s for the model and 2 s for a network id under load
+-- (client/inventory.lua throwFor, TrackThrow), and says so at once when it cannot (throwForFailed).
+local THROW_FOR_ANSWER_MS = 8000
 local THROW_FOR_POWER     = 40.0   -- m/s at most (a player throws at 18)
 local LAUNCH_EVENT        = 'whip_core:server:throwForLaunched'
 

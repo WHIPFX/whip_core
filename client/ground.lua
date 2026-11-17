@@ -505,10 +505,6 @@ end
 --- the same pile in that time, and two props would be made with only one remembered.
 local spawning = {}
 
---- Item props the game threw on when asked for (LoadModel's 'error'): their piles stand as Config.DefaultGroundProp
---- instead, so they can still be seen and picked up. Said once per model.
-local badProps = {}
-
 --- A flying pile's object here, or nil (not streamed in, or gone).
 ---@param netId number
 ---@return number|nil
@@ -562,17 +558,9 @@ local function SpawnGroundProp(data)
         return
     end
 
-    local modelName = Inventory.itemPropModel(data.item)
-    if badProps[modelName] then modelName = Config.DefaultGroundProp end
     spawning[data.id] = true
-    local model, why = LoadModel(modelName)
-    if not model and why == 'error' and modelName ~= Config.DefaultGroundProp then
-        badProps[modelName] = true
-        print(('[whip_core:ground] %s piles stand as %s: the game would not load their prop, %s')
-            :format(tostring(data.item), tostring(Config.DefaultGroundProp), tostring(modelName)))
-        modelName = Config.DefaultGroundProp
-        model = LoadModel(modelName)
-    end
+    -- Its own prop, or the box the game would not load its own as (seen, picked up and thrown the same)
+    local model, modelName = Inventory.loadItemProp(data.item)
     spawning[data.id] = nil
     if not model then
         print(('[whip_core:ground] WARNING: Failed to load model %s for item #%d'):format(modelName, data.id))

@@ -1854,8 +1854,14 @@ end)
 --- Reported once per item, not per use.
 local propWarned = {}
 
+--- Item props the game threw on when asked for (LoadModel's 'error'). Seen with whip_gunny's add-on weapon models
+--- (w_<type>_whip_<gun>), which the game knows only as a weapon's: requested as a prop, it throws. The default box
+--- stands in for them from then on, on the ground, in a throw and in the hand alike.
+local badProps = {}
+
 --- Which prop model stands for this item, dropped in the world or offered in the hand.
---- A model missing from this client's archives (IsModelInCdimage) would time out, so it falls back to Config.DefaultGroundProp.
+--- A model missing from this client's archives (IsModelInCdimage) would time out, so it falls back to Config.DefaultGroundProp,
+--- as does one the game threw on (Inventory.loadItemProp).
 ---@param itemKey string
 ---@return string
 function Inventory.itemPropModel(itemKey)
@@ -1863,6 +1869,7 @@ function Inventory.itemPropModel(itemKey)
     local want = def and def.prop or nil
 
     if want then
+        if badProps[want] then return Config.DefaultGroundProp end
         if IsModelInCdimage(GetHashKey(want)) then return want end
 
         if not propWarned[itemKey] then
@@ -1874,6 +1881,26 @@ function Inventory.itemPropModel(itemKey)
     end
 
     return Config.DefaultGroundProp
+end
+
+--- An item's prop, loaded: its own, or Config.DefaultGroundProp when its own is missing or the game throws loading
+--- it (then the box for the session, said once). Answers the hash, or nil when it did not load in `ms`, and the model
+--- name either way. Waits up to `ms` (from a thread); 0 asks for it without waiting, for one wanted shortly.
+---@param itemKey string
+---@param ms number|nil
+---@return number|nil hash
+---@return string name
+function Inventory.loadItemProp(itemKey, ms)
+    local name = Inventory.itemPropModel(itemKey)
+    local hash, why = LoadModel(name, ms)
+    if not hash and why == 'error' and name ~= Config.DefaultGroundProp then
+        badProps[name] = true
+        print(('[whip_core:items] item "%s" stands as %s: the game would not load its prop, %s')
+            :format(tostring(itemKey), tostring(Config.DefaultGroundProp), tostring(name)))
+        name = Config.DefaultGroundProp
+        hash = LoadModel(name, ms)
+    end
+    return hash, name
 end
 
 --- The offered item in the hand is a server-made held prop (like an emote's bottle), shown a moment after give mode starts.
@@ -1911,13 +1938,13 @@ local function giveHandNow()
 end
 
 local function AskForHandProp()
-    local modelName = Inventory.itemPropModel(giveItemKey)
+    -- Asked for now, not waited on (a throw finds it loaded): its own model, or the box when the game throws on it
+    local _, modelName = Inventory.loadItemProp(giveItemKey, 0)
     if not modelName then return end
     modelName = modelName:lower()
     if giveProp then SetModelAsNoLongerNeeded(giveProp) end   -- an earlier give's, not let go yet
     giveProp = GetHashKey(modelName)
     giveHand = giveHandNow()
-    RequestModel(giveProp)
     TriggerServerEvent('whip_core:server:giveHold', giveContainer, giveSlot, modelName, giveHand)
 end
 
@@ -2424,7 +2451,7 @@ RegisterNetEvent('whip_core:client:throwFor', function(token, itemKey, from, vel
     if type(from) ~= 'vector3' or type(vel) ~= 'vector3' then return end
     local function failed(why) TriggerServerEvent('whip_core:server:throwForFailed', token, why) end
     CreateThread(function()
-        local model = LoadModel(Inventory.itemPropModel(itemKey), 2000)
+        local model = Inventory.loadItemProp(itemKey, 2000)   -- its own, or the box the game would not load its own as
         if not model then return failed('model') end
         local obj = CreateObject(model, from.x, from.y, from.z, true, true, false)
         SetModelAsNoLongerNeeded(model)
@@ -2534,8 +2561,7 @@ local function giveTick()
                 RemoveAllProjectilesOfType(GetHashKey('WEAPON_BALL'), false)
 
                 -- The item's ground prop (requested when give mode started): the pile's model, and what the server checks the flying object against.
-                local modelName = Inventory.itemPropModel(giveItemKey)
-                local model = LoadModel(modelName, 2000)
+                local model = Inventory.loadItemProp(giveItemKey, 2000)
 
                 if model then
                     -- Spawn slightly in front of the player at chest height

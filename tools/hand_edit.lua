@@ -382,8 +382,7 @@ end
 ---@return boolean|nil walk
 ---@return boolean|nil twoHands
 local function loadItem(key)
-    local model = Inventory.itemPropModel(key)
-    local hash = model and LoadModel(model, 3000)
+    local hash = Inventory.loadItemProp(key, 3000)   -- its own, or the box the game would not load its own as
     if not hash then return nil, 'That item has no model to hold' end
     local saved, why = Callback('whip_core:itemHolds:get', key)
     if type(saved) ~= 'table' then return nil, why or 'Its hand position could not be read' end
