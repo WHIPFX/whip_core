@@ -921,6 +921,14 @@ local THROW_FOR_ANSWER_MS = 8000
 local THROW_FOR_POWER     = 40.0   -- m/s at most (a player throws at 18)
 local LAUNCH_EVENT        = 'whip_core:server:throwForLaunched'
 
+-- ONE THROW EVERY THROW_SPACING_MS AT MOST, whoever asks. Faster than that the flier's game cannot keep up (a model
+-- each, a network id each: some were put down at the target instead), so a call that comes sooner waits its turn,
+-- in the order asked, and the console says so (once every THROW_WARN_MS while there is a queue).
+local THROW_SPACING_MS = 500
+local THROW_WARN_MS    = 5000
+local throwNextAt  = 0   -- when the next throw may start (GetGameTimer)
+local throwWarnedAt = -THROW_WARN_MS
+
 --- [token] = { flier, charId, promise }: asks waiting for their launch
 local throwAsks = {}
 local throwAskToken = 0
@@ -1100,8 +1108,11 @@ end)
 --- throw should come down (the target, when it reaches; a vector4 target's w is its heading), lying still.
 --- `metadata`, `reason` and `createdBy` as CreateGroundItem's.
 ---
+--- One throw starts every THROW_SPACING_MS at most: a call that comes sooner waits its turn, in the order asked (and
+--- the console warns that throws are being asked for too quickly).
+---
 --- Returns the row and how it went, 'thrown' (flying now) or 'ground' (put down, and why), or `false, reason`. It
---- waits for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most.
+--- waits its turn, then for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most.
 ---@param t table { item, amount?, from, target, power?, by?, metadata?, reason?, createdBy? }
 function GroundItems.throwItem(t)
     -- Who asked, read BEFORE anything waits (see createItem).
@@ -1127,6 +1138,20 @@ function GroundItems.throwItem(t)
     local amount = Sanitize.amount(t.amount, 1)
     if not amount then return false, Sanitize.AMOUNT_ERR end
     local metadata = type(t.metadata) == 'table' and t.metadata or nil
+
+    -- Its turn: the next free slot, THROW_SPACING_MS after the one before. Who flies it is chosen when it comes.
+    local now = GetGameTimer()
+    local startAt = math.max(now, throwNextAt)
+    throwNextAt = startAt + THROW_SPACING_MS
+    if startAt > now then
+        if now - throwWarnedAt >= THROW_WARN_MS then
+            throwWarnedAt = now
+            print(('^3[whip_core:ground] ThrowGroundItem is being asked to throw faster than one every %d ms (%s): going '
+                .. 'faster causes problems, so the throws are queued (%d waiting)^7')
+                :format(THROW_SPACING_MS, askedBy, math.ceil((startAt - now) / THROW_SPACING_MS)))
+        end
+        Wait(startAt - now)
+    end
 
     local path = throwPath(from, target, power)
     local how = 'thrown'
@@ -1202,7 +1227,8 @@ end
 
 SecureEvent('whip_core:server:throwTest', {
     ace = 'whip.devtools',
-    rateLimit = false,   -- held down, the tool asks every frame: as fast as it can, on purpose
+    -- Held down, the tool asks every frame; ThrowGroundItem queues them, one every 500 ms (THROW_SPACING_MS)
+    rateLimit = false,
     params = {
         {'fx', 'number', -TEST_REACH, TEST_REACH}, {'fy', 'number', -TEST_REACH, TEST_REACH}, {'fz', 'number', -500, 3000},
         {'tx', 'number', -TEST_REACH, TEST_REACH}, {'ty', 'number', -TEST_REACH, TEST_REACH}, {'tz', 'number', -500, 3000},
@@ -1216,22 +1242,26 @@ SecureEvent('whip_core:server:throwTest', {
     end
     local def = Config.Items[key]
     local label = type(def) == 'table' and def.label or key
-    local row, how, putDownWhy = GroundItems.throwItem({
-        item = key, amount = 1, from = vector3(fx, fy, fz), target = vector4(tx, ty, tz, tw), power = power,
-        by = source, reason = 'Throw test',
-    })
-    if not row then
-        TriggerClientEvent('whip_core:client:throwTestResult', source, false, label, tostring(how))
-        return
-    end
-    -- (The throw waited on their game: kept for Clear only while it is still them, or a dropped source's list
-    -- would come back for whoever gets that id next)
-    local now = Players[source]
-    if not now or now.charId ~= player.charId then return end
-    local mine = testThrown[source]
-    if not mine then mine = {} testThrown[source] = mine end
-    mine[row.id] = true
-    TriggerClientEvent('whip_core:client:throwTestResult', source, how, label, putDownWhy)
+    local charId = player.charId
+    -- Thrown in a thread: a queued throw may wait a long time for its turn, and the event is done with
+    CreateThread(function()
+        local row, how, putDownWhy = GroundItems.throwItem({
+            item = key, amount = 1, from = vector3(fx, fy, fz), target = vector4(tx, ty, tz, tw), power = power,
+            by = source, reason = 'Throw test',
+        })
+        -- (It waited: answered, and kept for Clear, only while it is still them, or a dropped source's list would
+        -- come back for whoever gets that id next)
+        local now = Players[source]
+        if not now or now.charId ~= charId then return end
+        if not row then
+            TriggerClientEvent('whip_core:client:throwTestResult', source, false, label, tostring(how))
+            return
+        end
+        local mine = testThrown[source]
+        if not mine then mine = {} testThrown[source] = mine end
+        mine[row.id] = true
+        TriggerClientEvent('whip_core:client:throwTestResult', source, how, label, putDownWhy)
+    end)
 end)
 
 SecureEvent('whip_core:server:throwTestClear', {

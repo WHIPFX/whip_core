@@ -2445,7 +2445,7 @@ function whip_core:CreateGroundItem(def) end
 --- to rest. Aimed to land on `target` at `power`: too soft falls short, hard skids on; no power is the gentlest throw
 --- that reaches it. A player's game flies it: `by` when they are within 50 m of `from`, else the nearest player who
 --- is. With nobody that near, or when that game's throw cannot be checked, it is put down where the throw would have
---- come down.
+--- come down. One throw starts every 500 ms at most: a call that comes sooner waits its turn (the console warns).
 ---@param def { item: string, amount?: number, from: vector3, target: vector3|vector4, power?: number, by?: number|{ charId: number }, metadata?: table, reason?: string, createdBy?: number }  power: 0 to 40 (a player throws at 18; 18 to 22 recommended); createdBy: the charId it is logged against
 ---@return WhipGroundItem|false created The ground item (flying, or put down), or false on failure
 ---@return string how 'thrown' (in the air now) or 'ground' (put down), or the error when it failed
