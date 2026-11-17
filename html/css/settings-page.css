@@ -2,8 +2,8 @@
    SETTINGS — the pause menu's one Settings page: Game and Server (js/settings-page.js)
 
    Three columns, left aligned: the rail of tabs (Game, then Server), the chosen tab's rows to scan, and the inspector
-   with the chosen row's whole control and what the tab can show. Drawn for 1080p and zoomed by --st-k, as the pause
-   menu's other pages are; the minimap's preview is laid over its place unzoomed (a canvas is drawn in true px).
+   with the chosen row's whole control and what the tab can show. Drawn for 1080p and scaled by --st-k (1 at 1080p,
+   2 at 4K); the minimap's preview is laid over its place unscaled (a canvas is drawn in true px).
 
    Marks: a blue dot is a game change not applied yet; a hollow ring is a server row that is your own choice. The
    chosen row wears Signal Blue; what a setting IS set to wears whip's white pill.
@@ -43,11 +43,19 @@
     color: #ffffff;
 }
 
+/* A TRANSFORM, NOT `zoom` (as css/creator.css and css/cam-editor.css scale their whole screens). Under `zoom` the
+   100%/k below is never zoomed back up, so past 1080p the page filled only the top left of the screen with its
+   inspector squeezed (1920 x 1080 of a 1440p screen, less still in Chromium 103), and under 1080p it ran off the
+   right and the bottom. Scaled, the box sized at 1/k covers the screen at every size, and the mouse and
+   getBoundingClientRect see what is drawn in Chromium 103 and 144 alike. */
 .st-z {
-    position: relative;
-    zoom: var(--st-k);
+    position: absolute;
+    left: 0;
+    top: 0;
     width: calc(100% / var(--st-k));
     height: calc(100% / var(--st-k));
+    transform: scale(var(--st-k));
+    transform-origin: top left;
     display: flex;
     flex-direction: column;
 }

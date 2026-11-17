@@ -189,6 +189,20 @@ function whip_core:IsPlayerLoaded() end
 ---@async
 function whip_core:EnterCharacter(opts) end
 
+--- The character editor on this character's own look, as a store: only the tabs `only` names, Save priced from
+--- `prices` ("Pay $120"), and Save handed to onSave(look), which charges and keeps it (server GetAppearanceChanges,
+--- SetPlayerAppearance) and returns true, or false, 'why' (said on Save; the editor stays open). With `methods`, Save
+--- first opens a checkout (the total, a Cash and a Bank tile with what `wallet` says the player has) and onSave gets
+--- the method chosen. Cancel puts the old look back. onClose(saved) is told when it shuts. Yields for the fade.
+---
+---     exports.whip_core:EditAppearance({ only = { 'hair', 'beard' }, prices = { hair = 40, beard = 15 },
+---         title = 'Herr Kutz', onSave = function(look) return exports.whip_core:Callback('mybarber:buy', look) end })
+---@param opts { only?: string[], prices?: table<string, number>, methods?: ('cash'|'bank')[], wallet?: { cash?: number, bank?: number }, title?: string, sub?: string, onSave: fun(look: table, method: 'cash'|'bank'|nil): boolean, string?, onClose?: fun(saved: boolean) }
+---@return boolean ok
+---@return string|nil why
+---@async
+function whip_core:EditAppearance(opts) end
+
 --- Get the current character ID.
 ---@return number|nil charId Nil if not loaded
 function whip_core:GetCharId() end
@@ -458,6 +472,11 @@ function whip_core:ReleasePlayerPed(id) end
 --- Close the inventory UI (handles NUI, server cleanup, and focus release).
 function whip_core:CloseInventory() end
 
+--- Set the calling resource's inventory UI lock; released when that resource stops.
+---@param locked boolean
+---@return boolean ok False without an invoking resource or with an invalid value
+function whip_core:SetInventoryLocked(locked) end
+
 --- Get an item definition by key.
 ---@param key string Item key
 ---@return WhipItemDef|nil
@@ -643,6 +662,17 @@ function whip_core:Input(title, fields) end
 ---@async
 function whip_core:PlaceObject(model, opts) end
 
+--- A point placed in the world with the object viewer's markers: a ghost where the camera looks (opts.at's heading), the
+--- centre dot dragged over the world, the arrows along X / Y / Z, the ring to turn it; Place (A) takes it, Esc (B)
+--- leaves it.
+---
+---     local spot = exports.whip_core:PlacePoint({ model = 's_f_y_shop_mid', ped = true, label = 'Shopkeeper' })
+---@param opts? { at?: { x: number, y: number, z: number, w?: number }, model?: string, ped?: boolean, label?: string }
+---@return { x: number, y: number, z: number, w: number }|false point
+---@return 'cancelled'|'busy'|'model'|nil why
+---@async
+function whip_core:PlacePoint(opts) end
+
 --- Run a skill check (blocking): the ring. The player pushes the dot onto the lit part of a ring and
 --- holds it there until it fills, once a round (the difficulty's `rounds`, each part smaller); touching the ring
 --- outside the lit part fails. Mouse (just moved, no cursor) or a pad's right stick; not the keyboard. The player's
@@ -764,6 +794,7 @@ function whip_core:IsRadialOpen() end
 ---@field perModel table<string, { offset: vector3|nil, heading: number|nil }>|nil With model: one model placed its own way; what an entry leaves out is the action's offset / heading. /actionplace <id> aims it and copies the line
 ---@field radial boolean|nil The F1 wheel (a label is required; its slab shows `icon`, the pill under it `description`)
 ---@field aimBox 'vehicle'|'object'|'ped'|'world'|string[]|nil A prompt where the player looks on the box of the car / prop / person they aim at: flat on that side (wrapped round its corners) or over its top. Offered only while the look meets one in reach; ctx.entity is the thing, ctx.coords the point. 'world': the map itself (ground, walls) where the look meets it: ctx.entity nil, ctx.world true, ctx.normal the way the surface faces
+---@field aimModels (string|number)[]|nil Only these entity models may offer an aimBox action; other models and world hits are rejected before callbacks
 
 ---@class WhipActionRequire
 ---@field alive boolean|nil false: also offered while downed (default: alive only)

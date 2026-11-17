@@ -1012,6 +1012,19 @@ end)
 
 --- Items are locked while the server cannot reach its database: an open screen closes and none opens until it is back.
 local itemsLocked = false
+local inventoryLocks = {}
+
+exports('SetInventoryLocked', function(locked)
+    local owner = GetInvokingResource()
+    if not owner or type(locked) ~= 'boolean' then return false end
+    inventoryLocks[owner] = locked or nil
+    if locked and inventoryScreenOpen() then Inventory.close() end
+    return true
+end)
+
+AddEventHandler('onResourceStop', function(owner)
+    inventoryLocks[owner] = nil
+end)
 local lockedToastAt = 0
 local LOCKED_MSG = "Your items are locked: the server can't save right now. Try again in a moment."
 
@@ -1032,6 +1045,7 @@ end)
 ---@param context table|nil  { containerId, vehicleStorage, externalPanel, shopId, playerInv }
 ---@return boolean opened  true if UI was opened, false if blocked
 function Inventory.openUI(action, data, context)
+    if next(inventoryLocks) then return false end
     if itemsLocked then
         -- Once per few seconds: a remembered panel and the server's answer both arrive here.
         if GetGameTimer() - lockedToastAt > 3000 then

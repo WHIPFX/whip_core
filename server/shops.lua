@@ -120,8 +120,10 @@ end
 --- Ended only by Shops.endSession.
 ---@param source number
 ---@param shopId number
-function Shops.beginSession(source, shopId)
+function Shops.beginSession(source, shopId, access)
     Shops._openShops[source] = shopId
+    Shops._externalAccess = Shops._externalAccess or {}
+    Shops._externalAccess[source] = access
     _basketSessions[source] = { items = {}, slots = basketSlots() }
 end
 
@@ -137,6 +139,17 @@ function Shops.inRange(source)
     local shopId = Shops._openShops[source]
     local def = shopId and Shops.getDef(shopId)
     if not def or not def.x then return false end
+    local access = Shops._externalAccess and Shops._externalAccess[source]
+    if access then
+        local player = Players[source]
+        if not player or player.closing or player.session ~= access.session or not Registry.alive(access.owner) then return false end
+        if access.authorize then
+            local ok, allowed = pcall(access.authorize, source)
+            if not ok or allowed ~= true then return false end
+        end
+        return IsPlayerNear(source, access.x, access.y, access.z, access.range)
+    end
+    if def.settings and def.settings.virtual then return false end
     return IsPlayerNear(source, def.x, def.y, def.z, SHOP_KEEP_RANGE)
 end
 
@@ -341,6 +354,7 @@ function Shops.endSession(source, deferWrite)
     -- more stock into a basket about to be wiped.
     _basketSessions[source] = nil
     Shops._openShops[source] = nil
+    if Shops._externalAccess then Shops._externalAccess[source] = nil end
     Shops.talkEnded(source)
 
     if returned then
@@ -1542,18 +1556,19 @@ end
 ---@param def table
 ---@return table
 function Shops.wireOne(def)
+    local virtual = def.settings and def.settings.virtual == true
     return {
         shopId     = def.shopId,
         name       = def.name,
         mode       = def.mode,
         jobId      = def.jobId,
-        npcModel   = def.npcModel,
-        prop       = def.prop,
+        npcModel   = not virtual and def.npcModel or nil,
+        prop       = not virtual and def.prop or nil,
         x          = def.x,
         y          = def.y,
         z          = def.z,
         heading    = def.heading,
-        blipSprite = def.blipSprite,
+        blipSprite = not virtual and def.blipSprite or nil,
         blipColor  = def.blipColor,
         ownerAway  = ownerAway(def) or nil,
     }

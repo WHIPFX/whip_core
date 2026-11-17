@@ -2,6 +2,12 @@
 
 Vehicles = {}
 
+local function heldBy(def)
+    local by = def.reservation
+    if by and Registry.alive(by) then return by end
+    return nil
+end
+
 --- Every vehicle whip knows about, keyed by id. Private: read it through `Vehicles.context` (a
 --- copy), write it through `Vehicles.persist` (the only database writer). Used directly only
 --- inside this file.
@@ -92,6 +98,7 @@ local FIELDS = {
     gloveboxSlots     = 'int',
     gloveboxMaxWeight = 'number',
     keyToken          = 'string',
+    reservation       = 'string',
 }
 
 --- NULL, as a value you can pass: `fields.x = nil` is just an absent key in Lua, so it can't mean
@@ -268,6 +275,7 @@ function Vehicles.ensureTable()
             -- The car's locks (Vehicles.changeLocks): set, only keys cut with it fit; NULL, every key of
             -- this car does (migration 044 adds it to an existing table).
             `keyToken`           VARCHAR(24)      DEFAULT NULL,
+            `reservation`        VARCHAR(191)     DEFAULT NULL,
             `createdAt`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`vehicleId`),
             UNIQUE KEY `uk_plate` (`plate`),
@@ -425,6 +433,7 @@ function Vehicles.loadAll()
             Vehicles._records[row.vehicleId] = {
                 vehicleId        = row.vehicleId,
                 ownerCharId      = row.ownerCharId,
+                reservation      = row.reservation,
                 model            = row.model,
                 plate            = row.plate,
                 state            = state,
@@ -1155,9 +1164,12 @@ end
 ---@param newCharId number|string|nil
 ---@return boolean ok
 ---@return string|nil err
-function Vehicles.transferOwner(vehicleId, newCharId)
+function Vehicles.transferOwner(vehicleId, newCharId, expectedOwner)
+    if Vehicles._transitionLocks[vehicleId] then return false, 'Vehicle is busy' end
     local def = Vehicles._records[vehicleId]
     if not def then return false, 'Vehicle not found' end
+    if heldBy(def) then return false, 'Vehicle is in custody' end
+    if expectedOwner ~= nil and def.ownerCharId ~= tonumber(expectedOwner) then return false, 'Vehicle ownership changed' end
 
     -- A street car whip adopted has no row and nobody owns it.
     if def.session then return false, 'Session vehicles have no owner' end
@@ -1168,7 +1180,10 @@ function Vehicles.transferOwner(vehicleId, newCharId)
     local from = def.ownerCharId
     if from == newCharId then return false, 'Already owned by that character' end
 
-    local ok, err = Vehicles.persist(vehicleId, { ownerCharId = newCharId })
+    Vehicles._transitionLocks[vehicleId] = true
+    local called, ok, err = pcall(Vehicles.persist, vehicleId, { ownerCharId = newCharId })
+    Vehicles._transitionLocks[vehicleId] = nil
+    if not called then return false, 'Database write failed' end
     if not ok then return false, err or 'Database write failed' end
 
     Vehicles.announce('ownerChanged', {
@@ -1203,6 +1218,7 @@ local deleteLocked
 function Vehicles.delete(vehicleId)
     local delDef = Vehicles._records[vehicleId]
     if not delDef then return false, 'Vehicle not found' end
+    if heldBy(delDef) then return false, 'Vehicle is in custody' end
 
     -- Not mid-transition, and the lock is held for the whole delete: it waits four times, and a
     -- spawn landing in one of those waits would bind a car to an id that no longer exists.
@@ -2454,6 +2470,7 @@ function Vehicles.context(vehicleId, opts)
 
         -- where it is
         state   = def.state,
+        reservation = def.reservation,
         garage  = def.garage,
         coords  = coords,
         heading = heading,
@@ -2843,6 +2860,7 @@ end
 function Vehicles.spawn(vehicleId, x, y, z, heading)
     local def = Vehicles._records[vehicleId]
     if not def then return nil, 'Vehicle not found' end
+    if heldBy(def) then return nil, 'Vehicle is in custody' end
 
     -- A session vehicle is a street car whip adopted (Vehicles.adopt), not one it built.
     if def.session then return nil, 'Session vehicles are adopted, not spawned' end
@@ -3766,6 +3784,7 @@ function Vehicles.retrieve(vehicleId, garageKey)
     if Vehicles._transitionLocks[vehicleId] then return false, 'Vehicle is busy' end
     local def = Vehicles._records[vehicleId]
     if not def then return false, 'Vehicle not found' end
+    if heldBy(def) then return false, 'Vehicle is in custody' end
     if def.state ~= 'garaged' then return false, 'Vehicle is not garaged' end
     -- Allow retrieval if garage matches OR if vehicle has no garage assigned (admin set state)
     if def.garage and def.garage ~= '' and def.garage ~= garageKey then return false, 'Wrong garage' end
@@ -4460,13 +4479,13 @@ function Vehicles.spawnTempFor(model, coords, opts, owner)
     return vehicleId
 end
 
---- Hand a vehicle to another player (a server id, or { charId = n } for a character playing now); they must be online.
+--- Hand a vehicle to another character: an online server id, or { charId = n } online or offline.
 --- A `vehicle_key` carries `metadata.vehicleId` and is not tied to the owner, so the seller's key still works.
 --- `revokeOldKeys` removes keys from the previous owner's pockets when online; it can't reach a key offline, in a
 --- stash, a boot or on the ground. Returns `false` rather than nil on failure.
 ---@param vehicleId number|WhipVehicleRef|nil
----@param newOwner number|table  the receiving player: a server id, or { charId = n } while they play
----@param opts table|nil  { giveKey = true, revokeOldKeys = true }
+---@param newOwner number|table  an online server id, or { charId = n } online or offline
+---@param opts table|nil  { giveKey = true, revokeOldKeys = true, expectedOwner?: number } Expected owner character id
 ---@return boolean ok
 ---@return string|nil err
 exports('TransferVehicle', function(vehicleId, newOwner, opts)
@@ -4477,8 +4496,10 @@ exports('TransferVehicle', function(vehicleId, newOwner, opts)
     local newCharId, newSource = WhoIs(newOwner)
     if not newCharId then return false, newSource --[[@as string]] end
     local buyer = newSource and Players[newSource]
-    if not buyer then return false, 'The new owner must be online' end
-    ---@cast newSource number   -- online, so WhoIs gave their source
+    if not buyer then
+        local exists = MySQL.scalar.await('SELECT 1 FROM characters WHERE charId = ? AND deleted IS NULL', { newCharId })
+        if not exists then return false, 'No such character' end
+    end
 
     opts = type(opts) == 'table' and opts or {}
 
@@ -4488,7 +4509,7 @@ exports('TransferVehicle', function(vehicleId, newOwner, opts)
     -- Captured before the write, because after it the def no longer remembers who had it.
     local oldCharId = def.ownerCharId
 
-    local ok, err = Vehicles.transferOwner(vehicleId, newCharId)
+    local ok, err = Vehicles.transferOwner(vehicleId, newCharId, opts.expectedOwner)
     if not ok then return false, err end
 
     -- Best-effort, from the old owner's own pockets, after the transfer has stood.
@@ -4499,7 +4520,7 @@ exports('TransferVehicle', function(vehicleId, newOwner, opts)
         end
     end
 
-    if opts.giveKey ~= false then
+    if buyer and opts.giveKey ~= false then
         Vehicles.giveKey(newSource, buyer, vehicleId)
     end
 
@@ -4895,3 +4916,20 @@ Sentinel.watch({
         return props
     end,
 })
+
+exports('SetVehicleCustody', function(ref, held, expectedOwner)
+    local owner = Registry.caller()
+    if type(held) ~= 'boolean' then return false, 'Invalid custody state' end
+    local vehicleId, why = Vehicles.idFromRef(ref)
+    if not vehicleId then return false, why end
+    local def = Vehicles._records[vehicleId]
+    if not def or def.session then return false, 'Owned vehicle not found' end
+    if expectedOwner ~= nil and def.ownerCharId ~= tonumber(expectedOwner) then return false, 'Vehicle ownership changed' end
+    local holder = heldBy(def)
+    if holder and holder ~= owner then return false, 'Vehicle is held by another resource' end
+    if Vehicles._transitionLocks[vehicleId] then return false, 'Vehicle is busy' end
+    if not held and not def.reservation then return true end
+    return underTransitionLock(vehicleId, 'custody', function()
+        return Vehicles.persist(vehicleId, { reservation = held and owner or Vehicles.NULL })
+    end)
+end)

@@ -138,6 +138,7 @@ InteractSpec.ACTION_AT = {
     netId       = { place = true },
     vehiclePart = { place = true },
     aimBox      = { place = true },   -- where the player looks, on what they aim at (client/aim_box.lua)
+    aimModels   = { with = { 'aimBox' } },
     radial      = { place = true },
     model       = { place = true },
     heading     = { with = { 'coords', 'entity', 'netId', 'model' } },

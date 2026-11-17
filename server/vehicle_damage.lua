@@ -188,6 +188,7 @@ function VehicleDamage.clear(vehicleId)
     end)
     local d = done[vehicleId]
     if d then d.at = GetGameTimer() end
+    Vehicles.announce('damageCleared', { vehicleId = vehicleId })
     return true
 end
 

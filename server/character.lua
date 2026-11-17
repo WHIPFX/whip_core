@@ -49,19 +49,14 @@ end
 -- After the first character loads
 -- ============================================
 --
--- On FiveM for GTAV Enhanced, a networked entity the server makes while no player is in the game gets
--- a network id the game hands out again later. On 20 Oct 2026 the four NPCs made at start held ids 1-4,
--- then the first player's ped and cars got 1-4 as well, and the shop prompts rode the player. So whip
--- makes its standing NPCs (shop keepers, the Director's standing things) once a character has loaded:
--- not when someone connects, as a player still in FiveM's menus is connected. On Legacy it changes
--- nothing anyone sees: nobody is there to see an NPC before then.
+-- whip makes its standing NPCs (shop keepers, the Director's standing things) once a character has
+-- loaded: not when someone connects, as a player still in FiveM's menus is connected. Nobody is there to
+-- see an NPC before then, so it costs nothing. (It began as a workaround: on FiveM for GTAV Enhanced in
+-- Oct 2026, an entity the server made with nobody in the game had its network id handed out again to a
+-- player's ped or car. Cfx has patched that, and cfx-server b177 no longer does it.)
 
 local _firstLoaded = false
 local _afterFirst = {}
-
---- Is a character in the world? True from the first load after whip_core started.
----@return boolean
-function Character.anyLoaded() return _firstLoaded end
 
 --- Run `fn()` once a character has loaded since whip_core started: now if one has, else just after
 --- the first load (in its own thread, so that player's load never waits on it).
@@ -418,4 +413,10 @@ exports('IsCharacterDeleted', function(charId)
     if not row then return true, 'no such character' end
     if row.deleted ~= nil then return true, 'deleted' end
     return false
+end)
+
+exports('RenameCharacter', function(who, firstName, lastName)
+    local charId, why = WhoIs(who)
+    if not charId then return false, why end
+    return Character.rename(charId, firstName, lastName, GetInvokingResource() or GetCurrentResourceName())
 end)

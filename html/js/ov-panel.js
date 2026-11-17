@@ -570,14 +570,16 @@ function drawMove() {
     bar.classList.add('open');
     // The keys as the Director shows them: a white keycap, or the pad's own button picture.
     const pad = (n) => `<img class="ov-pad" src="img/pad/${n}.svg" alt="${n.toUpperCase()}">`;
-    // The caller's own keys (the hand editor's), else Move's.
+    // The caller's own keys (the hand editor's), else Move's. With its own Done (PlacePoint's Place), Esc and B leave
+    // without it, and A on a pad is that button.
     const keys = move.keys
         ? move.keys.map((k) => `<span><kbd>${e(k.key)}</kbd> ${e(k.text)}</span>`).join('')
         : move.pad
         ? `<span>${pad('ls')} move</span><span>${pad('lt')}${pad('rt')} down / up</span><span>${pad('dpad')} turn</span>`
-            + `<span>${pad('rs')} look</span><span>${pad('b')} done</span>`
+            + `<span>${pad('rs')} look</span>`
+            + (move.doneText ? `<span>${pad('a')} ${e(move.doneText.toLowerCase())}</span><span>${pad('b')} cancel</span>` : `<span>${pad('b')} done</span>`)
         : '<span>Drag the arrows or the dot</span><span><kbd>R</kbd> ' + (move.mode === 'move' ? 'rotate' : 'move') + '</span>'
-            + '<span><kbd>Shift</kbd> snap</span><span><kbd>Right mouse</kbd> look</span><span><kbd>Esc</kbd> done</span>';
+            + `<span><kbd>Shift</kbd> snap</span><span><kbd>Right mouse</kbd> look</span><span><kbd>Esc</kbd> ${move.doneText ? 'cancel' : 'done'}</span>`;
     bar.innerHTML = `<div class="ov-move-main"><div class="ov-move-name"><small>${e(move.caption || 'Moving')}</small><b>${e(move.name || '')}</b></div>`
         + (move.pad ? '' : `<div class="dr-chips ov-move-modes"><button class="dr-chip plain${move.mode === 'move' ? ' on' : ''}" data-mode="move" type="button">Move</button>`
             + `<button class="dr-chip plain${move.mode === 'rotate' ? ' on' : ''}" data-mode="rotate" type="button">Rotate</button></div>`)

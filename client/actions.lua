@@ -331,11 +331,31 @@ local function resolveText(entry, o, field, ctx)
     return tostring(res)
 end
 
+local function checkCallbacks(entry, o, ctx)
+    local def = entry.def
+    for i = 1, 2 do
+        local fn
+        if i == 1 then fn = def.canInteract else fn = o.canInteract end
+        if fn ~= nil then
+            local good, res, reason = pcall(fn, ctx)
+            if not good then
+                report(entry.key, 'canInteract', res)
+                return false, 'canInteract threw'
+            end
+            if not yes(res) then return false, reason or 'canInteract said no' end
+        end
+    end
+    return true
+end
+
 --- May this option be offered right now? Answers true, or false and why.
 ---@return boolean
 ---@return string|nil why
-local function check(entry, o, ctx)
+local function check(entry, o, ctx, displayCache)
     local def = entry.def
+    if entry.aimModels and (not ctx.entity or ctx.entity == 0 or not entry.aimModels[GetEntityModel(ctx.entity) & 0xFFFFFFFF]) then
+        return false, 'model not allowed'
+    end
     if def.enabled == false or o.enabled == false then return false, 'switched off' end
     -- An option down a menu must pass the one it is under too.
     if o._up then
@@ -361,20 +381,26 @@ local function check(entry, o, ctx)
         return false, 'in a vehicle'
     end
 
-    -- The action's rule, then the option's (a numeric loop: a nil first slot must not end it).
-    for i = 1, 2 do
-        local fn
-        if i == 1 then fn = def.canInteract else fn = o.canInteract end
-        if fn ~= nil then
-            local good, res, reason = pcall(fn, ctx)
-            if not good then
-                report(entry.key, 'canInteract', res)
-                return false, 'canInteract threw'
-            end
-            if not yes(res) then return false, reason or 'canInteract said no' end
+    if def.canInteract == nil and o.canInteract == nil then return true end
+    if not displayCache then return checkCallbacks(entry, o, ctx) end
+    local now = GetGameTimer()
+    local same = displayCache.at and now >= displayCache.at and now - displayCache.at < 100
+        and displayCache.action == def.canInteract and displayCache.option == o.canInteract
+    if same then
+        for key, value in pairs(ctx) do
+            if type(value) == 'table' or displayCache.ctx[key] ~= value then same = false break end
+        end
+        for key in pairs(displayCache.ctx) do
+            if ctx[key] == nil then same = false break end
         end
     end
-    return true
+    if same then return displayCache.ok, displayCache.why end
+    local saved = displayCache.ctx
+    for key in pairs(saved) do saved[key] = nil end
+    for key, value in pairs(ctx) do saved[key] = value end
+    displayCache.at, displayCache.action, displayCache.option = now, def.canInteract, o.canInteract
+    displayCache.ok, displayCache.why = checkCallbacks(entry, o, ctx)
+    return displayCache.ok, displayCache.why
 end
 
 --- A ctx for conditions and label functions: made once per option and reused. It carries no functions,
@@ -799,6 +825,7 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
             return c
         end
         local menu = isMenu(o)
+        local displayCache = { ctx = {} }
         options[#options + 1] = {
             id        = o.id,
             -- Hold to use: the option's own, else the action's. A menu entry is always a press.
@@ -811,8 +838,11 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
             icon      = function() return resolveText(entry, o, 'icon', current()) end,
             -- A picture of its own, a menu's above it (a car's page shows the car), or the action's.
             image     = givesImage(o, def) and function() return resolveText(entry, o, 'image', current()) end or nil,
-            condition = function() return open() and (check(entry, o, current())) end,
+            condition = function() return open() and (check(entry, o, current(), displayCache)) end,
             callback  = function()
+                displayCache.at = nil
+                if not open() then return end
+                if menu and not check(entry, o, current()) then return end
                 if menu then
                     menuAt[pid] = o
                     if fills(o) then fill(entry, pid, o, extraNow(), show) end
@@ -951,7 +981,14 @@ local aimBoxes = {}   -- [key] = { pid, kinds, flags, maxT, out, on, about }
 local aimDriverRunning = false
 
 local function aimBoxLook(a)
+    local frame = GetFrameCount()
+    if a.frame == frame then return a.on end
+    a.frame = frame
     a.on = AimBox.aim(a.kinds, a.flags, a.maxT, a.on and a.out.entity or nil, a.out)
+    if a.on and a.models then
+        local entity = a.out.entity
+        a.on = entity ~= nil and entity ~= 0 and a.models[GetEntityModel(entity) & 0xFFFFFFFF] == true
+    end
     -- With 'world' among the kinds: is it the map itself (ctx.world), and its facing (ctx.normal)
     local about = a.about
     if about then
@@ -986,7 +1023,14 @@ local function mountAimBox(entry)
     local pid = 'act:' .. entry.key
     -- Looked along from the camera; the reach is measured from the player.
     local reach = tonumber(def.reach) or Config.InteractActiveRange or 2.0
-    local a = { pid = pid, kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false,
+    if at.aimModels then
+        entry.aimModels = {}
+        for _, model in ipairs(at.aimModels) do
+            local hash = type(model) == 'string' and GetHashKey(model) or model
+            entry.aimModels[hash & 0xFFFFFFFF] = true
+        end
+    end
+    local a = { pid = pid, kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false, models = entry.aimModels,
                 about = kinds.world and { world = false, normal = false } or nil }
 
     local function entityNow() return a.on and a.out.entity or nil end
@@ -1206,6 +1250,25 @@ local function kindOf(at)
     end
     if at.aimBox ~= nil then
         if not AimBox.kinds(at.aimBox) then return nil, "at.aimBox is 'vehicle', 'object', 'ped' or 'world' (or a list of them)" end
+        if at.aimModels ~= nil then
+            if type(at.aimModels) ~= 'table' or #at.aimModels == 0 then
+                return nil, 'at.aimModels is a non-empty list of model names or hashes'
+            end
+            local count = 0
+            for index, model in pairs(at.aimModels) do
+                count = count + 1
+                local name = type(model) == 'string' and model ~= ''
+                local hash = type(model) == 'number' and math.tointeger(model)
+                    and model >= -2147483648 and model <= 4294967295
+                if type(index) ~= 'number' or index % 1 ~= 0 or index < 1 or index > #at.aimModels
+                    or not (name or hash) then
+                    return nil, 'at.aimModels is a non-empty list of model names or hashes'
+                end
+            end
+            if count ~= #at.aimModels then
+                return nil, 'at.aimModels is a non-empty list of model names or hashes'
+            end
+        end
         return 'aimbox'
     end
     if at.coords ~= nil then
@@ -1495,6 +1558,11 @@ local function autoId(def)
         label, tostring(at.vehiclePart or ''), tostring(at.aim or ''),
         tostring(model or ''), tostring(at.bone or ''), tostring(at.radial or ''), tostring(entity),
         x or 0, y or 0, z or 0, ox or 0, oy or 0, oz or 0, table.concat(opts, ','))
+    if type(at.aimModels) == 'table' then
+        local names = {}
+        for i, m in ipairs(at.aimModels) do names[i] = tostring(m) end
+        seed = seed .. '|aimModels:' .. table.concat(names, '+')
+    end
     return ('auto:%08x'):format(GetHashKey(seed) & 0xFFFFFFFF)
 end
 

@@ -1898,6 +1898,7 @@ local function askSide(side, detail)
         item       = detail and detail.item,
         amount     = detail and detail.amount,
         metadata   = detail and detail.metadata,
+        source     = detail and detail.source,
         -- True for the returning half of a swap: the slot's current occupant is leaving, so a hook counting
         -- what is already there should not count it.
         swap       = detail and detail.swap or nil,
@@ -4804,8 +4805,22 @@ function Stores.takeAt(addr, amount, opts, askedBy)
     local store, slot, err = Stores.fromAddr(addr, { slotOptional = true })
     if not store then return false, err end
 
+    if o.metadata ~= nil and type(o.metadata) ~= 'table' then return false, 'metadata must be a table' end
+    local function matches(value, filter)
+        if type(value) ~= type(filter) then return false end
+        if type(filter) ~= 'table' then return value == filter end
+        for key, expected in pairs(filter) do
+            if not matches(value[key], expected) then return false end
+        end
+        return true
+    end
+    local function accepts(entry)
+        return entry and (o.item == nil or entry.item == o.item)
+            and (o.metadata == nil or matches(entry.metadata or {}, o.metadata))
+    end
     local removed, slots
     if slot then
+        if not accepts(store.kind.get(store.handle, slot)) then return false, 'Item does not match' end
         if amount ~= nil then
             amount = Sanitize.amount(amount)
             if not amount then return false, Sanitize.AMOUNT_ERR end
@@ -4826,7 +4841,7 @@ function Stores.takeAt(addr, amount, opts, askedBy)
         local total, n = 0, store.kind.slots(store.handle)
         for s = 1, n do
             local d = store.kind.get(store.handle, s)
-            if d and d.item == item then total = total + d.amount end
+            if accepts(d) then total = total + d.amount end
         end
         if total < amount then
             return false, ('Not enough %s there (%d of %d)'):format(item, total, amount)
@@ -4840,7 +4855,7 @@ function Stores.takeAt(addr, amount, opts, askedBy)
         for s = n, 1, -1 do
             if remaining <= 0 then break end
             local d = store.kind.get(store.handle, s)
-            if d and d.item == item then
+            if accepts(d) then
                 local part = math.min(d.amount, remaining)
                 local ok, _, stack = Stores.take(store, s, part)
                 if ok then
