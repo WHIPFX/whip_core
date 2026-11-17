@@ -2857,6 +2857,8 @@ end
 for i = 1, 5 do
     local cmd = 'hotbar_' .. i
     RegisterCommand(cmd, function()
+        -- Talking to someone: the number picks the answer the dialog shows with it (client/conversations.lua).
+        if Conversations ~= nil and Conversations.answerByNumber(i) then return end
         -- A world key: not under a placement ghost or in give mode, unless the mode lets it through (the camera item).
         if not IsGameInputFree(false, false, true) then return end
         Inventory.useHotbarSlot(i)

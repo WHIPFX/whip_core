@@ -4,9 +4,9 @@
 --
 -- A conversation is between ONE player and ONE speaker (an NPC Creator NPC, or any networked
 -- entity), shown in the dialog capsule that orbits the speaker (client/conversations.lua): the
--- speaker's line and up to four answers, chosen with the scroll wheel and E. Named "conversation"
--- because "dialog" already means Input/Confirm in whip; a conversation is not a UI and holds no
--- NUI focus.
+-- speaker's line and up to four answers, chosen with the scroll wheel and E, a number key, or a
+-- pad's D-pad and A. Named "conversation" because "dialog" already means Input/Confirm in whip; a
+-- conversation is not a UI and holds no NUI focus.
 --
 --   * It opens only from an interaction: `fromUse` is the useId a runtime point's
 --     onUse was handed (AddPoint, server/runtime_points.lua), by this player, in the last few
