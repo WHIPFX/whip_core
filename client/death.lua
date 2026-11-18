@@ -746,10 +746,8 @@ RegisterNetEvent('whip_core:client:playerLoaded', function(data)
     loadGen = loadGen + 1
     deadLoad = nil
     if data and data.isDead then
-        -- Laid down AFTER the spawn has put the ped in its place, not on a timer from here: this event is
-        -- the start of the load, and the appearance and the world round the spot can take far longer than
-        -- 2 s. Laid down before that, the spawn then moved the frozen body to its floor snap (the ped's
-        -- origin on the floor), and they lay half in the ground.
+        -- Laid down once the spawn has placed the ped (whip_core:player:spawned, below): this event is the start
+        -- of the load.
         local myLoad = loadGen
         deadLoad = myLoad
         -- A backstop in case the spawn never says so (it errored): dead, rather than standing up. Long enough for
@@ -762,17 +760,15 @@ end)
 AddEventHandler('whip_core:player:spawned', function()
     local myLoad = deadLoad
     if not myLoad then return end
-    CreateThread(function()
-        -- The spawn snaps the ped's origin to the floor and lets go; the game stands it back up over a
-        -- few frames. Lay it down once it stands (origin a metre up), for at most 1.5 s.
-        local ped = PlayerPedId()
-        local by = GetGameTimer() + 1500
-        while GetGameTimer() < by and GetEntityHeightAboveGround(ped) < 0.8 do
-            Wait(50)
-            ped = PlayerPedId()
-        end
-        enterDeadLoad(myLoad)
-    end)
+    -- The spawn snaps the ped's origin to the floor and lets go; the game stands it back up over a
+    -- few frames. Lay it down once it stands (origin a metre up), for at most 1.5 s.
+    local ped = PlayerPedId()
+    local by = GetGameTimer() + 1500
+    while GetGameTimer() < by and GetEntityHeightAboveGround(ped) < 0.8 do
+        Wait(50)
+        ped = PlayerPedId()
+    end
+    enterDeadLoad(myLoad)
 end)
 
 -- ============================================
