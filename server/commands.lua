@@ -21,7 +21,7 @@ local function devCommand(name, fn, help)
     DEV_COMMANDS[name] = type(help) == 'table' and help or true
     RegisterCommand(name, function(source, args, raw)
         if source ~= 0 and not DevTools.isAllowed(source) then
-            ShowError(source, 'That command needs whip.devtools')
+            ShowError(source, DevTools.isEligible(source) and DevTools.OFF_REASON or 'That command needs whip.devtools')
             return
         end
         return fn(source, args, raw)
@@ -50,11 +50,8 @@ end)
 -- ============================================
 -- Chat suggestions for the admin commands
 -- ============================================
--- whip_chat no longer sends server commands as suggestions (its SUGGESTIONS switch is off: the sweep of every
--- player x every command on each resource start cost too much), so none of these showed as an admin typed them.
--- Sent here instead, once per staff member: when their character loads, and to everyone on whip_core's start.
--- One event each, only to players holding whip.devtools (what whip_chat's own list checked through
--- GetCommandAce). The handlers still check developer mode when a command is run.
+-- Staff get these as chat suggestions when their character loads, and again on whip_core's start: one event each,
+-- only to players holding whip.devtools. The handlers still check developer mode when a command is run.
 
 --- Send the admin commands to one player's chat, if they hold whip.devtools.
 ---@param src number
@@ -69,9 +66,7 @@ local function suggestCommandsTo(src)
     TriggerClientEvent('chat:addSuggestions', src, list)
 end
 
-AddEventHandler('whip_core:player:loaded', function(e)
-    if type(e) == 'table' and not e.phantom then suggestCommandsTo(e.source) end
-end)
+Character.onLife('loaded', function(e) suggestCommandsTo(e.source) end)
 
 -- A restart of whip_core: the commands are registered again, so the staff in the game get them again. After a
 -- moment, so every devCommand below (and in other files) has been made.
