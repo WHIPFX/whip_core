@@ -237,6 +237,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field temp boolean True for a SpawnTempVehicle car (a rental, a job van) — session is true for these too
 ---@field secure boolean True for a SpawnTempVehicle car made with `secure = true`: no lockpicking, no ignition hacking
 ---@field owner WhipVehicleOwnerInfo
+---@field reservation string|nil Resource holding custody of the vehicle
 ---@field state string|nil 'out' or 'garaged'
 ---@field garage string|nil Garage key it is filed under
 ---@field coords vector3|nil Where it is (or where it was parked)

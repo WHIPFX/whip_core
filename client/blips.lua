@@ -9,14 +9,31 @@
 local blips = {}   -- [wireId] = { point = blip, area = blip }
 
 --- [GTA blip handle] = its label. GTA lets nothing read a blip's name back, so the pause map
---- (client/pause.lua) asks here: whip's own blips have names on the map, others their sprite's.
+--- (client/pause.lua) asks here for whip's labels and those registered by other resources.
 local labelOf = {}
+local externalLabels = {}
+local labelReg = Registry.new('blipLabel', { store = externalLabels })
 
---- A whip blip's label, or nil for one whip did not make here.
+exports('SetBlipLabel', function(handle, label)
+    local owner = Registry.caller()
+    if type(handle) ~= 'number' or handle % 1 ~= 0 or handle <= 0 then
+        return false, 'blip handle must be a positive integer'
+    end
+    if label == nil then
+        if externalLabels[handle] == nil then return true end
+        return labelReg:remove(owner, handle)
+    end
+    if type(label) ~= 'string' or label == '' then return false, 'blip label must be a non-empty string' end
+    if not DoesBlipExist(handle) then return false, 'blip does not exist' end
+    if labelOf[handle] then return false, 'blip belongs to whip_core' end
+    return labelReg:add(owner, handle, label)
+end)
+
+--- A registered blip label, or nil.
 ---@param handle number
 ---@return string|nil
 function WhipBlipLabel(handle)
-    return labelOf[handle]
+    return labelOf[handle] or externalLabels[handle]
 end
 
 --- Name, for the pause map, a blip whip_core made outside this file (/w Reveal Players); nil forgets it.

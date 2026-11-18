@@ -3,8 +3,8 @@ game 'gta5'
 
 name 'whip_core'
 author 'Whippy'
-description 'Custom FiveM framework — Beta 1.0.1'
-version '1.0.1'   -- the start-up banner reads it
+description 'Custom FiveM framework — Beta 1.2.0'
+version '1.2.0'   -- the start-up banner reads it
 -- Where its releases are: the update check (server/updates.lua) compares the latest one with `version`.
 whip_updates 'WHIPFX/whip_core'
 
@@ -231,6 +231,7 @@ server_scripts {
     'server/events_vehicles.lua',
     'server/seats.lua',
     'server/events_misc.lua',
+    'server/appearance_store.lua',   -- a look kept by a store (GetAppearanceChanges, SetPlayerAppearance)
     'server/shop_counters.lua',
     'server/shop_talk.lua',
     -- After RegisterItem, RegisterUseHandler (inventory.lua) and RegisterPanelItem (panels.lua), which items call at file scope.
@@ -288,6 +289,7 @@ client_scripts {
     'client/controller_debug.lua',
     'client/keyboard.lua',
     'client/appearance.lua',
+    'client/place_point.lua',   -- PlacePoint: a point placed in the world (OvMove's markers, tools/ov_move.lua)
     'client/portrait.lua',
     'client/inventory.lua',
     -- After inventory.lua: it sets Inventory.freeHands at file scope.
@@ -426,6 +428,7 @@ client_scripts {
     'tools/objectviewer.lua',
     'tools/ov_panel.lua',
     'tools/ov_move.lua',
+    'tools/place_point.lua',   -- the settings page's Place (client/place_point.lua's PlacePoint)
     'tools/hand_edit.lua',
     -- Before every tool that shows it.
     'tools/editor_hud.lua',

@@ -142,6 +142,30 @@ local function wanted(kinds, ent)
     return false
 end
 
+local rays, rayFrame, rayCount = {}, -1, 0
+
+local function cameraRay(cam, dx, dy, dz, flags, maxT)
+    local frame, ped = GetFrameCount(), PlayerPedId()
+    if frame ~= rayFrame then rayFrame, rayCount = frame, 0 end
+    for i = 1, rayCount do
+        local r = rays[i]
+        if r.flags == flags and r.maxT == maxT and r.ped == ped
+            and r.x == cam.x and r.y == cam.y and r.z == cam.z
+            and r.dx == dx and r.dy == dy and r.dz == dz then
+            return r.hit, r.pos, r.normal, r.entity
+        end
+    end
+    rayCount = rayCount + 1
+    local r = rays[rayCount]
+    if not r then r = {}; rays[rayCount] = r end
+    r.flags, r.maxT, r.ped = flags, maxT, ped
+    r.x, r.y, r.z, r.dx, r.dy, r.dz = cam.x, cam.y, cam.z, dx, dy, dz
+    local _, hit, pos, normal, entity = GetShapeTestResult(StartExpensiveSynchronousShapeTestLosProbe(
+        cam.x, cam.y, cam.z, cam.x + dx * maxT, cam.y + dy * maxT, cam.z + dz * maxT, flags, ped, 4))
+    r.hit, r.pos, r.normal, r.entity = hit, pos, normal, entity
+    return hit, pos, normal, entity
+end
+
 --- What the player is looking at among `kinds`, up to maxT metres from the camera, written into `out`
 --- (kept and reused, so nothing is made per frame):
 ---   out.entity          the thing (nil: the map itself, with 'world' among the kinds)
@@ -155,8 +179,7 @@ end
 function AimBox.aim(kinds, flags, maxT, sticky, out)
     local cam = GetFinalRenderedCamCoord()
     local dx, dy, dz = InteractGetCameraForward()
-    local _, hit, hitPos, hitNormal, ent = GetShapeTestResult(StartExpensiveSynchronousShapeTestLosProbe(
-        cam.x, cam.y, cam.z, cam.x + dx * maxT, cam.y + dy * maxT, cam.z + dz * maxT, flags, PlayerPedId(), 4))
+    local hit, hitPos, hitNormal, ent = cameraRay(cam, dx, dy, dz, flags, maxT)
     local limit, target = maxT, nil
     local wx, wy, wz = hitPos.x - cam.x, hitPos.y - cam.y, hitPos.z - cam.z
     local hitT = math.sqrt(wx * wx + wy * wy + wz * wz)

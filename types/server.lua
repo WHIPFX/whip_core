@@ -1564,6 +1564,30 @@ function whip_core:SanitizeAppearance(appearance) end
 ---@return string|nil why
 function whip_core:OpenCharacterEditor(who) end
 
+--- What a store's customer changed (client EditAppearance): their saved look against `look`, by the editor's tabs.
+--- A count per category id ('tops' = 1, 'makeup' = 2 for two of its overlays) and `tattoos` for tattoos put on.
+--- Taking off an accessory or a tattoo counts nothing. `only` (the editor's category ids or groups) counts only those.
+---
+---     local changes = exports.whip_core:GetAppearanceChanges(source, look, { 'apparel', 'props' })
+---@param who number|{ charId: number } A server id, or { charId = n } for a character who is playing
+---@param look table The look from the editor
+---@param only? string[] Category ids ('hair', 'tops') or groups ('face', 'apparel', 'props', 'tattoos', 'outfits')
+---@return table|false changes { [id] = count, tattoos? = count }
+---@return string|nil why
+function whip_core:GetAppearanceChanges(who, look, only) end
+
+--- Keep a look for a playing character, checked as the editor's Save is. opts.only takes only those tabs' parts
+--- from `look` and keeps the rest of their saved look, so a barber can't change a face. What they wear changes with
+--- the editor's Save (EditAppearance), else when they next load in.
+---
+---     local ok, why = exports.whip_core:SetPlayerAppearance(source, look, { only = { 'hair', 'beard' } })
+---@param who number|{ charId: number } A server id, or { charId = n } for a character who is playing
+---@param look table The look
+---@param opts? { only?: string[] }
+---@return boolean ok
+---@return table|string result The look kept, or why not
+function whip_core:SetPlayerAppearance(who, look, opts) end
+
 --- Register (or replace) one accessory-strip slot. Re-registration is
 --- idempotent, and a stopping resource's slots are unregistered automatically.
 --- `accepts` names the item key the slot takes, or a list of them; `keys = true` takes any ignition key
@@ -1913,9 +1937,8 @@ function whip_core:RetrieveVehicle(vehicleId, garageKey) end
 
 --- Hand a vehicle to another player.
 ---
---- Takes the receiving player: their server id, or { charId = n } while they play. The new owner
---- must be online, the same rule CreateOwnedVehicle follows: read off a live player record, the
---- owner can only be a character that exists.
+--- Takes an online server id, or { charId = n } for an online or offline character.
+--- An offline character must exist and not be deleted. Keys are given only while online.
 ---
 --- Fires `whip_core:vehicle:ownerChanged` and re-syncs both players' vehicle lists.
 ---
@@ -1924,8 +1947,8 @@ function whip_core:RetrieveVehicle(vehicleId, garageKey) end
 --- pockets while they are online. A key that is offline, stashed, in a boot or on the ground
 --- survives and still works. Closing that needs a key generation on the vehicle.
 ---@param vehicleId number|WhipVehicleRef
----@param newOwner number|{ charId: number }  the receiving player, who must be online
----@param opts table|nil  { giveKey = true, revokeOldKeys = true }
+---@param newOwner number|{ charId: number } Player server id, or an online/offline character id
+---@param opts table|nil  { giveKey = true, revokeOldKeys = true, expectedOwner?: number } Expected owner is a character id
 ---@return boolean ok, string|nil err
 ---@async
 function whip_core:TransferVehicle(vehicleId, newOwner, opts) end
@@ -2584,7 +2607,7 @@ function whip_core:StoreGive(addr, item, amount, metadata, opts) end
 --- to put it somewhere, StoreMove.
 ---@param addr WhipStoreAddr
 ---@param amount? number
----@param opts? { item?: string, reason?: string }|string  a plain string is the reason
+---@param opts? { item?: string, metadata?: table, reason?: string }|string Metadata is a partial filter; a plain string is the reason
 ---@return { item: string, amount: number, metadata: table|nil }|false taken
 ---@return string|nil err
 ---@async
@@ -2725,6 +2748,15 @@ function whip_core:GetShops(filter) end
 ---@return string|nil error
 ---@async
 function whip_core:EnsureShop(key, data) end
+
+--- Open a shop declared by the calling resource for a player.
+---@param source number Player server id
+---@param ref number|{ id: number }|{ key: string }|{ containerId: number } Shop reference
+---@param opts? { range?: number, authorize?: fun(source: number): boolean } Range defaults to 3 metres (greater than 0, at most 20); authorize must return true
+---@return boolean opened
+---@return string|nil why
+---@async
+function whip_core:OpenShop(source, ref, opts) end
 
 --- Create a new shop.
 ---@param data table Shop data (key, name, mode, x, y, z, heading, npcModel, prop, blipSprite, blipColor, jobId, catalog)
@@ -3403,7 +3435,6 @@ function whip_core:RegisterAskChannel(name, deliver) end
 ---@return string|nil why 'That question is gone' | 'That question was not asked through you' | 'That question was for another character'
 function whip_core:AnswerAsk(source, token, yes) end
 
-
 -- ============================================
 -- Player Stats & Effects
 -- ============================================
@@ -3987,6 +4018,26 @@ function whip_core:GetUpdate(resource) end
 --- Every running resource that names a repository, with its update status.
 ---@return WhipUpdateStatus[]
 function whip_core:GetUpdates() end
+
+--- Rename an online or offline character through the native identity service.
+---@param who WhipPersonRef Player server id, or { charId = n }
+---@param firstName string
+---@param lastName string
+---@return boolean renamed
+---@return string nameOrError New full name on success, refusal reason otherwise
+---@return string|nil oldName Previous full name on success
+---@async
+function whip_core:RenameCharacter(who, firstName, lastName) end
+
+--- Hold an owned vehicle against retrieval, spawning, transfer and deletion, or release this resource's hold.
+--- A stopped resource's hold is ignored. Does not despawn the car or change its garage or position.
+---@param ref number|WhipVehicleRef
+---@param held boolean
+---@param expectedOwner? number Expected owner character id; refuse if ownership changed
+---@return boolean ok
+---@return string|nil why
+---@async
+function whip_core:SetVehicleCustody(ref, held, expectedOwner) end
 
 -- ============================================
 -- Export binding

@@ -671,6 +671,12 @@ AddEventHandler('whip_core:player:died', function()
     if invOpen then Inventory.close() end
 end)
 
+-- So does a logout: its focus outlived character select, and the next character came in with the last one's
+-- inventory on screen.
+AddEventHandler('whip_core:player:logout', function()
+    if invOpen then Inventory.close() end
+end)
+
 -- Satellite UIs: resources that declared their own screen open, so IsAnyUIOpen covers them.
 -- Keyed from the calling resource (Registry.caller) and dropped when it stops.
 --- [resource] = { [key] = { keepHud = bool } }; a resource with one screen passes no key.
@@ -1012,6 +1018,19 @@ end)
 
 --- Items are locked while the server cannot reach its database: an open screen closes and none opens until it is back.
 local itemsLocked = false
+local inventoryLocks = {}
+
+exports('SetInventoryLocked', function(locked)
+    local owner = GetInvokingResource()
+    if not owner or type(locked) ~= 'boolean' then return false end
+    inventoryLocks[owner] = locked or nil
+    if locked and inventoryScreenOpen() then Inventory.close() end
+    return true
+end)
+
+AddEventHandler('onResourceStop', function(owner)
+    inventoryLocks[owner] = nil
+end)
 local lockedToastAt = 0
 local LOCKED_MSG = "Your items are locked: the server can't save right now. Try again in a moment."
 
@@ -1032,6 +1051,7 @@ end)
 ---@param context table|nil  { containerId, vehicleStorage, externalPanel, shopId, playerInv }
 ---@return boolean opened  true if UI was opened, false if blocked
 function Inventory.openUI(action, data, context)
+    if next(inventoryLocks) then return false end
     if itemsLocked then
         -- Once per few seconds: a remembered panel and the server's answer both arrive here.
         if GetGameTimer() - lockedToastAt > 3000 then
@@ -2037,6 +2057,12 @@ local function CancelGiveMode()
     giveRayTarget   = nil
     giveRayLastCheck = 0
 end
+
+-- A logout ends give mode: for up to GIVE_TIMEOUT after character select, E gave from the next character's
+-- inventory at the slot this one picked.
+AddEventHandler('whip_core:player:logout', function()
+    if giveMode then CancelGiveMode() end
+end)
 
 -- Forward-declared: the give tick lives below its raycast helper.
 local startGiveTick
