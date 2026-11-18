@@ -84,10 +84,8 @@ end
 --- The room of interior `id` holding a point, or nil.
 ---
 --- `prefer` (optional): a room key that wins when its box holds the point. Room boxes are rough and
---- can overlap well beyond doorways: in the Diamond Casino rm_GamingFloor_02's box reaches over the
---- main floor (rm_GamingFloor_01), so "smallest wins" put a camera on the main floor in _02 and the
---- game culled the floor around the player. The game's own room for the player (it follows them
---- through doorways) settles it when it is one of the boxes holding the point.
+--- can overlap well beyond doorways (the Diamond Casino's gaming floors); the game's own room for the
+--- player follows them through doorways, so it settles which of the boxes a point near them is in.
 function InteriorRooms.roomAt(id, x, y, z, prefer)
     local r = InteriorRooms.of(id)
     if not r then return nil end
