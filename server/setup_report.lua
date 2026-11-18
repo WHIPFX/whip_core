@@ -52,15 +52,7 @@ local function versionAtLeast(have, want)
 end
 
 --- Every resource the server knows, by name.
-local function allResources()
-    local out = {}
-    for i = 0, GetNumResources() - 1 do
-        local res = GetResourceByFindIndex(i)
-        if res then out[#out + 1] = res end
-    end
-    table.sort(out)
-    return out
-end
+local allResources = AllResources   -- server/helpers.lua: each resource once (a provided name is its provider)
 
 --- How many of whip's four marks the oxmysql build carries: those of WHIPFX's oxmysql, or of a build patched by hand with
 --- dev/oxmysql-p001.diff (a lost connection fails at once).
@@ -238,7 +230,8 @@ local function gather()
     end
 
     -- What fights whip.
-    if running('chat') and running('whip_chat') then
+    -- A real chat resource, not whip_chat's own `provide 'chat'` (which FiveM lists as running too).
+    if running('chat') and running('whip_chat') and ProviderOf('chat') == nil then
         add('fix', 'chat is running beside whip_chat: two chat boxes on one key. Remove "ensure chat" from server.cfg')
     end
     for _, c in ipairs(CLASHES) do

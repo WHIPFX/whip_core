@@ -291,7 +291,18 @@ end
 exports('RegisterItemFlag', Inventory.registerItemFlag)
 exports('HasItemFlag', Inventory.hasItemFlag)
 
---- Does the player hold the item? A number in place of the filter is a minimum amount.
+-- What stays the player's inside a holder (a bank card in a wallet): the rule the server sent with the item
+-- definitions (shared/inventory_shape.lua EachCarriedInside).
+local function holdOf(holderItem)
+    local def = Config.Items[holderItem]
+    return def and def.holds or nil
+end
+local function countsInside(holderItem, item)
+    local def = Config.Items[item]
+    return def ~= nil and type(def.insideOf) == 'table' and def.insideOf[holderItem] == true
+end
+
+--- Does the player hold the item? A number in place of the filter is a minimum amount. A wallet's cards count.
 --- @param itemKey string
 --- @param filter function|number|nil   Optional metadata filter, or a minimum amount
 --- @return boolean
@@ -314,10 +325,15 @@ function hasItem(itemKey, filter)
             end
         end
     end
-    return false
+    local found = false
+    EachCarriedInside(_cachedInventory, itemKey, holdOf, countsInside, function(_, _, _, data)
+        found = not filter or not not filter(data.metadata)
+        return found
+    end)
+    return found
 end
 
---- Count an item across all containers (a number in the filter's place is ignored).
+--- Count an item across all containers, a wallet's cards too (a number in the filter's place is ignored).
 --- @param itemKey string
 --- @param filter function|nil   Optional metadata filter
 --- @return number
@@ -342,6 +358,9 @@ function Inventory.getItemCount(itemKey, filter)
             end
         end
     end
+    EachCarriedInside(_cachedInventory, itemKey, holdOf, countsInside, function(_, _, _, data)
+        if not filter or filter(data.metadata) then count = count + (tonumber(data.amount) or 1) end
+    end)
     return count
 end
 
@@ -671,6 +690,12 @@ AddEventHandler('whip_core:player:died', function()
     if invOpen then Inventory.close() end
 end)
 
+-- So does a logout: its focus outlived character select, and the next character came in with the last one's
+-- inventory on screen.
+AddEventHandler('whip_core:player:logout', function()
+    if invOpen then Inventory.close() end
+end)
+
 -- Satellite UIs: resources that declared their own screen open, so IsAnyUIOpen covers them.
 -- Keyed from the calling resource (Registry.caller) and dropped when it stops.
 --- [resource] = { [key] = { keepHud = bool } }; a resource with one screen passes no key.
@@ -919,6 +944,10 @@ local function adoptServerItemDefs(defs)
         if type(def) == 'table' and (have == nil or have._fromServer) then
             def._fromServer = true
             Config.Items[key] = def
+        elseif type(def) == 'table' then
+            -- A config item keeps its own entry, but takes the server's rule for what stays the player's inside a
+            -- holder (shared/inventory_shape.lua): only the server knows the panel registrations.
+            have.holds, have.insideOf = def.holds, def.insideOf
         end
     end
 end
@@ -2083,6 +2112,12 @@ local function CancelGiveMode()
     giveRayLastCheck = 0
 end
 
+-- A logout ends give mode: for up to GIVE_TIMEOUT after character select, E gave from the next character's
+-- inventory at the slot this one picked.
+AddEventHandler('whip_core:player:logout', function()
+    if giveMode then CancelGiveMode() end
+end)
+
 -- Forward-declared: the give tick lives below its raycast helper.
 local startGiveTick
 
@@ -2729,6 +2764,8 @@ end)
 
 --- Handoff animation, triggered by the server on giver and receiver. Animation only: the item moves as the server's held prop at the clip's middle.
 RegisterNetEvent('whip_core:client:playGiveAnim', function(otherServerId, isGiver)
+    -- A downed player keeps their pose: the ground death is a looped clip laid once (client/death.lua).
+    if PlayerIsDead then return end
     local ped  = PlayerPedId()
     local dict = 'mp_common'
     local clip = isGiver and 'givetake1_a' or 'givetake1_b'
@@ -2749,7 +2786,7 @@ RegisterNetEvent('whip_core:client:playGiveAnim', function(otherServerId, isGive
 
         -- (The props cross at the clip's middle, on the server's clock.)
         Wait(2000)
-        ClearPedTasks(isGiver and ped or PlayerPedId())
+        StopAnimTask(PlayerPedId(), dict, clip, 1.0)
         RemoveAnimDict(dict)
     else
         RemoveAnimDict(dict)
@@ -2935,6 +2972,8 @@ end
 for i = 1, 5 do
     local cmd = 'hotbar_' .. i
     RegisterCommand(cmd, function()
+        -- Talking to someone: the number picks the answer the dialog shows with it (client/conversations.lua).
+        if Conversations ~= nil and Conversations.answerByNumber(i) then return end
         -- A world key: not under a placement ghost or in give mode, unless the mode lets it through (the camera item).
         if not IsGameInputFree(false, false, true) then return end
         Inventory.useHotbarSlot(i)

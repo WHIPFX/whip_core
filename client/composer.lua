@@ -427,3 +427,8 @@ end)
 AddEventHandler('whip_core:player:died', function()
     if _session then EndSession(false) end
 end)
+
+-- And a logout, for the same reason: its focus outlived character select.
+AddEventHandler('whip_core:player:logout', function()
+    if _session then EndSession(false) end
+end)

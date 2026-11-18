@@ -127,7 +127,8 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field item string Item key
 ---@field amount number Stack count
 ---@field metadata table|nil A copy
----@field addr WhipStoreAddr Where it is — { kind = 'player', id = source, sub = pocket, slot }
+---@field addr WhipStoreAddr|nil Where it is — { kind = 'player', id = source, sub = pocket, slot }; nil for a stack inside a wallet
+---@field inside { addr: WhipStoreAddr, slot: number }|nil Inside a wallet the player carries: the wallet's address and the place in it
 
 -- ============================================
 -- Item Definition
@@ -147,6 +148,7 @@ function WhipPlayer:removeCash(amount, why, withNext) end
 ---@field grab '1h'|'2h'|nil How it is picked up off the ground: one hand (the default) or both (a rifle, a duffel bag); also on /whip → Items
 ---@field playerWalk boolean|nil Held out to give or throw, the player keeps their own walk instead of the give walk (default false); also on /whip → Items and in the hand position editor
 ---@field metaFields table[]|nil Array of { key, label, format?, value? } for tooltip display; `value` is shown when the item's metadata has no `key`
+---@field wallet boolean|nil Fits in a wallet (true), and is still the player's there: HasItem, GetItemCount, RemoveItem, FindItem, FindAllItems, an `item` requirement and the item events count it inside one (a bank card, a licence)
 ---@field fuelCapacity number|nil Makes it a fuel can (read by whip_fuel): how much of a car's tank (100) a full one holds; metadata `fuel` is how full it is, 0-100
 ---@field defaultAction string|nil Context menu default action key
 ---@field contextOptions table[]|nil Right-click options, { action, label, order?, when?, whyNot?, require?, anywhere? }: at the top of the menu under Use, lowest `order` first (none: as listed, after those with one); Give, Place, Split and Destroy below. `when` tests the item's metadata (a test's `default` stands in for a missing field), `whyNot` is said when it fails, `require` tests the player (AddAction's words), `anywhere = true` offers it in a boot, stash or bag too (the handler gets that store's address): server/item_options.lua

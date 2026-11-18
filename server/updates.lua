@@ -141,9 +141,8 @@ end
 --- Every resource that declares a repository: { resource, repository }, started ones only.
 local function declared()
     local out = {}
-    for i = 0, GetNumResources() - 1 do
-        local res = GetResourceByFindIndex(i)
-        local state = res and GetResourceState(res)
+    for _, res in ipairs(AllResources()) do   -- each once: a provided name is its provider (server/helpers.lua)
+        local state = GetResourceState(res)
         if state == 'started' or state == 'starting' then
             local repository = repositoryOf(res)
             if repository then out[#out + 1] = { resource = res, repository = repository } end

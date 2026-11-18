@@ -70,6 +70,16 @@ ToolHandlers['Restore Player Cores'] = {
     isActive = function() return false end,
 }
 
+-- ---- Teleport to Waypoint ----
+
+--- A one-off: /tpm (server/commands.lua), so the same whip.devtools check and the same activity log line. The waypoint
+--- is read on this game when the server answers (client/main.lua whip_core:client:tpWaypoint).
+ToolHandlers['Teleport to Waypoint'] = {
+    enter = function() ExecuteCommand('tpm') end,
+    exit = function() end,
+    isActive = function() return false end,
+}
+
 -- ---- Kill Me ----
 
 --- A one-off. The server checks it is an admin's and that they are up (server/devtools.lua), then says

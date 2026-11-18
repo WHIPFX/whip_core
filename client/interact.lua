@@ -152,9 +152,57 @@ local function resolveField(data, opt, field)
     return res
 end
 
---- Normalise a registration's options into a list.
+-- ============================================
+-- Options other resources add to a list
+-- ============================================
+--
+-- A list is named by an option in it: '<prompt group>:<option id>' ('atm:balance', the ATM's Check Balance). Every
+-- list holding that option, on every prompt of that group, gets the added options right after it, each time the list
+-- is built (registered, or swapped by setOptions). A menu one level down that lacks the option does not. Added through
+-- AddAction's at = { list = '...' } (client/actions.lua); each option's `can(promptId)` is its condition, asked every
+-- frame, `act(promptId)` its callback, and `label` / `icon` a string or a function of the prompt id, asked as the list
+-- is built.
+
+---@type table<string, { owner: string, id: string, label: string|fun(pid: string): string, icon: string|fun(pid: string): string|nil, image: string|nil, holdMs: number|nil, can: fun(pid: string): boolean, act: fun(pid: string) }[]>
+local listAddOns = {}
+
+local function addOnText(v, promptId)
+    if type(v) ~= 'function' then return v end
+    local ok, res = pcall(v, promptId)
+    return ok and res ~= nil and tostring(res) or nil
+end
+
+--- `out` with every option added after its anchor, bound to this prompt.
+local function withAddOns(out, promptId, group)
+    if next(listAddOns) == nil or group == nil then return out end
+    local i = 1
+    while i <= #out do
+        local list = listAddOns[tostring(group) .. ':' .. tostring(out[i].id)]
+        if list then
+            for k = 1, #list do
+                local a = list[k]
+                i = i + 1
+                table.insert(out, i, {
+                    id        = ('+%s:%s'):format(a.owner, a.id),
+                    icon      = addOnText(a.icon, promptId),
+                    label     = addOnText(a.label, promptId),
+                    image     = a.image,
+                    holdMs    = tonumber(a.holdMs),
+                    condition = function() return a.can(promptId) end,
+                    callback  = function() a.act(promptId) end,
+                })
+            end
+        end
+        i = i + 1
+    end
+    return out
+end
+
+--- Normalise a registration's options into a list, with what other resources added to it (listAddOns).
+---@param promptId string|nil
+---@param group string|nil
 ---@return table options
-local function buildOptions(data)
+local function buildOptions(data, promptId, group)
     local src = data.options
     if type(src) == 'table' and #src > 0 then
         local out = {}
@@ -172,11 +220,11 @@ local function buildOptions(data)
                 holdMs    = tonumber(o.holdMs),
             }
         end
-        return out
+        return withAddOns(out, promptId, group)
     end
 
     -- The implicit option inherits icon, label and callback from the prompt.
-    return { { id = 'default' } }
+    return withAddOns({ { id = 'default' } }, promptId, group)
 end
 
 --- Rebuild which options are offerable and keep the selection valid. `_avail` holds indices into `options`,
@@ -339,7 +387,9 @@ function Interactions.register(data)
         -- Each option used plays the hand press towards the circle (client/interact_press.lua).
         press = data.press == true,
 
-        options = buildOptions(data),
+        options = buildOptions(data, id, data.group or 'default'),
+        -- The options as given, so the list can be built again when another resource adds to it (listAddOns).
+        _src    = data.options,
 
         -- Called when this prompt stops being the focused one.
         onBlur = data.onBlur,
@@ -526,12 +576,95 @@ function Interactions.setOptions(id, options)
     data.options = buildOptions({
         options = options,
         icon = data.icon, label = data.label, callback = data.callback,
-    })
+    }, id, data.group)
+    data._src = options
 
     data._sel = 1
     -- The next score frame rebuilds the available list.
     data._availN = nil
 end
+
+--- Every prompt of `group` builds its list again (an option added to or taken off one of its lists).
+local function rebuildGroup(group)
+    for id, data in pairs(registry) do
+        if data.group == group then
+            -- Typed digits must not be submitted against a shifted selection.
+            if inputState and inputState.id == id then endInput(true) end
+            data.options = buildOptions({
+                options = data._src,
+                icon = data.icon, label = data.label, callback = data.callback,
+            }, id, group)
+            data._availN = nil
+        end
+    end
+end
+
+--- Add an option to every list holding the option `listKey` names ('<group>:<option id>', 'atm:balance'), right after
+--- it. `owner`'s option of the same id again replaces it. client/actions.lua's at = { list } is the public way in.
+---@param owner string
+---@param listKey string
+---@param option table { id, label, icon?, image?, holdMs?, can(pid), act(pid) }
+---@return boolean ok
+---@return string|nil why
+function Interactions.addListOption(owner, listKey, option)
+    local group, anchor
+    if type(listKey) == 'string' then group, anchor = listKey:match('^(.-):(.+)$') end
+    if not group or group == '' or not anchor then
+        return false, "a list is named '<prompt group>:<option id>' ('atm:balance')"
+    end
+    if type(option) ~= 'table' or option.id == nil or option.can == nil or option.act == nil then
+        return false, 'an option is { id, label, can, act }'
+    end
+    local list = listAddOns[listKey]
+    if not list then list = {}; listAddOns[listKey] = list end
+    local add = {
+        owner = tostring(owner), id = tostring(option.id), label = option.label, icon = option.icon,
+        image = option.image, holdMs = option.holdMs, can = option.can, act = option.act,
+    }
+    local replaced = false
+    for i = 1, #list do
+        if list[i].owner == add.owner and list[i].id == add.id then
+            list[i] = add
+            replaced = true
+            break
+        end
+    end
+    if not replaced then list[#list + 1] = add end
+    rebuildGroup(group)
+    return true
+end
+
+--- Take `owner`'s option `id` off the list `listKey` names.
+---@return boolean removed
+function Interactions.removeListOption(owner, listKey, id)
+    local list = listAddOns[listKey]
+    if not list then return false end
+    for i = #list, 1, -1 do
+        if list[i].owner == tostring(owner) and list[i].id == tostring(id) then
+            table.remove(list, i)
+            if #list == 0 then listAddOns[listKey] = nil end
+            rebuildGroup((listKey:match('^(.-):')))
+            return true
+        end
+    end
+    return false
+end
+
+-- A stopping resource's added options go with it (its own stop handler cannot reach this table)
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() then return end
+    local groups = {}
+    for key, list in pairs(listAddOns) do
+        for i = #list, 1, -1 do
+            if list[i].owner == res then
+                table.remove(list, i)
+                groups[key:match('^(.-):')] = true
+            end
+        end
+        if #list == 0 then listAddOns[key] = nil end
+    end
+    for group in pairs(groups) do rebuildGroup(group) end
+end)
 
 --- Change how close you have to be to an existing point. Absolute metres; nil means the Config
 --- default. Does not touch `sizeRange`.

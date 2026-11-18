@@ -97,17 +97,18 @@ RegisterNUICallback('smPlaceSpot', function(data, cb)
         name = 'Shop spot',
         solo = SPOT_GROUP,
         hud = {
-            title = 'Where the shopkeeper stands',
-            sub = name,
-            rows = {
-                { label = 'Stand', value = 'where they will stand' },
-                { label = 'Face', value = 'the way they will face' },
-            },
+            house = true, icon = 'pin', title = 'Shopkeeper spot',
+            sub = 'Stand where they will stand, facing their way', chip = { text = name },
+            rows = {},
+            -- Enter (A on a pad), as the other placers put things down.
             hints = {
-                { key = 'E', text = 'Here' },
-                { key = 'Esc', text = 'Back' },
+                { key = 'Enter', pad = 'a', text = 'They stand here' },
+                { key = 'C', pad = 'b', text = 'Cancel' },
             },
         },
+        -- Enter (201, 18) and C (26) read, held off so they do not also fire underneath; melee too, which a
+        -- pad's B also is. Walking is left alone: you walk to the spot.
+        block = { controls = { 18, 26, 140, 141, 142, 201 } },
         onFrame = function()
             local ped = PlayerPedId()
             local c = GetEntityCoords(ped)
@@ -123,10 +124,11 @@ RegisterNUICallback('smPlaceSpot', function(data, cb)
                     { label = 'Facing', value = ('%.0f°'):format(h) },
                 } })
             end
-            if IsControlJustPressed(0, 38) then
+            if WhipKeyPressed(201, 201) or (not WhipLastInputIsPad() and IsDisabledControlJustPressed(0, 18)) then
                 WhipPanelData('shops', 'spot', { x = c.x, y = c.y, z = c.z, heading = h })
                 return 'exit'
             end
+            if WhipCancelJustPressed() then return 'exit' end
         end,
     })
     cb({ ok = started == true })
@@ -178,14 +180,17 @@ RegisterNUICallback('smPreviewKeeper', function(data, cb)
         ped = nil
     end
 
+    -- How the one shown stands, in the card's chip: loading, ready, or why not.
     local function showHud(status, tone)
         local model, name = entry(index)
-        EditorHud.update({ rows = {
-            { label = 'Who', value = name },
-            { label = 'Model', value = model },
-            { label = 'Look', value = ('%d of %d'):format(index, #list) },
-            { label = 'Now', value = status, tone = tone },
-        } })
+        EditorHud.update({
+            chip = { text = status, tone = tone },
+            rows = {
+                { label = 'Who', value = name },
+                { label = 'Model', value = model },
+                { label = 'Look', value = ('%d of %d'):format(index, #list) },
+            },
+        })
     end
 
     local function show()
@@ -195,10 +200,10 @@ RegisterNUICallback('smPreviewKeeper', function(data, cb)
         local hash = GetHashKey(model)
         if not (IsModelInCdimage(hash) and IsModelAPed(hash)) then
             removePed()
-            showHud('this game does not have them', 'warn')
+            showHud('Not in this game', 'warn')
             return
         end
-        showHud('loading…')
+        showHud('Loading')
         CreateThread(function()
             LoadModel(hash, PREVIEW_LOAD_MS)   -- whip's loader, not a hand-written loop (audit 20, ARC-1)
             if mine ~= token or not live then
@@ -207,7 +212,7 @@ RegisterNUICallback('smPreviewKeeper', function(data, cb)
             end
             if not HasModelLoaded(hash) then
                 removePed()
-                showHud('could not be loaded', 'warn')
+                showHud('Did not load', 'warn')
                 return
             end
             removePed()
@@ -215,14 +220,14 @@ RegisterNUICallback('smPreviewKeeper', function(data, cb)
             SetModelAsNoLongerNeeded(hash)
             if not ped or ped == 0 then
                 ped = nil
-                showHud('could not be made', 'warn')
+                showHud('Could not be made', 'warn')
                 return
             end
             FreezeEntityPosition(ped, true)
             SetEntityInvincible(ped, true)
             SetBlockingOfNonTemporaryEvents(ped, true)
             TaskStartScenarioInPlace(ped, PREVIEW_SCENARIO, 0, true)
-            showHud('as the shop will have them', 'ok')
+            showHud('Ready', 'ok')
         end)
     end
 
@@ -236,15 +241,15 @@ RegisterNUICallback('smPreviewKeeper', function(data, cb)
     local started = PropertyEditor.start({
         name = 'Shopkeeper preview',
         solo = SPOT_GROUP,
+        padBack = true,   -- B goes back, as Esc does
         hud = {
-            title = 'Shopkeeper',
-            sub = shopName,
+            house = true, icon = 'ped', title = 'Shopkeeper', sub = shopName,
             rows = {},
             hints = {
-                { key = '←/→', text = 'Next look' },
-                { key = 'Mouse', text = 'Turn round' },
-                { key = Interactions.keyName(), text = 'Choose' },   -- the Interact key (WhipAcceptJustPressed)
-                { key = 'Esc', text = 'Back' },
+                { key = '← / →', pad = { 'dpad_left', 'dpad_right' }, text = 'Next look' },
+                { key = 'Mouse', pad = 'rs', text = 'Turn round' },
+                { key = Interactions.keyName(), pad = 'a', text = 'Choose them' },   -- the Interact key (WhipAcceptJustPressed)
+                { key = 'Esc', pad = 'b', text = 'Back' },
             },
         },
         onExit = function()

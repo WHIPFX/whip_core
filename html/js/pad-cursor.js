@@ -60,12 +60,19 @@ const AFTER_TYPING_MS = 250;
 // about 100 means unzoomed. Measured once per box, for every cursor.
 const zoomFix = new WeakMap();
 
-function rectScale(node) {
+/** The zoom a node is drawn at: `k`, the product of its own and its ancestors' CSS zoom (the /whip panel's one zoom),
+ *  and `host`, the nearest zoomed box (null when there is none). Also ui-controls.js's, to draw a list at that size. */
+export function zoomChain(node) {
     let k = 1, host = null;
     for (let n = node; n && n !== document.documentElement; n = n.parentElement) {
         const z = parseFloat(getComputedStyle(n).zoom);
         if (z > 0 && Math.abs(z - 1) > 0.001) { k *= z; if (!host) host = n; }
     }
+    return { k, host };
+}
+
+function rectScale(node) {
+    const { k, host } = zoomChain(node);
     if (!host || Math.abs(k - 1) < 0.01) return 1;
     if (zoomFix.has(host)) return zoomFix.get(host);
     const probe = document.createElement('div');

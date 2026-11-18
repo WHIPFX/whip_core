@@ -6,11 +6,59 @@
 -- Three SecureCallbacks: the ATM is a prompt waiting for an answer, so they RETURN it (did it work,
 -- and if not, why not, in words it can put on the badge) rather than firing a toast.
 --
--- About proximity: these have no `near` clause, because there is no server-side list of ATM
--- positions (machines are found from their MODEL on the client, client/atm.lua, so any map works).
+-- About proximity: these have no `near` clause. WHIP's machines are found from their MODEL on the client
+-- (client/atm.lua), so any map works; the position list below holds GTA's own machines only.
 -- A client could call these from anywhere. That does NOT let anyone create money: the permission,
 -- balance and cash-held checks and the chk_balance_nonneg constraint all run here on the server.
 -- What it costs is the ROLEPLAY constraint of standing at a machine.
+
+-- ============================================
+-- Where the machines are (IsNearAtm, GetNearestAtm)
+-- ============================================
+--
+-- For a resource that wants the standing-at-a-machine rule whip's own callbacks above leave out (an ATM resource of
+-- its own): GTA's own machines (server/atm_positions.lua, from the game's map) and config.lua's AtmExtraPositions. A
+-- machine's point is its base on the floor, so the distance is measured across the ground, with the height held to
+-- ATM_HEIGHT_SLACK (a machine on the floor below is not this one).
+
+local ATM_HEIGHT_SLACK = 3.0
+
+--- The machine nearest `x, y, z` across the ground within that height slack: its point and distance, or nil.
+local function nearestAtm(x, y, z)
+    local best, bestD = nil, nil
+    local function consider(p)
+        local px, py, pz = tonumber(p and p.x), tonumber(p and p.y), tonumber(p and p.z)
+        if not (px and py and pz) or math.abs(pz - z) > ATM_HEIGHT_SLACK then return end
+        local d = math.sqrt((px - x) ^ 2 + (py - y) ^ 2)
+        if not bestD or d < bestD then best, bestD = p, d end
+    end
+    for _, p in ipairs(AtmPositions or {}) do consider(p) end
+    for _, p in ipairs(Config.AtmExtraPositions or {}) do consider(p) end
+    if not best then return nil end
+    return vector3(best.x + 0.0, best.y + 0.0, best.z + 0.0), bestD
+end
+
+--- The cash machine nearest a place: GetNearestAtm(coords) -> vector3 at its base and the distance across the ground,
+--- or nil when none is within the height slack of it.
+exports('GetNearestAtm', function(coords)
+    local x, y, z = tonumber(coords and coords.x), tonumber(coords and coords.y), tonumber(coords and coords.z)
+    if not (x and y and z) then return nil end
+    return nearestAtm(x, y, z)
+end)
+
+--- Is this player standing at a cash machine? IsNearAtm(source, range?) -> true and the machine's point, or false and
+--- why. range: metres across the ground, 0.5-10, default Config.AtmActiveRange + 1 (the prompt's reach and a step).
+exports('IsNearAtm', function(source, range)
+    local ped = GetPlayerPed(tonumber(source) or -1)
+    if not ped or ped == 0 then return false, 'Player not available' end
+    local r = tonumber(range) or ((Config.AtmActiveRange or 1.4) + 1.0)
+    if r ~= r then r = 2.4 end
+    r = math.max(0.5, math.min(10.0, r))
+    local c = GetEntityCoords(ped)
+    local at, d = nearestAtm(c.x, c.y, c.z)
+    if not at or d > r then return false, 'Not at a cash machine' end
+    return true, at
+end)
 
 -- ============================================
 -- Reading the accounts

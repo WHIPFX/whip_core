@@ -232,13 +232,17 @@ class Minimap {
         this.dataVer = data.ver;
         for (const [id, el] of this.blipEls) {
             const b = data.blips.get(id);
-            if (!b || el._sprite !== b.sprite || el._colour !== b.colour) { el.remove(); this.blipEls.delete(id); }
+            if (!b || el._sprite !== b.sprite || el._colour !== b.colour || el._number !== b.number) {
+                el.remove();
+                this.blipEls.delete(id);
+            }
         }
         for (const [id, b] of data.blips) {
             if (this.blipEls.has(id)) continue;
-            const el = blipImage(b.sprite, b.colour);
+            const el = blipImage(b.sprite, b.colour, b.number);
             el._sprite = b.sprite;
             el._colour = b.colour;
+            el._number = b.number;
             el.style.display = 'none';
             this.marksEl.appendChild(el);
             this.blipEls.set(id, el);

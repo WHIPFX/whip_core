@@ -82,15 +82,20 @@ function InteriorRooms.boxOf(id, key)
 end
 
 --- The room of interior `id` holding a point, or nil.
-function InteriorRooms.roomAt(id, x, y, z)
+---
+--- `prefer` (optional): a room key that wins when its box holds the point. Room boxes are rough and
+--- can overlap well beyond doorways (the Diamond Casino's gaming floors); the game's own room for the
+--- player follows them through doorways, so it settles which of the boxes a point near them is in.
+function InteriorRooms.roomAt(id, x, y, z, prefer)
     local r = InteriorRooms.of(id)
     if not r then return nil end
     local lx, ly, lz = PropertyMath.toLocal(r.place, x, y, z)
     local best = nil
     for _, room in ipairs(r.list) do
         if lx >= room.mn[1] and lx <= room.mx[1] and ly >= room.mn[2] and ly <= room.mx[2]
-            and lz >= room.mn[3] and lz <= room.mx[3] and (not best or room.vol < best.vol) then
-            best = room
+            and lz >= room.mn[3] and lz <= room.mx[3] then
+            if prefer and sameKey(room.key, prefer) then return room end
+            if not best or room.vol < best.vol then best = room end
         end
     end
     return best
@@ -106,23 +111,39 @@ end
 ---@return table|nil room { id, alt, key, name }, boolean inInterior  whether the game puts an interior here at all
 --- The room of interior `id` holding the point, as find answers it, or nil. (Its own function, not a
 --- closure in find: a free camera asks find nearly every frame, and it builds nothing it can avoid.)
-local function roomOf(id, x, y, z, at, mine, hint)
-    local room = InteriorRooms.roomAt(id, x, y, z)
+local function roomOf(id, x, y, z, at, mine, hint, prefer)
+    local room = InteriorRooms.roomAt(id, x, y, z, prefer)
     if not room then return nil end
     -- The other way of naming it, for a native that will not take this one.
     local alt = (id == at) and ((mine ~= 0 and mine) or hint) or at
     return { id = id, alt = alt, key = room.key, name = room.name }
 end
 
-function InteriorRooms.find(x, y, z, hint)
+--- `prefer` (optional): a room key that wins over a smaller overlapping box (InteriorRooms.roomAt).
+function InteriorRooms.find(x, y, z, hint, prefer)
     local at = GetInteriorAtCoords(x, y, z)
     local mine = GetInteriorFromEntity(PlayerPedId())
     local h = hint or 0
     -- hint, then mine, then at: each number once
-    local found = h ~= 0 and roomOf(h, x, y, z, at, mine, hint) or nil
-    if not found and mine ~= 0 and mine ~= h then found = roomOf(mine, x, y, z, at, mine, hint) end
-    if not found and at ~= 0 and at ~= h and at ~= mine then found = roomOf(at, x, y, z, at, mine, hint) end
+    local found = h ~= 0 and roomOf(h, x, y, z, at, mine, hint, prefer) or nil
+    if not found and mine ~= 0 and mine ~= h then found = roomOf(mine, x, y, z, at, mine, hint, prefer) end
+    if not found and at ~= 0 and at ~= h and at ~= mine then found = roomOf(at, x, y, z, at, mine, hint, prefer) end
     return found, at ~= 0
+end
+
+--- The player's own room, as the game tracks it, for a camera within `near` metres of them (first person, a
+--- seat or close camera); nil further out or outside an interior. A free camera away from the player keeps
+--- "smallest wins": there the player's big room box is the wrong answer.
+function InteriorRooms.playerRoomNear(p, near)
+    if not GetRoomKeyFromEntity then return nil end
+    local ped = PlayerPedId()
+    if GetInteriorFromEntity(ped) == 0 then return nil end
+    local q = GetEntityCoords(ped)
+    local dx, dy, dz = p.x - q.x, p.y - q.y, p.z - q.z
+    if dx * dx + dy * dy + dz * dz > near * near then return nil end
+    local key = GetRoomKeyFromEntity(ped)
+    if not key or math.tointeger(key) == 0 then return nil end
+    return key
 end
 
 -- ---- filing entities ----

@@ -235,10 +235,27 @@ local function readLevel(raw, depth, count, under, warn)
             kids, why = readLevel(o.options, depth + 1, count, id, warn)
             if not kids then return false, why end
         end
+        -- Its own reach (on foot 2.5 m, from a car 7 m, on one point): held to the point's own range, as the point's
+        -- is. A menu's reach is its options' unless they give their own.
+        local reach
+        if o.reach ~= nil and o.reach ~= false then
+            reach = InteractSpec.number(o.reach, ('option "%s" reach'):format(id), 0.5, 25, warn) or nil
+        end
         out[#out + 1] = { id = id, label = o.label and Sanitize.string(o.label, 80, '') or nil, icon = o.icon, requires = req,
-                          options = kids }
+                          options = kids, reach = reach }
     end
     return out
+end
+
+--- The furthest any option in `list` (any level) reaches by its own `reach`, or nil when none has one.
+local function furthestOption(list)
+    local far
+    for _, o in ipairs(list or {}) do
+        if o.reach and (not far or o.reach > far) then far = o.reach end
+        local deeper = o.options and furthestOption(o.options)
+        if deeper and (not far or deeper > far) then far = deeper end
+    end
+    return far
 end
 
 --- The options. None given is one option that IS the point.
@@ -339,6 +356,13 @@ local function readDef(def, warn)
         audience = audience or 'everyone', enabled = def.enabled ~= false, onUse = def.onUse,
         talk = def.talk == true, quietFor = quietFor, style = style, holdMs = holdMs,
     }
+    -- An option that reaches further than the point (or the default) widens the prompt to it; each nearer option
+    -- is then held to its own on the player's game (client/runtime_points.lua) and here (useRuntimePoint).
+    local far = furthestOption(options)
+    if far and far > (reach or Config.InteractActiveRange or 2.0) then
+        out.promptReach = far
+        out.seeFrom = math.max(seeFrom or Config.InteractVisibleRange or 5.0, far)   -- seen as far as it reaches
+    end
     for k, v in pairs(at) do out[k] = v end
     return out
 end
@@ -381,7 +405,8 @@ local function wireOptions(list, src, player)
             local kids
             if o.options then kids = wireOptions(o.options, src, player) end
             if not kids or #kids > 0 then
-                out[#out + 1] = { id = o.id, label = o.label, icon = o.icon, requires = shownRequire(o.requires), options = kids }
+                out[#out + 1] = { id = o.id, label = o.label, icon = o.icon, requires = shownRequire(o.requires), options = kids,
+                                  reach = o.reach }
             end
         end
     end
@@ -449,7 +474,7 @@ local function wireFor(rec, src, player)
         if not any then return nil end
         return wirePlace(rec, {
             pointId = rec.pointId, owner = rec.owner, label = busy, icon = rec.icon,
-            reach = rec.reach, seeFrom = rec.seeFrom, focusMode = rec.focusMode, enabled = true, busy = busy,
+            reach = rec.promptReach or rec.reach, seeFrom = rec.seeFrom, focusMode = rec.focusMode, enabled = true, busy = busy,
             requires = shownRequire(rec.requires), options = { { id = 'busy', label = busy } },
             style = rec.style,
         })
@@ -458,7 +483,8 @@ local function wireFor(rec, src, player)
     if #opts == 0 then return nil end
     return wirePlace(rec, {
         pointId = rec.pointId, owner = rec.owner, label = rec.label, icon = rec.icon,
-        reach = rec.reach, seeFrom = rec.seeFrom, focusMode = rec.focusMode, enabled = rec.enabled,
+        reach = rec.promptReach or rec.reach, pointReach = rec.promptReach and (rec.reach or Config.InteractActiveRange or 2.0) or nil,
+        seeFrom = rec.seeFrom, focusMode = rec.focusMode, enabled = rec.enabled,
         requires = shownRequire(rec.requires), options = opts, style = rec.style, holdMs = rec.holdMs,
     })
 end
@@ -664,7 +690,7 @@ end
 local function viewOptions(list)
     local out = {}
     for _, o in ipairs(list) do
-        out[#out + 1] = { id = o.id, label = o.label, icon = o.icon, options = o.options and viewOptions(o.options) or nil }
+        out[#out + 1] = { id = o.id, label = o.label, icon = o.icon, reach = o.reach, options = o.options and viewOptions(o.options) or nil }
     end
     return out
 end
@@ -801,13 +827,19 @@ SecureEvent('whip_core:server:useRuntimePoint', {
     if not Audience.has(rec.audience, source) then return false, 'That is not for you' end
     local x, y, z = position(rec)
     if not (x and y and z) then return false, 'That is not available' end
-    local reach = (rec.reach or Config.InteractActiveRange or 2.0) + 2.0
-    if not IsPlayerNear(source, x, y, z, reach) then return false, 'Too far away' end
 
     -- The whole way down: a menu the player could not have opened (its own require) opens nothing.
     local opt, chain = optionAt(rec.options, optionId)
     if not opt then return false, 'That is not available' end
     ---@cast chain -nil   -- optionAt answers an option and its chain together
+
+    -- How close: the option's own reach, the deepest on its way down that gives one, else the point's.
+    local reach
+    for i = #chain, 1, -1 do
+        if chain[i].reach then reach = chain[i].reach break end
+    end
+    reach = (reach or rec.reach or Config.InteractActiveRange or 2.0) + 2.0
+    if not IsPlayerNear(source, x, y, z, reach) then return false, 'Too far away' end
 
     -- `alive` from the nearest that says (the option, the menus above it, the point): the client's
     -- rule for one option and its action, in client/actions.lua, carried down a menu.

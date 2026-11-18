@@ -293,6 +293,15 @@
     outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
+/* The shorthand above clears base.css's chevron: whip's, again, at the right. */
+.form-group select {
+    padding-right: 36px;
+    background-image: var(--ui-chevron);
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 12px;
+    cursor: pointer;
+}
 .form-group select option { background: var(--ui-select-option-bg); color: var(--ui-select-option-fg); }
 .form-group input:focus, .form-group select:focus {
     border-color: rgba(255, 255, 255, 0.4);

@@ -11,9 +11,14 @@
 -- spawn point removed or a key taken since the list was sent is refused, never trusted.
 --
 -- A choice: { id, kind = 'last'|'preset'|'property', label, x, y, z, heading }. `id` is 'last',
--- 'preset:<id>' or 'property:<propertyId>'. Only a name: the picker shows the name and its kind's icon (Josh).
+-- 'preset:<id>', 'property:<propertyId>' or 'res:<resource>:<id>' (RegisterSpawnPoint, below: drawn as a preset).
+-- Only a name: the picker shows the name and its kind's icon (Josh).
 
 SpawnChoices = {}
+
+-- The longest choice id the game may send back (server/player_lifecycle.lua reads it at this length): a registered
+-- point's 'res:<resource>:<id>' is the longest, and is refused at registering when it would be longer.
+SpawnChoices.ID_MAX = 96
 
 --- GTA's heading (degrees, 0 = north, counter-clockwise) for a direction on the ground.
 local function headingOf(dx, dy)
@@ -39,6 +44,83 @@ local function presetChoice(p)
         x = x, y = y, z = z, heading = num(pos.w) or 0.0,
     }
 end
+
+-- ============================================
+-- A resource's own spawn points (RegisterSpawnPoint)
+-- ============================================
+--
+-- Beside config.lua's: a gang's hideout, a job's depot, a hotel a housing script runs. Each resource's ids are its
+-- own (the registry is scoped), they go when it stops, and `canUse(charId)` can keep one to some characters. Listed
+-- after the config's, and read again live when picked, like every other choice.
+
+local MAX_REGISTERED = 30
+local registered = {}   -- ['<resource>:<id>'] = { label, x, y, z, heading, canUse }
+local spawnReg = Registry.new('SpawnPoint', { label = 'spawn point', store = registered, scoped = true, same = false })
+
+local callable = InteractSpec.callable   -- a function, or one handed over an export
+
+--- A registered point as a choice for this character, or nil when its canUse says no (or errs: fails closed).
+local function registeredChoice(key, rec, charId)
+    if rec.canUse then
+        local ok, yes = pcall(rec.canUse, charId)
+        if not ok then
+            print(('^3[whip_core] spawn point %s: canUse failed: %s^0'):format(key, tostring(yes)))
+            return nil
+        end
+        if yes ~= true then return nil end
+    end
+    return { id = 'res:' .. key, kind = 'preset', label = rec.label, x = rec.x, y = rec.y, z = rec.z, heading = rec.heading }
+end
+
+--- RegisterSpawnPoint's body: (true) or (false, why).
+function SpawnChoices.register(owner, id, def)
+    if type(id) ~= 'string' or #id > 24 or not id:match('^[%w_%-]+$') then
+        return false, 'a spawn point id is letters, digits, - and _ (at most 24)'
+    end
+    if type(def) ~= 'table' or callable(def) then return false, 'a spawn point is { label, pos, canUse? }' end
+    local pos = def.pos
+    local kind = type(pos)
+    if kind ~= 'table' and kind ~= 'vector3' and kind ~= 'vector4' then
+        return false, 'pos is a vector4 (or vector3) where they arrive'
+    end
+    local x, y, z = num(pos.x), num(pos.y), num(pos.z)
+    if not (x and y and z) then return false, 'pos is a vector4 (or vector3) where they arrive' end
+    if x < -4000 or x > 8000 or y < -7000 or y > 8000 or z < -200 or z > 2000 then return false, 'pos is outside the map' end
+    if def.label ~= nil and type(def.label) ~= 'string' then return false, 'label is text' end
+    if def.canUse ~= nil and not callable(def.canUse) then return false, 'canUse is a function(charId) that answers true' end
+    local key = spawnReg:keyOf(owner, id)
+    if #key + 4 > SpawnChoices.ID_MAX then   -- 'res:' .. key
+        return false, ('"%s" and the resource name together are longer than %d characters: use a shorter id'):format(id, SpawnChoices.ID_MAX - 4)
+    end
+    if registered[key] == nil then
+        local n = 0
+        for _ in pairs(registered) do n = n + 1 end
+        if n >= MAX_REGISTERED then return false, ('at most %d spawn points are registered at once'):format(MAX_REGISTERED) end
+    end
+    local label = def.label and Sanitize.string(def.label, 40, '') or ''
+    return spawnReg:add(owner, id, {
+        label = label ~= '' and label or id,
+        x = x, y = y, z = z, heading = (num(pos.w) or num(def.heading) or 0.0) % 360.0,
+        canUse = def.canUse,
+    })
+end
+
+--- RemoveSpawnPoint's body: only the caller's own.
+function SpawnChoices.remove(owner, id)
+    if type(id) ~= 'string' then return false, 'a spawn point id is text' end
+    return spawnReg:remove(owner, id)
+end
+
+--- Add a spawn point to the picker, beside config.lua's. RegisterSpawnPoint(id, { label, pos, canUse? }) ->
+--- true | false, why. The same id again replaces it; it goes when your resource stops.
+exports('RegisterSpawnPoint', function(id, def)
+    return SpawnChoices.register(Registry.caller(), id, def)
+end)
+
+--- Take one of yours out: RemoveSpawnPoint(id) -> true | false, why.
+exports('RemoveSpawnPoint', function(id)
+    return SpawnChoices.remove(Registry.caller(), id)
+end)
 
 local function presetById(id)
     for _, p in ipairs(Config.SpawnPoints or {}) do
@@ -89,6 +171,14 @@ function SpawnChoices.list(row)
         if c then out[#out + 1] = c end
     end
     local charId = tonumber(row.charId)
+    -- The resources' own, by resource then id (the same order every time).
+    local keys = {}
+    for key in pairs(registered) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        local c = registeredChoice(key, registered[key], charId)
+        if c then out[#out + 1] = c end
+    end
     if charId and Properties and Properties.forCharacter then
         local held = Properties.forCharacter(charId)
         for _, list in ipairs({ held.owned, held.keys }) do
@@ -110,7 +200,13 @@ function SpawnChoices.resolve(charId, spawnId)
     local c
     local presetId = spawnId:match('^preset:(.+)$')
     local propertyId = tonumber(spawnId:match('^property:(%d+)$'))
-    if presetId then
+    local resKey = spawnId:match('^res:(.+)$')
+    if resKey then
+        local rec = registered[resKey]
+        if not rec then return nil, 'That spawn point is not there any more' end
+        c = registeredChoice(resKey, rec, charId)
+        if not c then return nil, 'That spawn point is not yours to choose' end
+    elseif presetId then
         c = presetById(presetId)
         if not c then return nil, 'That spawn point is not there any more' end
     elseif propertyId then

@@ -244,9 +244,8 @@ end
 
 --- At start-up, after the properties: every running resource that declares themes.
 function PropertyThemes.scanAll()
-    for i = 0, GetNumResources() - 1 do
-        local res = GetResourceByFindIndex(i)
-        if res and res ~= GetCurrentResourceName() and GetResourceState(res) == 'started' then scan(res) end
+    for _, res in ipairs(AllResources()) do   -- each once: a provided name is its provider (server/helpers.lua)
+        if res ~= GetCurrentResourceName() and GetResourceState(res) == 'started' then scan(res) end
     end
     _ready = true
 end

@@ -69,13 +69,14 @@ end
 
 local function testHud()
     if not testing then return end
+    -- F9 and F5 are key bindings a player can move (makeKeys): a keyboard's alone, so a pad shows none.
     testing.hud = {
-        title = 'Testing',
-        sub = testing.name or '',
+        house = true, icon = 'objective', title = 'Testing', sub = testing.name or '',
+        chip = { text = 'Running', tone = 'ok' },
         rows = { { label = 'Card', value = 'waiting for you…' } },
         hints = {
-            { key = 'F9', text = 'Editor (it keeps running)' },
-            { key = 'F5', text = 'Start it again' },
+            { key = 'F9', pad = false, text = 'Editor (it keeps running)' },
+            { key = 'F5', pad = false, text = 'Start it again' },
         },
     }
     EditorHud.show(testing.hud)
@@ -359,24 +360,46 @@ RegisterNUICallback('systemsPlace', function(d, cb)
     SendNUIMessage({ action = 'systemsHide' })
 
     local x, y, z, valid = 0.0, 0.0, 0.0, false
-    local label = type(d.label) == 'string' and d.label ~= '' and d.label or 'a place'
+    local label = type(d.label) == 'string' and d.label ~= '' and d.label or 'A place'
+    local pad, padHeld = false, false
+    local nextHud, lastValid = 0, nil
+
+    -- The house card (the container placer's): the place's name, whether it is a point or a line's end, and the
+    -- keys, a controller's when one is in hand. Enter puts it, as the other placers put things down.
+    local function card(line)
+        local rows = { { label = 'Aim', value = valid and ('%.1f, %.1f'):format(x, y) or 'nothing in reach',
+                         tone = not valid and 'warn' or nil } }
+        if line then rows[2] = { label = 'Line', value = line } end
+        return {
+            house = true, icon = 'pin', title = label,
+            sub = partner and 'The other end is shown' or 'Aim at the ground',
+            chip = { text = partner and 'Line end' or 'Point' },
+            rows = rows,
+            hints = {
+                { key = 'Enter', pad = 'a', text = 'Put it here', off = not valid },
+                { key = 'C', pad = 'b', text = 'Cancel' },
+            },
+        }
+    end
+
+    -- On a pad, held while it places: Menu (named, so the pause menu stands aside), X's jump, Y's get-in.
+    local function holdPad(on)
+        if on == padHeld then return end
+        padHeld = on
+        if on then ControlBlocks.hold('systemsPlacePad', { controls = { 199, 22, 23 } })
+        else ControlBlocks.release('systemsPlacePad') end
+    end
+
     local started = PropertyEditor.start({
         name = 'Systems: place',
-        hud = {
-            title = 'Place ' .. label,
-            sub = partner and 'a line: the other end is shown' or 'aim at the ground',
-            rows = { { label = 'Aim', value = 'at the floor' } },
-            hints = {
-                { key = 'E', text = 'Here' },
-                { key = 'C', text = 'Cancel' },
-                { key = 'Esc', text = 'Back' },
-            },
-        },
-        -- Weapon scroll, getting in, shooting, aiming, the wheel, cover, melee: held off for the mode by the
-        -- editor's control block. And C (26), the cancel, so it does not swing the camera round as well; read
-        -- with the disabled reader.
-        block = { controls = { 14, 15, 16, 17, 23, 24, 25, 26, 37, 44, 140 } },
+        hud = card(nil),
+        -- Weapon scroll, getting in, shooting, aiming, the wheel, cover, melee, Enter (201, 18): held off for the
+        -- mode by the editor's control block. And C (26), the cancel, so it does not swing the camera round as
+        -- well; read with the disabled reader.
+        block = { controls = { 14, 15, 16, 17, 23, 24, 25, 26, 37, 44, 140, 141, 142, 201, 18 } },
         onFrame = function()
+            pad = WhipLastInputIsPad()
+            holdPad(pad)
             local cam = GetFinalRenderedCamCoord()
             local fx, fy, fz = InteractGetCameraForward()
             local ray = StartShapeTestRay(cam.x, cam.y, cam.z, cam.x + fx * REACH, cam.y + fy * REACH, cam.z + fz * REACH,
@@ -400,18 +423,24 @@ RegisterNUICallback('systemsPlace', function(d, cb)
                 DrawMarker(25, x, y, z + 0.02, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 0.8, MARK.r, MARK.g, MARK.b, 200,
                     false, false, 2, false, (nil) --[[@as string]], (nil) --[[@as string]], false)
             end
-            EditorHud.update({ rows = {
-                { label = 'Aim', value = valid and ('%.1f, %.1f'):format(x, y) or 'nothing in reach', tone = valid and 'ok' or 'warn' },
-                partner and valid and { label = 'Line', value = ('%.1f m long'):format(#(vector3(x, y, z) - partner)) } or nil,
-            } })
-            if valid and IsControlJustPressed(0, 38) then
+            -- The card: at once when the aim finds or loses the ground, else five times a second.
+            local now = GetGameTimer()
+            if valid ~= lastValid then nextHud = 0 end
+            lastValid = valid
+            if now >= nextHud then
+                nextHud = now + 200
+                EditorHud.update(card(partner and valid and ('%.1f m long'):format(#(vector3(x, y, z) - partner)) or nil))
+            end
+            if valid and (WhipKeyPressed(201, 201) or (not pad and IsDisabledControlJustPressed(0, 18))) then
                 SendNUIMessage({ action = 'systemsPlaced', node = d.node, key = d.key,
                                  coords = { x = x, y = y, z = z, heading = GetEntityHeading(PlayerPedId()) } })
                 return 'exit'
             end
-            if IsDisabledControlJustPressed(0, 26) then return 'exit' end
+            -- C / B: nothing placed. Menu on a pad too (Esc is the mode's own).
+            if WhipCancelJustPressed() or (pad and WhipKeyPressed(nil, 199)) then return 'exit' end
         end,
         onExit = function(reason)
+            holdPad(false)
             if reason == 'died' then close()
             elseif reason ~= 'stopped' then show() end
         end,

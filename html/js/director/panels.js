@@ -13,6 +13,7 @@
 import { escapeHtml, propImageUrl, vehicleImageUrl, pedImageUrl, itemImageUrl } from '../utils.js';
 import { plural, dateTime, clock, money } from '../wp/format.js';
 import { GLYPHS } from '../furnisher-data.js';
+import { uiIcon, ICON_PATH } from '../ui-icons.js';
 import { getItemDefs } from '../core/item-defs.js';
 import { groupCards } from './search.js';
 import { findNode, findWorld, usesOfWorld, usesOfVar, problemCards, variantList } from './doc.js';
@@ -36,14 +37,14 @@ export const isTab = (id) => TABS.some((t) => t.id === id);
 /** The column's icons: 24x24, drawn in currentColor. */
 const svg = (d, w) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w || 2.2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 export const ICON = {
-    back: svg('<path d="M15 5l-7 7 7 7"/>', 2.4),
-    close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+    back: svg(ICON_PATH.back, 2.4),
+    close: svg(ICON_PATH.close),
     undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
     redo: svg('<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
-    plus: svg('<path d="M12 5v14M5 12h14"/>', 2.4),
+    plus: svg(ICON_PATH.plus, 2.4),
     search: svg('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),
     bin: svg('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/>', 2),
-    open: svg('<path d="M9 5l7 7-7 7"/>', 2.4),
+    open: svg(ICON_PATH.forward, 2.4),
     box: svg('<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>', 1.8),
     gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', 1.8),
 };
@@ -114,7 +115,7 @@ function timeField(t, k, value, o = {}) {
         + ` value="${total === null ? '' : n}" placeholder="${n}" data-t="${e(t)}" data-k="${e(k)}" data-f="dhms" data-part="${p}"`
         + ` aria-label="${word}" spellcheck="false"><span class="dr-dhms-u">${p}</span>`
         + `<button class="dr-dhms-dd" type="button" data-act="dhms-pick" data-part="${p}" aria-label="Pick ${word}">`
-        + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>').join('');
+        + '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON_PATH.down + '</svg></button></div>').join('');
     return `<div class="dr-row">${label(o.label || k, o.hint)}<div class="dr-dhms${o.units === 'hms' ? ' hms' : ''}">${boxes}</div></div>`;
 }
 
@@ -2644,9 +2645,9 @@ function variantsGroup(ed, s, variants) {
     }
     html += '<div class="dr-vorder">' + order.map((id, i) => `<div class="dr-vorder-row"><span class="dr-vorder-n">${numOf(id)}</span>`
         + `<span class="dr-vorder-name">${e(nameOf(id))}</span>`
-        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="-1" aria-label="Earlier"${i === 0 ? ' disabled' : ''}>↑</button>`
-        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="1" aria-label="Later"${i === order.length - 1 ? ' disabled' : ''}>↓</button>`
-        + `<button class="dr-ibtn" data-act="vorder-remove" data-i="${i}" aria-label="Take it out of the list">×</button></div>`).join('') + '</div>';
+        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="-1" aria-label="Earlier"${i === 0 ? ' disabled' : ''}>${uiIcon('up')}</button>`
+        + `<button class="dr-ibtn" data-act="vorder-move" data-i="${i}" data-by="1" aria-label="Later"${i === order.length - 1 ? ' disabled' : ''}>${uiIcon('down')}</button>`
+        + `<button class="dr-ibtn" data-act="vorder-remove" data-i="${i}" aria-label="Take it out of the list">${uiIcon('close')}</button></div>`).join('') + '</div>';
     const left = variants.filter((v) => !order.includes(v.id));
     if (left.length) {
         html += '<div class="dr-btns dr-btns-tight">' + left.map((v) => `<button class="dr-btn ghost" data-act="vorder-add" data-id="${e(v.id)}">+ ${numOf(v.id)} · ${e(nameOf(v.id))}</button>`).join('') + '</div>'

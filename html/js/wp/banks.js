@@ -705,7 +705,7 @@ function buildAccountPage() {
     els.body.innerHTML = '';
     const a = account.account;
 
-    const back = WP.btn('← Back to ' + (dash ? dash.name : 'the list'), 'bkAccountBack', 'ghost');
+    const back = WP.backBtn('Back to ' + (dash ? dash.name : 'the list'), 'bkAccountBack');
     back.classList.add('wp-log-back');
     els.body.appendChild(back);
 

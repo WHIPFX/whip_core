@@ -1163,31 +1163,68 @@ end
 -- Config Seeding (garages pattern)
 -- ============================================
 
-function Shops.seedFromConfig()
-    if not Config.Shops then return end
+--- A shop config describes (a Config.Shops entry's shape), made under `key` when no shop has it. Answers the new
+--- shop, or nil when there was one already (false and why when it could not be made).
+local function seedOne(key, data)
+    if Shops._keyIndex[key] then return nil end
+    local x, y, z, h = data.pos.x, data.pos.y, data.pos.z, data.pos.w or 0.0
+    return Shops.create({
+        key        = key,
+        name       = data.name or 'Shop',
+        mode       = data.mode or 'npc',
+        jobId      = data.jobId,
+        containerId = data.containerId,
+        npcModel   = data.npcModel,
+        prop       = data.prop,
+        x          = x,
+        y          = y,
+        z          = z,
+        heading    = h,
+        blipSprite = data.blipSprite,
+        blipColor  = data.blipColor or 2,
+        catalog    = data.catalog,
+        settings   = data.settings,
+    })
+end
 
-    for key, data in pairs(Config.Shops) do
-        if not Shops._keyIndex[key] then
-            local x, y, z, h = data.pos.x, data.pos.y, data.pos.z, data.pos.w or 0.0
-            Shops.create({
-                key        = key,
-                name       = data.name or 'Shop',
-                mode       = data.mode or 'npc',
-                jobId      = data.jobId,
-                containerId = data.containerId,
-                npcModel   = data.npcModel,
-                prop       = data.prop,
-                x          = x,
-                y          = y,
-                z          = z,
-                heading    = h,
-                blipSprite = data.blipSprite,
-                blipColor  = data.blipColor or 2,
-                catalog    = data.catalog,
-                settings   = data.settings,
-            })
+-- The GTA stores this server has ever had (whip_core's KVP): each is made ONCE, so one deleted in /whip > Shops stays
+-- deleted, the setting on or not.
+local GTA_MADE_KVP = 'shops:gtaStoresMade'
+local gtaSeeding = false   -- one pass at a time: a quick off and on again does not start a second
+
+--- GTA's own 24/7s and LTDs (server/gta_stores.lua), while Config.GtaStores is on: a keeper behind the till, a map
+--- icon, Config.GtaStoreCatalog. Called at start (seedFromConfig) and when the setting is turned on.
+function Shops.seedGtaStores()
+    if gtaSeeding or Config.GtaStores ~= true or type(GtaStores) ~= 'table' then return end
+    gtaSeeding = true
+    local ok, err = pcall(function()
+        local okJson, made = pcall(json.decode, GetResourceKvpString(GTA_MADE_KVP) or '')
+        made = okJson and type(made) == 'table' and made or {}
+        local changed = false
+        for _, s in ipairs(GtaStores) do
+            if not made[s.key] and (Shops._keyIndex[s.key] or seedOne(s.key, { name = s.name,
+                    npcModel = 'mp_m_shopkeep_01', pos = s.pos, blipSprite = 52,
+                    catalog = Config.GtaStoreCatalog or { food = 50, drink = 30 } })) then
+                made[s.key] = true
+                changed = true
+            end
         end
-    end
+        if changed then SetResourceKvp(GTA_MADE_KVP, json.encode(made)) end
+    end)
+    gtaSeeding = false
+    if not ok then print(('^1[whip_core:shops] GTA stores: %s^0'):format(tostring(err))) end
+end
+
+-- Turned on in /whip > Settings: the ones not made yet, now (in a thread of its own: each is a database write). Not
+-- before start-up has read the shops (Shops.seeded): until then the start's own seeding makes them.
+Settings.onChange('GtaStores', function(on)
+    if on == true and Shops.seeded then CreateThread(Shops.seedGtaStores) end
+end)
+
+function Shops.seedFromConfig()
+    Shops.seedGtaStores()
+    Shops.seeded = true
+    for key, data in pairs(Config.Shops or {}) do seedOne(key, data) end
 end
 
 -- ============================================
@@ -1757,8 +1794,13 @@ function Shops.ensureShop(key, data, caller)
     local existing = Shops.getByKey(key)
     if not existing then
         fields.key = key
-        fields.settings = fields.settings or {}
-        fields.settings.ensured = ensured
+        -- A table of its own: fields.settings is the declaration's (d.settings), and the declaration is inside
+        -- `ensured`, so putting `ensured` into that same table made it contain itself (the save then failed with
+        -- "maximum table nesting depth exceeded" for any EnsureShop given settings).
+        local settings = {}
+        for k, v in pairs(type(fields.settings) == 'table' and fields.settings or {}) do settings[k] = v end
+        settings.ensured = ensured
+        fields.settings = settings
         return Shops.create(fields)
     end
 

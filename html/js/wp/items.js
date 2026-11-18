@@ -827,7 +827,7 @@ WhipPanel.registerSection({
 
         els.detail = WP.el('div', 'wp-detail cfg-detail');
         // Back to the items at a glance, over an item's page (as the Item Log's "Back to everything").
-        els.back = WP.btn('← All items', 'ibBack', 'ghost');
+        els.back = WP.backBtn('All items', 'ibBack');
         els.back.classList.add('wp-log-back');
         els.back.style.display = 'none';
         els.detail.appendChild(els.back);

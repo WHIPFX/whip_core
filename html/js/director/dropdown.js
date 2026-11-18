@@ -15,12 +15,13 @@
 
 import { escapeHtml } from '../utils.js';
 import { screenRect } from '../pad-cursor.js';
+import { ICON_PATH } from '../ui-icons.js';
 
 const e = escapeHtml;
 const SEARCH_AT = 9;   // options from which the list has a search box
 
-const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-const TICK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON_PATH.down + '</svg>';
+const TICK = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON_PATH.check + '</svg>';
 
 let open = null;   // { el, anchor, close } while a list is up
 
@@ -30,8 +31,11 @@ export function isDropdownOpen() { return !!open; }
 /** Its list down (a redraw, Esc from elsewhere). */
 export function closeDropdown() { if (open) open.close(); }
 
+/** The box (or select) the list is up from, or null. */
+export function dropdownAnchor() { return open ? open.anchor : null; }
+
 /** A select's choices as the list shows them: [{ group } | { value, label, pic, sub, disabled }]. */
-function choicesOf(sel) {
+export function choicesOf(sel) {
     const out = [];
     const add = (o) => out.push({ value: o.value, label: o.textContent, pic: o.dataset.pic || '', sub: o.dataset.sub || '',
                                   disabled: o.disabled });
@@ -102,7 +106,10 @@ export function watchSelects(target) {
 }
 
 /** A list of `items` ([{ group } | { value, label, pic, sub, disabled }]) under `anchor`; onPick(value). Used by the
- *  boxed selects and by any other box (a time field's units). o: { search, label }. */
+ *  boxed selects, by any other box (a time field's units) and by every other screen's selects (ui-controls.js).
+ *  o: { search, label, zoom, focus }: zoom, when given, is the list's own instead of the Director's (--dr-zoom), so a
+ *  list opened from a screen zoomed otherwise (the /whip panel) is drawn at that screen's size. focus: what has the keys
+ *  again once the list is put away (Esc or a pick), when the anchor cannot take them (a field's capsule). */
 export function openChoices(anchor, items, current, onPick, o = {}) {
     closeDropdown();
     const el = document.createElement('div');
@@ -121,6 +128,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     document.body.appendChild(el);
 
     const list = el.firstElementChild;
+    if (o.zoom > 0) list.style.zoom = String(o.zoom);
     const find = el.querySelector('.dr-dd-find');
     const opts = () => [...el.querySelectorAll('.dr-dd-opt')].filter((b) => !b.hidden && !b.disabled);
 
@@ -138,6 +146,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     const pick = (b) => {
         const it = items[Number(b.dataset.i)];
         close();
+        if (o.focus) o.focus.focus();
         if (it) onPick(it.value);
     };
     const filter = () => {
@@ -165,7 +174,7 @@ export function openChoices(anchor, items, current, onPick, o = {}) {
     });
     // The list's own keys, before the page's (the router listens on the document, after this).
     el.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); close(); anchor.focus(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); close(); (o.focus || anchor).focus(); }
         else if (ev.key === 'ArrowDown') { ev.preventDefault(); ev.stopPropagation(); move(1); }
         else if (ev.key === 'ArrowUp') { ev.preventDefault(); ev.stopPropagation(); move(-1); }
         else if (ev.key === 'Enter') {

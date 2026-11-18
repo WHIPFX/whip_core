@@ -60,11 +60,12 @@ const FOOT = {
 const FOOT_PICK = hint('<b>Click</b>', 'Pose the character') + hint('<b>Stop</b>', 'Stand normally')
     + hint('<span class="em-key">Esc</span>', 'Back to the shot');
 
-// A person, drawn where an emote has no video (scenarios and props-only emotes are not filmed).
-const NO_VIDEO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" '
-    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-    + '<circle cx="12" cy="5" r="2.2"/><path d="M12 8v6"/><path d="M8 11l4-2 4 2"/>'
-    + '<path d="M9.5 21l2.5-7 2.5 7"/></svg>';
+// Where an emote has no video (scenarios and props-only emotes are not filmed): whip's own emote glyph
+// (js/glyphs.js, "a figure mid-dance, one arm up": the same picture as an emote everywhere else) and the words
+// "No preview", so the card is not read as a clip still loading. Read when drawn: glyphs.js is a classic script
+// that loads before the modules.
+const noVideo = () => (((window.WhipGlyphs && window.WhipGlyphs.glyphs) || {}).emote || '')
+    + '<span class="em-card-none-text">No preview</span>';
 
 // ---- filtering ----
 
@@ -136,7 +137,7 @@ function isCurrent(kind, cmd) {
 
 /** The picture half of a card: its video (loaded when it scrolls into view), or the stand-in. */
 function media(video) {
-    if (!video) return '<div class="em-card-media em-card-none">' + NO_VIDEO + '</div>';
+    if (!video) return '<div class="em-card-media em-card-none">' + noVideo() + '</div>';
     return '<div class="em-card-media"><video class="em-card-video" muted loop playsinline preload="none"'
         + ' data-src="' + escapeHtml(emoteVideoUrl(video)) + '"></video></div>';
 }

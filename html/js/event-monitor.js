@@ -25,6 +25,7 @@
 import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
 import { WhipPanel, WP } from './whip-panel.js';
+import { uiIcon } from './ui-icons.js';
 import { plural, ago, timeOfDay } from './wp/format.js';
 
 // ---- what the stream is ----
@@ -537,7 +538,8 @@ function renderFacets() {
     const chip = (label, onRemove) => {
         const c = el('span', 'mon-facet');
         c.appendChild(el('span', null, label));
-        const x = el('button', 'mon-facet-x', '×');
+        const x = el('button', 'mon-facet-x');
+        x.innerHTML = uiIcon('close');
         x.type = 'button';
         x.title = 'Take it off';
         x.addEventListener('click', onRemove);
@@ -993,7 +995,7 @@ function emRefreshEventsTable() {
 
 function viewHead(pane, title, sub) {
     const head = el('div', 'mon-card-head');
-    const back = WP.btn('← Live feed', null, 'ghost');
+    const back = WP.backBtn('Live feed', null);
     back.classList.add('wp-btn-sm');
     back.addEventListener('click', () => setView('feed'));
     head.appendChild(back);

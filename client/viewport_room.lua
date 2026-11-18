@@ -35,6 +35,7 @@ local ROOM_EVERY_MS = 100     -- the camera's room is looked up at most this oft
 local ROOM_MOVE_M   = 0.25    -- ...or as soon as it has moved this far
 local REFUSED_FRAMES = 30     -- the game not taking a room this long: try naming the interior the other way
 local OUT_HOLD_FRAMES = 15    -- "outside" held this long before the room is handed back
+local PLAYER_ROOM_NEAR_M = 2.0 -- a camera this close to the player takes the player's own room where boxes overlap
 
 local want = nil              -- the room the camera is in: { id, alt, key, name }, or nil outside every room
 local inInterior = false      -- does the game put an interior at the camera at all (GetInteriorAtCoords)
@@ -67,7 +68,7 @@ function ViewportRoom.follow(p)
     local now = GetGameTimer()
     if not lookedFrom or #(p - lookedFrom) > ROOM_MOVE_M or now - lookedAt >= ROOM_EVERY_MS then
         lookedAt, lookedFrom = now, p
-        want, inInterior = InteriorRooms.find(p.x, p.y, p.z)
+        want, inInterior = InteriorRooms.find(p.x, p.y, p.z, nil, InteriorRooms.playerRoomNear(p, PLAYER_ROOM_NEAR_M))
     end
 
     if want then
@@ -179,7 +180,7 @@ function ViewportRoom.settle()
         while GetGameTimer() < watchUntil do
             if FreeCam and FreeCam.isActive() then settling = false return end
             local c = cam()
-            local room = InteriorRooms.find(c.x, c.y, c.z)
+            local room = InteriorRooms.find(c.x, c.y, c.z, nil, InteriorRooms.playerRoomNear(c, PLAYER_ROOM_NEAR_M))
             if room and not sameKey(GetRoomKeyForGameViewport(), room.key) then slipped = true break end
             Wait(100)
         end
