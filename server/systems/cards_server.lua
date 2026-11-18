@@ -734,9 +734,9 @@ define({
 --- Why this player could not pay `price` by `method` now, or nil when they look able to. Money.charge decides;
 --- this is a look first, so a sale they cannot afford never hands the item over only to take it back. Waits (a
 --- bank read) when the cash will not do.
-local function cannotPay(player, price, method)
+local function cannotPay(src, player, price, method)
     if price <= 0 then return nil end
-    local cash = Inventory.getItemCountAcrossContainers(player.inventory, 'cash')
+    local cash = Money.spendableCash(src, player)
     if method == 'cash' then return cash < price and ('not enough cash (have $%d)'):format(cash) or nil end
     if method == 'auto' and cash >= price then return nil end
     local acct, readErr = Bank.GetDefaultAccount(player.charId)
@@ -775,7 +775,7 @@ define({
         ctx:call(function()
             local player = ctx:source(me) and Players[src]
             if not player or not player.inventory then return 'cantPay' end
-            local short = cannotPay(player, price, method)
+            local short = cannotPay(src, player, price, method)
             if short then ctx:log('Sell refused: %s', short) return 'cantPay' end
             if not ctx:source(me) or Players[src] ~= player then return 'cantPay' end   -- the bank read waited
             -- Never dropped at their feet (noDrop): that drop writes a ground row and waits. Full
@@ -802,7 +802,7 @@ define({
             -- so the item cannot be carried off in the wait and kept if the debit fails. Decided as Money.charge
             -- decides 'auto' (nothing waits between here and there), and never for cash, which it would refuse.
             local useBank = price > 0 and (method == 'bank'
-                or (method == 'auto' and Inventory.getItemCountAcrossContainers(player.inventory, 'cash') < price))
+                or (method == 'auto' and Money.spendableCash(src, player) < price))
             local hold = useBank and pockets and pockets.unit and Stores.freeze(pockets.unit) or nil
             local called, rec, err = pcall(Money.charge, src, price, { method = method, reason = reason }, owner, logWhy,
                 pockets and { pockets } or nil)

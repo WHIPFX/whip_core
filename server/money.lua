@@ -81,13 +81,12 @@ end
 -- Cash in a wallet
 -- ============================================
 --
--- A wallet's notes live in its metadata, not in a pocket slot, so the pocket count never saw them: "Not enough cash"
--- with $500 in the wallet. A cash payment now counts them too, loose notes first, then each wallet carried in the
--- pockets or on the strip (not one inside a bag). A WALLET is any panel item made to hold cash: its registration
--- names the items it takes, cash among them, with no read/write of its own (whip's wallet; a duffle takes anything
--- and is not one). Notes another character of the same player left in it stay theirs (CashMarks.blockedAt), as they
--- would be if taken out by hand, and its tally shrinks with what is spent (CashMarks.spent). An open wallet panel is
--- repainted from its item (Panels.refreshFromHost).
+-- A wallet's notes live in its metadata, not in a pocket slot. A cash payment counts them too: loose notes first, then
+-- each wallet carried in the pockets or on the strip (not one inside a bag). A WALLET is any panel item made to hold
+-- cash: its registration names the items it takes, cash among them, with no read/write of its own (whip's wallet; a
+-- duffle takes anything and is not one). Notes another character of the same player left in it stay theirs
+-- (CashMarks.blockedAt), as they would be if taken out by hand, and its tally shrinks with what is spent
+-- (CashMarks.spent). An open wallet panel is repainted from its item (Panels.refreshFromHost).
 
 --- The registration of an item made to hold `currency`, or nil.
 ---@param itemKey string
@@ -192,6 +191,14 @@ local function takeFromWallets(source, player, wallets, currency, amount)
         end
     end
     return undo, finish
+end
+
+--- What a cash payment can take from this player now: loose notes and their wallets' (Money.charge's count). For a
+--- look before a payment, so it decides as Money.charge will.
+---@return number
+function Money.spendableCash(source, player)
+    local _, inWallets = walletsOf(source, player, 'cash')
+    return Inventory.getItemCountAcrossContainers(player.inventory, 'cash') + inWallets
 end
 
 --- Take a payment from a player.
@@ -696,6 +703,17 @@ end)
 -- Exports
 -- ============================================
 
+--- What a cash payment can take from this player now: loose notes, and what the wallets they carry hold for them to
+--- spend (not another character's notes in one, with Config.BlockOwnCharacterTransfers on). For a "can they afford
+--- it" before a ChargePlayer / HoldMoney with method 'cash'; GetPlayerCash is the loose notes alone.
+---
+---     if exports.whip_core:GetSpendableCash(source) < price then return 'Not enough cash' end
+exports('GetSpendableCash', function(source)
+    local player = Players[source]
+    if not player or not player.inventory then return 0, 'Player not loaded' end
+    return Money.spendableCash(source, player)
+end)
+
 --- Take a payment from a player: `receipt`, or `false, reason` (a reason the player can read —
 --- 'Not enough cash (have $20, need $50)', 'No withdraw permission on this account').
 ---
@@ -706,18 +724,6 @@ end)
 ---     })
 ---
 --- Keep the receipt if the thing being paid for can still fail, and hand it to RefundPlayer if it does.
---- What a cash payment can take from this player now: loose notes, and what the wallets they carry hold for them to
---- spend (not another character's notes in one, with Config.BlockOwnCharacterTransfers on). For a "can they afford
---- it" before a ChargePlayer / HoldMoney with method 'cash'; GetPlayerCash is the loose notes alone.
----
----     if exports.whip_core:GetSpendableCash(source) < price then return 'Not enough cash' end
-exports('GetSpendableCash', function(source)
-    local player = Players[source]
-    if not player or not player.inventory then return 0, 'Player not loaded' end
-    local _, inWallets = walletsOf(source, player, 'cash')
-    return player:getCash() + inWallets
-end)
-
 exports('ChargePlayer', function(source, amount, opts)
     local owner = Registry.caller()   -- first, before anything can yield
     local why = Log.reasonFrom(type(opts) == 'table' and opts.reason or nil)
