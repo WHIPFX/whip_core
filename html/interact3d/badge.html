@@ -381,27 +381,34 @@ html, body {
 
     // Defaults so the page is not blank before Lua's first message — useful when
     // opening this file straight in a browser to look at the art.
-    var state = { cell: 128, cols: 6, keys: ['E'] };
+    var state = { cell: 128, cols: 6, perRow: 6, keys: ['E'] };
 
     function render() {
         var cell = state.cell;
         var cols = state.cols;
+        // Columns wrap into bands of perRow, each band 3 state rows tall, so the texture stays narrow
+        // enough for every GPU. Lua samples the same layout (badgeUV in client/interact_world.lua).
+        var perRow = Math.min(state.perRow || cols, cols);
+        var bands = Math.ceil(cols / perRow);
+        var w = cell * perRow, h = cell * 3 * bands;
 
         // The document is the texture, so its size is the atlas size.
-        document.documentElement.style.width  = (cell * cols) + 'px';
-        document.documentElement.style.height = (cell * 3) + 'px';
-        document.body.style.width  = (cell * cols) + 'px';
-        document.body.style.height = (cell * 3) + 'px';
+        document.documentElement.style.width  = w + 'px';
+        document.documentElement.style.height = h + 'px';
+        document.body.style.width  = w + 'px';
+        document.body.style.height = h + 'px';
 
-        atlas.style.width = (cell * cols) + 'px';
-        atlas.style.height = (cell * 3) + 'px';
-        atlas.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cell + 'px)';
-        atlas.style.gridTemplateRows = 'repeat(3, ' + cell + 'px)';
+        atlas.style.width = w + 'px';
+        atlas.style.height = h + 'px';
+        atlas.style.gridTemplateColumns = 'repeat(' + perRow + ', ' + cell + 'px)';
+        atlas.style.gridTemplateRows = 'repeat(' + (3 * bands) + ', ' + cell + 'px)';
 
         var html = '';
+        for (var b = 0; b < bands; b++)
         for (var s = 0; s < 3; s++) {
-            for (var c = 0; c < cols; c++) {
-                var key = state.keys[c];
+            for (var x = 0; x < perRow; x++) {
+                var c = b * perRow + x;
+                var key = c < cols ? state.keys[c] : undefined;
                 // A column with no key assigned stays EMPTY rather than falling
                 // back to something. Lua never points a quad at an unassigned
                 // column, and a stray glyph there would be a silent wrong answer
@@ -433,6 +440,7 @@ html, body {
         if (!d) return;
         if (d.cell) state.cell = d.cell;
         if (d.cols) state.cols = d.cols;
+        if (d.perRow) state.perRow = d.perRow;
         if (d.keys) state.keys = d.keys;
         // HOW MUCH OF A CELL THE DISC FILLS, from Lua rather than from the stylesheet below.
         // Lua needs this number to size the quad — the quad is a whole cell, the badge is only the

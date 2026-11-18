@@ -16,6 +16,21 @@ local BADGE_COLS   = 96
 -- (8192 on Enhanced, so 85). The columns stay at 96 either way. badge.html lays itself out from `cell`.
 local BADGE_CELL   = 128
 local BADGE_STATES = 3            -- idle / active / focused, in that row order
+-- The 96 columns are wrapped into bands of 16: 16 x 128 = 2048 px wide, 6 bands x 3 states = 2304 px tall. One strip of
+-- 96 cells was 12288 px wide, and GPUs or drivers that cap a texture below that sampled it blank, so those players saw the
+-- prompt words with no key badge. Same pixel count, same VRAM. badge.html lays itself out from `perRow`.
+local BADGE_PER_ROW = 16
+local BADGE_BANDS   = BADGE_COLS // BADGE_PER_ROW
+
+--- A badge cell's UVs: key slot `col` (0-based), state rows s0..s1 (0..3), shrunk by `inset` cells on each side.
+local function badgeUV(col, s0, s1, inset)
+    inset = inset or 0.0
+    local x, band = col % BADGE_PER_ROW, col // BADGE_PER_ROW
+    local tall = BADGE_BANDS * BADGE_STATES
+    local base = band * BADGE_STATES
+    return (x + inset) / BADGE_PER_ROW, (base + s0 + inset) / tall,
+           (x + 1 - inset) / BADGE_PER_ROW, (base + s1 - inset) / tall
+end
 
 -- How much of a cell the visible disc fills (the `.disc` width in badge.html; the rest is glow margin). Config's pixel
 -- height means the disc, so the target is divided back out. pushBadgeSetup sends this to the page.
@@ -115,6 +130,7 @@ local function badgeSetup(look)
     return json.encode({
         cell = BADGE_CELL,
         cols = BADGE_COLS,
+        perRow = BADGE_PER_ROW,
         keys = keyList,
         -- Sent, so the number lives in Lua only.
         discFrac = BADGE_DISC_FRAC,
@@ -134,8 +150,8 @@ local function badgePageFor(look, txd)
     return DuiPage.new({
         name = 'interact3d', url = 'interact3d/badge.html', txd = txd, tex = TEX_BADGE,
         -- (Asked when made: R.attach may have fitted the cell.)
-        width = function() return BADGE_CELL * BADGE_COLS end,
-        height = function() return BADGE_CELL * BADGE_STATES end,
+        width = function() return BADGE_CELL * BADGE_PER_ROW end,
+        height = function() return BADGE_CELL * BADGE_STATES * BADGE_BANDS end,
         setup = function() return badgeSetup(look or currentBase) end,
         -- Told its setup again a moment after it is up: a browser may not be listening for the first message, leaving a blank atlas.
         -- (The label page's setup is not resent: it rebuilds its rows.)
@@ -186,8 +202,8 @@ function R.attach()
     badgePage = badgePageFor(nil, TXD_BADGE)
     local made, why = badgePage:ensure()
     local maxW = not made and tonumber(tostring(why):match('Invalid Width %[%d+, (%d+)%]'))
-    if maxW and maxW >= BADGE_COLS then
-        BADGE_CELL = math.min(BADGE_CELL, maxW // BADGE_COLS)
+    if maxW and maxW >= BADGE_PER_ROW then
+        BADGE_CELL = math.min(BADGE_CELL, maxW // BADGE_PER_ROW)
         badgePage = badgePageFor(nil, TXD_BADGE)
         made, why = badgePage:ensure()
     end
@@ -734,8 +750,7 @@ end
 --- `corner` nil is a circle; given, a rounded square. `dark`: track white, colours swapped as the prompt's are.
 local function drawHoldRing(cx, cy, cz, rx, ry, rz, ux, uy, uz, half, corner, thick, p, a, r, g, b, dark)
     local col = columnForKey('__white')
-    local u0, u1 = (col + 0.3) / BADGE_COLS, (col + 0.7) / BADGE_COLS
-    local v0, v1 = 0.3 / BADGE_STATES, 0.7 / BADGE_STATES
+    local u0, v0, u1, v1 = badgeUV(col, 0, 1, 0.3)
     local perimeter = corner and (8.0 * (half - corner) + 2.0 * math.pi * corner) or (TAU * half)
     local trackA = math.floor(a * 0.55 + 0.5)
     local track = dark and 255 or 0
@@ -1108,8 +1123,6 @@ function R.frame(visible, _, _, isScoreFrame, camPos, cfx, cfy, cfz, passNow)
             local icon = e.icon
             if icon == 'E' or icon == nil then icon = liveE end
             local col = columnForKey(icon)
-            local u0 = col / BADGE_COLS
-            local u1 = (col + 1) / BADGE_COLS
 
             -- Mid-crossfade both cells are drawn, coplanar (no z-fighting). Written out twice to avoid a closure per prompt per frame.
             --
@@ -1124,13 +1137,15 @@ function R.frame(visible, _, _, isScoreFrame, camPos, cfx, cfy, cfz, passNow)
             local btxd = themeTxd(st.look)
             if outA >= 1 then
                 local s = e.prev
+                local u0, v0, u1, v1 = badgeUV(col, s, s + 1)
                 drawQuad(btxd, TEX_BADGE, pcx, pcy, pcz, rx, ry, rz, ux, uy, uz, bDraw, bDraw,
-                         u0, s / BADGE_STATES, u1, (s + 1) / BADGE_STATES, outA, tr, tg, tb)
+                         u0, v0, u1, v1, outA, tr, tg, tb)
             end
             if inA >= 1 then
                 local s = e.state
+                local u0, v0, u1, v1 = badgeUV(col, s, s + 1)
                 drawQuad(btxd, TEX_BADGE, pcx, pcy, pcz, rx, ry, rz, ux, uy, uz, bDraw, bDraw,
-                         u0, s / BADGE_STATES, u1, (s + 1) / BADGE_STATES, inA, tr, tg, tb)
+                         u0, v0, u1, v1, inA, tr, tg, tb)
             end
 
             -- The hold ring (holdMs): just outside the disc, in the cell's margin, so it reads as the rim filling. In the style's
@@ -1170,11 +1185,11 @@ function R.frame(visible, _, _, isScoreFrame, camPos, cfx, cfy, cfz, passNow)
                                 local kicon = e.optIcons[k]
                                 if kicon == 'E' or kicon == nil then kicon = liveE end
                                 local kcol = columnForKey(kicon)
+                                local ku0, kv0, ku1, kv1 = badgeUV(kcol, 2, 3)
                                 drawQuad(btxd, TEX_BADGE,
                                          cx + ux * koff, cy + uy * koff, cz + uz * koff,
                                          rx, ry, rz, ux, uy, uz, bMs, bMs,
-                                         kcol / BADGE_COLS, 2 / BADGE_STATES,
-                                         (kcol + 1) / BADGE_COLS, 3 / BADGE_STATES,
+                                         ku0, kv0, ku1, kv1,
                                          ka, tr, tg, tb)
                             end
                         end
