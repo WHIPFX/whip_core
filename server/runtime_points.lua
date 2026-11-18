@@ -359,7 +359,10 @@ local function readDef(def, warn)
     -- An option that reaches further than the point (or the default) widens the prompt to it; each nearer option
     -- is then held to its own on the player's game (client/runtime_points.lua) and here (useRuntimePoint).
     local far = furthestOption(options)
-    if far and far > (reach or Config.InteractActiveRange or 2.0) then out.promptReach = far end
+    if far and far > (reach or Config.InteractActiveRange or 2.0) then
+        out.promptReach = far
+        out.seeFrom = math.max(seeFrom or Config.InteractVisibleRange or 5.0, far)   -- seen as far as it reaches
+    end
     for k, v in pairs(at) do out[k] = v end
     return out
 end
