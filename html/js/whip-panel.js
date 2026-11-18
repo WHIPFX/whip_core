@@ -1037,7 +1037,7 @@ export const WP = {
     },
 
     /** The way back out of a page: a ghost button with the chevron WHIP's screens use for "back" (the Settings
-     *  page, the Object Viewer), then the label ('All items'). Not a text arrow, which sits off the line. */
+     *  page, the Object Viewer), then the label ('All items'). */
     backBtn(label, action, arg) {
         const b = WP.btn('', action, 'ghost', arg);
         b.classList.add('wp-btn-back');

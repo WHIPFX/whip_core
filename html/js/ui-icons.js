@@ -3,8 +3,7 @@
 
    Back, close, move up and down, the tick, minus and plus: the controls every screen has. One family, drawn as
    the Settings page and the Object Viewer already draw their chevron: a 24x24 line, 2.4 wide, round
-   ends, in currentColor. They replace the text characters these buttons used (‹ ← × ↑ ↓ ✓), which
-   sat off the line and changed shape with the font.
+   ends, in currentColor.
 
    Sized by `.ui-ic` (css/base.css) at 1em, so an icon is as big as the text it stands for: a button
    keeps its own font-size and gets an icon to match.

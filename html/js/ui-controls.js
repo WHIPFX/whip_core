@@ -6,7 +6,7 @@
    whip's instead, without one of them changing:
 
    - A SELECT KEEPS ITS PLACE, ITS CLASSES AND ITS CLOSED LOOK (each screen's CSS). Only the list is whip's: a press
-     on it (the mouse, or Space, Enter, F4, Alt+Down) opens the Director's list under it (director/dropdown.js
+     on it (the mouse, or Space, F4, Alt+Down; Enter stays the form's) opens the Director's list under it (director/dropdown.js
      openChoices: a search once there are many, its groups, a tick on the choice, the arrow keys, Enter, Esc), and
      a pick sets the select and sends input and change from it, as the browser's list would. Nothing is wrapped,
      moved or copied, so no screen's layout, styling or lookups change. On a pad the cursor already opens a list of
@@ -87,7 +87,7 @@ document.addEventListener('keydown', (ev) => {
     const sel = ev.target;
     if (!(sel instanceof HTMLSelectElement) || isPad()) return;
     const k = ev.key;
-    if (k === ' ' || k === 'Enter' || k === 'F4' || (ev.altKey && (k === 'ArrowDown' || k === 'ArrowUp'))) {
+    if (k === ' ' || k === 'F4' || (ev.altKey && (k === 'ArrowDown' || k === 'ArrowUp'))) {
         if (dropdownAnchor() === anchorOf(sel)) return;   // the list has the keys
         if (openList(sel)) {
             ev.preventDefault();

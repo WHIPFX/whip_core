@@ -1002,7 +1002,7 @@
 #inv-basket-account {
     width: 100%;
     padding: var(--ui-sp-4) var(--ui-sp-5);
-    background: var(--ui-surface-subtle);
+    background-color: var(--ui-surface-subtle);
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius-slot);
     color: var(--ui-text);
@@ -1014,7 +1014,7 @@
 
 #inv-basket-account:focus {
     border-color: var(--ui-accent-medium);
-    background: var(--ui-surface-hover);
+    background-color: var(--ui-surface-hover);
 }
 
 .inv-basket-pays-in {
