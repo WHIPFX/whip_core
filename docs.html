@@ -8378,7 +8378,7 @@ end }</code></pre>
 <div class="export-header"><span class="export-name">GetAction(id)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>One of your actions as data, with whether each option is offered to this player now and why not. The first thing to check when an action never shows.</p>
-<div class="return-info"><strong>Returns: </strong><code>{ id, owner, key, group, reach, seeFrom, enabled, at, label, icon, mounted, engineIds, options = { { id, label, offered, why } } }</code> or <code>nil</code>. <code>mounted</code>: <code>'prompt'</code>, <code>'aimbox'</code>, <code>'props'</code>, <code>'radial'</code>, <code>'part'</code>, or <code>false</code> if it failed (F8 says why)</div>
+<div class="return-info"><strong>Returns: </strong><code>{ id, owner, key, group, reach, seeFrom, enabled, at, label, icon, mounted, engineIds, options = { { id, label, offered, why } } }</code> or <code>nil</code>. <code>mounted</code>: <code>'prompt'</code>, <code>'aimbox'</code>, <code>'props'</code>, <code>'radial'</code>, <code>'part'</code>, <code>'list'</code>, or <code>false</code> if it failed (F8 says why)</div>
 <pre><code class="lang-lua">for _, opt in ipairs((exports.whip_core:GetAction('bench') or {}).options or {}) do
     print(opt.id, opt.offered, opt.why)
 end</code></pre>
