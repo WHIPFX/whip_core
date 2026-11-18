@@ -669,6 +669,7 @@ cb('delete', { { 'key', 'key', 64 } }, function(source, _, key)
     if shipped then DirectorPacks.forget(key, source) end
     editing[key] = nil
     Director.scriptSwitched[key] = nil
+    Director.forgetCooldowns(key)
     return { ok = true }
 end, 1000, ADMIN)
 

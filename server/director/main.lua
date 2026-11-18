@@ -649,6 +649,12 @@ local function cooldownSec(sc)
     return math.floor(math.min(m, 10080) * 60)
 end
 
+--- A scenario deleted: its cooldowns go with it, as a new scenario may be made under its key.
+function Director.forgetCooldowns(id)
+    cooldowns[id] = nil
+    DeleteResourceKvp('director:cd:' .. id)
+end
+
 --- Who a job's cooldown is for: 'starter' (only the player who started it) or 'everyone' in it.
 local function cooldownWho(sc)
     return sc and type(sc.graph.settings) == 'table' and sc.graph.settings.cooldownWho == 'starter' and 'starter' or 'everyone'

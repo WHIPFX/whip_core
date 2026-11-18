@@ -369,10 +369,11 @@ function renderOverview() {
     const recent = arr(o.recent);
     if (!recent.length) { pane.appendChild(WP.empty('No runs yet')); return; }
     pane.appendChild(table(['Run', 'Scenario', 'Started', 'Took', 'How it went', 'Players', 'Paid'],
-        recent.map((x) => [`${x.id}${x.test ? ' (test)' : ''} · revision ${x.rev}`, x.name || x.key, dateTime(x.startedAt), took(x.durationS),
+        recent.map((x) => [`${x.id}${x.test ? ' (test)' : ''} · revision ${x.rev}`, (x.name || x.key) + (x.deleted ? ' (deleted)' : ''),
+            dateTime(x.startedAt), took(x.durationS),
             pill((OUTCOME[x.outcome] || x.outcome) + (x.reason ? `: ${x.reason}` : ''), OUTCOME_PILL[x.outcome]),
             x.players || '—', x.payout ? money(x.payout) : '—']),
-        { action: 'wdRecentRun', arg: (i) => `${recent[i].key}|${recent[i].id}` }));
+        { action: 'wdRecentRun', arg: (i) => `${recent[i].key}|${recent[i].id}|${recent[i].deleted ? 1 : 0}` }));
 }
 
 // ============================================================
@@ -1013,7 +1014,9 @@ const actions = {
     },
     wdOpenScenario: (el) => openScenario(el.dataset.arg),
     wdRecentRun: (el) => {
-        const [key, id] = String(el.dataset.arg).split('|');
+        const [key, id, deleted] = String(el.dataset.arg).split('|');
+        // Its key may be a newer scenario's now: that one's runs are not this one's.
+        if (deleted === '1') { WP.result(`${key} was deleted`, 'err'); return; }
         showRun(key, Number(id) || 0);
     },
     // ---- Shipped, Live runs, Access ----
