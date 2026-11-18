@@ -1954,12 +1954,10 @@ end)
 --- The thrower's game saw its throw come to rest: `posed` with the way it lies (yaw as heading, rx
 --- and ry), or snapped upright when it never settled. Only the thrower may say, somewhere their throw
 --- could have got to (GroundItems.flightReaches); a landing far from where the server sees the object
---- is put where the server sees it, upright. Not rate limited, because a script's throws (ThrowGroundItem) come to
---- rest in one game as fast as the script throws them, and a refused one stays in the air until the watchdog: it
---- only settles a flight the sender owns, once. While dead, because whoever's game flies one may be shot while it
---- is in the air.
+--- is put where the server sees it, upright. The default rate limit (ten back to back, then one per 100 ms): a
+--- script's throws start one every 500 ms (ThrowGroundItem), so the landings of several in the air at once still
+--- fit. While dead, because whoever's game flies one may be shot while it is in the air.
 SecureEvent('whip_core:server:throwSettled', {
-    rateLimit = false,
     whileDead = true,
     params = {
         {'groundId', 'id'},

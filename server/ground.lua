@@ -8,8 +8,8 @@ GroundItems.cache = {}        -- [id] = { id, item, amount, metadata, x, y, z, h
 GroundItems._pickupLocks = {} -- [id] = true — prevents race condition on simultaneous pickup
 GroundItems._grid       = {} -- [cellKey] = { [id] = true } — spatial grid
 GroundItems._itemCells  = {} -- [id] = cellKey — reverse lookup
--- [id] = { netId, owner, launchedAt }: piles still flying (a throw). Memory only — the
--- row is on disk at the launch point, so a restart mid-flight leaves an ordinary pile there.
+-- [id] = { netId, owner, launchedAt, path }: piles still flying (a throw; `path` for a script's, ThrowGroundItem).
+-- Memory only — the row is on disk at the launch point, so a restart mid-flight leaves an ordinary pile there.
 GroundItems._flights    = {}
 
 --- Metadata keys that say where a PILE lies, not what the item is: left on the ground when it is picked up
@@ -192,6 +192,13 @@ function GroundItems.loadAll()
 
 end
 
+--- What a thrown pile weighs, in kg (a bag with what is in it): with its speed, it decides whether it knocks over
+--- whoever it hits (Config.ThrowKnockdown.MinImpact, client/inventory.lua).
+---@return number
+function GroundItems.throwKg(item, amount, metadata)
+    return Inventory.effectiveWeight(item, amount or 1, metadata) or 0
+end
+
 --- Create a ground item.
 ---
 --- Accepts EITHER shape, because the positional-only form has now been got wrong by two
@@ -310,6 +317,9 @@ function GroundItems.create(item, amount, metaOrCoords, xOrMeta, y, z, heading, 
         -- Who threw it (a server id), beside it: a game follows an object only while the thrower's game owns it
         -- (client/inventory.lua, watchThrows)
         flightBy  = (type(flight) == 'table' and tonumber(flight.netId) and tonumber(flight.owner)) or nil,
+        -- What it weighs (kg): with its speed, whether it knocks over whoever it hits
+        flightKg  = (type(flight) == 'table' and tonumber(flight.netId)) and GroundItems.throwKg(item, amount, metadata)
+                    or nil,
     }
 
     GroundItems.cache[insertId] = data
@@ -529,7 +539,7 @@ function GroundItems.settle(id, x, y, z, heading, placed)
     data.placed  = placed and true or nil
     data.rx      = placed and rx or nil
     data.ry      = placed and ry or nil
-    data.flight, data.flightBy = nil, nil
+    data.flight, data.flightBy, data.flightKg = nil, nil, nil
     GroundItems.gridRemove(id)
     GroundItems.gridInsert(id, x, y)
     announceSettled(data, fromX, fromY)
@@ -1011,10 +1021,11 @@ end
 local function askThrow(flier, item, amount, metadata, createdBy, path)
     throwAskToken = throwAskToken + 1
     local token = throwAskToken
+    local kg = GroundItems.throwKg(item, amount, metadata)
     local ask = { flier = flier, charId = Players[flier] and Players[flier].charId, promise = promise.new(),
-                  from = path.from }
+                  from = path.from, kg = kg }
     throwAsks[token] = ask
-    TriggerClientEvent('whip_core:client:throwFor', flier, token, item, path.from, path.vel)
+    TriggerClientEvent('whip_core:client:throwFor', flier, token, item, path.from, path.vel, kg)
     SetTimeout(THROW_FOR_ANSWER_MS, function()
         if throwAsks[token] == ask then
             throwAsks[token] = nil
@@ -1057,10 +1068,7 @@ end
 --- asked, once, as the character asked; anything else, a launch after the ask gave up included, is dropped
 --- by that game.
 SecureEvent(LAUNCH_EVENT, {
-    -- Not rate limited: a launch only answers an ask this server made of that game, once, and a script may ask
-    -- dozens a second (a spray of cash; the throw test held down). Refused, the throw was put down at the target
-    -- after its flight was seen.
-    rateLimit = false,
+    -- The default rate limit: ThrowGroundItem starts one throw every THROW_SPACING_MS, so an honest game never meets it
     whileDead = true,              -- the flier may be down: their game still runs the throw
     params = { {'token', 'id'}, {'netId', 'id'} },
 }, function(source, player, token, netId)
@@ -1071,8 +1079,9 @@ SecureEvent(LAUNCH_EVENT, {
         return
     end
     throwAsks[token] = nil
-    -- Every game near where it is thrown from watches it (a player's own throw says this itself: throwStarted)
-    SendToPlayers(PlayersInRange(ask.from.x, ask.from.y), 'whip_core:client:playerThrew', source, netId)
+    -- Every game near where it is thrown from watches it (a player's own throw says this itself: throwStarted), and
+    -- knows what it weighs at once
+    SendToPlayers(PlayersInRange(ask.from.x, ask.from.y), 'whip_core:client:playerThrew', source, netId, ask.kg)
     ask.promise:resolve(netId)
 end)
 
@@ -1084,8 +1093,7 @@ local FAILED_WHY = {
     network = 'the thrower\'s game could not give the object a network id (too many in the air at once)',
 }
 SecureEvent('whip_core:server:throwForFailed', {
-    rateLimit = false,   -- as the launch: it only answers an ask this server made of that game, once
-    whileDead = true,
+    whileDead = true,    -- (the default rate limit, as the launch's)
     params = { {'token', 'id'}, {'why', 'enum', { 'model', 'object', 'network' }} },
 }, function(source, player, token, why)
     local ask = throwAsks[token]
@@ -1112,7 +1120,8 @@ end)
 --- the console warns that throws are being asked for too quickly).
 ---
 --- Returns the row and how it went, 'thrown' (flying now) or 'ground' (put down, and why), or `false, reason`. It
---- waits its turn, then for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most.
+--- waits its turn, then for the flier's game: a round trip, THROW_FOR_ANSWER_MS at most. From a SecureCallback (the
+--- client gives up after 10 s), throw in a CreateThread and answer at once.
 ---@param t table { item, amount?, from, target, power?, by?, metadata?, reason?, createdBy? }
 function GroundItems.throwItem(t)
     -- Who asked, read BEFORE anything waits (see createItem).
@@ -1138,6 +1147,15 @@ function GroundItems.throwItem(t)
     local amount = Sanitize.amount(t.amount, 1)
     if not amount then return false, Sanitize.AMOUNT_ERR end
     local metadata = type(t.metadata) == 'table' and t.metadata or nil
+    -- `by` as the character, read now: after the wait below a server id may be someone else's, or theirs again under
+    -- a new id. Not online is no refusal (the nearest flies it); not a person at all is.
+    local by
+    if t.by ~= nil then
+        if type(t.by) ~= 'table' and not tonumber(t.by) then return false, 'by is a server id or { charId = n }' end
+        local charId, why = WhoIs(t.by)
+        if not charId and type(t.by) == 'table' then return false, why end
+        by = charId and { charId = charId } or nil
+    end
 
     -- Its turn: the next free slot, THROW_SPACING_MS after the one before. Who flies it is chosen when it comes.
     local now = GetGameTimer()
@@ -1155,7 +1173,7 @@ function GroundItems.throwItem(t)
 
     local path = throwPath(from, target, power)
     local how = 'thrown'
-    local flier = throwFlier(t.by, from)
+    local flier = throwFlier(by, from)
     local row, putDownWhy
     if flier then
         row, putDownWhy = askThrow(flier, t.item, amount, metadata, t.createdBy, path)
@@ -1206,9 +1224,9 @@ exports('DeleteGroundItem', GroundItems.deleteItem)
 --
 -- A developer trying ThrowGroundItem in the world: each ask throws one item, picked at random from every item any
 -- resource has registered, from their point at their target at their power, exactly as a script's call would, with
--- `by` = them (their own game flies it when they are near the point). The tool asks every frame while its key is
--- held, so this is not rate limited: developer mode only. Clear takes back what the test threw that still lies on
--- the ground. The answer of each throw goes back to the tool's card, never as a toast (held down, that is dozens a
+-- `by` = them (their own game flies it when they are near the point). Held down, the tool asks up to 20 times a
+-- second, and ThrowGroundItem queues them: developer mode only. Clear takes back what the test threw that still lies
+-- on the ground. The answer of each throw goes back to the tool's card, never as a toast (held down, that is two a
 -- second).
 
 local TEST_REACH = 20000.0   -- metres either way a test point may be (the map is well inside that)
@@ -1227,8 +1245,9 @@ end
 
 SecureEvent('whip_core:server:throwTest', {
     ace = 'whip.devtools',
-    -- Held down, the tool asks every frame; ThrowGroundItem queues them, one every 500 ms (THROW_SPACING_MS)
-    rateLimit = false,
+    -- Held down, the tool asks up to 20 times a second (tools/throw_test.lua ASK_MS); ThrowGroundItem queues them,
+    -- one every 500 ms (THROW_SPACING_MS)
+    rateLimit = 50, burst = 10,
     params = {
         {'fx', 'number', -TEST_REACH, TEST_REACH}, {'fy', 'number', -TEST_REACH, TEST_REACH}, {'fz', 'number', -500, 3000},
         {'tx', 'number', -TEST_REACH, TEST_REACH}, {'ty', 'number', -TEST_REACH, TEST_REACH}, {'tz', 'number', -500, 3000},
@@ -1279,7 +1298,8 @@ SecureEvent('whip_core:server:throwTestClear', {
 end)
 
 AddEventHandler('playerDropped', function()
-    testThrown[source] = nil
+    local src = source
+    testThrown[src] = nil
 end)
 
 --- Ground items within `range` metres. `GetGroundItemsNearby(x, y, z, range)` or

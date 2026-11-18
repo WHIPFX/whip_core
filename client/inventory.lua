@@ -2213,6 +2213,7 @@ end)
 --   * a player is knocked down by their own game when the item reaches them on screen (watchThrows);
 --   * the thrower's game runs the flight, bounces the item off whoever it hits and knocks down people of the street.
 -- A script's throw (ThrowGroundItem) has no thrower: the player whose game flies it is hit like anyone else.
+-- What knocks someone over is weight and speed together (hitsHard): a fast coin does not, a slow rock does not.
 
 local KNOCK_AHEAD  = 0.4   -- metres the hit ray runs past where the item got to (and half the item's size: its tip hits first)
 local KNOCK_PUSH   = 0.1   -- of the item's speed, the shove the way it flew: about 2 m/s from a throw, a nudge into the fall
@@ -2222,6 +2223,17 @@ local KNOCK_BOUNCE = 0.2   -- of the item's speed, how fast it comes back off a 
 local KNOCK_REACH  = 0.65
 local WATCH_RANGE  = 30.0  -- metres: a flying throw further than this from you is not looked at
 local WATCH_MAX_MS = 15000 -- a throw still "flying" after this is forgotten (its landing never reached this game)
+local KG_WAIT_MS   = 1000  -- a hit before the throw's weight reached this game waits this long for it (watchThrows)
+
+--- Hard enough to knock someone over: fast enough (MinSpeed) and heavy enough for that speed, its weight (kg) times its
+--- speed (m/s) at least MinImpact. A weight not known says no.
+---@param kg number|nil
+---@param speed number
+local function hitsHard(kg, speed)
+    local cfg = Config.ThrowKnockdown
+    if speed < (tonumber(cfg.MinSpeed) or 8.0) then return false end
+    return (tonumber(kg) or 0) * speed >= (tonumber(cfg.MinImpact) or 8.0)
+end
 
 --- Down for Config.ThrowKnockdown.RagdollMs, shoved the way the item flew. Not someone already down, in a car, or who cannot fall. The ped must be this game's.
 local function knockDown(ped, dx, dy, dz, speed)
@@ -2261,8 +2273,8 @@ local function knockMeDown(dx, dy, dz, speed)
 end
 
 --- The thrower's game, one frame of a flying throw: did it fly into someone? A ray along its path since the last frame,
---- people only, judged on the speed before this frame. It bounces back; a person of the street falls.
---- `k` is the throw's own { pos, vel, hit = { [ped] = true } }, each person once.
+--- people only, judged on the speed before this frame. It bounces back; a person of the street falls when it hit
+--- hard enough (hitsHard). `k` is the throw's own { pos, vel, kg, hit = { [ped] = true } }, each person once.
 local function throwHitCheck(obj, vel, k)
     local cfg = Config.ThrowKnockdown
     if not cfg or cfg.Enabled == false then return end
@@ -2292,6 +2304,7 @@ local function throwHitCheck(obj, vel, k)
     local back = speed * KNOCK_BOUNCE
     SetEntityVelocity(obj, -dx * back, -dy * back, math.min(lastVel.z, 0.0) - 1.0)
     k.pos, k.vel = nil, nil   -- the next frame starts afresh from where it was put
+    if not hitsHard(k.kg, speed) then return end
     if me then
         knockMeDown(dx, dy, dz, speed)
     elseif not IsPedAPlayer(ped) and cfg.Npcs ~= false then
@@ -2301,8 +2314,8 @@ end
 
 -- Every game: the flying throws near its own player (ground.lua names them as they launch)
 
--- [netId] = { since, thrower (a player index), pos, vel, done, mine }. `mine`: a script's throw this game flies
--- (TrackThrow), watched for this player too.
+-- [netId] = { since, thrower (a player index), kg, pos, vel, done, hit, mine }. `mine`: a script's throw this game
+-- flies (TrackThrow), watched for this player too. `hit`: it reached this player, judged once its weight is known.
 local watched = {}
 local watchRunning = false
 
@@ -2328,7 +2341,9 @@ local function segmentsWithin(a, b, c, d, r)
     return px * px + py * py + pz * pz <= r * r
 end
 
---- Each frame while throws fly near: has one, flying fast, passed through this player's body? Not their own throw. Each throw once.
+--- Each frame while throws fly near: has one, flying fast, passed through this player's body? Not their own throw. Each
+--- throw once. Down only when it hit hard enough for its weight (hitsHard); a hit before its weight is known here (a
+--- player's own throw: its pile brings the weight a moment after the throw is named) waits KG_WAIT_MS for it.
 local function watchThrows()
     if watchRunning then return end
     watchRunning = true
@@ -2343,6 +2358,14 @@ local function watchThrows()
             for netId, w in pairs(watched) do
                 if now - w.since > WATCH_MAX_MS then
                     watched[netId] = nil
+                elseif w.hit then
+                    local h = w.hit
+                    if w.kg ~= nil then
+                        w.hit = nil
+                        if hitsHard(w.kg, h.speed) then knockMeDown(h.dx, h.dy, h.dz, h.speed) end
+                    elseif now - h.at > KG_WAIT_MS then
+                        w.hit = nil
+                    end
                 elseif not w.done and cfg and cfg.Enabled ~= false and NetworkDoesNetworkIdExist(netId) then
                     local obj = NetToObj(netId)
                     -- Only an object (never a car or person) that the thrower's game runs: the id came from them, so a made-up id cannot name someone else's prop.
@@ -2363,7 +2386,9 @@ local function watchThrows()
                                     pos.x, pos.y, pos.z, me.x, me.y, me.z, 1, obj, 4))
                                 if blocked ~= 1 then
                                     w.done = true
-                                    knockMeDown(lastVel.x / speed, lastVel.y / speed, lastVel.z / speed, speed)
+                                    -- Judged on its weight, now or when the weight comes (above)
+                                    w.hit = { dx = lastVel.x / speed, dy = lastVel.y / speed, dz = lastVel.z / speed,
+                                              speed = speed, at = now }
                                 end
                             end
                         end
@@ -2376,15 +2401,23 @@ local function watchThrows()
     end)
 end
 
---- A throw was launched; watched until it lands. No thrower, no watch.
+--- A throw was launched; watched until it lands. No thrower, no watch. `kg`, what it weighs, as the server says it
+--- (with the launch for a script's throw, with the pile for a player's own); named again later, it is kept.
 ---@param netId number|nil
 ---@param throwerServerId number|string|nil
-function Inventory.watchThrow(netId, throwerServerId)
+---@param kg number|nil
+function Inventory.watchThrow(netId, throwerServerId, kg)
     throwerServerId = tonumber(throwerServerId)
-    if not netId or not throwerServerId or watched[netId] then return end
+    kg = tonumber(kg)
+    if not netId or not throwerServerId then return end
+    local w = watched[netId]
+    if w then
+        if kg then w.kg = kg end
+        return
+    end
     -- The thrower as this game knows them (nil when not here)
     local thrower = GetPlayerFromServerId(throwerServerId)
-    watched[netId] = { since = GetGameTimer(), thrower = thrower ~= -1 and thrower or nil }
+    watched[netId] = { since = GetGameTimer(), thrower = thrower ~= -1 and thrower or nil, kg = kg }
     watchThrows()
 end
 
@@ -2426,17 +2459,19 @@ local THROW_NET_WAIT_MS = 2000
 --- throwRefused. `own`: this player's own throw. This game tells the players nearby (throwStarted), and the throw
 --- never knocks this player down. A script's is told by the server when the launch reaches it, and knocks this player
 --- down like anyone else: they only fly it, they did not throw it. `lost()`, when given, hears that the object never
---- got a network id: it is deleted here and nothing is launched.
+--- got a network id: it is deleted here and nothing is launched. `kg`: what it weighs, for whether it knocks over
+--- whoever it hits (hitsHard).
 ---@param obj number  the networked object, already flying
 ---@param launchVel vector3  the velocity it left the hand with
 ---@param launch fun(netId: number)
 ---@param own boolean
 ---@param lost fun()|nil
-local function TrackThrow(obj, launchVel, launch, own, lost)
+---@param kg number|nil
+local function TrackThrow(obj, launchVel, launch, own, lost, kg)
     -- The hit check starts at the hand with the launch speed, so someone a metre or two ahead still counts (throwHitCheck)
     local mn, mx = GetModelDimensions(GetEntityModel(obj))
     local knock = { hit = {}, pos = GetEntityCoords(obj), vel = launchVel, ahead = KNOCK_AHEAD + #(mx - mn) * 0.5,
-        hitsMe = not own }
+        hitsMe = not own, kg = kg }
     CreateThread(function()
         -- The server finds the pile's object by network id; it lands where this game saw it land.
         local waitUntil = GetGameTimer() + THROW_NET_WAIT_MS
@@ -2456,7 +2491,7 @@ local function TrackThrow(obj, launchVel, launch, own, lost)
         -- A script's: this player is also watched for it as every other player near is, so a close pass counts the same
         -- (a straight hit is caught by throwHitCheck)
         if not own then
-            watched[netId] = { since = GetGameTimer(), thrower = PlayerId(), mine = true }
+            watched[netId] = { since = GetGameTimer(), thrower = PlayerId(), mine = true, kg = kg }
             watchThrows()
         end
         local t = {}
@@ -2501,9 +2536,11 @@ end
 --- player is near where it is thrown from. Made at `from` and let go at `vel` as this player's own throws are,
 --- then followed to rest the same way. When it cannot be thrown (its model, the object, or a network id for it), this
 --- game says so at once (throwForFailed) and the server puts the item down itself, rather than waiting out the ask.
-RegisterNetEvent('whip_core:client:throwFor', function(token, itemKey, from, vel)
+--- `kg` is what the pile weighs, as the server weighs it (a bag with what is in it).
+RegisterNetEvent('whip_core:client:throwFor', function(token, itemKey, from, vel, kg)
     if type(token) ~= 'number' or type(itemKey) ~= 'string' then return end
     if type(from) ~= 'vector3' or type(vel) ~= 'vector3' then return end
+    kg = tonumber(kg)
     local function failed(why) TriggerServerEvent('whip_core:server:throwForFailed', token, why) end
     CreateThread(function()
         local model = Inventory.loadItemProp(itemKey, 2000)   -- its own, or the box the game would not load its own as
@@ -2514,7 +2551,7 @@ RegisterNetEvent('whip_core:client:throwFor', function(token, itemKey, from, vel
         letFly(obj, vel.x, vel.y, vel.z)
         TrackThrow(obj, vel, function(netId)
             TriggerServerEvent('whip_core:server:throwForLaunched', token, netId)
-        end, false, function() failed('network') end)
+        end, false, function() failed('network') end, kg)
     end)
 end)
 
@@ -2654,9 +2691,12 @@ local function giveTick()
                         -- It is a ground item now: give mode ends here so the hands are free. Where it came from is
                         -- copied first: CancelGiveMode clears give mode's own before the launch is said.
                         local container, slot, amount = giveContainer, giveSlot, giveItemAmount
+                        -- What it weighs, for the people of the street it hits (players are told the server's weight)
+                        local def = Config.Items[giveItemKey]
+                        local kg = (type(def) == 'table' and tonumber(def.weight) or 0) * (tonumber(amount) or 1)
                         TrackThrow(obj, vector3(vx, vy, vz), function(netId)
                             TriggerServerEvent('whip_core:server:throwLaunched', container, slot, amount, netId)
-                        end, true, function() UI.Notify('The throw was lost', 'error') end)   -- (the item stays)
+                        end, true, function() UI.Notify('The throw was lost', 'error') end, kg)   -- (the item stays)
                         CancelGiveMode()
                     else
                         -- Prop creation failed: raycast fallback.
@@ -2755,11 +2795,12 @@ startGiveTick = function()
 end
 
 --- Another client threw an item: remove the ball projectile so only the item prop shows.
-RegisterNetEvent('whip_core:client:playerThrew', function(throwerServerId, netId)
+RegisterNetEvent('whip_core:client:playerThrew', function(throwerServerId, netId, kg)
     if GetPlayerServerId(PlayerId()) == throwerServerId then return end
     RemoveAllProjectilesOfType(GetHashKey('WEAPON_BALL'), false)
     -- ...and watch what flies (watchThrows).
-    if tonumber(netId) then Inventory.watchThrow(tonumber(netId), throwerServerId) end
+    -- (`kg` comes with a script's throw; a player's own brings it with its pile, groundItemCreated)
+    if tonumber(netId) then Inventory.watchThrow(tonumber(netId), throwerServerId, kg) end
 end)
 
 --- Handoff animation, triggered by the server on giver and receiver. Animation only: the item moves as the server's held prop at the clip's middle.

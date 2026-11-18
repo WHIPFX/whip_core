@@ -789,8 +789,8 @@ RegisterNetEvent('whip_core:client:groundItemCreated', function(data)
     -- A throw's prompt at once: it is in the air for a second or two, and the streaming pass could
     -- leave it unshown for half of one. (A flying pile has no model to load, so this does not wait.)
     if data.flight and inStreamRange(data) then SpawnGroundProp(data) end
-    -- Watched while it flies: thrown hard into this player, it knocks them down (client/inventory.lua)
-    if data.flight then Inventory.watchThrow(data.flight, data.flightBy) end
+    -- Watched while it flies: thrown hard into this player, heavy enough, it knocks them down (client/inventory.lua)
+    if data.flight then Inventory.watchThrow(data.flight, data.flightBy, data.flightKg) end
     if onMyPanel(data) then RefreshNUIGroundItems() end
 end)
 
