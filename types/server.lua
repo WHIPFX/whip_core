@@ -119,6 +119,15 @@ function whip_core:GetPlayerIdentifiers(source) end
 ---@return string|nil why  'Player not loaded'
 function whip_core:GetPlayerCash(source) end
 
+--- What a cash payment can take now: loose notes plus the cash in the wallets they carry (pockets or strip).
+--- ChargePlayer / HoldMoney with method 'cash' take loose notes first, then wallet cash: check a price with this, not
+--- GetPlayerCash (loose notes only). Notes another character of the same player left in a wallet are not counted
+--- while Config.BlockOwnCharacterTransfers is on.
+---@param source number
+---@return number cash  0 when the player is not loaded
+---@return string|nil why  'Player not loaded'
+function whip_core:GetSpendableCash(source) end
+
 --- Show a player one of whip's toasts, of any kind, from the server.
 ---@param source number  a player, or -1 for everyone
 ---@param text string

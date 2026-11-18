@@ -77,6 +77,130 @@ local function priced(currency, n)
     return ('%d %s'):format(n, currencyName(currency))
 end
 
+-- ============================================
+-- Cash in a wallet
+-- ============================================
+--
+-- A wallet's notes live in its metadata, not in a pocket slot. A cash payment counts them too: loose notes first, then
+-- each wallet carried in the pockets or on the strip (not one inside a bag). A WALLET is any panel item made to hold
+-- cash: its registration names the items it takes, cash among them, with no read/write of its own (whip's wallet; a
+-- duffle takes anything and is not one). Notes another character of the same player left in it stay theirs
+-- (CashMarks.blockedAt), as they would be if taken out by hand, and its tally shrinks with what is spent
+-- (CashMarks.spent). An open wallet panel is repainted from its item (Panels.refreshFromHost).
+
+--- The registration of an item made to hold `currency`, or nil.
+---@param itemKey string
+---@param currency string
+---@return table|nil reg
+local function walletReg(itemKey, currency)
+    local reg = Panels and Panels.itemConfigs and Panels.itemConfigs[itemKey]
+    if type(reg) ~= 'table' or reg.read or reg.write then return nil end
+    local allowed = reg.allowedItems
+    if type(allowed) ~= 'table' then return nil end
+    if allowed[currency] == true then return reg end
+    for _, k in ipairs(allowed) do
+        if k == currency then return reg end
+    end
+    return nil
+end
+
+--- Every wallet the player carries, with what it holds of `currency` and how much of that they may spend.
+---@return { container: string, slot: number, key: string|nil, uid: any, storageKey: string, have: number, usable: number }[] wallets
+---@return number usable  all of them together
+local function walletsOf(source, player, currency)
+    local out, total = {}, 0
+    for _, container in ipairs(PlayerContainers) do
+        for slot, sd in pairs(player.inventory[container] or {}) do
+            local reg = type(sd) == 'table' and walletReg(sd.item, currency)
+            local meta = reg and type(sd.metadata) == 'table' and sd.metadata
+            local storageKey = reg and (reg.storageKey or 'slots')
+            local inside = meta and meta[storageKey]
+            if type(inside) == 'table' then
+                local have = 0
+                for _, e in pairs(inside) do
+                    if type(e) == 'table' and e.item == currency then have = have + (tonumber(e.amount) or 0) end
+                end
+                if have > 0 then
+                    local key = Stores.cashMarks and Stores.cashMarks.itemKey(meta.uid) or nil
+                    local blocked = key and Stores.cashMarks.blockedAt(key, source) or 0
+                    local usable = math.max(0, have - blocked)
+                    out[#out + 1] = { container = container, slot = slot, key = key, uid = meta.uid,
+                                      storageKey = storageKey, have = have, usable = usable }
+                    total = total + usable
+                end
+            end
+        end
+    end
+    return out, total
+end
+
+--- Take `amount` of `currency` out of the player's wallets, in memory only (the caller writes it). Answers an undo
+--- (puts every wallet back as it was) and a finish (the tallies, the open panels: once it is written for good), or
+--- nil when they hold less than that to spend.
+---@return function|nil undo
+---@return function|nil finish
+local function takeFromWallets(source, player, wallets, currency, amount)
+    local undos, done, left = {}, {}, amount
+    for _, w in ipairs(wallets) do
+        if left <= 0 then break end
+        local n = math.min(w.usable, left)
+        if n > 0 then
+            local sd = Inventory.getSlot(player.inventory, w.container, w.slot)
+            local before = Inventory.copyMetadata(sd.metadata)
+            local meta = Inventory.copyMetadata(sd.metadata)
+            local inside = meta[w.storageKey]
+            local slots = {}
+            for s, e in pairs(inside) do
+                if type(e) == 'table' and e.item == currency then slots[#slots + 1] = s end
+            end
+            table.sort(slots, function(a, b) return (tonumber(a) or 0) > (tonumber(b) or 0) end)
+            local need = n
+            for _, s in ipairs(slots) do
+                if need <= 0 then break end
+                local e = inside[s]
+                local take = math.min(tonumber(e.amount) or 0, need)
+                e.amount = (tonumber(e.amount) or 0) - take
+                if e.amount <= 0 then inside[s] = nil end
+                need = need - take
+            end
+            Inventory.setSlot(player.inventory, w.container, w.slot, sd.item, sd.amount, meta)
+            undos[#undos + 1] = { w = w, item = sd.item, amount = sd.amount, meta = before }
+            done[#done + 1] = { w = w, spent = n }
+            left = left - n
+        end
+    end
+    local function undo()
+        for i = #undos, 1, -1 do
+            local u = undos[i]
+            Inventory.setSlot(player.inventory, u.w.container, u.w.slot, u.item, u.amount, u.meta)
+        end
+    end
+    if left > 0 then
+        undo()
+        return nil
+    end
+    local function finish()
+        for _, d in ipairs(done) do
+            if Stores.cashMarks then Stores.cashMarks.spent(d.w.key, source, d.spent, d.w.have - d.spent) end
+            -- Its panel open on their screen: re-read from the wallet, so the notes spent are gone there too
+            for _, session in pairs((Panels and Panels._sessions[source]) or {}) do
+                if type(session) == 'table' and session.host and d.w.uid ~= nil and session.host.uid == d.w.uid then
+                    Panels.refreshFromHost(source, session)
+                end
+            end
+        end
+    end
+    return undo, finish
+end
+
+--- What a cash payment can take from this player now: loose notes and their wallets' (Money.charge's count). For a
+--- look before a payment, so it decides as Money.charge will.
+---@return number
+function Money.spendableCash(source, player)
+    local _, inWallets = walletsOf(source, player, 'cash')
+    return Inventory.getItemCountAcrossContainers(player.inventory, 'cash') + inWallets
+end
+
 --- Take a payment from a player.
 ---
 --- opts:
@@ -124,7 +248,11 @@ function Money.charge(source, amount, opts, owner, why, saveWith)
     why = why or reason
     local by = owner ~= GetCurrentResourceName() and ('by ' .. owner) or nil
 
-    local haveCash = Inventory.getItemCountAcrossContainers(player.inventory, currency)
+    -- Loose notes, and (dollars only) what their wallets hold for them to spend
+    local loose = Inventory.getItemCountAcrossContainers(player.inventory, currency)
+    local wallets, inWallets = {}, 0
+    if currency == 'cash' then wallets, inWallets = walletsOf(source, player, currency) end
+    local haveCash = loose + inWallets
     local wasAuto = method == 'auto'
     if wasAuto then
         method = (currency ~= 'cash' or amount == 0 or haveCash >= amount) and 'cash' or 'bank'
@@ -147,10 +275,34 @@ function Money.charge(source, amount, opts, owner, why, saveWith)
                 currencyName(currency), priced(currency, haveCash), priced(currency, amount))
         end
         if currency == 'cash' then
-            -- The framework's cash path: logged, the cash counter told, and written now — or only
-            -- marked, when something written with it carries it (saveWith).
-            local ok = player:removeCash(amount, why, saveWith ~= nil)
-            if not ok then return false, 'Could not take the cash' end
+            -- Loose notes first; what they do not cover comes out of the wallets.
+            local fromLoose = math.min(loose, amount)
+            local fromWallets = amount - fromLoose
+            local undoWallets, finishWallets
+            if fromWallets > 0 then
+                -- In memory first, so the write below (removeCash's, or ours) carries the wallets with it
+                undoWallets, finishWallets = takeFromWallets(source, player, wallets, currency, fromWallets)
+                if not undoWallets then return false, 'Could not take the cash' end
+            end
+            if fromLoose > 0 then
+                -- The framework's cash path: logged, the cash counter told, and written now — or only
+                -- marked, when something written with it carries it (saveWith).
+                local ok = player:removeCash(fromLoose, why, saveWith ~= nil)
+                if not ok then
+                    if undoWallets then undoWallets() end
+                    return false, 'Could not take the cash'
+                end
+            end
+            if fromWallets > 0 then
+                Log.lost(player.charId, 'cash', fromWallets, why)
+                if fromLoose == 0 then
+                    -- No removeCash to write it: written as it would have been
+                    Inventory.noteChangeReason(source, why, by)
+                    if saveWith ~= nil then Inventory.syncAndSave(source, player) else Inventory.syncAndFlush(source, player) end
+                    TriggerClientEvent('whip_core:client:updateCash', source, player:getCash())
+                end
+                finishWallets()
+            end
             if withStores then
                 local together = { Stores.player(source, 'player') }
                 for _, s in ipairs(withStores) do together[#together + 1] = s end
@@ -550,6 +702,17 @@ end)
 -- ============================================
 -- Exports
 -- ============================================
+
+--- What a cash payment can take from this player now: loose notes, and what the wallets they carry hold for them to
+--- spend (not another character's notes in one, with Config.BlockOwnCharacterTransfers on). For a "can they afford
+--- it" before a ChargePlayer / HoldMoney with method 'cash'; GetPlayerCash is the loose notes alone.
+---
+---     if exports.whip_core:GetSpendableCash(source) < price then return 'Not enough cash' end
+exports('GetSpendableCash', function(source)
+    local player = Players[source]
+    if not player or not player.inventory then return 0, 'Player not loaded' end
+    return Money.spendableCash(source, player)
+end)
 
 --- Take a payment from a player: `receipt`, or `false, reason` (a reason the player can read —
 --- 'Not enough cash (have $20, need $50)', 'No withdraw permission on this account').

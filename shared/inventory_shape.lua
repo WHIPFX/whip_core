@@ -48,7 +48,7 @@ AccessoryStripSlots = {
 -- definition sets that field to true (a bank card's `wallet = true`) is still on the player while it is inside one:
 -- every count and take of what a player carries looks in those holders too, after the pockets. HasItem,
 -- GetItemCount, RemoveItem, FindItem, FindAllItems, the `item` requirement of prompts, points and doors, and the
--- item events all agree. Only such items: cash in a wallet is put away (the money system pays from the pockets),
+-- item events all agree. Only such items: cash in a wallet is the money system's (GetSpendableCash, Money.charge),
 -- and a bag's contents stay the bag's.
 --
 -- The rule is the server's panel registrations. Each side passes `holdOf(holderItem)`, the holder's slot array as

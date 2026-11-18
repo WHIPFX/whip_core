@@ -2801,7 +2801,13 @@ if c then print(c.lastName, c.dateOfBirth) end</code></pre>
 <div class="export-card" data-search="getplayercash cash money balance">
 <div class="export-header"><span class="export-name">GetPlayerCash(source)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Total cash in every container the character carries.</p>
+  <p>Total cash in every container the character carries: loose notes only, not what is in a wallet.</p>
+  <div class="return-info"><strong>Returns: </strong><code>number</code>; <code>0, 'Player not loaded'</code></div>
+</div></div>
+<div class="export-card" data-search="getspendablecash cash wallet money afford pay">
+<div class="export-header"><span class="export-name">GetSpendableCash(source)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>What a cash payment can take now: loose notes plus the cash in the wallets the character carries (in the pockets or on the strip). <code>ChargePlayer</code> and <code>HoldMoney</code> with <code>method = 'cash'</code> take loose notes first, then wallet cash. Use this, not <code>GetPlayerCash</code>, to check a price before charging. With <code>BlockOwnCharacterTransfers</code> on, notes another character of the same player left in a wallet are not counted.</p>
   <div class="return-info"><strong>Returns: </strong><code>number</code>; <code>0, 'Player not loaded'</code></div>
 </div></div>
 
@@ -2982,7 +2988,7 @@ if not ok then exports.whip_core:NotifyPlayer(source, why, 'error') end</code></
   <tr><td>only</td><td>table?</td><td>The tabs offered: category ids or groups. Left out, all of them</td></tr>
   <tr><td>prices</td><td>table?</td><td>Dollars each, by category id, then group, then <code>default</code>: <code>{ apparel = 50, hat = 20 }</code>. <code>tattoos</code> is per tattoo put on</td></tr>
   <tr><td>methods</td><td>table?</td><td><code>{ 'cash', 'bank' }</code>: Save first opens a checkout, as whip_autos' basket: the total and a tile for each way to pay. One: no checkout, that way. Left out, Save pays your own way</td></tr>
-  <tr><td>wallet</td><td>table?</td><td><code>{ cash = n, bank = n }</code>: shown on the tiles; one that can't cover the total is greyed out. Read it on your server (<code>GetPlayerCash</code>, <code>GetBalance</code>)</td></tr>
+  <tr><td>wallet</td><td>table?</td><td><code>{ cash = n, bank = n }</code>: shown on the tiles; one that can't cover the total is greyed out. Read it on your server (<code>GetSpendableCash</code>, <code>GetBalance</code>)</td></tr>
   <tr><td>title / sub</td><td>string?</td><td>The editor's heading</td></tr>
   <tr><td>onSave</td><td>function(look, method)</td><td>Required. May wait. <code>method</code> is the tile chosen, or nil. Returns <code>true</code>, or <code>false, why</code> (60 characters)</td></tr>
   <tr><td>onClose</td><td>function(saved)?</td><td>The editor shut: saved, or not (Cancel, a death, a logout)</td></tr></table>
@@ -4221,7 +4227,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <div class="export-card" id="getitemcount" data-search="getitemcount count item total how many">
 <div class="export-header"><span class="export-name">GetItemCount(source, item)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>How many of an item the player carries, across both pockets, and inside a wallet they carry for an item with <code>wallet = true</code>. The same count everywhere: <code>RemoveItem</code> takes from a wallet after the pockets, an <code>item</code> requirement (prompts, points, doors) and the item events count it there, and the player's own game counts it too. Cash in a wallet is put away, not counted.</p>
+<p>How many of an item the player carries, across both pockets, and inside a wallet they carry for an item with <code>wallet = true</code>. The same count everywhere: <code>RemoveItem</code> takes from a wallet after the pockets, an <code>item</code> requirement (prompts, points, doors) and the item events count it there, and the player's own game counts it too. Cash in a wallet isn't counted here; <code>GetSpendableCash</code> counts it.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr></table>
