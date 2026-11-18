@@ -869,10 +869,6 @@ end)
 -- (client/main.lua fadeTeleport): behind a fade, waiting for the ground there to load, and a car the admin is driving
 -- comes along. It is refused for a player in another world (routing bucket): the admin would land in an empty copy
 -- of the map. Each one is on the admin's activity log ('teleport').
---
--- The Player Manager's Teleport To used to place the admin at once, one metre above the player, with no fade, no
--- wait for the ground, no world check and no log line; it now goes the same way as the commands. Bring Here and
--- the other uses of whip_core:client:pmTeleport are unchanged.
 
 --- A teleport on the admin's own activity log: where they went, in words.
 ---@param source number
