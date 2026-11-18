@@ -183,15 +183,19 @@ RegisterNUICallback('plmSetStat', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('plmTeleportTo', function(data, cb)
-    TriggerServerEvent('whip_core:server:pmTeleportTo', data.targetSource)
-    cb('ok')
-end)
-
-RegisterNUICallback('plmBringPlayer', function(data, cb)
-    TriggerServerEvent('whip_core:server:pmBringPlayer', data.targetSource)
-    cb('ok')
-end)
+-- The action cards on a player: the server checks and does each (server/devtools.lua).
+for callback, event in pairs({
+    plmTeleportTo  = 'whip_core:server:pmTeleportTo',
+    plmBringPlayer = 'whip_core:server:pmBringPlayer',
+    plmRevive      = 'whip_core:server:pmRevive',
+    plmHeal        = 'whip_core:server:pmHeal',
+    plmKill        = 'whip_core:server:pmKill',
+}) do
+    RegisterNUICallback(callback, function(data, cb)
+        TriggerServerEvent(event, data.targetSource)
+        cb('ok')
+    end)
+end
 
 -- Open a character's inventory from the panel. Inventory handoff v1: the shell
 -- CLOSES rather than suspends — resuming on inventory close needs a clean
