@@ -18,8 +18,8 @@
 -- where it comes down. The card counts the throws a game flew and the ones the server put down instead (nobody near
 -- enough, or no launch in time), and says the last item or why it failed.
 --
--- An admin mode (PropertyEditor.start): Esc, death and a resource stop end it the same way. While a point is being
--- placed the mode's keys wait, its Esc too: PlacePoint's Esc and B are PlacePoint's. The world's prompts stay up
+-- An admin mode (PropertyEditor.start, `padBack`): Esc or B, death and a resource stop end it the same way. While a
+-- point is being placed the mode's keys wait, its Esc and B too: PlacePoint's Esc and B are PlacePoint's. The world's prompts stay up
 -- (`prompts = true`), so what it threw can be picked up with E or A without leaving: none of its keys is E, A or the
 -- scroll wheel, which are the prompts'.
 
@@ -205,7 +205,6 @@ local function onFrame()
     elseif WhipKeyPressed(73, 204) then CreateThread(function() place('target') end) end
 
     if WhipKeyPressed(178, 206) then TriggerServerEvent('whip_core:server:throwTestClear') end
-    if pad and WhipKeyPressed(nil, 202) then return 'exit' end
 
     refreshCard(now)
 end
@@ -223,9 +222,10 @@ local function start()
         name = 'Throw test',
         hud = card(),
         block = BLOCK,
+        padBack = true,   -- B leaves, as Esc does
         prompts = true,   -- the piles it throws can be picked up without leaving
         onFrame = onFrame,
-        -- Esc while a point is placed is PlacePoint's
+        -- Esc or B while a point is placed is PlacePoint's
         onEscape = function() return not (S and (S.placing or GetGameTimer() < S.quietUntil)) end,
         onExit = function()
             -- Left while a point was being placed (a death, another mode): its markers and ghost go too
