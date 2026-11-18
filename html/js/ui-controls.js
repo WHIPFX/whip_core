@@ -192,7 +192,7 @@ function place() {
     const inset = Math.max(3, Math.min(6, Math.round(r.height * 0.13)));
     const h = Math.max(18, Math.round(r.height - inset * 2));
     const w = h * 2;
-    const inside = r.width >= w * 2.6;
+    const inside = r.width - w >= 80;   // room left for the number
     const s = stepEl.style;
     s.left = Math.round(inside ? r.right - w - inset : r.right + 4) + 'px';
     s.top = Math.round(r.top + (r.height - h) / 2) + 'px';
