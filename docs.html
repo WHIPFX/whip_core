@@ -11633,6 +11633,7 @@ end</code></pre>
 <tr><td><code>PlayerNameRange</code></td><td><code>25.0</code></td><td>Metres, for <code>'nearby'</code></td></tr>
 <tr><td><code>DependentResources</code></td><td><code>{}</code></td><td>Resources to restart with whip_core. Leave empty; use <a href="#quickstart-satellite"><code>Whip.register</code></a></td></tr>
 <tr><td><code>PlaceItemRange</code></td><td><code>10.5</code></td><td>Metres from the camera an item can be set down</td></tr>
+<tr><td><code>ItemNotices</code></td><td><code>{ enabled = true, removed = true, position = 'right' }</code></td><td>A box at the side of the screen when a player gets or loses an item, any way. <code>removed = false</code>: only what they get; <code>position</code>: <code>'right'</code>, <code>'left'</code> or <code>'bottom'</code></td></tr>
 <tr><td><code>GiveModeStyle</code></td><td><code>{ walk = 'trash', speed = 'jog' }</code></td><td>Movement while holding an item out: <code>walk</code> (a /walk name; nil: own), <code>speed</code> (<code>'jog'</code>, <code>'walk'</code> or nil). <a href="#client-inventory"><code>SetGiveModeStyle</code></a> overrides it</td></tr>
 <tr><td><code>ThrowKnockdown.Enabled</code></td><td><code>true</code></td><td>A thrown item that hits hard enough knocks a person down and bounces off. Never in a no-PvP zone or on god mode</td></tr>
 <tr><td><code>ThrowKnockdown.MinSpeed</code></td><td><code>8.0</code></td><td>m/s the item must still be flying at (a throw starts at 18)</td></tr>
@@ -11856,6 +11857,7 @@ end</code></pre>
 <tr><td><code>/paddebug</code></td><td>A controller's chain live: controls down, their buttons, and what WHIP claimed</td></tr>
 <tr><td><code>/mousedebug</code></td><td>Measures this player's mouse speed, for the skill check's dot</td></tr>
 <tr><td><code>/nuicaps</code></td><td>Prints what this game's browser can do (<code>GetNuiCaps</code>)</td></tr>
+<tr><td><code>/vector3</code>, <code>/vector4</code>, <code>/vector2</code>, <code>/heading</code></td><td>Copies where you stand (<code>vector4(x, y, z, heading)</code>, two decimals) or the way you face, ready to paste into a config, and shows it. Short forms: <code>/vec</code> (a vector4), <code>/vec2</code>, <code>/vec3</code>, <code>/vec4</code>. The same text as <strong>Coords</strong> in <code>/w</code> copies with <kbd>G</kbd>; if the copy can't happen it's in F8</td></tr>
 <tr><td><code>/whipplatform</code></td><td>The platform this game read at start and now. A wrong one means <code>server.cfg</code> needs <code>setr</code></td></tr>
 <tr><td><code>/vehpoints</code></td><td>Where each prompt would sit on the bike, boat or aircraft you look at, and why</td></tr>
 <tr><td><code>/throwtest</code></td><td>Tries <a href="#ground-items">ThrowGroundItem</a> where you stand: place where it is thrown from and its target, set the power, and throw a random item with G or RT. Held, it asks for up to 20 a second, and the server throws them one every 500 ms. Delete takes back what it threw; run it again, Esc or B to leave</td></tr>

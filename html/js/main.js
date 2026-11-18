@@ -40,6 +40,7 @@ import './creator.js';
 import './core/inv-wire.js';   // the inventory system's inbound protocol
 import './inventory.js';       // ...and its default renderer
 import './hotbar.js';
+import './item-notices.js';   // the box when an item comes or goes (client/item_notices.lua)
 import './interact.js';
 import './label-measure.js';   // how wide a 3D prompt's words are, for a prompt centred on its point
 import './aim-dot.js';      // the aim dot, whip's crosshair for any weapon (client/aim_dot.lua)

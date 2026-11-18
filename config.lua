@@ -1413,6 +1413,10 @@ Config.GroundItemPickupRange = 2.0     -- How close before dropped items show in
 Config.GroundItemStreamRange = 100.0   -- How far away dropped items still appear in the world (door lock changes ride this too: keep it 50 or more)
 Config.PlaceItemRange        = 10.5    -- How far away you can set an item down (metres, from the camera)
 
+-- The box at the side of the screen when a player gets or loses an item (any way: a shop, a job, an admin, a
+-- pick up, another player). `removed` false shows only what they get; `position` is 'right', 'left' or 'bottom'.
+Config.ItemNotices = { enabled = true, removed = true, position = 'right' }
+
 -- How the player moves while holding an item out to give it: `walk` is a /walk name ('trash'), or nil for their own
 -- walk; `speed` is 'jog' (no sprint), 'walk' (no running) or nil (as fast as they like). A resource can set its own
 -- with SetGiveModeStyle. One item can keep the player's own walk: "Allow player walk animation" on its /whip Items page.

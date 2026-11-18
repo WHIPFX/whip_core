@@ -116,6 +116,24 @@ devCommand('whip_pending', function(source)
     say(('Total pending players: %d'):format(count))
 end)
 
+-- /vector2, /vector3, /vector4 and /heading — where you stand, on your clipboard, ready to paste into a config
+-- ("vector4(215.76, -810.12, 30.73, 157.48)"). Short forms: /vec (a vector4, the usual one), /vec2, /vec3, /vec4.
+-- In-game only. Your game reads the position and copies it, the same way /w → Coords does with G
+-- (tools/coords.lua whip_core:client:copyCoords): one format for both.
+local COPY_COMMANDS = {
+    vector2 = 'vector2', vector3 = 'vector3', vector4 = 'vector4', heading = 'heading',
+    vec = 'vector4', vec2 = 'vector2', vec3 = 'vector3', vec4 = 'vector4',
+}
+for name, kind in pairs(COPY_COMMANDS) do
+    devCommand(name, function(source)
+        if source == 0 then
+            print('[whip_core] This command must be run in-game')
+            return
+        end
+        TriggerClientEvent('whip_core:client:copyCoords', source, kind)
+    end, { help = kind == 'heading' and 'Copy the way you face (staff)' or ('Copy where you stand as a %s (staff)'):format(kind) })
+end
+
 -- /whip_save — Force save all players
 devCommand('whip_save', function(source)
     local say = linesTo(source)

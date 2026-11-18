@@ -1,0 +1,106 @@
+/* ========================================
+   ITEM NOTICES (js/item-notices.js) — the box when an item comes or goes
+   ======================================== */
+
+#item-notices {
+    position: fixed;
+    z-index: 900;
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+}
+#item-notices[data-position="right"] {
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    align-items: flex-end;
+}
+#item-notices[data-position="left"] {
+    left: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    align-items: flex-start;
+}
+#item-notices[data-position="bottom"] {
+    left: 50%;
+    bottom: 140px;
+    transform: translateX(-50%);
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.item-notice {
+    width: 104px;
+    padding: 8px 8px 9px;
+    border-radius: var(--ui-radius-pop);
+    background: var(--ui-surface-raised);
+    border: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow);
+    color: var(--ui-text);
+    text-align: center;
+    animation: item-notice-in 0.25s ease-out;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.item-notice.out {
+    opacity: 0;
+    transform: scale(0.9);
+}
+.item-notice.bump .item-notice-amount {
+    animation: item-notice-bump 0.3s ease-out;
+}
+
+.item-notice-pic {
+    position: relative;
+    height: 64px;
+    border-radius: var(--ui-radius-slot);
+    background: var(--ui-surface-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.item-notice-pic img {
+    max-width: 56px;
+    max-height: 56px;
+    object-fit: contain;
+}
+.item-notice-amount {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    text-shadow: var(--ui-shadow-text);
+}
+.item-notice.added .item-notice-amount,
+.item-notice.added .item-notice-verb   { color: var(--ui-success); }
+.item-notice.removed .item-notice-amount,
+.item-notice.removed .item-notice-verb { color: var(--ui-error); }
+
+.item-notice-verb {
+    margin-top: 6px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.item-notice-name {
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes item-notice-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+}
+@keyframes item-notice-bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
