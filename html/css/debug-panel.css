@@ -5,7 +5,7 @@
    other; the pane grows to fit them. The house look (DESIGN.md): solid night glass under the corner
    glow, the display face for the title, hairlines between sections. Read-only: no focus, no clicks.
 
-   It owns the top-right corner while it is up. Notifications and objective cards read --dbg-h (its
+   It owns the top-right corner while it is up. Objective cards read --dbg-h (its
    height in screen pixels, set by the JS) and move down under it (ui.css).
    ======================================== */
 
@@ -13,7 +13,7 @@
     position: fixed;
     top: 12px;
     right: 16px;
-    z-index: 930;               /* under the notifications (950) and objective cards (940) it pushes down */
+    z-index: 930;               /* under the objective cards (940) it pushes down */
     width: 400px;
     box-sizing: border-box;
     padding: 18px 16px 14px;
