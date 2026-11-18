@@ -6,8 +6,8 @@
 -- Three SecureCallbacks: the ATM is a prompt waiting for an answer, so they RETURN it (did it work,
 -- and if not, why not, in words it can put on the badge) rather than firing a toast.
 --
--- About proximity: these have no `near` clause, because there is no server-side list of ATM
--- positions (machines are found from their MODEL on the client, client/atm.lua, so any map works).
+-- About proximity: these have no `near` clause. WHIP's machines are found from their MODEL on the client
+-- (client/atm.lua), so any map works; the position list below holds GTA's own machines only.
 -- A client could call these from anywhere. That does NOT let anyone create money: the permission,
 -- balance and cash-held checks and the chk_balance_nonneg constraint all run here on the server.
 -- What it costs is the ROLEPLAY constraint of standing at a machine.

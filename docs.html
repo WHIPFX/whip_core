@@ -3686,6 +3686,25 @@ if not holdId then return false, why end
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
+<div class="export-card" id="isnearatm" data-search="isnearatm atm cash machine near standing position">
+<div class="export-header"><span class="export-name">IsNearAtm(source, range?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>Is the player standing at a cash machine? GTA's own machines and <code>Config.AtmExtraPositions</code>, measured across the ground from each machine's base. For a resource that wants the standing-at-a-machine rule; WHIP's own ATMs find machines by model and don't ask this.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>source</td><td>number</td><td>Server id</td></tr>
+<tr><td>range</td><td>number?</td><td>Metres, 0.5 to 10. Default <code>AtmActiveRange</code> + 1</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>true, at</code> (the machine's base) or <code>false, why</code></div>
+</div></div>
+
+<div class="export-card" id="getnearestatm" data-search="getnearestatm atm cash machine nearest position">
+<div class="export-header"><span class="export-name">GetNearestAtm(coords)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>The cash machine nearest a place, from the same list as <code>IsNearAtm</code>, within 3 m of its height.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>coords</td><td>vector3|table</td><td>The place</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>at, distance</code> (the machine's base, and the distance across the ground), or <code>nil</code></div>
+</div></div>
+
 <div class="export-card" id="getcharacterbankaccounts" data-search="getcharacterbankaccounts getcharacteraccounts character accounts role">
 <div class="export-header"><span class="export-name">GetCharacterBankAccounts(charId)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
