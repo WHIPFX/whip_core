@@ -2177,6 +2177,7 @@ end)
 -- Knocked over by a thrown item (Config.ThrowKnockdown). The item is not a GTA projectile, so the hit is looked for here:
 --   * a player is knocked down by their own game when the item reaches them on screen (watchThrows);
 --   * the thrower's game runs the flight, bounces the item off whoever it hits and knocks down people of the street.
+-- A script's throw (ThrowGroundItem) has no thrower: the player whose game flies it is hit like anyone else.
 
 local KNOCK_AHEAD  = 0.4   -- metres the hit ray runs past where the item got to (and half the item's size: its tip hits first)
 local KNOCK_PUSH   = 0.1   -- of the item's speed, the shove the way it flew: about 2 m/s from a throw, a nudge into the fall
@@ -2210,6 +2211,20 @@ local function knockDownNpc(ped, dx, dy, dz, speed)
     end)
 end
 
+local KNOCK_GRACE_MS = 1500   -- after getting up, this long before another throw can knock this player down
+local knockedUntil = 0        -- GetGameTimer() before which this player cannot be knocked down again
+
+--- This player knocked down by a throw. Not while dead, held in place by whip (frozen, hidden, no collision), or
+--- invincible (no-PvP zone, god mode); not again until back up KNOCK_GRACE_MS.
+local function knockMeDown(dx, dy, dz, speed)
+    if PlayerIsDead or PedHold.wants('frozen') or PedHold.wants('hidden') or PedHold.wants('noCollision')
+        or PedHold.wants('invincible') then return end
+    local now = GetGameTimer()
+    if now < knockedUntil then return end
+    knockedUntil = now + math.floor(tonumber(Config.ThrowKnockdown.RagdollMs) or 2500) + KNOCK_GRACE_MS
+    knockDown(PlayerPedId(), dx, dy, dz, speed)
+end
+
 --- The thrower's game, one frame of a flying throw: did it fly into someone? A ray along its path since the last frame,
 --- people only, judged on the speed before this frame. It bounces back; a person of the street falls.
 --- `k` is the throw's own { pos, vel, hit = { [ped] = true } }, each person once.
@@ -2230,21 +2245,30 @@ local function throwHitCheck(obj, vel, k)
         last.x, last.y, last.z, pos.x + dx * ahead, pos.y + dy * ahead, pos.z + dz * ahead,
         1 + 2 + 8 + 16, obj, 4))
     if hit ~= 1 or not ped or ped == 0 or k.hit[ped] or not DoesEntityExist(ped) or not IsEntityAPed(ped) then return end
-    if ped == PlayerPedId() then return end
+    -- Not off its own thrower. A script's throw (k.hitsMe) has none: this player only flies it, so it comes off them as
+    -- off anyone and knocks them down (here: the bounce below would take it off them before watchThrows saw it reach).
+    local me = ped == PlayerPedId()
+    if me and not k.hitsMe then return end
     -- Not off someone nobody can see (an invisible admin keeps collision).
-if not IsEntityVisible(ped) then return end
+    if not IsEntityVisible(ped) then return end
     k.hit[ped] = true
     -- Off them, not through: back to where it met them, slowly and falling
     SetEntityCoordsNoOffset(obj, hitPos.x - dx * 0.2, hitPos.y - dy * 0.2, hitPos.z - dz * 0.2, false, false, false)
     local back = speed * KNOCK_BOUNCE
     SetEntityVelocity(obj, -dx * back, -dy * back, math.min(lastVel.z, 0.0) - 1.0)
     k.pos, k.vel = nil, nil   -- the next frame starts afresh from where it was put
-    if not IsPedAPlayer(ped) and cfg.Npcs ~= false then knockDownNpc(ped, dx, dy, dz, speed) end
+    if me then
+        knockMeDown(dx, dy, dz, speed)
+    elseif not IsPedAPlayer(ped) and cfg.Npcs ~= false then
+        knockDownNpc(ped, dx, dy, dz, speed)
+    end
 end
 
 -- Every game: the flying throws near its own player (ground.lua names them as they launch)
 
-local watched = {}   -- [netId] = { since, thrower (a player index), pos, vel, done }
+-- [netId] = { since, thrower (a player index), pos, vel, done, mine }. `mine`: a script's throw this game flies
+-- (TrackThrow), watched for this player too.
+local watched = {}
 local watchRunning = false
 
 --- The nearest two points of segments AB and CD are within `r` of each other? (Each a pair of vector3s.)
@@ -2269,20 +2293,6 @@ local function segmentsWithin(a, b, c, d, r)
     return px * px + py * py + pz * pz <= r * r
 end
 
-local KNOCK_GRACE_MS = 1500   -- after getting up, this long before another throw can knock this player down
-local knockedUntil = 0        -- GetGameTimer() before which this player cannot be knocked down again
-
---- This player knocked down by a throw. Not while dead, held in place by whip (frozen, hidden, no collision), or
---- invincible (no-PvP zone, god mode); not again until back up KNOCK_GRACE_MS.
-local function knockMeDown(dx, dy, dz, speed)
-    if PlayerIsDead or PedHold.wants('frozen') or PedHold.wants('hidden') or PedHold.wants('noCollision')
-        or PedHold.wants('invincible') then return end
-    local now = GetGameTimer()
-    if now < knockedUntil then return end
-    knockedUntil = now + math.floor(tonumber(Config.ThrowKnockdown.RagdollMs) or 2500) + KNOCK_GRACE_MS
-    knockDown(PlayerPedId(), dx, dy, dz, speed)
-end
-
 --- Each frame while throws fly near: has one, flying fast, passed through this player's body? Not their own throw. Each throw once.
 local function watchThrows()
     if watchRunning then return end
@@ -2301,8 +2311,9 @@ local function watchThrows()
                 elseif not w.done and cfg and cfg.Enabled ~= false and NetworkDoesNetworkIdExist(netId) then
                     local obj = NetToObj(netId)
                     -- Only an object (never a car or person) that the thrower's game runs: the id came from them, so a made-up id cannot name someone else's prop.
+                    -- Never this player's own throw, but a script's that this game flies, yes (`mine`).
                     if obj ~= 0 and DoesEntityExist(obj) and GetEntityType(obj) == 3
-                        and NetworkGetEntityOwner(obj) == w.thrower and not NetworkHasControlOfEntity(obj) then
+                        and NetworkGetEntityOwner(obj) == w.thrower and (w.mine or not NetworkHasControlOfEntity(obj)) then
                         local pos = GetEntityCoords(obj)
                         if #(pos - me) > WATCH_RANGE then
                             w.pos, w.vel = nil, nil
@@ -2377,18 +2388,20 @@ local THROW_NET_WAIT_MS = 2000
 
 --- Follow a thrown object to rest. `launch(netId)` tells the server it is in the air: throwLaunched for this
 --- player's own throw, throwForLaunched for a script's. Either way the server answers throwAccepted or
---- throwRefused. `announce`: this game tells the players nearby (throwStarted), for a player's own throw; a script's
---- is told by the server when the launch reaches it. `lost()`, when given, hears that the object never got a
---- network id: it is deleted here and nothing is launched.
+--- throwRefused. `own`: this player's own throw. This game tells the players nearby (throwStarted), and the throw
+--- never knocks this player down. A script's is told by the server when the launch reaches it, and knocks this player
+--- down like anyone else: they only fly it, they did not throw it. `lost()`, when given, hears that the object never
+--- got a network id: it is deleted here and nothing is launched.
 ---@param obj number  the networked object, already flying
 ---@param launchVel vector3  the velocity it left the hand with
 ---@param launch fun(netId: number)
----@param announce boolean
+---@param own boolean
 ---@param lost fun()|nil
-local function TrackThrow(obj, launchVel, launch, announce, lost)
+local function TrackThrow(obj, launchVel, launch, own, lost)
     -- The hit check starts at the hand with the launch speed, so someone a metre or two ahead still counts (throwHitCheck)
     local mn, mx = GetModelDimensions(GetEntityModel(obj))
-    local knock = { hit = {}, pos = GetEntityCoords(obj), vel = launchVel, ahead = KNOCK_AHEAD + #(mx - mn) * 0.5 }
+    local knock = { hit = {}, pos = GetEntityCoords(obj), vel = launchVel, ahead = KNOCK_AHEAD + #(mx - mn) * 0.5,
+        hitsMe = not own }
     CreateThread(function()
         -- The server finds the pile's object by network id; it lands where this game saw it land.
         local waitUntil = GetGameTimer() + THROW_NET_WAIT_MS
@@ -2404,7 +2417,13 @@ local function TrackThrow(obj, launchVel, launch, announce, lost)
         SetNetworkIdCanMigrate(netId, false)
         -- Every game nearby: hide GTA's tennis ball and watch this object (watchThrows), at once; the pile below reaches
         -- them later.
-        if announce then TriggerServerEvent('whip_core:server:throwStarted', netId) end
+        if own then TriggerServerEvent('whip_core:server:throwStarted', netId) end
+        -- A script's: this player is also watched for it as every other player near is, so a close pass counts the same
+        -- (a straight hit is caught by throwHitCheck)
+        if not own then
+            watched[netId] = { since = GetGameTimer(), thrower = PlayerId(), mine = true }
+            watchThrows()
+        end
         local t = {}
         pendingThrows[netId] = t
         launch(netId)
@@ -2439,6 +2458,7 @@ local function TrackThrow(obj, launchVel, launch, announce, lost)
             end
         end
         pendingThrows[netId] = nil
+        if not own then watched[netId] = nil end
     end)
 end
 
