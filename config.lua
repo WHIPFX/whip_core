@@ -1424,7 +1424,7 @@ Config.GiveModeStyle = { walk = 'trash', speed = 'jog' }
 Config.ThrowKnockdown = {
     Enabled   = true,
     MinSpeed  = 8.0,    -- m/s it must still be flying at when it hits (it leaves the hand at 18): not one that has bounced or rolls
-    -- How hard: its weight in kg times its speed in m/s. At a normal throw a 1 kg package is about 17 (down) and a
+    -- How hard: its weight in kg times its speed in m/s. At a normal throw a 1 kg item is about 17 (down) and a
     -- 0.3 kg sandwich about 5 (not); a handful of cash never is.
     MinImpact = 8.0,
     RagdollMs = 2500,   -- how long they stay down (milliseconds)

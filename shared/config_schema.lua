@@ -654,7 +654,7 @@ ConfigSchema = {
             { path = 'ThrowKnockdown.MinImpact', type = 'number', min = 0, max = 100, step = 0.5,
               shownWhen = { path = 'ThrowKnockdown.Enabled', equals = true },
               label = 'How hard a hit knocks someone over',
-              help = 'The item\'s weight in kg times its speed in m/s. At a normal throw a 1 kg package is about 17 and a sandwich about 5. Higher: only heavier things knock people over.' },
+              help = 'The item\'s weight in kg times its speed in m/s. At a normal throw a 1 kg item is about 17 and a sandwich about 5. Higher: only heavier things knock people over.' },
             { path = 'ActionMode.Disable', type = 'bool',
               label = 'Keep GTA\'s combat stance off',
               help = 'GTA\'s crouched combat walk after firing or being shot at. On keeps it off, every frame.' },
