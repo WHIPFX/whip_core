@@ -116,24 +116,6 @@ devCommand('whip_pending', function(source)
     say(('Total pending players: %d'):format(count))
 end)
 
--- /vector2, /vector3, /vector4 and /heading — where you stand, on your clipboard, ready to paste into a config
--- ("vector4(215.76, -810.12, 30.73, 157.48)"). Short forms: /vec (a vector4, the usual one), /vec2, /vec3, /vec4.
--- In-game only. Your game reads the position and copies it, the same way /w → Coords does with G
--- (tools/coords.lua whip_core:client:copyCoords): one format for both.
-local COPY_COMMANDS = {
-    vector2 = 'vector2', vector3 = 'vector3', vector4 = 'vector4', heading = 'heading',
-    vec = 'vector4', vec2 = 'vector2', vec3 = 'vector3', vec4 = 'vector4',
-}
-for name, kind in pairs(COPY_COMMANDS) do
-    devCommand(name, function(source)
-        if source == 0 then
-            print('[whip_core] This command must be run in-game')
-            return
-        end
-        TriggerClientEvent('whip_core:client:copyCoords', source, kind)
-    end, { help = kind == 'heading' and 'Copy the way you face (staff)' or ('Copy where you stand as a %s (staff)'):format(kind) })
-end
-
 -- /whip_save — Force save all players
 devCommand('whip_save', function(source)
     local say = linesTo(source)
@@ -530,76 +512,54 @@ end)
 -- Death / Revive Commands
 -- ============================================
 
--- /whip_revive <charId> — Revive a character by charId
-devCommand('whip_revive', function(source, args)
-    local charId = tonumber(args[1])
-    if not charId then
-        local msg = 'Usage: /whip_revive <charId>'
-        if source == 0 then
-            print('[whip_core] ' .. msg)
-        else
-            ShowError(source, msg)
+-- /revive [serverId] — Revive & restore yourself or another player (works even when alive)
+devCommand('revive', function(source, args)
+    local targetSrc
+    if args[1] ~= nil then
+        targetSrc = math.tointeger(tonumber(args[1]))
+        if not targetSrc or targetSrc < 1 then
+            return reply(source, 'Use /revive [server id]', 'error')
         end
-        return
+    else
+        if source == 0 then
+            return reply(source, 'Console usage: revive <server id>', 'error')
+        end
+        targetSrc = source
     end
 
-    local target, targetSrc = GetPlayerByCharId(charId)
+    local target = Players[targetSrc]
     if not target then
-        local msg = ('No active player with charId %d'):format(charId)
-        if source == 0 then
-            print('[whip_core] ' .. msg)
-        else
-            ShowError(source, msg)
+        if targetSrc == source then
+            return reply(source, 'No character loaded', 'error')
         end
-        return
-    end
-    ---@cast targetSrc -nil
-
-    if not target.isDead then
-        local msg = ('%s is not dead'):format(target.fullName)
-        if source == 0 then
-            print('[whip_core] ' .. msg)
-        else
-            ShowError(source, msg)
-        end
-        return
+        return reply(source, ('No active player with server id %d'):format(targetSrc), 'error')
     end
 
-    MarkPlayerAlive(targetSrc, target, 'revive:admin')
+    local why = targetSrc == source and 'revive:self' or 'revive:admin'
+    if target.isDead then
+        MarkPlayerAlive(targetSrc, target, why)
+    end
     TriggerClientEvent('whip_core:client:revive', targetSrc)
 
-    local msg = ('Revived %s (charId: %d)'):format(target.fullName, charId)
-    if source == 0 then
-        print('[whip_core] ' .. msg)
+    if Stats then
+        Stats.set(targetSrc, 'health', 1e9, why)
+        Stats.set(targetSrc, 'hunger', 1e9, why)
+        Stats.set(targetSrc, 'thirst', 1e9, why)
+        Stats.freshBreath(targetSrc, why)
+    end
+
+    if targetSrc == source then
+        reply(source, 'You have been revived', 'success')
+        print(('[whip_core] %s [%d] self-revived via /revive'):format(target.fullName, targetSrc))
     else
-        ShowSuccess(source, msg)
+        reply(source, ('Revived %s [%d]'):format(target.fullName, targetSrc), 'success')
+        NotifyPlayer(targetSrc, 'You were revived by an admin', 'success')
+        print(('[whip_core] %s [%d] revived by source %d via /revive'):format(target.fullName, targetSrc, source))
     end
-    print(('[whip_core] %s revived by source %d'):format(target.fullName, source))
-end)
-
--- /whip_reviveme — Revive yourself
-devCommand('whip_reviveme', function(source)
-    if source == 0 then
-        print('[whip_core] This command must be run in-game')
-        return
-    end
-
-    local player = Players[source]
-    if not player then
-        ShowError(source, 'No character loaded')
-        return
-    end
-
-    if not player.isDead then
-        ShowError(source, 'You are not dead')
-        return
-    end
-
-    MarkPlayerAlive(source, player, 'revive:self')
-    TriggerClientEvent('whip_core:client:revive', source)
-    ShowSuccess(source, 'You have been revived')
-    print(('[whip_core] %s [%d] self-revived via /whip_reviveme'):format(player.fullName, source))
-end)
+end, {
+    help = 'Revive and restore HP, food and water (staff)',
+    params = { { name = 'id', help = 'Optional server id (empty = yourself)' } },
+})
 
 -- /whip_statebag [id] — Print all statebag values for a player
 devCommand('whip_statebag', function(source, args)
@@ -696,3 +656,332 @@ devCommand('tpm', function(source)
     TriggerClientEvent('whip_core:client:tpWaypoint', source)
     DevTools.logTeleport(source, 'to their map waypoint')
 end, { help = 'Go to your map waypoint (staff)' })
+
+-- /bring <server id> — teleport another player to you
+devCommand('bring', function(source, args)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local targetSrc = math.tointeger(tonumber(args[1]))
+    if not targetSrc or targetSrc < 1 or args[2] ~= nil then
+        return reply(source, 'Use /bring <server id>', 'error')
+    end
+    if targetSrc == source then
+        return reply(source, 'That is you', 'error')
+    end
+    local srcPed = GetPlayerPed(source)
+    local targetPed = GetPlayerPed(targetSrc)
+    local them = Players[targetSrc]
+    if not srcPed or srcPed == 0 or not them or not targetPed or targetPed == 0 then
+        return reply(source, ('No player with id %d in the world'):format(targetSrc), 'error')
+    end
+    if GetPlayerRoutingBucket(targetSrc) ~= GetPlayerRoutingBucket(source) then
+        return reply(source, 'They are in another world (routing bucket)', 'error')
+    end
+
+    local c = GetEntityCoords(srcPed)
+    local h = GetEntityHeading(srcPed)
+    TriggerClientEvent('whip_core:client:fadeTeleport', targetSrc, c.x, c.y, c.z, h, true)
+
+    local who = ('%s [%d]'):format(them.fullName or GetPlayerName(targetSrc) or '?', targetSrc)
+    DevTools.logTeleport(source, 'brought ' .. who)
+    reply(source, 'Brought ' .. who, 'success')
+    NotifyPlayer(targetSrc, 'You were teleported to an admin', 'info')
+end, {
+    help = 'Teleport a player to you (staff)',
+    params = { { name = 'id', help = 'Their server id' } },
+})
+
+-- /back — return to where you stood before your last /tp, /tpto or /tpm
+devCommand('back', function(source)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    TriggerClientEvent('whip_core:client:tpBack', source)
+    DevTools.logTeleport(source, 'back to previous position')
+end, { help = 'Return to where you were before your last teleport (staff)' })
+
+-- ============================================
+-- Staff Shortcut Commands (Items, Armour & Vehicles)
+-- ============================================
+
+-- /giveitem [serverId] <item> [amount] — Give an item by server id, or to yourself when id is omitted
+devCommand('giveitem', function(source, args)
+    local usage = 'Use /giveitem [server id] <item> [amount]'
+    local targetSrc, item, amountArg
+
+    if args[1] ~= nil and tonumber(args[1]) ~= nil then
+        targetSrc = math.tointeger(tonumber(args[1]))
+        item = args[2]
+        amountArg = args[3]
+        if not targetSrc or targetSrc < 1 or not item then
+            return reply(source, usage, 'error')
+        end
+    elseif args[1] ~= nil then
+        if source == 0 then
+            return reply(source, 'Console usage: giveitem <server id> <item> [amount]', 'error')
+        end
+        targetSrc = source
+        item = args[1]
+        amountArg = args[2]
+    else
+        return reply(source, usage, 'error')
+    end
+
+    local amount = Sanitize.amount(amountArg, 1)
+    if not amount then
+        return reply(source, Sanitize.AMOUNT_ERR, 'error')
+    end
+
+    local target = Players[targetSrc]
+    if not target then
+        if targetSrc == source then
+            return reply(source, 'No character loaded', 'error')
+        end
+        return reply(source, ('No active player with server id %d'):format(targetSrc), 'error')
+    end
+
+    if not target.inventory then
+        return reply(source, 'That player has no inventory loaded', 'error')
+    end
+
+    if not Config.Items[item] then
+        return reply(source, 'Unknown item: ' .. tostring(item), 'error')
+    end
+
+    local ok, err, placement = Inventory.giveOrDrop(targetSrc, target, item, amount, nil, {
+        container = 'player',
+        reason    = 'admin command giveitem, run by ' .. (source == 0 and 'the console' or (GetPlayerName(source) or ('#' .. source))),
+    })
+    if ok then
+        local dropped = placement == 'ground' and ' — INVENTORY FULL, dropped at feet' or ''
+        if targetSrc == source then
+            reply(source, ('Gave yourself %dx %s%s'):format(amount, item, dropped), 'success')
+        else
+            reply(source, ('Gave %dx %s to %s [%d]%s'):format(amount, item, target.fullName, targetSrc, dropped), 'success')
+            NotifyPlayer(targetSrc, ('You received %dx %s from an admin'):format(amount, item), 'success')
+        end
+    else
+        reply(source, ('Failed: %s'):format(err or 'Unknown error'), 'error')
+    end
+end, {
+    help = 'Give an item to yourself or a player by server id (staff)',
+    params = {
+        { name = 'id or item', help = 'Server id, or item name for yourself' },
+        { name = 'item / amount', help = 'Item name (with id), or amount (for yourself)' },
+        { name = 'amount', help = 'Optional amount (default 1)' },
+    },
+})
+
+-- /armor [serverId] — Give full armour to yourself or a player
+devCommand('armor', function(source, args)
+    local targetSrc
+    if args[1] ~= nil then
+        targetSrc = math.tointeger(tonumber(args[1]))
+        if not targetSrc or targetSrc < 1 then
+            return reply(source, 'Use /armor [server id]', 'error')
+        end
+    else
+        if source == 0 then
+            return reply(source, 'Console usage: armor <server id>', 'error')
+        end
+        targetSrc = source
+    end
+
+    local target = Players[targetSrc]
+    if not target then
+        if targetSrc == source then
+            return reply(source, 'No character loaded', 'error')
+        end
+        return reply(source, ('No active player with server id %d'):format(targetSrc), 'error')
+    end
+
+    local why = targetSrc == source and 'armor:self' or 'armor:admin'
+    if Stats then
+        Stats.set(targetSrc, 'armour', 1e9, why)
+    end
+
+    if targetSrc == source then
+        reply(source, 'Armour restored', 'success')
+        print(('[whip_core] %s [%d] restored armour via /armor'):format(target.fullName, targetSrc))
+    else
+        reply(source, ('Restored armour for %s [%d]'):format(target.fullName, targetSrc), 'success')
+        NotifyPlayer(targetSrc, 'Your armour was restored by an admin', 'success')
+        print(('[whip_core] %s [%d] armour restored by source %d via /armor'):format(target.fullName, targetSrc, source))
+    end
+end, {
+    help = 'Give full armour to yourself or a player (staff)',
+    params = { { name = 'id', help = 'Optional server id (empty = yourself)' } },
+})
+
+-- /car <model> — Spawn a temporary vehicle with key in ignition and seat yourself in it
+devCommand('car', function(source, args)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local model = args[1] and tostring(args[1]):lower() or ''
+    if model == '' then
+        return reply(source, 'Use /car <model>', 'error')
+    end
+    local player = Players[source]
+    if not player then
+        return reply(source, 'No character loaded', 'error')
+    end
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then
+        return reply(source, 'Could not find your ped', 'error')
+    end
+
+    local missing = Vehicles.missingModel(model)
+    if missing then
+        return reply(source, missing, 'error')
+    end
+
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+    local spawnX, spawnY, spawnZ = coords.x, coords.y, coords.z
+
+    local curVeh = GetVehiclePedIsIn(ped, false)
+    if curVeh and curVeh ~= 0 and DoesEntityExist(curVeh) then
+        local curVid = Vehicles.getEntityVehicleId(curVeh)
+        local curDef = curVid and Vehicles.getDef(curVid)
+        if not curDef or curDef.session then
+            if curVid then
+                Vehicles.removeFromWorld(curVid)
+            else
+                DeleteEntity(curVeh)
+            end
+        else
+            local rad = math.rad(heading)
+            spawnX = coords.x - math.sin(rad) * 4.5
+            spawnY = coords.y + math.cos(rad) * 4.5
+        end
+    end
+
+    local vehicleId, err = Vehicles.spawnTempFor(model, vector4(spawnX, spawnY, spawnZ, heading), {
+        forSource     = source,
+        giveKey       = false,
+        keyInIgnition = true,
+        locked        = false,
+        bucket        = GetPlayerRoutingBucket(source),
+        force         = true,
+    }, GetCurrentResourceName())
+
+    if not vehicleId then
+        return reply(source, tostring(err or 'Could not spawn vehicle'), 'error')
+    end
+
+    local entity = Vehicles.getEntity(vehicleId)
+    local netId = entity and DoesEntityExist(entity) and NetworkGetNetworkIdFromEntity(entity) or nil
+    if netId and netId > 0 then
+        TriggerClientEvent('whip_core:client:seatInVehicle', source, netId)
+    end
+
+    reply(source, ('Spawned %s'):format(model), 'success')
+    print(('[whip_core] %s [%d] spawned %s via /car'):format(player.fullName, source, model))
+end, {
+    help = 'Spawn a vehicle and sit in it (staff)',
+    params = { { name = 'model', help = 'Vehicle model name (e.g. sultan)' } },
+})
+
+-- /dv [radius] — Delete the vehicle you are in, the closest one (5m), or all vehicles within radius (max 50m)
+devCommand('dv', function(source, args)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then
+        return reply(source, 'Could not find your ped', 'error')
+    end
+
+    local function removeVehicle(veh)
+        if not veh or veh == 0 or not DoesEntityExist(veh) then return false end
+        local vid = Vehicles.getEntityVehicleId(veh)
+        if vid then
+            local ok = Vehicles.removeFromWorld(vid)
+            return ok == true
+        end
+        DeleteEntity(veh)
+        return true
+    end
+
+    local bucket = GetPlayerRoutingBucket(source)
+
+    if args[1] ~= nil then
+        local radius = tonumber(args[1])
+        if not radius or radius <= 0 then
+            return reply(source, 'Use /dv [radius]', 'error')
+        end
+        if radius > 50.0 then radius = 50.0 end
+
+        local origin = GetEntityCoords(ped)
+        local removed = 0
+        for _, veh in ipairs(GetAllVehicles() --[[@as integer[] ]]) do
+            if DoesEntityExist(veh) and GetEntityRoutingBucket(veh) == bucket then
+                if #(GetEntityCoords(veh) - origin) <= radius then
+                    if removeVehicle(veh) then removed = removed + 1 end
+                end
+            end
+        end
+        if removed == 0 then
+            return reply(source, ('No vehicles within %.1fm'):format(radius), 'info')
+        end
+        reply(source, ('Deleted %d vehicle%s within %.1fm'):format(removed, removed == 1 and '' or 's', radius), 'success')
+        print(('[whip_core] %s [%d] deleted %d vehicle(s) within %.1fm via /dv'):format(GetPlayerName(source) or '?', source, removed, radius))
+        return
+    end
+
+    local veh = GetVehiclePedIsIn(ped, false)
+    if not veh or veh == 0 or not DoesEntityExist(veh) then
+        local origin = GetEntityCoords(ped)
+        local bestVeh, bestDist = nil, 5.0
+        for _, v in ipairs(GetAllVehicles() --[[@as integer[] ]]) do
+            if DoesEntityExist(v) and GetEntityRoutingBucket(v) == bucket then
+                local dist = #(GetEntityCoords(v) - origin)
+                if dist <= bestDist then
+                    bestDist = dist
+                    bestVeh = v
+                end
+            end
+        end
+        veh = bestVeh
+    end
+
+    if not veh then
+        return reply(source, 'No vehicle nearby (within 5m)', 'error')
+    end
+
+    if removeVehicle(veh) then
+        reply(source, 'Vehicle deleted', 'success')
+        print(('[whip_core] %s [%d] deleted a vehicle via /dv'):format(GetPlayerName(source) or '?', source))
+    else
+        reply(source, 'Could not delete that vehicle', 'error')
+    end
+end, {
+    help = 'Delete current/nearby vehicle, or all within radius (staff)',
+    params = { { name = 'radius', help = 'Optional radius in metres (max 50)' } },
+})
+
+-- /fix — Repair and wash the vehicle you are in
+devCommand('fix', function(source)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local ped = GetPlayerPed(source)
+    local veh = (ped and ped ~= 0) and GetVehiclePedIsIn(ped, false) or 0
+    if not veh or veh == 0 or not DoesEntityExist(veh) then
+        return reply(source, 'You are not in a vehicle', 'error')
+    end
+    local ok, why = ObjectViewer.fixCar(source, veh)
+    if not ok then
+        return reply(source, why or 'Could not repair vehicle', 'error')
+    end
+    reply(source, 'Vehicle repaired and washed', 'success')
+end, {
+    help = 'Repair and wash the vehicle you are in (staff)',
+})

@@ -996,7 +996,7 @@ end)
 -- an over-large value is "full" without knowing the numbers (hunger and thirst are registered even when switched
 -- off in the config, so setting them is always safe).
 --
--- Dead, it revives you first, the way /whip_revive does: MarkPlayerAlive (the server's record, full
+-- Dead, it revives you first, the way /revive does: MarkPlayerAlive (the server's record, full
 -- health, the revived hooks) and the client's revive, which stands the ped up and ends the death
 -- screen before it returns. The full stats set after it land on the living ped.
 -- (Accepted while dead: an `ace` event is an admin tool, not the character acting.)
