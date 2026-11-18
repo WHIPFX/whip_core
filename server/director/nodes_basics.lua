@@ -4,6 +4,7 @@
 --
 --   Give Item           straight into their pockets (at their feet when it does not fit)
 --   Player Has Item?    a branch: yes or no
+--   Player Has Weapon Equipped?   a branch based on the weapon currently selected
 --   Player Has Money?   a branch: cash, bank, or either
 --   Charge Player       take money: Paid, or Could not pay
 --   Player Downed       when one of the run's players goes down (or all of them have)
@@ -73,7 +74,7 @@ define({
 })
 
 -- ============================================
--- Has Item? / Has Money?
+-- Has Item? / Has Weapon Equipped? / Has Money?
 -- ============================================
 
 define({
@@ -103,6 +104,42 @@ define({
         if who == 'everyone in the run' then return all and 'yes' or 'no' end
         if first then return 'yes', { source = first } end
         return 'no'
+    end,
+})
+
+local function weaponName(value)
+    if type(value) ~= 'string' then return nil end
+    local name = value:upper()
+    return name:match('^WEAPON_[A-Z0-9_]+$')
+end
+
+define({
+    type = 'player.hasWeaponEquipped', v = 1, category = 'flow', title = 'Player Has Weapon Equipped?',
+    desc = 'Goes Yes when the player has a weapon out. Checks any weapon, or the one you pick.',
+    outputs = { 'yes', 'no' },
+    branch = true,
+    props = {
+        { key = 'specific', kind = 'bool', label = 'Check a specific weapon', default = false },
+        { key = 'weapon', kind = 'text', label = 'Weapon name', required = true, maxLength = 64,
+          hint = 'GTA weapon name, for example WEAPON_PISTOL', when = { key = 'specific', is = true } },
+    },
+    check = function(props)
+        if props.specific and not weaponName(props.weapon) then
+            return 'Enter a GTA weapon name, for example WEAPON_PISTOL'
+        end
+    end,
+    run = function(ctx)
+        local src = Director.playerOf(ctx)
+        if not src then return 'no' end
+        local ped = GetPlayerPed(src)
+        if ped == 0 or not DoesEntityExist(ped) then return 'no' end
+        local hash = math.tointeger(GetSelectedPedWeapon(ped))
+        if not hash then return 'no' end
+        local selected = hash & 0xffffffff
+        if selected == 0 or selected == (GetHashKey('WEAPON_UNARMED') & 0xffffffff) then return 'no' end
+        if not ctx:prop('specific') then return 'yes' end
+        local name = weaponName(ctx:prop('weapon'))
+        return (name and selected == (GetHashKey(name) & 0xffffffff)) and 'yes' or 'no'
     end,
 })
 
