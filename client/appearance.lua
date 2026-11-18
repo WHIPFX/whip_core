@@ -143,9 +143,81 @@ end
 -- Tattoos
 -- Stored as a list of { collection, overlay } names, drawn in order (list: shared/tattoo_list.lua).
 -- No native removes one decoration, so changing the list clears all and re-applies the new list.
--- The hair fade (`hairFade`, shared/hair_fades.lua) is a decoration too and goes on first.
+-- The hair fade (`hairFade`, shared/hair_fades.lua) is a decoration too and goes on first. With no fade
+-- chosen, a freemode ped gets the decoration GTA Online puts under its haircut (shared/hair_decor.lua), so
+-- the hair does not look glued on; it follows the cut and is never saved.
+
+--- The body letter HairDecor and the fades use for this ped, or nil for a non-freemode ped.
+local function freemodeBody(ped)
+    local model = GetEntityModel(ped)
+    if model == GetHashKey('mp_m_freemode_01') then return 'm' end
+    if model == GetHashKey('mp_f_freemode_01') then return 'f' end
+    return nil
+end
+
+-- The game's own answer (what GTA Online's barber reads): a shop haircut lists its decoration among its
+-- "forced components" (type 10, a decal), by overlay hash only; the collection is found from HairFades,
+-- which names every hair decoration of the newest game.
+local DECAL_TYPE = 10
+local function u32(h) return (tonumber(h) or 0) % 0x100000000 end
+local BAD_HASH = { [0] = true, [0xFFFFFFFF] = true, [u32(GetHashKey('0'))] = true }
+
+local hairOverlayIndex = nil   -- [body][overlay hash] = { collection, overlay }, built on first use
+local function overlayIndex()
+    if hairOverlayIndex then return hairOverlayIndex end
+    local idx = { m = {}, f = {} }
+    for _, f in ipairs(HairFades.list) do
+        local col = HairFades.collections[f[1]]
+        if col then
+            for b in f[3]:gmatch('[mf]') do idx[b][u32(GetHashKey(f[2]))] = { col.name, f[2] } end
+        end
+    end
+    hairOverlayIndex = idx
+    return idx
+end
+
+--- The decoration the game's shop data gives this haircut, or nil (an add-on hair, or one the data leaves out).
+---@return table|nil { collection, overlay }
+local function shopHairDecor(ped, body, drawable)
+    local compHash = GetHashNameForComponent(ped, 2, drawable, 0)
+    if not compHash or BAD_HASH[u32(compHash)] then return nil end
+    local index = overlayIndex()[body]
+    for i = 0, (GetShopPedApparelForcedComponentCount(compHash) or 0) - 1 do
+        local nameHash, _, compType = GetForcedComponent(compHash, i)
+        if compType == DECAL_TYPE and not BAD_HASH[u32(nameHash)] then
+            local e = index[u32(nameHash)]
+            if e then return e end
+        end
+    end
+    return nil
+end
+
+local hairDecorCache = { m = {}, f = {} }   -- [body][drawable] = result of hairDecorFor
+
+--- The decoration under this haircut: shared/hair_decor.lua's table (checked by hand), else the game's shop
+--- data, else the generic fuzz. Cached; a model's haircuts do not change while the game runs.
+---@return string|nil collection   nil: none
+---@return string|nil overlay
+---@return string source           'table' | 'shop' | 'fallback' | 'none'
+local function hairDecorFor(ped, body, drawable)
+    local hit = hairDecorCache[body][drawable]
+    if not hit then
+        local e = HairDecor.listed(body, drawable)
+        if e then hit = { e[1], e[2], 'table' }
+        elseif e == false then hit = { nil, nil, 'none' }
+        else
+            e = shopHairDecor(ped, body, drawable)
+            if e then hit = { e[1], e[2], 'shop' }
+            elseif HairDecor.fallback then hit = { HairDecor.fallback[1], HairDecor.fallback[2], 'fallback' }
+            else hit = { nil, nil, 'none' } end
+        end
+        hairDecorCache[body][drawable] = hit
+    end
+    return hit[1], hit[2], hit[3]
+end
 
 --- Put exactly this fade and these tattoos on a ped (nil or empty: none).
+--- Call it after the hair is set: with no fade, the haircut's own decoration goes on (HairDecor).
 ---@param ped number
 ---@param tattoos table|nil  { { collection = 'mpBiker_overlays', overlay = 'MP_MP_Biker_Tat_000_M' }, ... }
 ---@param fade table|nil     { collection = 'multiplayer_overlays', overlay = 'NG_M_Hair_001' }
@@ -153,6 +225,12 @@ local function applyTattoos(ped, tattoos, fade)
     ClearPedDecorationsLeaveScars(ped)
     if type(fade) == 'table' and type(fade.collection) == 'string' and type(fade.overlay) == 'string' then
         AddPedDecorationFromHashes(ped, GetHashKey(fade.collection), GetHashKey(fade.overlay))
+    else
+        local body = freemodeBody(ped)
+        if body then
+            local col, ovl = hairDecorFor(ped, body, GetPedDrawableVariation(ped, 2))
+            if col then AddPedDecorationFromHashes(ped, GetHashKey(col), GetHashKey(ovl)) end
+        end
     end
     if type(tattoos) ~= 'table' then return end
     for _, t in ipairs(tattoos) do
@@ -162,8 +240,9 @@ local function applyTattoos(ped, tattoos, fade)
     end
 end
 
---- One string naming a fade and a tattoo list, so two can be compared.
-local function tattooSig(tattoos, fade)
+--- One string naming a fade, a tattoo list and the haircut, so two can be compared.
+--- The haircut is in it because, with no fade, its decoration goes on with the tattoos (applyTattoos).
+local function tattooSig(tattoos, fade, hair)
     local parts = {}
     if type(tattoos) == 'table' then
         for i, t in ipairs(tattoos) do
@@ -171,7 +250,8 @@ local function tattooSig(tattoos, fade)
         end
     end
     local f = type(fade) == 'table' and ((fade.collection or '') .. '/' .. (fade.overlay or '')) or ''
-    return f .. '|' .. table.concat(parts, ',')
+    local h = (f == '' and type(hair) == 'table') and tostring(hair.style or 0) or ''
+    return f .. '|' .. h .. '|' .. table.concat(parts, ',')
 end
 
 --- Apply an appearance to a ped.
@@ -768,9 +848,7 @@ local fadesByBody = {}     -- as tattoosByBody, for the hair fades
 --- The hair fades this ped's body can wear, or nil for a non-freemode ped (a decoration on zone 1).
 ---@return table|nil  { collections = { { name, label }, ... }, list = { { collection index, overlay }, ... } }
 local function fadesFor(ped)
-    local model = GetEntityModel(ped)
-    local body = (model == GetHashKey('mp_m_freemode_01') and 'm')
-        or (model == GetHashKey('mp_f_freemode_01') and 'f') or nil
+    local body = freemodeBody(ped)
     if not body then return nil end
     if fadesByBody[body] then return fadesByBody[body] end
 
@@ -1226,7 +1304,7 @@ local function applyPreviewDelta(ped, appearance, last)
     end
 
     -- Tattoos and the fade: the whole list again, or nothing (see applyTattoos).
-    local sig = tattooSig(appearance.tattoos, appearance.hairFade)
+    local sig = tattooSig(appearance.tattoos, appearance.hairFade, appearance.hair)
     if sig ~= previewLastTattooSig then
         applyTattoos(ped, appearance.tattoos, appearance.hairFade)
         previewLastTattooSig = sig
@@ -1255,7 +1333,7 @@ RegisterNUICallback('previewAppearance', function(data, cb)
 
     if blendChanged or not previewLastApplied then
         -- Full path: sets blend, waits out the bake. Tattoos only when changed (see skipTattoos).
-        local tSig = tattooSig(appearance.tattoos, appearance.hairFade)
+        local tSig = tattooSig(appearance.tattoos, appearance.hairFade, appearance.hair)
         local tattoosOn = (tSig == previewLastTattooSig)
         previewLastTattooSig = tSig
         ApplyAppearance(ped, appearance, nil, tattoosOn)
