@@ -435,6 +435,11 @@ function DirectorStore.events(key, runId, before, limit)
     return out
 end
 
+--- A deleted scenario's key as it was made (DirectorStore.delete keeps a freed key behind the row's id).
+local function keyAsMade(key)
+    return type(key) == 'string' and (key:gsub('^~%d+~', '')) or key
+end
+
 --- EVERY SCENARIO AT ONCE, over the last `days` (the /whip Director section's Overview). Test runs are left out of
 --- every number, and shown, marked, among the recent runs. A deleted scenario's runs still count, under its name.
 ---   totals    { runs, succeeded, failed, faulted, calledOff, paid, avgS, players }
@@ -442,7 +447,7 @@ end
 ---   scenarios { { key, name, deleted, runs, succeeded, calledOff, paid, players } }, most run first
 ---   players   { { charId, name, account, times, succeeded, lastAt } }, the ten who played most
 ---   reasons   { { reason, n } }, why runs failed or went wrong most often
----   recent    { { id, key, name, rev, test, startedAt, outcome, reason, durationS, payout, players } }, newest first
+---   recent    { { id, key, name, deleted, rev, test, startedAt, outcome, reason, durationS, payout, players } }, newest first
 --- `ids`: only those scenarios' runs (their database ids: idsOf, madeBy); nil for every scenario's.
 --- Answers nil and why when the database does not answer.
 function DirectorStore.overview(days, ids)
@@ -491,7 +496,7 @@ function DirectorStore.overview(days, ids)
                  WHERE r2.`scenarioId` = s.`id` AND r2.`test` = 0 AND r2.`startedAt` >= NOW() - INTERVAL ? DAY) AS `players`
           FROM `director_runs` r JOIN `director_scenarios` s ON s.`id` = r.`scenarioId`
          WHERE r.`test` = 0 AND %s GROUP BY s.`id` ORDER BY `runs` DESC LIMIT 50]]):format(since), { days, days }) or {}) do
-        out.scenarios[#out.scenarios + 1] = { key = x.key, name = x.name, deleted = x.gone == 1 or x.gone == true,
+        out.scenarios[#out.scenarios + 1] = { key = keyAsMade(x.key), name = x.name, deleted = x.gone == 1 or x.gone == true,
             runs = tonumber(x.runs) or 0, succeeded = tonumber(x.ok) or 0, calledOff = tonumber(x.off) or 0,
             paid = tonumber(x.paid) or 0, players = tonumber(x.players) or 0 }
     end
@@ -511,12 +516,14 @@ function DirectorStore.overview(days, ids)
         out.reasons[#out.reasons + 1] = { reason = x.reason, n = tonumber(x.n) or 0 }
     end
     for _, x in ipairs(q(([[
-        SELECT r.`id`, s.`key`, s.`name`, r.`rev`, r.`test`, r.`startedAt`, r.`outcome`, r.`reason`, r.`durationS`, r.`payout`,
+        SELECT r.`id`, s.`key`, s.`name`, s.`deletedAt` IS NOT NULL AS `gone`, r.`rev`, r.`test`, r.`startedAt`, r.`outcome`,
+               r.`reason`, r.`durationS`, r.`payout`,
                (SELECT GROUP_CONCAT(rp.`name` ORDER BY rp.`joinedAt` SEPARATOR ', ')
                   FROM `director_run_players` rp WHERE rp.`runId` = r.`id`) AS `players`
           FROM `director_runs` r JOIN `director_scenarios` s ON s.`id` = r.`scenarioId`
          %s ORDER BY r.`id` DESC LIMIT 25]]):format(only and 'WHERE ' .. only or '')) or {}) do
-        out.recent[#out.recent + 1] = { id = tonumber(x.id), key = x.key, name = x.name, rev = tonumber(x.rev),
+        out.recent[#out.recent + 1] = { id = tonumber(x.id), key = keyAsMade(x.key), name = x.name,
+            deleted = x.gone == 1 or x.gone == true, rev = tonumber(x.rev),
             test = x.test == 1 or x.test == true, startedAt = x.startedAt, outcome = x.outcome, reason = x.reason,
             durationS = tonumber(x.durationS), payout = tonumber(x.payout) or 0, players = x.players }
     end
@@ -560,6 +567,14 @@ function DirectorStore.create(key, name, doc, by, source)
     source = type(source) == 'string' and source:match('^pack:[%w_%-%.]+$') and source or 'db'
     local s, why = encode(doc)
     if not s then return false, why end
+    -- A shipped scenario deleted here keeps its key (DirectorStore.delete): said, not left to the unique key to refuse.
+    local held = q('SELECT `source` FROM `director_scenarios` WHERE `key` = ?', { key })
+    if not held then return false, DB_ERROR end
+    if held[1] then
+        local pack = type(held[1].source) == 'string' and held[1].source:match('^pack:(.+)$')
+        if pack then return false, ('%s was shipped by %s and deleted here: its key is not used again'):format(key, pack) end
+        return false, 'there is already a scenario called ' .. key
+    end
     local userId, uname = who(by)
     local ok, id = pcall(MySQL.insert.await, [[
         INSERT INTO `director_scenarios` (`key`, `name`, `description`, `draftRev`, `createdBy`, `createdByName`, `updatedBy`, `updatedByName`, `source`)
@@ -658,20 +673,23 @@ function DirectorStore.packOf(key)
     return res or nil
 end
 
---- Is a key taken, by a scenario here or one deleted (a tombstone keeps its key)? Waits on the database.
+--- Is a key taken, by a scenario here or a shipped one deleted (its tombstone keeps its key)? Waits on the database.
 function DirectorStore.keyTaken(key)
     if scenarios[key] then return true end
     local rows = q('SELECT `id` FROM `director_scenarios` WHERE `key` = ?', { key })
     return rows == nil or rows[1] ~= nil
 end
 
---- Delete a scenario (a tombstone: its rows stay, the key is freed for nothing new).
+--- Delete a scenario (a tombstone: its rows stay, and its runs still count in the Overview). One made here frees its
+--- key for a new scenario: the row keeps it behind its id (~<id>~<key>), as the key is unique. A shipped one keeps
+--- its key, so its pack never makes it again (DirectorPacks.accept asks keyTaken).
 function DirectorStore.delete(key, by)
     local r = scenarios[key]
     if not r then return false, 'no such scenario' end
     local userId, uname = who(by)
-    local res = q("UPDATE `director_scenarios` SET `deletedAt` = NOW(), `status` = 'disabled', `updatedBy` = ?, `updatedByName` = ? WHERE `id` = ?",
-        { userId, uname, r.id })
+    local kept = DirectorStore.packOf(key) and key or ('~%d~%s'):format(r.id, key):sub(1, 64)
+    local res = q("UPDATE `director_scenarios` SET `deletedAt` = NOW(), `status` = 'disabled', `key` = ?, `updatedBy` = ?, `updatedByName` = ? WHERE `id` = ?",
+        { kept, userId, uname, r.id })
     if not res then return false, DB_ERROR end
     scenarios[key], summaries[key] = nil, nil
     return true

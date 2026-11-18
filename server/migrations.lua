@@ -764,6 +764,29 @@ Migrations.list = {
               unless = { column = { 'vehicles', 'reservation' } } },
         },
     },
+    {
+        id   = '047_director_deleted_keys',
+        note = 'A deleted Director scenario kept its key, which is unique, so a new scenario under that key failed '
+            .. 'with a database error. One made here now frees it when deleted (DirectorStore.delete: the row keeps '
+            .. 'it as ~<id>~<key>); this frees the keys of those deleted before. A shipped one keeps its key, so its '
+            .. 'pack never makes it again. A DATA migration, and a `run`, as 035: on a fresh database the table is not '
+            .. 'there yet, and has no deleted scenarios.',
+        run = function()
+            if not Migrations.has.table('director_scenarios') then return true end
+            -- SAFE TO RUN AGAIN (a freed key starts with ~), so a failure does not halt start-up: it is said, and the
+            -- next start tries again.
+            local ok, res = pcall(MySQL.query.await, [[UPDATE `director_scenarios` SET `key` = LEFT(CONCAT('~', `id`, '~', `key`), 64)
+                WHERE `deletedAt` IS NOT NULL AND `source` NOT LIKE 'pack:%' AND `key` NOT LIKE '~%']])
+            if not ok then
+                print(('[whip_core:migrations] 047 could not free the deleted scenarios\' keys (%s); it runs again at '
+                    .. 'the next start'):format(tostring(res)))
+                return false
+            end
+            local n = type(res) == 'table' and tonumber(res.affectedRows) or 0
+            if n > 0 then print(('[whip_core:migrations] 047: %d deleted scenario(s) gave back their key'):format(n)) end
+            return true
+        end,
+    },
 }
 
 -- ============================================
