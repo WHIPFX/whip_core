@@ -9,8 +9,8 @@
 -- (CritteR's table, with the corrections from post #12, found with GET_SHOP_PED_APPAREL_FORCED_COMPONENT_COUNT /
 -- GET_FORCED_COMPONENT).
 --
--- client/appearance.lua (applyTattoos) puts it on when the character has no hair fade of their own
--- (`hairFade`, shared/hair_fades.lua); a chosen fade takes its place. It is never saved: it follows the cut.
+-- client/appearance.lua (applyTattoos) always puts a cut's own decoration on; the character's hair fade
+-- (`hairFade`, shared/hair_fades.lua) goes on only for a cut with none. It is never saved: it follows the cut.
 --
 -- byBody[body][drawable] = { collection, overlay }, or false for "no decoration" (a bald head, say).
 -- A drawable not listed (a newer DLC cut: Enhanced has many past 78 / 82) is looked up in the game's own
