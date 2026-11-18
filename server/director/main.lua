@@ -1794,8 +1794,7 @@ CoreStart.add('the Director', function()
     for _, id in ipairs(ids) do GroundItems.deleteItem(id) end
     if #ids > 0 then say('removed %d ground item(s) a run, a standing item spot or Dungeon Mode left behind', #ids) end
 
-    -- Back on once a character has loaded: their standing things are NPCs, and an NPC made with nobody
-    -- in the game loses its network id on Enhanced (Character.afterFirstLoad).
+    -- Back on once a character has loaded, as whip's other standing NPCs are (Character.afterFirstLoad).
     Character.afterFirstLoad(function()
         -- Each on its own: one that throws is said, and the rest still come back on.
         for _, s in ipairs(DirectorStore.list()) do

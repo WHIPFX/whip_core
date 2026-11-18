@@ -39,3 +39,50 @@ AccessoryStripSlots = {
     { slot = 4, label = 'Key', keys = true, icon = 'vehicle_key' },
     { slot = 5, label = 'Key', keys = true, icon = 'vehicle_key' },
 }
+
+-- ============================================
+-- Items that stay the player's inside another (both sides)
+-- ============================================
+--
+-- A panel item may name an item field as its allowedFlag (the wallet's 'wallet', server/panels.lua). An item whose
+-- definition sets that field to true (a bank card's `wallet = true`) is still on the player while it is inside one:
+-- every count and take of what a player carries looks in those holders too, after the pockets. HasItem,
+-- GetItemCount, RemoveItem, FindItem, FindAllItems, the `item` requirement of prompts, points and doors, and the
+-- item events all agree. Only such items: cash in a wallet is put away (the money system pays from the pockets),
+-- and a bag's contents stay the bag's.
+--
+-- The rule is the server's panel registrations. Each side passes `holdOf(holderItem)`, the holder's slot array as
+-- { storageKey, slots } or nil, and `counts(holderItem, item)`: the server from Panels.itemConfigs and the item
+-- definitions, a game from the definitions the server sends it (`holds`, `insideOf`: Inventory.getItemDefs).
+
+--- Each stack of `item` (every counted one, when nil) inside a holder in `cache`, a character's containers: pockets
+--- in order, then the holder's slot, then the place inside it, as fn(container, slot, place, data, inner, key); fn
+--- answering true stops the walk. `key` is the place as the holder's array keys it (JSON may have made it text).
+---@param cache table|nil
+---@param item string|nil
+---@param holdOf fun(holderItem: string): table|nil
+---@param counts fun(holderItem: string, item: string): boolean
+---@param fn fun(container: string, slot: number, place: number, data: table, inner: table, key: any): boolean|nil
+function EachCarriedInside(cache, item, holdOf, counts, fn)
+    if type(cache) ~= 'table' then return end
+    for _, container in ipairs(PlayerContainers) do
+        local slots = cache[container]
+        if type(slots) == 'table' then
+            for slot = 1, (Config.ContainerSlots[container] or 0) do
+                local holder = slots[slot] or slots[tostring(slot)]
+                local hold = type(holder) == 'table' and holder.item and holdOf(holder.item)
+                local inner = hold and type(holder.metadata) == 'table' and holder.metadata[hold.storageKey or 'slots']
+                if type(inner) == 'table' then
+                    for place = 1, (hold.slots or 3) do
+                        local key = inner[place] ~= nil and place or tostring(place)
+                        local data = inner[key]
+                        if type(data) == 'table' and data.item and (item == nil or data.item == item)
+                            and counts(holder.item, data.item) and fn(container, slot, place, data, inner, key) then
+                            return
+                        end
+                    end
+                end
+            end
+        end
+    end
+end

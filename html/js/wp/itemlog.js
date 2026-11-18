@@ -791,7 +791,7 @@ function renderEconomy() {
     // until one is picked.
     if (econ.picking) {
         const top = WP.el('div', 'wp-actions-row wp-head-row');
-        top.appendChild(WP.btn('← Back', 'ilEconPickClose', 'ghost'));
+        top.appendChild(WP.backBtn('Back', 'ilEconPickClose'));
         top.appendChild(WP.el('div', 'wp-pane-title', 'Pick an item'));
         body.appendChild(top);
         const all = Object.assign({}, items);
@@ -990,7 +990,7 @@ WhipPanel.registerSection({
         els.filters = WP.el('div', 'wp-list-col wp-log-filters');
         split.appendChild(els.filters);
         els.detail = WP.el('div', 'wp-detail');
-        els.back = WP.btn('← Back to everything', 'ilBack', 'ghost');
+        els.back = WP.backBtn('Back to everything', 'ilBack');
         els.back.classList.add('wp-log-back');
         els.back.style.display = 'none';
         els.detail.appendChild(els.back);

@@ -282,6 +282,7 @@ local function scanBlips(alive, list)
                             local short = IsBlipShortRange(b) and true or false
                             local rot = rotationOf(b)
                             local flash = IsBlipFlashing(b) and true or nil
+                            local number = WhipBlipNumber and WhipBlipNumber(b) or nil
                             n = n + 1
                             local e = list[n]
                             if not e then
@@ -289,9 +290,9 @@ local function scanBlips(alive, list)
                                 list[n] = e
                             end
                             if e.id ~= b or e.x ~= x or e.y ~= y or e.sprite ~= sprite or e.colour ~= colour
-                                or e.short ~= short or e.rot ~= rot or e.flash ~= flash then
-                                e.id, e.x, e.y, e.sprite, e.colour, e.short, e.rot, e.flash =
-                                    b, x, y, sprite, colour, short, rot, flash
+                                or e.short ~= short or e.rot ~= rot or e.flash ~= flash or e.number ~= number then
+                                e.id, e.x, e.y, e.sprite, e.colour, e.short, e.rot, e.flash, e.number =
+                                    b, x, y, sprite, colour, short, rot, flash, number
                                 changed = true
                             end
                             if MOVING[GetBlipInfoIdType(b)] then

@@ -20,6 +20,7 @@
 
 import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
+import { uiIcon } from './ui-icons.js';
 import { PauseMap } from './pause-map.js';
 import { BLIP_NAMES } from './blip-names.js';
 import { logoMarkup, logoLight } from './logo-light.js';
@@ -77,10 +78,10 @@ root.id = 'pause';
 root.innerHTML = `
     <section class="pm-mapwrap">
         <div class="pm-map"></div>
-        <button class="pm-back" type="button"><span class="pm-back-arrow">&#8592;</span> Menu</button>
+        <button class="pm-back" type="button">${uiIcon('back', 'pm-back-ico')}Menu</button>
         <aside class="pm-legend"><div class="pm-legend-head">Legend</div><div class="pm-legend-list"></div></aside>
         <div class="pm-keys">
-            <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span>
+            <span><b>Drag</b> Move</span><span><b>Scroll</b> Zoom</span><span><b>Double-click</b> Waypoint</span><span><b>Right-click</b> Clear it</span>
             <span><b>V</b> 3D</span><span><b>Right-drag</b> Turn</span>
             <span><b>C</b> Centre</span><span><b>L</b> Legend</span><span><b>Esc</b> Back</span>
         </div>
@@ -132,10 +133,18 @@ const mapOffset = () => legendOpen ? -legendEl.getBoundingClientRect().width / 2
 
 const onPad = () => document.documentElement.dataset.input === 'pad';
 
+// ---- sounds ----
+
+/** One of GTA's frontend sounds, by what happened: 'nav' (up and down), 'side' (across), 'select', 'back'.
+ *  client/pause.lua plays it; the waypoint's own sound, and the open and Resume sounds, are played there. */
+const sound = (name) => nuiCallback('pauseSound', { name });
+
 // ---- modes ----
 
 function setMode(m, instant) {
     const was = mode;
+    // Out of the menu to a screen (map, controller, settings, a confirm) is a select; back to it is a back.
+    if (!instant && m !== was) sound(m === 'menu' ? 'back' : 'select');
     mode = m;
     root.dataset.mode = m;
     map.setInteractive(m === 'map');
@@ -195,12 +204,12 @@ function choose(i) {
     else if (id === 'map') setMode('map');
     else if (id === 'controller') setMode('pad');
     else if (id === 'settings' || id === 'serverSettings') setMode('settings');
-    else if (id === 'gameSettings') nuiCallback('pauseSettings', {});   // GTA's own, in the pause menu's place
+    else if (id === 'gameSettings') { sound('select'); nuiCallback('pauseSettings', {}); }   // GTA's own, in the pause menu's place
     else if (CONFIRMS[id]) ask(id);
 }
 
 function answerConfirm(i) {
-    if (i === 0 && asking) nuiCallback(asking.callback, {});
+    if (i === 0 && asking) { sound('select'); nuiCallback(asking.callback, {}); }
     else setMode('menu');
 }
 
@@ -254,6 +263,7 @@ function drawLegend() {
         row.addEventListener('click', () => {
             const at = ((cycle.get(g.key) ?? -1) + 1) % g.blips.length;
             cycle.set(g.key, at);
+            sound('nav');
             pick(g.blips[at], { slide: true });
             if (map.zoom < 4.6) map.glide(mapOffset(), 4.6, GLIDE_MS);
         });
@@ -317,30 +327,58 @@ map.onSettle = settle;
 /** A click on a blip: it comes to the middle, lit in the legend. From the menu, the map opens. */
 map.onBlipClick = (b) => {
     if (mode !== 'map') setMode('map');
+    else sound('nav');
     pick(b, { slide: true, reveal: true });
 };
+
+// ---- moving the selection: keys, the pad and the mouse alike, each move with its tick ----
+
+/** The menu's selection to item i, wrapping round. */
+function selectItem(i) {
+    i = (i + menu.length) % menu.length;
+    if (i === sel) return;
+    sel = i;
+    drawMenu();
+    sound('nav');
+}
+
+/** The confirm's selection to answer i (0 or 1). */
+function selectAnswer(i) {
+    if (i === confirmSel) return;
+    confirmSel = i;
+    drawConfirm();
+    sound('side');
+}
+
+function toggleLegend() {
+    setLegend(!legendOpen);
+    sound('side');
+}
 
 // ---- mouse ----
 
 // On the menu, not each button: they are made again at each open (buildMenu).
 menuEl.addEventListener('mouseover', (e) => {
     const el = e.target.closest('.pm-item');
-    if (el && mode === 'menu') { sel = Number(el.dataset.i); drawMenu(); }
+    if (el && mode === 'menu') selectItem(Number(el.dataset.i));
 });
 menuEl.addEventListener('click', (e) => {
     const el = e.target.closest('.pm-item');
     if (el && mode === 'menu') { sel = Number(el.dataset.i); choose(sel); }
 });
 confirmBtns.forEach((el, i) => {
-    el.addEventListener('mouseenter', () => { confirmSel = i; drawConfirm(); });
+    el.addEventListener('mouseenter', () => selectAnswer(i));
     el.addEventListener('click', () => answerConfirm(i));
 });
 root.querySelector('.pm-back').addEventListener('click', () => setMode('menu'));
 // NO BUTTON HERE TAKES THE KEYBOARD'S FOCUS: a focused button (even hidden) would be pressed again by the next Enter
 // or Space as well as the key scope's own action. The keys are the scope's (onKey); a click still clicks.
 root.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
-// The map beside the menu is a door to the map.
-root.querySelector('.pm-mapwrap').addEventListener('click', () => { if (mode === 'menu') setMode('map'); });
+// The map beside the menu is a door to the map. Not a click on one of its own controls: the Menu button sits inside
+// .pm-mapwrap, so its click (which has just set 'menu') bubbles here and would open the map again at once.
+root.querySelector('.pm-mapwrap').addEventListener('click', (e) => {
+    if (mode === 'menu' && !e.target.closest('button, .pm-legend')) setMode('map');
+});
 
 map.onWaypoint = (x, y) => nuiCallback('pauseWaypoint', x === null ? { clear: true } : { x, y });
 
@@ -358,7 +396,7 @@ function mapKey(e) {
     else if (k === '-' || k === 'q') map.zoomBy(-0.5);
     else if (k === 'c') map.centreOnPlayer();
     else if (k === 'v') map.setTilt(!map.tilted());
-    else if (k === 'l') setLegend(!legendOpen);
+    else if (k === 'l') toggleLegend();
     else if (k === 'delete' && map.data.waypoint) { map.data.waypoint = null; map.data.route = null; map.render(); map.onWaypoint(null); }
 }
 
@@ -373,13 +411,13 @@ NuiRouter.registerKeyScope({
         if (mode === 'settings') { if (!settingsScreen.onKey(e)) setMode('menu'); return; }
         const k = e.key.toLowerCase();
         if (mode === 'confirm') {
-            if (k === 'arrowleft' || k === 'arrowright' || k === 'tab') { confirmSel = 1 - confirmSel; drawConfirm(); e.preventDefault(); }
+            if (k === 'arrowleft' || k === 'arrowright' || k === 'tab') { selectAnswer(1 - confirmSel); e.preventDefault(); }
             else if (k === 'enter' || k === ' ') answerConfirm(confirmSel);
             else if (k === 'escape') setMode('menu');
             return;
         }
-        if (k === 'arrowup' || k === 'w') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
-        else if (k === 'arrowdown' || k === 's') { sel = (sel + 1) % menu.length; drawMenu(); }
+        if (k === 'arrowup' || k === 'w') selectItem(sel - 1);
+        else if (k === 'arrowdown' || k === 's') selectItem(sel + 1);
         else if (k === 'enter' || k === ' ') choose(sel);
         else if (k === 'escape') nuiCallback('pauseResume', {});
         else if (k === 'm') setMode('map');
@@ -401,17 +439,17 @@ NuiRouter.registerKeyScope({
                 map.waypointAt(sx, sy);
             }
             else if (nav === 'buttonX') map.centreOnPlayer();
-            else if (nav === 'buttonY') setLegend(!legendOpen);
+            else if (nav === 'buttonY') toggleLegend();
             return;
         }
         if (mode === 'confirm') {
-            if (nav === 'left' || nav === 'right') { confirmSel = 1 - confirmSel; drawConfirm(); }
+            if (nav === 'left' || nav === 'right') selectAnswer(1 - confirmSel);
             else if (nav === 'select') answerConfirm(confirmSel);
             else if (nav === 'back') setMode('menu');
             return;
         }
-        if (nav === 'up') { sel = (sel + menu.length - 1) % menu.length; drawMenu(); }
-        else if (nav === 'down') { sel = (sel + 1) % menu.length; drawMenu(); }
+        if (nav === 'up') selectItem(sel - 1);
+        else if (nav === 'down') selectItem(sel + 1);
         else if (nav === 'select') choose(sel);
         else if (nav === 'back') nuiCallback('pauseResume', {});
     },

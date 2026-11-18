@@ -93,6 +93,8 @@
 
 Actions = {}
 
+local CORE = GetCurrentResourceName()
+
 --- What each action is mounted as: [key] = { kind, ids = { engineId, ... }, partKey?, entity? }
 local mounted = {}
 
@@ -331,11 +333,31 @@ local function resolveText(entry, o, field, ctx)
     return tostring(res)
 end
 
+local function checkCallbacks(entry, o, ctx)
+    local def = entry.def
+    for i = 1, 2 do
+        local fn
+        if i == 1 then fn = def.canInteract else fn = o.canInteract end
+        if fn ~= nil then
+            local good, res, reason = pcall(fn, ctx)
+            if not good then
+                report(entry.key, 'canInteract', res)
+                return false, 'canInteract threw'
+            end
+            if not yes(res) then return false, reason or 'canInteract said no' end
+        end
+    end
+    return true
+end
+
 --- May this option be offered right now? Answers true, or false and why.
 ---@return boolean
 ---@return string|nil why
-local function check(entry, o, ctx)
+local function check(entry, o, ctx, displayCache)
     local def = entry.def
+    if entry.aimModels and (not ctx.entity or ctx.entity == 0 or not entry.aimModels[GetEntityModel(ctx.entity) & 0xFFFFFFFF]) then
+        return false, 'model not allowed'
+    end
     if def.enabled == false or o.enabled == false then return false, 'switched off' end
     -- An option down a menu must pass the one it is under too.
     if o._up then
@@ -361,20 +383,39 @@ local function check(entry, o, ctx)
         return false, 'in a vehicle'
     end
 
-    -- The action's rule, then the option's (a numeric loop: a nil first slot must not end it).
-    for i = 1, 2 do
-        local fn
-        if i == 1 then fn = def.canInteract else fn = o.canInteract end
-        if fn ~= nil then
-            local good, res, reason = pcall(fn, ctx)
-            if not good then
-                report(entry.key, 'canInteract', res)
-                return false, 'canInteract threw'
+    if def.canInteract == nil and o.canInteract == nil then return true end
+    -- whip_core's own callbacks are plain calls, asked every time (a point option's reach is one); the cache
+    -- spares other resources' calls their round trip.
+    if not displayCache or entry.owner == CORE then return checkCallbacks(entry, o, ctx) end
+    local now = GetGameTimer()
+    local same = displayCache.at and now >= displayCache.at and now - displayCache.at < 500
+        and displayCache.action == def.canInteract and displayCache.option == o.canInteract
+    if same then
+        for key, value in pairs(ctx) do
+            local previous = displayCache.ctx[key]
+            if key == 'player' and type(value) == 'table' and type(previous) == 'table' then
+                for field, fact in pairs(value) do
+                    if type(fact) == 'table' or previous[field] ~= fact then same = false break end
+                end
+                for field in pairs(previous) do
+                    if value[field] == nil then same = false break end
+                end
+            elseif type(value) == 'table' or previous ~= value then
+                same = false
             end
-            if not yes(res) then return false, reason or 'canInteract said no' end
+            if not same then break end
+        end
+        for key in pairs(displayCache.ctx) do
+            if ctx[key] == nil then same = false break end
         end
     end
-    return true
+    if same then return displayCache.ok, displayCache.why end
+    local saved = displayCache.ctx
+    for key in pairs(saved) do saved[key] = nil end
+    for key, value in pairs(ctx) do saved[key] = value end
+    displayCache.at, displayCache.action, displayCache.option = now, def.canInteract, o.canInteract
+    displayCache.ok, displayCache.why = checkCallbacks(entry, o, ctx)
+    return displayCache.ok, displayCache.why
 end
 
 --- A ctx for conditions and label functions: made once per option and reused. It carries no functions,
@@ -799,6 +840,7 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
             return c
         end
         local menu = isMenu(o)
+        local displayCache = { ctx = {} }
         options[#options + 1] = {
             id        = o.id,
             -- Hold to use: the option's own, else the action's. A menu entry is always a press.
@@ -811,8 +853,11 @@ local function promptOptions(entry, pid, entityNow, whereNow, about, gate)
             icon      = function() return resolveText(entry, o, 'icon', current()) end,
             -- A picture of its own, a menu's above it (a car's page shows the car), or the action's.
             image     = givesImage(o, def) and function() return resolveText(entry, o, 'image', current()) end or nil,
-            condition = function() return open() and (check(entry, o, current())) end,
+            condition = function() return open() and (check(entry, o, current(), displayCache)) end,
             callback  = function()
+                displayCache.at = nil
+                if not open() then return end
+                if menu and not check(entry, o, current()) then return end
                 if menu then
                     menuAt[pid] = o
                     if fills(o) then fill(entry, pid, o, extraNow(), show) end
@@ -951,7 +996,14 @@ local aimBoxes = {}   -- [key] = { pid, kinds, flags, maxT, out, on, about }
 local aimDriverRunning = false
 
 local function aimBoxLook(a)
+    local frame = GetFrameCount()
+    if a.frame == frame then return a.on end
+    a.frame = frame
     a.on = AimBox.aim(a.kinds, a.flags, a.maxT, a.on and a.out.entity or nil, a.out)
+    if a.on and a.models then
+        local entity = a.out.entity
+        a.on = entity ~= nil and entity ~= 0 and a.models[GetEntityModel(entity) & 0xFFFFFFFF] == true
+    end
     -- With 'world' among the kinds: is it the map itself (ctx.world), and its facing (ctx.normal)
     local about = a.about
     if about then
@@ -986,7 +1038,14 @@ local function mountAimBox(entry)
     local pid = 'act:' .. entry.key
     -- Looked along from the camera; the reach is measured from the player.
     local reach = tonumber(def.reach) or Config.InteractActiveRange or 2.0
-    local a = { pid = pid, kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false,
+    if at.aimModels then
+        entry.aimModels = {}
+        for _, model in ipairs(at.aimModels) do
+            local hash = type(model) == 'string' and GetHashKey(model) or model
+            entry.aimModels[hash & 0xFFFFFFFF] = true
+        end
+    end
+    local a = { pid = pid, kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false, models = entry.aimModels,
                 about = kinds.world and { world = false, normal = false } or nil }
 
     local function entityNow() return a.on and a.out.entity or nil end
@@ -1137,6 +1196,49 @@ local function mountPart(entry)
     return true
 end
 
+--- `at = { list = '<prompt group>:<option id>' }`: options added to another prompt's list, right after that option
+--- ('atm:balance': under the ATM's Check Balance). ctx.entity is the prop the prompt is on (a prop prompt's), ctx.model
+--- its model name; label and icon are read as the list is built.
+local function mountList(entry)
+    local listKey = entry.def.at.list
+    local ids = {}
+    for _, o in ipairs(entry.opts) do
+        local oid = engineId(entry, o)
+        local c = condCtx(entry, o)
+        --- The prompt's prop into ctx, for conditions and labels
+        local function bind(ctx, pid)
+            local rec = PropPrompts.get(pid)
+            local reg = Interactions.getAll()[pid]
+            ctx.entity = rec and rec.entity or nil
+            ctx.model = rec and rec.model or nil
+            ctx.coords = (ctx.entity and DoesEntityExist(ctx.entity) and GetEntityCoords(ctx.entity))
+                or (reg and reg.x and vector3(reg.x, reg.y, reg.z)) or nil
+            return ctx
+        end
+        local ok, why = Interactions.addListOption(entry.owner, listKey, {
+            id    = oid,
+            label = function(pid) return resolveText(entry, o, 'label', bind(c, pid)) end,
+            icon  = (o.icon ~= nil or entry.def.icon ~= nil)
+                and function(pid) return resolveText(entry, o, 'icon', bind(c, pid)) end or nil,
+            holdMs = o.holdMs or entry.def.holdMs,
+            can   = function(pid) return (check(entry, o, bind(c, pid))) end,
+            act   = function(pid)
+                local x = bind({}, pid)
+                local reg = Interactions.getAll()[pid]
+                local here = reg and reg.x and vector3(reg.x, reg.y, reg.z) or nil
+                fire(entry, o, pid, { entity = x.entity, model = x.model, coords = x.coords }, here)
+            end,
+        })
+        if not ok then
+            for _, done in ipairs(ids) do Interactions.removeListOption(entry.owner, listKey, done) end
+            return false, why
+        end
+        ids[#ids + 1] = oid
+    end
+    mounted[entry.key] = { kind = 'list', listKey = listKey, ids = ids, owner = entry.owner }
+    return true
+end
+
 local function mountRadial(entry)
     local ids = {}
     for _, o in ipairs(entry.opts) do
@@ -1178,6 +1280,8 @@ local function unmount(key)
         for _, id in ipairs(m.ids) do VehiclePartOptions.remove(m.owner, m.partKey, id) end
     elseif m.kind == 'radial' then
         for _, id in ipairs(m.ids) do WhipRadialRemove(id) end
+    elseif m.kind == 'list' then
+        for _, id in ipairs(m.ids) do Interactions.removeListOption(m.owner, m.listKey, id) end
     elseif m.kind == 'props' then
         -- Every prop's prompt goes with its kind, and its watch (onLost is told for each found prop)
         PropPrompts.undefine(m.propKind)
@@ -1196,7 +1300,7 @@ local function kindOf(at)
     end
     -- One place only: two is refused rather than guessed.
     local named = {}
-    for _, k in ipairs({ 'coords', 'entity', 'netId', 'vehiclePart', 'aimBox', 'model' }) do
+    for _, k in ipairs({ 'coords', 'entity', 'netId', 'vehiclePart', 'aimBox', 'model', 'list' }) do
         if at[k] ~= nil then named[#named + 1] = k end
     end
     if at.radial then named[#named + 1] = 'radial' end
@@ -1206,6 +1310,25 @@ local function kindOf(at)
     end
     if at.aimBox ~= nil then
         if not AimBox.kinds(at.aimBox) then return nil, "at.aimBox is 'vehicle', 'object', 'ped' or 'world' (or a list of them)" end
+        if at.aimModels ~= nil then
+            if type(at.aimModels) ~= 'table' or #at.aimModels == 0 then
+                return nil, 'at.aimModels is a non-empty list of model names or hashes'
+            end
+            local count = 0
+            for index, model in pairs(at.aimModels) do
+                count = count + 1
+                local name = type(model) == 'string' and model ~= ''
+                local hash = type(model) == 'number' and math.tointeger(model)
+                    and model >= -2147483648 and model <= 4294967295
+                if type(index) ~= 'number' or index % 1 ~= 0 or index < 1 or index > #at.aimModels
+                    or not (name or hash) then
+                    return nil, 'at.aimModels is a non-empty list of model names or hashes'
+                end
+            end
+            if count ~= #at.aimModels then
+                return nil, 'at.aimModels is a non-empty list of model names or hashes'
+            end
+        end
         return 'aimbox'
     end
     if at.coords ~= nil then
@@ -1235,6 +1358,13 @@ local function kindOf(at)
         return 'props'
     end
     if at.vehiclePart ~= nil then return 'part' end
+    -- Another prompt's list, by an option in it: '<prompt group>:<option id>'
+    if at.list ~= nil then
+        if type(at.list) ~= 'string' or not at.list:match('^[^:]+:.+$') then
+            return nil, "at.list names another prompt's list by an option in it: '<prompt group>:<option id>' ('atm:balance')"
+        end
+        return 'list'
+    end
     if at.radial then return 'radial' end
     -- A place spelt wrong (`coord`, `pos`) is the likeliest reason none was found: say which.
     for k in pairs(at) do
@@ -1250,7 +1380,8 @@ end
 
 --- What each place is called in a warning.
 local PLACE_NAME = { prompt = 'a world prompt', part = 'a car part', radial = 'the F1 wheel',
-                     props = 'the props of a model', aimbox = 'a prompt where the player aims' }
+                     props = 'the props of a model', aimbox = 'a prompt where the player aims',
+                     list = "another prompt's list" }
 
 --- The places whose options may be menus: the world prompts.
 local MENU_KINDS = { prompt = true, props = true, aimbox = true }
@@ -1400,6 +1531,7 @@ local function mount(key, def, owner)
     elseif kind == 'aimbox' then ok, why = mountAimBox(entry)
     elseif kind == 'part' then ok, why = mountPart(entry)
     elseif kind == 'radial' then ok, why = mountRadial(entry)
+    elseif kind == 'list' then ok, why = mountList(entry)
     elseif kind == 'props' then ok, why = mountProps(entry) end
     if not ok then
         mountError[key] = tostring(why or 'the engine refused it')
@@ -1495,6 +1627,11 @@ local function autoId(def)
         label, tostring(at.vehiclePart or ''), tostring(at.aim or ''),
         tostring(model or ''), tostring(at.bone or ''), tostring(at.radial or ''), tostring(entity),
         x or 0, y or 0, z or 0, ox or 0, oy or 0, oz or 0, table.concat(opts, ','))
+    if type(at.aimModels) == 'table' then
+        local names = {}
+        for i, m in ipairs(at.aimModels) do names[i] = tostring(m) end
+        seed = seed .. '|aimModels:' .. table.concat(names, '+')
+    end
     return ('auto:%08x'):format(GetHashKey(seed) & 0xFFFFFFFF)
 end
 

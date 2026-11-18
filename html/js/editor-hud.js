@@ -60,6 +60,8 @@ function pair(item, a, b) {
 //   icon     a 3D-prompt glyph's name for the disc (js/glyphs.js: 'door')
 //   sub      what is happening, beside the target's state
 //   chip     { text, tone } — the target's state, 'ok' | 'warn' | 'err' or none
+//   progress { done, total } — a bar under the head (Verify's tour)
+//   rows     { label, value, tone, wrap } — `wrap` lets a long value (a problem) run onto more lines
 //   hints    { key, pad, text, off, group } — `key` the keyboard's (a string; ' / ' and ' + ' make
 //            several caps), `pad` a button's picture or a list of them (js/pad-glyphs.js), or false for
 //            a keyboard's only (it is not there on a pad); group = 'fly' puts it in the camera's small group
@@ -120,14 +122,17 @@ function buildHouse() {
     const now = el('div', 'eh-now');
     text.append(title, now);
     head.append(disc, text);
+    const bar = el('div', 'eh-progress');
+    const barFill = el('div', 'eh-progress-fill');
+    bar.appendChild(barFill);
     const readings = el('div', 'eh-readings');
     const actions = el('div', 'eh-actions');
     const fly = el('div', 'eh-fly');
     const flyList = el('div', 'eh-fly-list');
     fly.append(el('div', 'eh-fly-label', 'Camera'), flyList);
-    card.append(head, readings, actions, fly);
+    card.append(head, bar, readings, actions, fly);
     body.appendChild(card);
-    house = { card, disc, title, now, readings, actions, fly, flyList, says: null, icon: null,
+    house = { card, disc, title, now, bar, barFill, readings, actions, fly, flyList, says: null, icon: null,
               shapeA: null, shapeF: null, saysTimer: null, saysGone: null };
 }
 
@@ -168,13 +173,22 @@ function renderHouse() {
         h.now.appendChild(el('span', 'eh-chip' + (state.chip.tone ? ' ' + state.chip.tone : ''), state.chip.text));
     }
 
+    const p = state.progress;
+    const total = p ? Number(p.total) : 0;
+    if (total > 0) {
+        const done = Math.max(0, Math.min(Number(p.done) || 0, total));
+        h.barFill.style.width = (100 * done / total).toFixed(1) + '%';
+    }
+    h.bar.style.display = total > 0 ? '' : 'none';
+
     const rows = Array.isArray(state.rows) ? state.rows : [];
     h.readings.innerHTML = '';
     for (const row of rows) {
         const [label, value] = pair(row, 'label', 'value');
         h.readings.appendChild(el('span', 'eh-r-label', label));
         const tone = !Array.isArray(row) && row.tone ? ' ' + row.tone : '';
-        h.readings.appendChild(el('span', 'eh-r-value' + tone, value === undefined || value === null ? '—' : value));
+        const wrap = !Array.isArray(row) && row.wrap ? ' wrap' : '';
+        h.readings.appendChild(el('span', 'eh-r-value' + tone + wrap, value === undefined || value === null ? '—' : value));
     }
     h.readings.style.display = rows.length ? '' : 'none';
 

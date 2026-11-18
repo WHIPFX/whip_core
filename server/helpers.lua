@@ -393,3 +393,57 @@ function ResolveCharNames(charIds)
 
     return names
 end
+
+-- ---- Resources ----
+
+--- Which of `group` (resources sharing one folder) takes `name` with `provide`, other than `name` itself.
+local function providerIn(group, name)
+    for _, res in ipairs(group) do
+        if res ~= name then
+            for k = 0, (GetNumResourceMetadata(res, 'provide') or 0) - 1 do
+                if GetResourceMetadata(res, 'provide', k) == name then return res end
+            end
+        end
+    end
+    return nil
+end
+
+--- The resources by folder: FiveM lists a provided name (whip_chat's `provide 'chat'`) as a resource too, with its
+--- provider's state, metadata and folder.
+local function resourcesByFolder()
+    local names, byPath = {}, {}
+    for i = 0, GetNumResources() - 1 do
+        local res = GetResourceByFindIndex(i)
+        if res then
+            names[#names + 1] = res
+            local path = GetResourcePath(res) or ''
+            byPath[path] = byPath[path] or {}
+            table.insert(byPath[path], res)
+        end
+    end
+    return names, byPath
+end
+
+--- The resource that a name stands for through `provide` (whip_chat for 'chat'), or nil when the name is a resource
+--- of its own. A real resource of that name (stock chat installed beside whip_chat) has a folder of its own and is
+--- not one of these.
+---@param name string
+---@return string|nil provider
+function ProviderOf(name)
+    local _, byPath = resourcesByFolder()
+    return providerIn(byPath[GetResourcePath(name) or ''] or {}, name)
+end
+
+--- Every resource on the server once, by its own name, sorted: a name another resource provides is left out
+--- (ProviderOf), or a walk over the resources would meet the provider twice. Each such walk (the setup report, the
+--- update check, the Director's, property and theme packs) goes through this.
+---@return string[]
+function AllResources()
+    local names, byPath = resourcesByFolder()
+    local out = {}
+    for _, res in ipairs(names) do
+        if not providerIn(byPath[GetResourcePath(res) or ''], res) then out[#out + 1] = res end
+    end
+    table.sort(out)
+    return out
+end

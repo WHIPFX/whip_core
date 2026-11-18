@@ -755,6 +755,15 @@ Migrations.list = {
               unless = { column = { 'containers', 'reach' } } },
         },
     },
+    {
+        id   = '046_vehicle_reservation',
+        note = 'A resource can hold an owned car against retrieval, spawning, transfer and deletion while it runs. '
+            .. 'The CREATE in server/vehicles.lua has the reservation column, so a fresh database skips this.',
+        statements = {
+            { sql = 'ALTER TABLE `vehicles` ADD COLUMN `reservation` VARCHAR(191) DEFAULT NULL',
+              unless = { column = { 'vehicles', 'reservation' } } },
+        },
+    },
 }
 
 -- ============================================

@@ -336,20 +336,21 @@ local _hudRows, _hudToken = nil, 0
 local function showProbeHud(label, report)
     local b = report.basis
     local ident = report.identity
+    -- The report's row LAST: propertyProbeSaved (below) writes its answer there.
     _hudRows = {
         { label = 'Interior', value = ident and ident.locationHash and tostring(ident.locationHash.signed)
             or tostring(report.ped and report.ped.interior or 0) },
-        { label = 'Rooms', value = report.rooms and report.rooms.count or 0 },
+        { label = 'Rooms', value = ('%d, yours in blue'):format(report.rooms and report.rooms.count or 0) },
         { label = 'Portals', value = report.portals and report.portals.count or 0 },
         { label = 'Objects', value = report.objects and report.objects.total or 0 },
         { label = 'Yaw', value = b and b.yawFromEx or '—' },
-        { label = 'Yaw only', value = b and (b.yawOnly and 'yes' or 'NO — tilted') or '—',
-          tone = b and (b.yawOnly and 'ok' or 'err') or nil },
         { label = 'Report', value = 'sending…' },
     }
+    -- Whether the interior only turns (never tilts) is the probe's verdict: the chip.
+    local chip = nil
+    if b then chip = b.yawOnly and { text = 'Yaw only', tone = 'ok' } or { text = 'Tilted', tone = 'err' } end
     EditorHud.show({
-        title = 'Interior probe',
-        sub = label .. ' · the blue box is the room you are in',
+        house = true, icon = 'devtools', title = 'Interior probe', sub = label, chip = chip,
         rows = _hudRows,
     })
     _hudToken = _hudToken + 1

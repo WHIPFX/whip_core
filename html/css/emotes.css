@@ -336,14 +336,22 @@
     height: 100%;
     object-fit: contain;
 }
-/* No video (scenarios and props-only emotes are not filmed): a figure instead. */
+/* No video (scenarios and props-only emotes are not filmed): the emote glyph and "No preview" instead. */
 .em-card-none {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     color: rgba(255, 255, 255, 0.4);
 }
-.em-card-none svg { width: 40%; height: 40%; }
+.em-card-none svg { width: 34%; height: 34%; }
+.em-card-none-text {
+    font-size: 9px;
+    font-weight: var(--ui-fw-bold);
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.3);
+}
 .em-card.current .em-card-none { color: rgba(255, 255, 255, 0.7); }
 
 .em-card-text {

@@ -29,6 +29,7 @@
 --   shortRange  true: only on the radar when near (like a shop); default false: always shown
 --   scale       its size on the map, 0.3-2 (default 0.9)
 --   flash       true: it flashes
+--   number      0-99: a number on the dot (the stops of a route in order: 1, 2, 3), on GTA's map and whip's
 
 Blips = {}
 
@@ -80,6 +81,11 @@ local function readSpec(spec)
     w.route = spec.route == true or nil
     w.shortRange = spec.shortRange == true or nil
     w.flash = spec.flash == true or nil
+    if spec.number ~= nil then
+        local n = math.tointeger(tonumber(spec.number))
+        if not n or n < 0 or n > 99 then return nil, 'number is a whole number, 0-99' end
+        w.number = n
+    end
     return w
 end
 
@@ -244,7 +250,7 @@ for _, kind in ipairs({ 'clockedOn', 'clockedOff', 'hired', 'fired', 'deleted' }
 -- ============================================
 
 --- A blip on some players' maps: ShowBlip(audience, id, { coords, label, sprite, color, route, radius,
---- shortRange, scale, flash, tag }) -> true | false, why. The same id again moves or changes it.
+--- shortRange, scale, flash, number, tag }) -> true | false, why. The same id again moves or changes it.
 exports('ShowBlip', function(audience, id, spec)
     local owner = Registry.caller()
     return Blips.show(owner, audience, id, spec)

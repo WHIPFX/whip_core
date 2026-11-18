@@ -105,20 +105,17 @@ local function anyJustPressed(list)
     return false
 end
 
-local function placeHints()
-    if WhipPadActive then
-        return {
-            { key = 'Left stick', text = 'Fly' }, { key = 'Right stick', text = 'Look' },
-            { key = 'RT / LT', text = 'Up / down' }, { key = 'D-pad', text = 'Zoom' }, { key = 'L3', text = 'Faster' },
-            { key = 'A', text = 'Use this shot' }, { key = 'B', text = 'Cancel' },
-        }
-    end
-    return {
-        { key = 'WASD', text = 'Fly' }, { key = 'Mouse', text = 'Look' }, { key = 'Space / Ctrl', text = 'Up / down' },
-        { key = 'Wheel', text = 'Zoom' }, { key = 'Shift', text = 'Faster' },
-        { key = 'Enter', text = 'Use this shot' }, { key = 'Esc', text = 'Cancel' },
-    }
-end
+-- The house card's keys: a keyboard's caps, or a pad's pictures when one is in hand (the card swaps them itself).
+-- The flying ones in its small Camera group, as the door editor's.
+local PLACE_HINTS = {
+    { key = 'Enter',        pad = 'a',                        text = 'Use this shot' },
+    { key = 'Esc',          pad = 'b',                        text = 'Cancel' },
+    { key = 'WASD',         pad = 'ls',                       text = 'Move',      group = 'fly' },
+    { key = 'Mouse',        pad = 'rs',                       text = 'Look',      group = 'fly' },
+    { key = 'Space / Ctrl', pad = { 'rt', 'lt' },             text = 'Up / down', group = 'fly' },
+    { key = 'Wheel',        pad = { 'dpad_up', 'dpad_down' }, text = 'Zoom',      group = 'fly' },
+    { key = 'Shift',        pad = 'l3',                       text = 'Faster',    group = 'fly' },
+}
 
 local function placeRows()
     local p, r = FreeCam.getCoord(), FreeCam.getRot()
@@ -181,7 +178,7 @@ local function placeFrame()
     local now = GetGameTimer()
     if now - lastRows >= 100 then
         lastRows = now
-        EditorHud.update({ rows = placeRows(), hints = placeHints() })
+        EditorHud.update({ rows = placeRows() })
     end
 end
 
@@ -198,7 +195,8 @@ RegisterNUICallback('cfgPlaceCamera', function(data, cb)
         fov = tonumber(data.fov) or 60.0,
     })
     ControlBlocks.hold('cfgPlaceCamera', { controls = { 191, 201, 200, 202, PAD_ZOOM_IN, PAD_ZOOM_OUT } }, placeFrame)
-    EditorHud.show({ title = 'Place camera', sub = data.path, rows = placeRows(), hints = placeHints() })
+    EditorHud.show({ house = true, icon = 'camera', title = 'Place camera', sub = data.path,
+                     rows = placeRows(), hints = PLACE_HINTS })
 end)
 
 -- ---- An arrival scene's Watch ----

@@ -1868,7 +1868,7 @@ if not ok then return false, why end</code></pre>
 <p>Wherever an export takes a person, a <strong>bare number is a server id</strong> (the <code>source</code> you already hold) and <strong><code>{ charId = n }</code></strong> is a character, online or not. A bare number is never a charId, except in exports whose name says so (<code>GetCharacterProperties(charId)</code>).</p>
 <pre><code class="lang-lua">exports.whip_core:GivePropertyKey(propertyId, source)              -- the player in front of you
 exports.whip_core:GivePropertyKey(propertyId, { charId = 42 })   -- a character, online or not</code></pre>
-<div class="info-box warn"><strong>A server id must be online.</strong> To reach someone who may be offline, pass <code>{ charId = n }</code>. Some calls need the person online either way (a car key, <code>TransferVehicle</code>); their cards say so. A parameter named <code>source</code> is always a server id.</div>
+<div class="info-box warn"><strong>A server id must be online.</strong> To reach someone who may be offline, pass <code>{ charId = n }</code>. Some calls need the person online either way (giving a car key, for example); their cards say so. A parameter named <code>source</code> is always a server id.</div>
 
 <h3 id="patterns-lookups">Finding one thing</h3>
 <p>A lookup is one call, <code>GetX(ref)</code>: an id, or a table with one key that says what you hold. A list is <code>GetXs(filter?)</code>.</p>
@@ -2137,7 +2137,6 @@ end)</code></pre>
 <table class="event-table">
 <tr><th>What</th><th>On Enhanced</th><th>Do this</th></tr>
 <tr><td>Models, maps, props</td><td>Legacy models must be converted</td><td>Ship both: <code>stream/</code> for Legacy and <code>stream_enhanced/</code> for Enhanced, which is used instead when it exists</td></tr>
-<tr><td>NPCs made at start</td><td>An NPC made before any character loads can lose its network id</td><td>Make NPCs after <code>whip_core:player:loaded</code>, or in <code>Whip.register</code> once a player is on</td></tr>
 <tr><td>Wide DUI pages</td><td><code>CreateDui</code> refuses pages wider than 8192 pixels</td><td>Pack an atlas into rows</td></tr>
 <tr><td>Anything else</td><td></td><td><code>exports.whip_core:GetPlatform()</code> returns <code>'legacy'</code> or <code>'enhanced'</code> on either side</td></tr>
 </table>
@@ -2756,6 +2755,17 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>string|nil</code></div>
 </div></div>
 
+<div class="export-card" data-search="renamecharacter character rename first last name identity">
+<div class="export-header"><span class="export-name">RenameCharacter(who, firstName, lastName)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>Rename an online or offline character without changing their charId or anything owned by it. Uses the character editor's name rules: letters, spaces and hyphens, at least two letters and at most 30 characters per name. Online players receive the new name immediately; fires <code>whip_core:character:renamed</code>.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>who</td><td>number|table</td><td>Online server id, or <code>{ charId = n }</code></td></tr>
+<tr><td>firstName, lastName</td><td>string</td><td>The two names</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>true, fullName, oldName</code>, or <code>false, reason</code></div>
+<p>Check permission in your server handler before calling; this export does not grant a player permission to rename another character.</p>
+</div></div>
+
 <div class="export-card" data-search="getcharacternames names character offline list charid who">
 <div class="export-header"><span class="export-name">GetCharacterNames(charIds)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
@@ -2763,6 +2773,18 @@ end</code></pre>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>charIds</td><td>number[]</td><td>The characters</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>{ [charId] = 'First Last' }</code>, leaving out unknown ids</div>
+</div></div>
+
+<div class="export-card" id="getcharacterinfo" data-search="getcharacterinfo character info offline first last name date of birth dob gender id card licence records">
+<div class="export-header"><span class="export-name">GetCharacterInfo(charIds)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>What one name string can't carry, for up to 200 characters, online or not: an ID card, a licence, a records screen. Online characters come from their live sheet, the rest from one query. Deleted characters are left out. Check <a href="#canseeplayername"><code>CanSeePlayerName</code></a> before showing a stranger's.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>charIds</td><td>number[]</td><td>The characters</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>{ [charId] = { charId, firstName, lastName, fullName, dateOfBirth, gender, online } }</code> (<code>dateOfBirth</code> as <code>'YYYY-MM-DD'</code>, <code>gender</code> <code>'male'</code> or <code>'female'</code>), leaving out unknown and deleted ids; or <code>false, reason</code> if the database fails</div>
+<pre><code class="lang-lua">local info = exports.whip_core:GetCharacterInfo({ charId })
+local c = info and info[charId]
+if c then print(c.lastName, c.dateOfBirth) end</code></pre>
 </div></div>
 
 <div class="export-card" id="canseeplayername" data-search="canseeplayername name privacy shownames nearby hidden who see">
@@ -2815,6 +2837,27 @@ end</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
 </div></div>
 
+<div class="export-card" id="setbliplabel" data-search="setbliplabel blip label external third party pause map name">
+<div class="export-header"><span class="export-name">SetBlipLabel(handle, label)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-body">
+  <p>Tell WHIP's pause map the label of a blip your resource made. GTA does not let WHIP read a blip's custom name back; without this registration the map uses the sprite's name, such as "Getaway Car" instead of "PDM". This does not change GTA's blip name, create a blip or remove one.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>handle</td><td>integer</td><td>Positive client blip handle, such as the result of <code>AddBlipForCoord</code>. The blip must exist when registering a label</td></tr>
+  <tr><td>label</td><td>string|nil</td><td>Non-empty label, or <code>nil</code> to remove your registration, even after the blip has been deleted</td></tr></table>
+  <p>The same resource can update its label. Another running resource's registration and WHIP's own labels cannot be replaced. Only the registering resource can remove its label; removing an unregistered label succeeds. Labels are cleared when their resource stops.</p>
+  <div class="return-info"><strong>Returns: </strong><code>true, handle</code> when registered; <code>true</code> when removed; or <code>false, reason</code> for an invalid handle or label, a missing blip, or another resource's label. Does not wait.</div>
+<pre><code class="lang-lua">local blip = AddBlipForCoord(409.3, -1623.1, 29.3)
+BeginTextCommandSetBlipName('STRING')
+AddTextComponentSubstringPlayerName('PDM')
+EndTextCommandSetBlipName(blip)
+exports.whip_core:SetBlipLabel(blip, 'PDM')
+
+-- When removing it:
+exports.whip_core:SetBlipLabel(blip, nil)
+RemoveBlip(blip)</code></pre>
+  <p>Clear the registration whenever you remove the blip, so a reused handle does not inherit its old label. If <code>whip_core</code> restarts while your resource keeps running, register the labels of your surviving blips again from <code>onClientResourceStart</code>. For blips managed by WHIP, use <a href="#showblip"><code>ShowBlip</code></a> with <code>spec.label</code> instead.</p>
+</div></div>
+
 <div class="export-card" id="showblip" data-search="showblip hideblip setplayerwaypoint blip map marker waypoint route gps area server">
 <div class="export-header"><span class="export-name">ShowBlip(audience, id, spec) · HideBlip(id) · SetPlayerWaypoint(source, coords)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
@@ -2828,6 +2871,7 @@ end</code></pre>
   <tr><td>radius</td><td>number?</td><td>Metres: an area instead of a point</td></tr>
   <tr><td>shortRange</td><td>boolean?</td><td>Only on the radar when near</td></tr>
   <tr><td>scale · flash</td><td>number? · boolean?</td><td>Size (0.3–2, default 0.9) · flashing</td></tr>
+  <tr><td>number</td><td>integer?</td><td>0–99, on the dot: a route's stops in order (1, 2, 3). On GTA's map and whip's pause map and minimap</td></tr>
   <tr><td>tag</td><td>string?</td><td>Your run tag</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, reason</code></div>
 </div></div>
@@ -2911,12 +2955,80 @@ exports.whip_core:SetPlayerFlag(source, 'jobs_done', jobs + 1)</code></pre>
 <div class="export-card" data-search="opencharactereditor character editor creator appearance clothing barber surgeon open force">
 <div class="export-header"><span class="export-name">OpenCharacterEditor(who)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>Opens a player's character editor on their own character, as <code>/charedit</code> does: Save keeps the new look and Cancel puts the old one back. It's refused for someone who isn't online, is still making their character or is down, and their game also refuses it while the editor is already open. A clothing shop or a surgeon calls it once the player has paid.</p>
+  <p>Opens a player's character editor on their own character, as <code>/charedit</code> does: Save keeps the new look and Cancel puts the old one back. It's refused for someone who isn't online, is still making their character or is down, and their game also refuses it while the editor is already open. A surgeon calls it once the player has paid; a store uses <code>EditAppearance</code>.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>who</td><td>number|table</td><td>A server id, or <code>{ charId = n }</code> for a character who is online</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
 <pre><code class="lang-lua">local ok, why = exports.whip_core:OpenCharacterEditor(source)
 if not ok then exports.whip_core:NotifyPlayer(source, why, 'error') end</code></pre>
+</div></div>
+
+<div class="export-card" id="registerspawnpoint" data-search="registerspawnpoint removespawnpoint spawn picker spawn point choice arrive hideout depot hotel">
+<div class="export-header"><span class="export-name">RegisterSpawnPoint(id, def) · RemoveSpawnPoint(id)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>A place in the spawn picker beside <code>Config.SpawnPoints</code>: a gang's hideout, a job's depot, a hotel. Your ids are your own; the same id again replaces it, and it goes when your resource stops. Picked, it is read again live, so one removed (or no longer allowed) since the list was sent is refused. At most 30 registered at once. An id is letters, digits, <code>-</code> and <code>_</code>, at most 24, and at most 92 with your resource's name.</p>
+  <table class="param-table"><tr><th>def</th><th>Type</th><th>Description</th></tr>
+  <tr><td>pos</td><td>vector4</td><td>Where they arrive and the way they face (a <code>vector3</code> faces north)</td></tr>
+  <tr><td>label</td><td>string?</td><td>Its name in the list (40 characters; the id when left out)</td></tr>
+  <tr><td>canUse</td><td>function?</td><td><code>(charId) → true</code> for the characters who may pick it; checked for the list and again when picked. An error hides it</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
+<pre><code class="lang-lua">exports.whip_core:RegisterSpawnPoint('hideout', {
+    label = 'The Hideout', pos = vector4(-1150.2, -1520.4, 4.4, 35.0),
+    canUse = function(charId) return isMember(charId) end,
+})</code></pre>
+</div></div>
+
+<p>A store (clothes, a barber, tattoos) opens the editor with <code>EditAppearance</code> on the player's game: only its tabs, the price of what changed on Save. Its server counts the changes with <code>GetAppearanceChanges</code>, charges, and keeps the look with <code>SetPlayerAppearance</code>. The tabs are the editor's category ids (<code>heritage features eyes hair eyebrows beard makeup skin chestHair</code>, <code>mask tops undershirt arms legs shoes accessory armor decal bag</code>, <code>hat glasses ear watch bracelet</code>, <code>tatHead tatTorso tatLeftArm tatRightArm tatLeftLeg tatRightLeg</code>, <code>outfits</code>) or their groups (<code>face apparel props tattoos outfits</code>). Any tattoo tab lets every tattoo change. Saved outfits only put clothes on, so offer <code>outfits</code> with <code>apparel</code> and <code>props</code>.</p>
+
+<div class="export-card" data-search="editappearance store shop clothing barber tattoo editor price pay appearance">
+<div class="export-header"><span class="export-name">EditAppearance(opts)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-body">
+  <p>Opens the character editor on this character's own look, as a store. Save shows the price of what changed and calls <code>onSave(look)</code>, which charges and keeps it (on the server) and returns <code>true</code>, or <code>false, why</code>: the reason is shown on Save and the editor stays open. Cancel puts the old look back. Refused while dead, in a vehicle or holding a weapon. Waits for the fade.</p>
+  <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td>only</td><td>table?</td><td>The tabs offered: category ids or groups. Left out, all of them</td></tr>
+  <tr><td>prices</td><td>table?</td><td>Dollars each, by category id, then group, then <code>default</code>: <code>{ apparel = 50, hat = 20 }</code>. <code>tattoos</code> is per tattoo put on</td></tr>
+  <tr><td>methods</td><td>table?</td><td><code>{ 'cash', 'bank' }</code>: Save first opens a checkout, as whip_autos' basket: the total and a tile for each way to pay. One: no checkout, that way. Left out, Save pays your own way</td></tr>
+  <tr><td>wallet</td><td>table?</td><td><code>{ cash = n, bank = n }</code>: shown on the tiles; one that can't cover the total is greyed out. Read it on your server (<code>GetPlayerCash</code>, <code>GetBalance</code>)</td></tr>
+  <tr><td>title / sub</td><td>string?</td><td>The editor's heading</td></tr>
+  <tr><td>onSave</td><td>function(look, method)</td><td>Required. May wait. <code>method</code> is the tile chosen, or nil. Returns <code>true</code>, or <code>false, why</code> (60 characters)</td></tr>
+  <tr><td>onClose</td><td>function(saved)?</td><td>The editor shut: saved, or not (Cancel, a death, a logout)</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>true</code>, or <code>false, why</code></div>
+<pre><code class="lang-lua">exports.whip_core:EditAppearance({
+    only = { 'hair', 'beard', 'eyebrows' }, prices = { hair = 40, default = 15 }, title = 'Herr Kutz',
+    methods = { 'cash', 'bank' }, wallet = exports.whip_core:Callback('mybarber:wallet'),
+    onSave = function(look, method) return exports.whip_core:Callback('mybarber:buy', look, method) end,
+})</code></pre>
+</div></div>
+
+<div class="export-card" data-search="getappearancechanges store shop clothing barber tattoo price changed appearance">
+<div class="export-header"><span class="export-name">GetAppearanceChanges(who, look, only?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>What changed between a playing character's saved look and <code>look</code>, counted as the editor prices it: one per category id changed (<code>makeup</code> counts each of its three overlays), and <code>tattoos</code> per tattoo put on. Taking off an accessory or a tattoo counts nothing.</p>
+  <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+  <tr><td>who</td><td>number|table</td><td>A server id, or <code>{ charId = n }</code></td></tr>
+  <tr><td>look</td><td>table</td><td>The look from the editor</td></tr>
+  <tr><td>only</td><td>table?</td><td>Count only these category ids or groups</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>{ [id] = count, tattoos? }</code>, or <code>false, why</code></div>
+</div></div>
+
+<div class="export-card" data-search="setplayerappearance store shop clothing barber tattoo save keep appearance look">
+<div class="export-header"><span class="export-name">SetPlayerAppearance(who, look, opts?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+  <p>Keeps a look for a playing character, checked as the editor's Save is. <code>opts.only</code> takes only those tabs' parts from <code>look</code> and keeps the rest of their saved look, so a barber can't change a face. What they wear changes with the editor's Save (<code>EditAppearance</code>); called on its own, when they next load in.</p>
+  <div class="return-info"><strong>Returns: </strong><code>true, look</code> (as kept), or <code>false, why</code></div>
+<pre><code class="lang-lua">SecureCallback('mybarber:buy', { params = { { 'look', 'any' }, { 'method', 'enum', { 'cash', 'bank' }, 'cash' } } },
+    function(source, player, look, method)
+    local only = { 'hair', 'beard', 'eyebrows' }
+    local changes, why = exports.whip_core:GetAppearanceChanges(source, look, only)
+    if not changes then return false, why end
+    local total = 0
+    for id, n in pairs(changes) do total = total + (id == 'hair' and 40 or 15) * n end
+    local receipt, err = exports.whip_core:ChargePlayer(source, total, { method = method, reason = 'Haircut' })
+    if not receipt then return false, err end
+    local ok, kept = exports.whip_core:SetPlayerAppearance(source, look, { only = only })
+    if not ok then exports.whip_core:RefundPlayer(receipt) return false, kept end
+    return true
+end)</code></pre>
 </div></div>
 <h2 id="client-player">Player &amp; Status (Client)</h2>
 <p class="lede">Client exports about the local player: their sheet, stats and effects, body state, emotes and voice. For the server side, see <a href="#player">Player</a>.</p>
@@ -3629,6 +3741,25 @@ if not holdId then return false, why end
 <div class="return-info"><strong>Returns: </strong><code>table|nil</code></div>
 </div></div>
 
+<div class="export-card" id="isnearatm" data-search="isnearatm atm cash machine near standing position">
+<div class="export-header"><span class="export-name">IsNearAtm(source, range?)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>Is the player standing at a cash machine? GTA's own machines and <code>Config.AtmExtraPositions</code>, measured across the ground from each machine's base. For a resource that wants the standing-at-a-machine rule; WHIP's own ATMs find machines by model and don't ask this.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>source</td><td>number</td><td>Server id</td></tr>
+<tr><td>range</td><td>number?</td><td>Metres, 0.5 to 10. Default <code>AtmActiveRange</code> + 1</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>true, at</code> (the machine's base) or <code>false, why</code></div>
+</div></div>
+
+<div class="export-card" id="getnearestatm" data-search="getnearestatm atm cash machine nearest position">
+<div class="export-header"><span class="export-name">GetNearestAtm(coords)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>The cash machine nearest a place, from the same list as <code>IsNearAtm</code>, within 3 m of its height.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>coords</td><td>vector3|table</td><td>The place</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>at, distance</code> (the machine's base, and the distance across the ground), or <code>nil</code></div>
+</div></div>
+
 <div class="export-card" id="getcharacterbankaccounts" data-search="getcharacterbankaccounts getcharacteraccounts character accounts role">
 <div class="export-header"><span class="export-name">GetCharacterBankAccounts(charId)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
@@ -4085,7 +4216,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <div class="export-card" id="hasitem" data-search="hasitem has item check carrying">
 <div class="export-header"><span class="export-name">HasItem(source, item, amount)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>Whether the player has at least <code>amount</code>, across both pockets.</p>
+<p>Whether the player has at least <code>amount</code>, across both pockets, and inside a wallet they carry for an item registered with <code>wallet = true</code> (a bank card).</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr>
@@ -4096,7 +4227,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <div class="export-card" id="getitemcount" data-search="getitemcount count item total how many">
 <div class="export-header"><span class="export-name">GetItemCount(source, item)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-<p>How many of an item the player carries, across both pockets.</p>
+<p>How many of an item the player carries, across both pockets, and inside a wallet they carry for an item with <code>wallet = true</code>. The same count everywhere: <code>RemoveItem</code> takes from a wallet after the pockets, an <code>item</code> requirement (prompts, points, doors) and the item events count it there, and the player's own game counts it too. Cash in a wallet is put away, not counted.</p>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>source</td><td>number</td><td>Server player ID</td></tr>
 <tr><td>item</td><td>string</td><td>Item key</td></tr></table>
@@ -4126,6 +4257,7 @@ exports.whip_core:AddItem(source, 'cash', 100, nil, { pocket = 'accessory', noDr
 <tr><td>item</td><td>string</td><td>Item key</td></tr>
 <tr><td>pocket</td><td>string?</td><td><code>'player'</code> or <code>'accessory'</code>; <code>nil</code> searches all. A pocket that doesn't exist finds nothing</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>{ item, amount, metadata, addr }</code> or <code>nil</code></div>
+<p>Not in the pockets and no <code>pocket</code> named: an item registered with <code>wallet = true</code> is found inside a wallet the player carries. That stack has no <code>addr</code> (a place inside an item is no store address); <code>inside = { addr, slot }</code> is the wallet's address and the place in it.</p>
 <pre><code class="lang-lua">local found = exports.whip_core:FindItem(source, 'lockpick')
 if found then exports.whip_core:StoreTake(found.addr, 1, { reason = 'lockpick snapped' }) end</code></pre>
 </div></div>
@@ -4461,6 +4593,15 @@ if blocked then return false, why end</code></pre>
 <div class="return-info"><strong>Returns: </strong><code>bool</code></div>
 </div></div>
 
+<div class="export-card" data-search="setinventorylocked inventory lock busy access">
+<div class="export-header"><span class="export-name">SetInventoryLocked(locked)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-body">
+<p>Block inventory opening for this resource and close an open inventory when locking. <code>false</code> releases only your resource's lock; other resource locks and the database lock still apply. Your lock is cleared when your resource stops. This is a client UI lock, not server authorization for inventory writes.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>locked</td><td>boolean</td><td><code>true</code> to lock, <code>false</code> to release</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>boolean accepted</code>; false for a non-boolean or no calling resource</div>
+</div></div>
+
 <div class="export-card" data-search="closeinventory close inventory ui">
 <div class="export-header"><span class="export-name">CloseInventory()</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
@@ -4671,7 +4812,7 @@ if not item or item.item ~= 'alcohol' then return end</code></pre>
 <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
 <tr><td>addr</td><td>table</td><td>An <a href="#store-addresses">address</a>, with or without a slot</td></tr>
 <tr><td>amount</td><td>number?</td><td>How many</td></tr>
-<tr><td>opts</td><td>table|string?</td><td><code>{ item = 'drink' }</code> without a slot; <code>reason</code> for the log. A string is the reason</td></tr></table>
+<tr><td>opts</td><td>table|string?</td><td><code>{ item = 'drink', metadata = { quality = 'fresh' }, reason = 'used' }</code>. <code>item</code> is required without a slot. Optional <code>metadata</code> is a recursive partial match: extra keys are allowed, supplied values must match. Both filters apply with a slot too. A string is the reason for the log</td></tr></table>
 <div class="return-info"><strong>Returns: </strong><code>{ item, amount, metadata }</code> taken (metadata only from one slot), or <code>false, reason</code> (<code>'Empty slot'</code>, <code>'Not enough items'</code>…)</div>
 <pre><code class="lang-lua">local taken, err = exports.whip_core:StoreTake({ kind = 'container', id = 12 }, 5, { item = 'drink' })</code></pre>
 <div class="info-box warn"><strong>Taking isn't moving.</strong> What you take is gone; to put it elsewhere, use <code>StoreMove</code>.</div>
@@ -5181,6 +5322,7 @@ exports.whip_core:OpenPanel(source, {
   <tr><td>label</td><td>string | function</td><td>No</td><td>Header text, or <code>(host) → string</code> (a magazine's round count)</td></tr>
   <tr><td>storageKey</td><td>string</td><td>No</td><td>Metadata key for the items (default <code>'slots'</code>)</td></tr>
   <tr><td>allowedItems</td><td>table</td><td>No</td><td><code>{ 'cash', 'id_card' }</code> or <code>{ cash = true }</code>, fixed at registration</td></tr>
+  <tr><td>allowedFlag</td><td>string</td><td>No</td><td>Also every item whose definition has this field set to <code>true</code>, read each time it opens (the wallet's <code>'wallet'</code>: <code>RegisterItem('mybank_card', { ..., wallet = true })</code>). Plain slot array only (no <code>read</code>/<code>write</code>). Every count and take of what a player carries looks inside it for those items (<code>HasItem</code>, <code>GetItemCount</code>, <code>RemoveItem</code>, <code>FindItem</code>, <code>FindAllItems</code>, an <code>item</code> requirement, the item events)</td></tr>
   <tr><td>action</td><td>string</td><td>No</td><td>Default the item's <code>defaultAction</code>; several items may share one</td></tr>
   <tr><td>canOpen</td><td>function</td><td>No</td><td><code>(host) → ok, reason</code>, before <code>read</code>; fails closed</td></tr>
   <tr><td>read</td><td>function</td><td>No</td><td><code>(host) → items</code>. Default <code>metadata[storageKey]</code></td></tr>
@@ -5303,6 +5445,7 @@ local turbo = exports.whip_core:GetVehicleData(vehicleId, 'turbo')        -- any
 <table class="event-table">
 <tr><th>Event</th><th>Payload</th><th>Fires when</th></tr>
 <tr><td><code>whip_core:vehicle:created</code></td><td><code>{ vehicleId, ownerCharId }</code></td><td>Any path makes a vehicle</td></tr>
+<tr><td><code>whip_core:vehicle:damageCleared</code></td><td><code>{ vehicleId }</code></td><td>After WHIP clears its recorded damage for a repair. A resource can clear its own damage data here; this does not itself repair the game entity</td></tr>
 <tr><td><code>whip_core:vehicle:ownerChanged</code></td><td><code>{ vehicleId, from, to }</code></td><td>A vehicle changes character</td></tr>
 <tr><td><code>whip_core:vehicle:deleted</code></td><td><code>{ vehicleId, ownerCharId, wasOut }</code></td><td>A vehicle stops existing. Remove your own per-car data here</td></tr>
 <tr><td><code>whip_core:vehicle:dataChanged</code></td><td><code>{ vehicleId, key, value, old, cleared, resource }</code></td><td>Vehicle data is set or removed, by <code>resource</code></td></tr>
@@ -5656,10 +5799,22 @@ if ok then exports.whip_core:SpawnVehicle(vehicleId, vector4(x, y, z, heading)) 
   <p>Sell a vehicle to another player. Writes the owner, re-syncs both players' lists and fires <code>whip_core:vehicle:ownerChanged</code>.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>vehicleId</td><td>number</td><td>Vehicle ID</td></tr>
-  <tr><td>newOwner</td><td>number|table</td><td>The buyer, <strong>online</strong>: server id, or <code>{ charId = n }</code></td></tr>
-  <tr><td>opts</td><td>table?</td><td><code>{ giveKey, revokeOldKeys }</code>, both default <code>true</code></td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: <code>'The new owner must be online'</code>, <code>'Session vehicles have no owner'</code> (use <code>ClaimVehicle</code>), <code>'Already owned by that character'</code></div>
+  <tr><td>newOwner</td><td>number|table</td><td>The buyer: an online server id, or <code>{ charId = n }</code> for an online or offline character that exists and is not deleted</td></tr>
+  <tr><td>opts</td><td>table?</td><td><code>{ giveKey, revokeOldKeys, expectedOwner }</code>. Key options default <code>true</code> and only affect online players. <code>expectedOwner</code> is the expected current owner character id; a changed owner is refused</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: <code>'No such character'</code>, <code>'Vehicle ownership changed'</code>, <code>'Vehicle is in custody'</code>, <code>'Session vehicles have no owner'</code> (use <code>ClaimVehicle</code>), <code>'Already owned by that character'</code></div>
   <div class="info-box warn"><strong>The seller can keep a working key.</strong> <code>revokeOldKeys</code> only empties their pockets while online; keys in a stash, a boot, on the ground or <strong>in the ignition</strong> still work. With full pockets the buyer gets no key and this still returns <code>true</code>.</div>
+</div></div>
+
+<div class="export-card" data-search="setvehiclecustody vehicle hold reservation custody">
+<div class="export-header"><span class="export-name">SetVehicleCustody(ref, held, expectedOwner)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>Hold an owned vehicle for the calling resource. While that resource runs, retrieval, spawning, transfer and deletion are refused, including calls from the holder. Release the hold before those actions. Another running resource cannot replace or release it; a stopped resource's hold is ignored. The stored claim is not erased on stop and becomes active again if that resource restarts.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>ref</td><td>number|table</td><td>Vehicle id or vehicle reference; session cars are refused</td></tr>
+<tr><td>held</td><td>boolean</td><td><code>true</code> to hold, <code>false</code> to release</td></tr>
+<tr><td>expectedOwner</td><td>number?</td><td>Expected owner character id; refuses a changed owner</td></tr></table>
+<div class="return-info"><strong>Returns: </strong><code>boolean ok, string|nil reason</code></div>
+<p>This only changes the hold. It does not despawn, garage, lock or move a car. To impound, use <code>CreateGarage</code> for a lot without a position, then <code>DespawnVehicle(vehicleId, { garage = 'impound', refuseOccupied = true })</code>. Release any hold before <code>RetrieveVehicle</code> and <code>SpawnVehicle</code>.</p>
 </div></div>
 
 <div class="export-card" data-search="deletevehicle destroy car remove chop shop repossession scrap">
@@ -6945,6 +7100,19 @@ end)</code></pre>
   <div class="return-info"><strong>Returns: </strong><code>table</code>: the shop, its declaration in <code>settings.ensured</code>; or <code>false, reason</code> (a bad catalog, no x/y/z, no such job or container, another resource's key, a database error)</div>
 </div></div>
 
+<div class="export-card" data-search="openshop shop open third party virtual">
+<div class="export-header"><span class="export-name">OpenShop(source, ref, opts)</span><span class="export-side side-server">SERVER</span></div>
+<div class="export-body">
+<p>Open a shop declared by the calling resource for a living, loaded player. Another resource's shop is refused. Purchases keep the shop's normal stock, payment and access checks.</p>
+<table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
+<tr><td>source</td><td>number</td><td>Online player server id</td></tr>
+<tr><td>ref</td><td>number|table</td><td>Shop id, <code>{ id = n }</code>, <code>{ key = 'my_shop' }</code> or <code>{ containerId = n }</code></td></tr>
+<tr><td>opts</td><td>table?</td><td><code>range</code>: metres, default 3, greater than 0 and at most 20. <code>authorize(source)</code>: optional server check, must return <code>true</code>; checked again during the session</td></tr></table>
+<p>A physical shop opens within range of its coordinates. A virtual shop anchors the session at the player's opening position; moving out of range ends access. Validate who may open it in your server handler.</p>
+<div class="return-info"><strong>Returns: </strong><code>boolean opened, string|nil reason</code></div>
+<pre><code class="lang-lua">local ok, why = exports.whip_core:OpenShop(source, { key = 'my_shop' }, { range = 3 })</code></pre>
+</div></div>
+
 <div class="export-card" data-search="createshop shop create new">
 <div class="export-header"><span class="export-name">CreateShop(data)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
@@ -6983,6 +7151,9 @@ end)</code></pre>
   <tr><td>layout</td><td>table?</td><td><code>{ [itemKey] = { category, order } }</code>. Each entry replaces that item's place; one with neither removes it; others keep theirs</td></tr></table>
   <div class="return-info"><strong>Returns: </strong><code>boolean, string|nil</code>: <code>false</code> for an unknown item, a tab the shop doesn't have, a tab name too long or too many tabs</div>
 </div></div>
+
+<h3>Virtual shops</h3>
+<p>Set <code>settings.virtual = true</code> in <code>EnsureShop</code>, <code>CreateShop</code> or <code>UpdateShop</code> when your resource provides the interaction. WHIP creates no keeper, prop, prompt or blip for it; open it through <code>OpenShop</code>. The shop still needs x/y/z in its declaration and uses the same catalog, stock and payment rules.</p>
 
 <h3>Catalog (infinite and npc shops)</h3>
 
@@ -8153,7 +8324,8 @@ end)</code></pre>
 <tr><td><code>{ model = 'prop_vend_soda_01', offset?, heading?, faces?, perModel? }</code></td><td>On <strong>every prop of that model</strong> nearby (or a list of models), offered on the nearest, never from a car. <code>offset</code>: <code>x</code> across, <code>y</code> out of its face, <code>z</code> up. <code>heading</code> stands it like a sign at that turn from the prop's facing (try 0, 90, 180). <code>faces = 2</code> for two-sided props. <code>perModel = { ['prop_x'] = { offset, heading } }</code> overrides one model</td></tr>
 <tr><td><code>{ vehiclePart = 'hood' }</code></td><td>A choice on a car part: <code>'hood'</code> (shown only while open; engine work goes here), <code>'trunk'</code>, <code>'door_dside_f'</code>, <code>'door_pside_f'</code>, <code>'door_dside_r'</code>, <code>'door_pside_r'</code>, or the Get On / Board prompt of a <code>'bike'</code>, <code>'bicycle'</code> or <code>'boat'</code></td></tr>
 <tr><td><code>{ radial = true }</code></td><td>An F1 wheel entry with its <code>icon</code> and <code>label</code>, sorted by label. Aimed with mouse or stick, then click or A</td></tr>
-<tr><td><code>{ aimBox = 'vehicle' | 'object' | 'ped' | 'world' }</code></td><td><strong>Where the player looks</strong> on the car, prop or person (or a list of kinds) within <code>reach</code>, on its bounding box (or body, for a helicopter's rotor span); a wall in front hides it. <code>'world'</code> is the map itself: <code>ctx.entity</code> is <code>nil</code>, <code>ctx.world</code> <code>true</code>, <code>ctx.normal</code> the surface's facing, and a car or prop in front wins</td></tr>
+<tr><td><code>{ aimBox = 'vehicle' | 'object' | 'ped' | 'world', aimModels? }</code></td><td><strong>Where the player looks</strong> on the car, prop or person (or a list of kinds) within <code>reach</code>, on its bounding box (or body, for a helicopter's rotor span); a wall in front hides it. <code>'world'</code> is the map itself: <code>ctx.entity</code> is <code>nil</code>, <code>ctx.world</code> <code>true</code>, <code>ctx.normal</code> the surface's facing, and a car or prop in front wins. <code>aimModels = { 'prop_dumpster_01a', … }</code> (names or hashes): offered only on those models, checked before your <code>canInteract</code> is asked</td></tr>
+<tr><td><code>{ list = 'atm:balance' }</code></td><td>Options added to <strong>another prompt's list</strong>, right after one of its options, named <code>'&lt;prompt group&gt;:&lt;option id&gt;'</code>: <code>'atm:balance'</code> scrolls them in under the ATM's Check Balance. Every list holding that option gets them, on every prompt of that group (a submenu without it does not). <code>ctx.entity</code> / <code>ctx.model</code>: the prop that prompt is on. <code>label</code> and <code>icon</code> are read as the list is built; <code>require</code> and <code>canInteract</code> every frame</td></tr>
 </table>
 <div class="info-box warn"><strong>An <code>aimBox</code> casts a ray every frame.</strong> Add it only while it means something (a rope in hand, an officer on duty) and remove it after.</div>
 
@@ -8172,7 +8344,7 @@ end)</code></pre>
 <tr><td><code>ace</code></td><td><code>'whip.devtools'</code></td><td>Holds this ACE (asked once, then remembered)</td></tr>
 </table>
 <p>A <code>vehiclePart</code> action refuses <code>alive = false</code> and <code>vehicle = 'in'</code>: it's always used on foot and alive.</p>
-<div class="info-box tip"><strong><code>require</code> is free; <code>canInteract</code> isn't.</strong> <code>canInteract</code> crosses into your resource on every pass, about 95 times a second per option near a car. Say what you can with <code>require</code>, checked first, and for a state only you know, add the action while it holds and remove it after.</div>
+<div class="info-box tip"><strong><code>require</code> is free; <code>canInteract</code> isn't.</strong> World prompts cache <code>canInteract</code> results for 500 ms while the context stays the same. A different entity or other context change rechecks immediately, and selection always checks again. Custom conditions can take up to half a second to show or hide a prompt; drawing and built-in requirements continue updating. Say what you can with <code>require</code>, checked first, and for a state only you know, add the action while it holds and remove it after.</div>
 
 <h3 id="interactions-ctx">ctx: what your functions get</h3>
 <p><code>label</code>, <code>canInteract</code> and <code>onSelect</code> get one table; only <code>onSelect</code>'s has the functions.</p>
@@ -8261,7 +8433,7 @@ end }</code></pre>
 <div class="export-header"><span class="export-name">GetAction(id)</span><span class="export-side side-client">CLIENT</span></div>
 <div class="export-body">
 <p>One of your actions as data, with whether each option is offered to this player now and why not. The first thing to check when an action never shows.</p>
-<div class="return-info"><strong>Returns: </strong><code>{ id, owner, key, group, reach, seeFrom, enabled, at, label, icon, mounted, engineIds, options = { { id, label, offered, why } } }</code> or <code>nil</code>. <code>mounted</code>: <code>'prompt'</code>, <code>'aimbox'</code>, <code>'props'</code>, <code>'radial'</code>, <code>'part'</code>, or <code>false</code> if it failed (F8 says why)</div>
+<div class="return-info"><strong>Returns: </strong><code>{ id, owner, key, group, reach, seeFrom, enabled, at, label, icon, mounted, engineIds, options = { { id, label, offered, why } } }</code> or <code>nil</code>. <code>mounted</code>: <code>'prompt'</code>, <code>'aimbox'</code>, <code>'props'</code>, <code>'radial'</code>, <code>'part'</code>, <code>'list'</code>, or <code>false</code> if it failed (F8 says why)</div>
 <pre><code class="lang-lua">for _, opt in ipairs((exports.whip_core:GetAction('bench') or {}).options or {}) do
     print(opt.id, opt.offered, opt.why)
 end</code></pre>
@@ -8387,7 +8559,7 @@ style = { base = 'subtle', badgeScale = 1.3, tint = '#ffc850', fadeMs = 250 }</c
 <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
 <tr><td>at</td><td>table</td><td><code>{ coords, heading? }</code>; <code>{ netId, offset?, bone? }</code> (while each game has it); <code>{ vehicle = id | { plate }, offset?, bone? }</code> (a WHIP car while it's out); <code>{ ground = groundItemId, offset? }</code> (until picked up); or <code>{ container = containerId, offset? }</code>. On a car, pile or container it sits above their own prompts</td></tr>
 <tr><td>label, icon</td><td>string?</td><td>Text and glyph</td></tr>
-<tr><td>options</td><td>table?</td><td>Up to 6 <code>{ id, label?, icon?, require?, options? }</code>; none means <code>use.option = 'default'</code>. Nested <code>options</code> make a menu with a Back: 3 deep, 6 a level, 40 in all. Only a leaf is pressed, named by <code>use.path</code> (<code>'tools/hack/firewall'</code>), and the server checks every <code>require</code> on the path. What a menu requires, its options and Back need too</td></tr>
+<tr><td>options</td><td>table?</td><td>Up to 6 <code>{ id, label?, icon?, require?, reach?, options? }</code>; none means <code>use.option = 'default'</code>. An option's <code>reach</code> (0.5–25 m) is its own: the prompt reaches as far as the furthest option, and a nearer one shows (and is accepted) only within its own, so on foot at 2.5 m and from the car at 7 m share one point. A menu's <code>reach</code> goes to its options unless they give theirs. Nested <code>options</code> make a menu with a Back: 3 deep, 6 a level, 40 in all. Only a leaf is pressed, named by <code>use.path</code> (<code>'tools/hack/firewall'</code>), and the server checks every <code>require</code> on the path. What a menu requires, its options and Back need too</td></tr>
 <tr><td>require</td><td>table?</td><td><code>AddAction</code>'s words, checked again on the server. An unknown word is refused; a zone must be a saved one</td></tr>
 <tr><td>audience</td><td>table|'everyone'?</td><td><code>{ people = { serverId | { charId = n } } }</code>: only they see and use it. Default <code>'everyone'</code></td></tr>
 <tr><td>reach, seeFrom, focusMode, enabled, style, holdMs</td><td>?</td><td>As <code>AddAction</code>'s; <code>false</code> clears <code>style</code> or <code>holdMs</code>. In a menu only leaves are held. A hold is the player's game asking: <code>onUse</code> is still the check</td></tr>
@@ -8409,7 +8581,7 @@ style = { base = 'subtle', badgeScale = 1.3, tint = '#ffc850', fadeMs = 250 }</c
 </div></div>
 
 <h3 id="interactions-conversations">Conversations: StartConversation</h3>
-<p>An NPC talks and the player picks one of up to four answers with the scroll wheel and <kbd>E</kbd>, in the dialog capsule. It opens only from a point's <code>onUse</code>, and the server checks each answer before <code>onChoose</code> hears it. It ends when you end it, an <code>ends</code> answer is chosen, the player leaves, opens a screen, goes down or logs out, or the NPC dies, goes or turns hostile. Others nearby see it as <code>/me</code> bubbles (<code>Config.Conversations.watcherBubbles</code>).</p>
+<p>An NPC talks and the player picks one of up to four answers in the dialog capsule: the scroll wheel and <kbd>E</kbd>, or the number key shown beside the answer (the hotbar keys, <kbd>1</kbd> to <kbd>4</kbd> by default); on a controller the D-pad and <kbd>A</kbd>. It opens only from a point's <code>onUse</code>, and the server checks each answer before <code>onChoose</code> hears it. It ends when you end it, an <code>ends</code> answer is chosen, the player leaves, opens a screen, goes down or logs out, or the NPC dies, goes or turns hostile. Others nearby see it as <code>/me</code> bubbles (<code>Config.Conversations.watcherBubbles</code>).</p>
 
 <div class="export-card" data-search="startconversation updateconversation endconversation getconversation dialog talk npc conversation capsule answers">
 <div class="export-header"><span class="export-name">StartConversation(source, spec)</span><span class="export-side side-server">SERVER</span></div>
@@ -8702,6 +8874,19 @@ if not passed then return false, why == 'busy' and 'Finish what you are doing fi
     TriggerServerEvent('myres:server:placed', spot.coords, spot.rot, spot.netId, spot.offset, spot.offsetRot)
 end)</code></pre>
   <div class="info-box warn"><strong>The answer is the player's word.</strong> Check it on the server: near them, and somewhere you allow.</div>
+</div></div>
+
+<div class="export-card" id="ui-placepoint" data-search="placepoint place point position gizmo arrows ghost marker ped heading">
+<div class="export-header"><span class="export-name">PlacePoint(opts?)</span><span class="export-side side-client">CLIENT</span></div>
+<div class="export-body">
+  <p>A point placed in the world with the object viewer's markers: a see-through ghost appears where the camera looks, and the player drags the centre dot over the world, the arrows along X, Y and Z, and the ring to turn it (R swaps). Place (A on a pad) takes it; Esc (B) leaves it. The settings page's <em>Place</em> is this (a <code>vec3</code> or <code>vec4</code> entry with <code>place</code>). Waits.</p>
+  <table class="param-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td>at</td><td>table?</td><td><code>{ x, y, z, w? }</code>: the point as it is; its heading is kept. It always starts on the surface the camera looks at (left out, facing the player)</td></tr>
+  <tr><td>model</td><td>string?</td><td>The ghost: a prop, or a ped with <code>ped = true</code> (it stands and turns). Default a small marker</td></tr>
+  <tr><td>label</td><td>string?</td><td>The bar's name for it</td></tr></table>
+  <div class="return-info"><strong>Returns: </strong><code>{ x, y, z, w }</code> (<code>w</code> its heading), or <code>false, why</code>: <code>'cancelled'</code>, <code>'busy'</code> or <code>'model'</code></div>
+<pre><code class="lang-lua">local spot = Whip.core:PlacePoint({ model = 's_f_y_shop_mid', ped = true, label = 'Shopkeeper' })
+if spot then TriggerServerEvent('mystore:server:clerk', spot.x, spot.y, spot.z, spot.w) end</code></pre>
 </div></div>
 
 <h3>On-screen text</h3>
@@ -9469,6 +9654,7 @@ end)</code></pre>
   <tr><td>sides</td><td>string|nil</td><td><code>'both'</code> (default), or <code>'server'</code>: never sent to players, for a key or password. Admins still see it</td></tr>
   <tr><td>cross</td><td>function|nil</td><td><code>function(get)</code>, run on the server when this setting is in a save; <code>get(key)</code> returns any setting as it will be saved. Return <code>true</code>, or <code>false, 'why'</code> to refuse. Give both entries of a two-setting rule the check</td></tr>
   <tr><td>here / limits</td><td>boolean / table</td><td><code>vec3</code>, <code>vec4</code>: a <em>Use where I stand</em> button, and <code>{ x = { min, max }, … }</code> per ranged axis</td></tr>
+  <tr><td>place</td><td>boolean / table</td><td><code>vec3</code>, <code>vec4</code>: a <em>Place</em> button: the panel steps aside and the point is placed in the world (<a href="#ui-placepoint"><code>PlacePoint</code></a>). <code>{ model = 's_f_y_shop_mid', ped = true }</code> picks the ghost</td></tr>
   <tr><td>item</td><td>table</td><td><code>list</code>: every entry's shape, as an entry with no <code>key</code>: <code>{ type = 'int', min = 1, max = 9 }</code>. <code>int</code>, <code>number</code>, <code>string</code> or <code>enum</code>, edited as one comma-separated line. For positions, use <code>records</code> with a <code>vec3</code> field</td></tr>
   <tr><td>fields</td><td>table</td><td><code>records</code>, a <code>map</code> of rows, or <code>record</code>: the fields, each an entry with a <code>key</code></td></tr>
   <tr><td>widget / marker</td><td>string / table</td><td><code>widget = 'mapPoints'</code>: <code>records</code> with a <code>vec3</code> and a <code>string</code> field show as map icons, dragged to move, clicked to rename or remove, added where the admin stands. <code>marker = { sprite = 361, colour = 1, name = 'Gas Station' }</code>: the blip and a new row's name</td></tr>
@@ -11091,7 +11277,7 @@ TCP 7881           voices, when a player's network blocks UDP</code></pre>
 set whip_voice_key    "API..."
 set whip_voice_secret "..."
 set whip_voice_api    "https://your-project.livekit.cloud"   # where this FiveM server reaches its API</code></pre>
-<p>The voice bot is then yours to run (<code>whip_voice\service\voicebot</code>, with <code>whip_voicebot_url</code> and <code>whip_voicebot_token</code>). On a Windows server, <code>whip_voice\service\Setup voice server.bat</code> installs LiveKit, Caddy (HTTPS with a free certificate) and the voice bot as services and writes the lines into <code>server.cfg</code>. SETUP.md walks through it.</p>
+<p>Restart the server, then run <code>/voicecheck</code>. The voice bot (it plays a lore character's recorded line into a call) is then yours to run on this server's machine: <code>whip_voice\service\voicebot</code>, started with <code>node bot.mjs</code>, with <code>whip_voicebot_token</code> (and <code>whip_voicebot_url</code> when it listens somewhere other than <code>http://127.0.0.1:7899</code>). Without it voice works, and lore characters can't phone. whip_voice's <code>docs/SETUP.md</code> (Your own voice server) walks through it.</p>
 <h2 id="voice-lore-calls">Lore phone calls</h2>
 <p class="lede">A lore character (one of the Director's named NPCs) phones a player, and a recorded line plays into the call as them talking. It needs whip_voice and its voice bot (<a href="#voice-setup">Setting up whip_voice</a>).</p>
 
@@ -11392,7 +11578,7 @@ end</code></pre>
 <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
 <tr><td><code>Landing</code></td><td>table</td><td>The screen after loading: a camera shot, the WHIP logo and "Press any button to continue". <code>enabled = false</code> skips it. Also <code>camera</code>, <code>prompt</code>, <code>look</code> (sky and clock), fades, <code>streamMs</code>. <code>/logout</code> skips it</td></tr>
 <tr><td><code>CharSelect</code></td><td>table</td><td>The character screen. <code>slots</code>: a hero shot per character place (<code>camera</code>, <code>pos</code>, a <code>scenario</code>/<code>anim</code>/<code>emote</code>, <code>look</code>, <code>props</code>); a place without one reuses another, and shot 1 must exist. <code>quietBucket</code> (no traffic or people), <code>preloadShots</code>, <code>spawnPicker</code> (pick where to arrive on the 3D map; <code>false</code>: fade to black, as dead and new characters always get). Fades: <code>Config.CharSelectFades</code></td></tr>
-<tr><td><code>SpawnPoints</code></td><td>table</td><td>Extra spawn picker places, beside the last position and the character's properties: <code>{ id, label, pos }</code>, <code>pos</code> a <code>vector4</code>. Server only</td></tr>
+<tr><td><code>SpawnPoints</code></td><td>table</td><td>Extra spawn picker places, beside the last position and the character's properties: <code>{ id, label, pos }</code>, <code>pos</code> a <code>vector4</code>. Server only. A resource adds its own with <a href="#registerspawnpoint"><code>RegisterSpawnPoint</code></a></td></tr>
 <tr><td><code>Creator</code></td><td>table</td><td>Where a new character is made (<code>spawn</code>), <code>look</code>, fades and holds; saving sends them to <code>DefaultSpawn</code>. <code>maxOutfits</code> (20, up to 100): saved outfits per character (clothes and accessories only)</td></tr>
 <tr><td><code>ArrivalScenes</code></td><td>table</td><td>A GTA character-switch scene as the picture returns after picking a character. <code>enabled = false</code>: a plain fade</td></tr>
 </table>
@@ -11486,6 +11672,7 @@ end</code></pre>
 <tr><td><code>ContainerPrompt</code></td><td><code>'face'</code></td><td>A stash prompt's default spot: <code>'middle'</code>, <code>'side'</code> (nearest side) or <code>'face'</code> (follows you). Players can pick their own</td></tr>
 <tr><td><code>ShopInteractRange</code> / <code>ShopStreamRange</code></td><td><code>2.5</code> / <code>100.0</code></td><td>The same, for shops</td></tr>
 <tr><td><code>ShopBasketSlots</code></td><td><code>10</code></td><td>Lines in a basket (1 to 50)</td></tr>
+<tr><td><code>GtaStores</code> / <code>GtaStoreCatalog</code></td><td>off / <code>{ food = 50, drink = 30 }</code></td><td>GTA's nine 24/7s and five LTDs as shops (a keeper behind the till, a map icon), each made once and then managed in /whip. On with <code>set whip_gta_stores true</code> in <code>server.cfg</code> (WHIP's txAdmin recipe sets it for a new server) or on <b>/whip → Settings → World &amp; gameplay</b>. Off makes no more and deletes none; one deleted in /whip is not made again. Leave it off if another resource runs your stores</td></tr>
 <tr><td><code>ShopTalk.enabled</code></td><td><code>true</code></td><td>Shopper and shopkeeper speak in /me bubbles (<a href="#shop-talk">Shop talk</a>)</td></tr>
 <tr><td><code>ShopTalk.batchSeconds</code> / <code>.keeperDelay</code></td><td><code>1</code> / <code>1.2</code></td><td>Seconds of quiet before basket changes are said; seconds before the keeper answers</td></tr>
 <tr><td><code>ShopTalk.open</code> … <code>ShopTalk.keeperLeave</code></td><td>lists</td><td>Lines for <code>open</code>, <code>add</code>, <code>change</code>, <code>remove</code>, <code>paid</code>, <code>broke</code>, <code>leave</code> and their <code>keeper</code> versions, with <code>{n}</code>, <code>{item}</code>, <code>{total}</code>, <code>{items}</code>. <code>config.lua</code> only</td></tr>
@@ -11547,7 +11734,7 @@ end</code></pre>
 </details>
 
 <h3>ATMs</h3>
-<p>WHIP finds these models wherever they stand; there's no list of machines.</p>
+<p>WHIP finds these models wherever they stand. <code>AtmProps</code> and the two ranges are also on <strong>/whip → Settings → Characters, money &amp; jobs</strong>, live: an empty model list turns WHIP's ATMs off, for a server that uses another ATM resource.</p>
 <table class="event-table">
 <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
 <tr><td><code>AtmProps</code></td><td>4 models</td><td>ATM models. Add an MLO's machine here</td></tr>
@@ -11555,7 +11742,9 @@ end</code></pre>
 <tr><td><code>AtmVisibleRange</code> / <code>AtmActiveRange</code></td><td><code>3.0</code> / <code>1.4</code></td><td>Circle shows; circle works</td></tr>
 <tr><td><code>AtmBadgeOffset</code></td><td>table</td><td>The circle's spot per model (<code>side</code>, <code>out</code>, <code>up</code>, <code>yaw</code>), plus <code>default</code></td></tr>
 <tr><td><code>AtmMaxDigits</code></td><td><code>9</code></td><td>Longest amount ($999,999,999)</td></tr>
+<tr><td><code>AtmExtraPositions</code></td><td><code>{}</code></td><td>Machines a map mod or an MLO adds, for <code>IsNearAtm</code> and <code>GetNearestAtm</code> (a <code>vector3</code> at each one's base)</td></tr>
 </table>
+<p>For a resource of your own that wants the player standing at a machine, the server knows where GTA's own are (<code>server/atm_positions.lua</code>, 121 read from the game's map): <code>IsNearAtm(source, range?)</code> answers <code>true, at</code> or <code>false, why</code>, and <code>GetNearestAtm(coords)</code> the machine and its distance. Machines a map mod or an MLO adds go in <code>Config.AtmExtraPositions</code> (<code>vector3</code> at the machine's base). WHIP's own ATMs don't ask this, so a machine missing from the list still works for them.</p>
 
 <h3>Time and weather</h3>
 <table class="event-table">
@@ -11634,11 +11823,15 @@ end</code></pre>
 <p>In chat or F8 with developer mode on; the console ones in the server console.</p>
 <table class="event-table">
 <tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>/tp x y [z] [heading]</code></td><td>To coordinates, however they were copied (<code>x y z</code>, <code>x, y, z</code>, <code>vector3(...)</code>, <code>vector4(...)</code>). No height: onto the ground there. Behind a fade; a car you drive comes along. On your activity log</td></tr>
+<tr><td><code>/tpto &lt;server id&gt;</code></td><td>To a player (<code>/tp &lt;server id&gt;</code> does the same). Refused for a player in another world (routing bucket). The Player Manager's <strong>Teleport To</strong> goes this same way</td></tr>
+<tr><td><code>/tpm</code></td><td>To your map waypoint, onto the ground there; also <strong>Teleport to Waypoint</strong> in <code>/w</code></td></tr>
 <tr><td><code>/whipcost [seconds]</code></td><td>Times every part of WHIP and every resource's <code>WhipCost</code> sections (20 s; 5 to 120), then prints the dearest first (<a href="#measuring">Measuring your resource</a>)</td></tr>
 <tr><td><code>/nativecost</code></td><td>Prices each call the controls loop makes</td></tr>
 <tr><td><code>/paddebug</code></td><td>A controller's chain live: controls down, their buttons, and what WHIP claimed</td></tr>
 <tr><td><code>/mousedebug</code></td><td>Measures this player's mouse speed, for the skill check's dot</td></tr>
 <tr><td><code>/nuicaps</code></td><td>Prints what this game's browser can do (<code>GetNuiCaps</code>)</td></tr>
+<tr><td><code>/vector3</code>, <code>/vector4</code>, <code>/vector2</code>, <code>/heading</code></td><td>Copies where you stand (<code>vector4(x, y, z, heading)</code>, two decimals) or the way you face, ready to paste into a config, and shows it. Short forms: <code>/vec</code> (a vector4), <code>/vec2</code>, <code>/vec3</code>, <code>/vec4</code>. The same text as <strong>Coords</strong> in <code>/w</code> copies with <kbd>G</kbd>; if the copy can't happen it's in F8</td></tr>
 <tr><td><code>/whipplatform</code></td><td>The platform this game read at start and now. A wrong one means <code>server.cfg</code> needs <code>setr</code></td></tr>
 <tr><td><code>/vehpoints</code></td><td>Where each prompt would sit on the bike, boat or aircraft you look at, and why</td></tr>
 <tr><td><code>/radardebug</code></td><td>The minimap tuner: moves its parts live and prints the numbers</td></tr>
@@ -11657,6 +11850,7 @@ end</code></pre>
 <tr><th>Entry</th><th>Does</th></tr>
 <tr><td><strong>Developer mode</strong></td><td>The switch; with it off, the only row</td></tr>
 <tr><td><strong>Noclip</strong></td><td>Fly, invisible and invincible: WASD, <kbd>Space</kbd>/<kbd>Ctrl</kbd>, <kbd>Shift</kbd> for speed. In a car, the car comes too and you stay in your seat, unless another player is driving it</td></tr>
+<tr><td><strong>Teleport to Waypoint</strong></td><td>Once: to your map waypoint, onto the ground there, as <code>/tpm</code></td></tr>
 <tr><td><strong>Invisible</strong></td><td>Nobody sees you; you see yourself at half opacity</td></tr>
 <tr><td><strong>God Mode</strong></td><td>No damage; health kept full</td></tr>
 <tr><td><strong>Restore Player Cores</strong></td><td>Once: revives you if down (as <code>/whip_revive</code>), then fills your health, armour, food and drink</td></tr>
@@ -11753,7 +11947,7 @@ end</code></pre>
 <tr><td>Current Stats</td><td>Online only: every stat, HUD or not. Type a value and <strong>Apply</strong>; it's held to the stat's range and logged in the console. Health is in game units (empty at 100, full at 200)</td></tr>
 <tr><td>Vehicles</td><td>Every car the account's characters own, with state, garage and fuel. Click one to open it on the Vehicles page</td></tr>
 <tr><td>Their game</td><td>Online only: a picture of their screen (WHIP's screens, not other resources') and their map position. <strong>Capture Player's Game</strong> takes a new one; pictures are kept 5 minutes and each is logged</td></tr>
-<tr><td>Teleport To, Bring Here</td><td>Online only</td></tr>
+<tr><td>Teleport To, Bring Here</td><td>Online only. Teleport To goes as <code>/tpto</code> does: behind a fade, the ground there loaded first, refused for a player in another world (routing bucket), and on your activity log</td></tr>
 <tr><td>Open Inventory</td><td>Online or offline (loaded from the database); asks which character first</td></tr>
 <tr><td>Kick</td><td>With a reason; adds an admin note</td></tr>
 <tr><td>Temp Ban, Perma Ban, Unban</td><td>See Bans below</td></tr>
@@ -12491,7 +12685,7 @@ end)</code></pre>
   // ---- WAITS: the exports that can wait (on the database, on the player), each card's badge. The same list as
   // the ---@async marks in types/server.lua and types/client.lua. `node dev/waits.js --write` writes this line and
   // lib/satellite.lua's from the code; `--check` keeps all three the same ----
-  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChangeVehicleLocks","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CountVehicleKeys","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetPlayerMetadata","GetPlayerVehicleKeys","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HasVehicleKey","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPlayerMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlaceObject","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
+  var WAITS = {"server":["AddCatalogItem","AddItem","AdoptVehicle","BankDeposit","BankSystemDeposit","BankSystemTransfer","BankSystemWithdraw","BankTransfer","BankWithdraw","CanGrantBankAccess","CanHirePlayer","CanUseBankAccount","ChangeVehicleLocks","ChargePlayer","ClaimVehicle","ClearAllVehicleData","ClearVehicleData","CloseBankAccount","ClosePanel","ClosePlayerInventory","CloseStore","CommitWithAction","CountVehicleKeys","CreateBankAccount","CreateContainer","CreateDoor","CreateGarage","CreateGroundItem","CreateJobRole","CreateOwnedVehicle","CreateShop","DeleteContainer","DeleteDoor","DeleteGarage","DeleteGroundItem","DeleteJob","DeleteJobRole","DeleteShop","DeleteZone","DespawnVehicle","EnsureContainer","EnsureDoor","EnsureDoors","EnsureJob","EnsureShop","EnsureTable","EnsureZone","FlushActivityLog","GetBalance","GetBankAccessList","GetBankAccount","GetBankTransactions","GetCharacterBankAccounts","GetCharacterInfo","GetCharacterNames","GetDefaultBankAccount","GetItemAt","GetJobBankAccounts","GetPermissionHolders","GetPlayerMetadata","GetPlayerVehicleKeys","GetScenarioStats","GetShopPrices","GetShopStock","GiveOnLogin","GivePropertyKey","GiveVehicleKey","GrantBankAccess","GrantPermission","HasVehicleKey","HirePlayer","HoldDoor","HoldMoney","IsCharacterDeleted","LinkDoors","LogActivity","LoreSay","OpenPlayerInventory","OpenShop","OpenStore","PayAsLore","PayPlayer","Progress","RefundPlayer","RegisterPropertyPack","RegisterProps","RegisterVehicles","RemoveCatalogItem","RemoveItem","RemovePropertyKey","RemoveVehicleKey","RenameCharacter","RequestScreenshot","RevokeBankAccess","RevokePermission","SavePlayer","SetBankAccountFrozen","SetHeldItem","SetItemMetadata","SetPlayerMetadata","SetPropertyOwner","SetPropertyTheme","SetShopItemPrice","SetShopLayout","SetVehicleAppearance","SetVehicleCustody","SetVehicleData","SetVehicleGarage","SetVehicleLocked","SetVehiclePlate","SettleMoneyHold","SkillCheck","SpawnTempVehicle","SpawnVehicle","StoreCount","StoreGive","StoreMove","StoreRead","StoreTake","SwitchScenario","TestDirectorCard","TestDirectorScenario","TransferVehicle","UnlinkDoors","UpdateContainer","UpdateDoor","UpdateGarage","UpdateJob","UpdateJobRole","UpdateShop"],"client":["Alert","Callback","ClockOff","ClockOn","Confirm","EditAppearance","EnterCharacter","FreeHands","GetPlayerFullName","Input","LoadAnimDict","LoadAnimSet","LoadModel","LoadPtfxAsset","LoadTextureDict","OpenKeyboard","OrbitCamera","PlaceObject","PlacePoint","PlayCameraPath","PlayCameraSequence","PressScreen","Progress","ReadScreen","ResolveVehicle","SkillCheck","TakeScreenshot","TakeVehicleControl"]};
   (function () {
     var waits = { server: {}, client: {} };
     ['server', 'client'].forEach(function (side) { WAITS[side].forEach(function (n) { waits[side][n] = true; }); });

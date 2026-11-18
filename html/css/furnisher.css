@@ -94,7 +94,7 @@
     overflow: visible;
 }
 #furnisher.fz-looking #fz-gizmo { pointer-events: none; }
-#fz-gizmo:not(.fz-gz-on) > * { display: none; }
+#fz-gizmo:not(.fz-gz-on) > :not(.fz-gz-box) { display: none; }
 
 /* Two strokes each: a dark one under the colour, so a marker reads on a white wall and a black
    floor alike. */
@@ -158,6 +158,19 @@
 }
 .fz-gz-corner { fill: var(--fz-picked); stroke: rgba(0, 0, 0, 0.55); stroke-width: 1.5; }
 
+/* GRID LOCK (L): the world grid at the snap step on the floor under the selection, fading out from it. Drawn only. */
+.fz-gz-grid { pointer-events: none; }
+.fz-gz-grid line { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; }
+
+/* A drag on the room: the box everything inside is selected by. */
+.fz-gz-box {
+    pointer-events: none;
+    fill: rgba(96, 165, 250, 0.12);
+    stroke: var(--fz-picked);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+}
+
 /* TRANSFORM, NOT `zoom`. On CEF (Chromium 103) `zoom` scales what is PAINTED without scaling what
    is CLICKED: only the top-left 1/zoom of the screen answers the mouse, and getBoundingClientRect
    reports the unzoomed box while pointer events carry real viewport pixels. A transform has
@@ -207,6 +220,8 @@
 /* Dungeon Mode's world builder only: the bubble's Options (client/director_live.lua). */
 .fz-live-only { display: none; }
 #furnisher.fz-live .fz-live-only { display: inline-flex; align-items: center; }
+/* Ctrl+click Add: Dungeon Mode selects one thing at a time */
+#furnisher.fz-live .fz-multi-hint { display: none; }
 /* (The ring inside a panel or the window that scrolls: drawn inside its control's edge, or the list would clip it.) */
 html[data-input="pad"] #furnisher #fz-cfg-body .pad-focus,
 html[data-input="pad"] #furnisher #fz-bp .pad-focus { outline-offset: -2px; }
@@ -569,6 +584,7 @@ html[data-input="pad"] #furnisher .fz-btn-sm.fz-btn-keyed { padding-right: 13px;
 #furnisher.fz-director .fz-bar-rule,
 #furnisher.fz-director .fz-bar > .fz-seg,
 #furnisher.fz-director #fz-stepchip,
+#furnisher.fz-director #fz-grid-btn,
 #furnisher.fz-director #fz-extra,
 #furnisher.fz-director .fz-bar > .fz-pad-key { display: none; }
 /* The snap step on a pad, which nudges by it (a mouse has G in the hint line). */

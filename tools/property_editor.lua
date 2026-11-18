@@ -12,6 +12,7 @@
 --       hud      = { title = ..., rows = ..., hints = ... },   -- EditorHud.show
 --       solo     = 'group',        -- optional: Interactions.setSolo for the mode's own prompts
 --       block    = { controls = { 24, 25 } },   -- optional: held off for the mode (ControlBlocks), never by hand
+--       padBack  = true,           -- optional: B on a pad leaves too, as Esc does (a mode with nothing else on B)
 --       onFrame  = function() end, -- every frame; return 'exit' to finish
 --       onEscape = function() end, -- optional; return false to stay in the mode
 --       onExit   = function(reason) end,  -- 'done' | 'back' | 'died' | 'replaced' | 'error' | 'stopped'
@@ -23,12 +24,17 @@ PropertyEditor = {}
 local mode = nil
 local startLoop   -- the mode's frame loop, started by PropertyEditor.start; defined below
 
+-- A `padBack` mode's B is the way out: B on foot is also melee and reload, held off so the press that leaves does
+-- not throw a punch as well.
+local PAD_BACK_BLOCK = { controls = { 45, 140, 141, 142 } }
+
 local function finish(reason)
     local m = mode
     if not m then return end
     mode = nil
     PropertyEditorActive = false
     ControlBlocks.release('propEditMode')   -- the mode's own `block` (fine when it named none)
+    ControlBlocks.release('propEditBack')
     ZonePreview.clearPrefix('pe:')
     EditorHud.hide()
     if m.solo and Interactions then Interactions.setSolo(nil) end
@@ -51,6 +57,7 @@ function PropertyEditor.start(m)
     -- The controls the mode holds off, through the one control loop (so /whipcontrols and heldByOthers see
     -- them).
     if type(m.block) == 'table' then ControlBlocks.hold('propEditMode', m.block) end
+    if m.padBack then ControlBlocks.hold('propEditBack', PAD_BACK_BLOCK) end
     WhipPanelSuspend()
     if m.solo and Interactions then Interactions.setSolo(m.solo) end
     EditorHud.show(m.hud or { title = m.name or 'Property' })
@@ -77,7 +84,7 @@ local function run()
             finish('died')
             Wait(0)
         else
-            if IsDisabledControlJustPressed(0, 200) then
+            if IsDisabledControlJustPressed(0, 200) or (mode.padBack and WhipKeyPressed(nil, 202)) then
                 local stay = mode.onEscape and mode.onEscape() == false
                 if not stay then finish('back') end
             elseif mode.onFrame then
@@ -125,8 +132,8 @@ end)
 --
 -- AIM IT, DO NOT STAND ON IT. A sign goes on a wall, at a height, at an angle, and the only thing
 -- that knows where the wall is is a ray from the camera — so this is housing's entry placer again:
--- a live preview on the end of the ray, facing you, the wheel turning it off that, E to put it
--- there and C or Esc to leave it where it was.
+-- a live preview on the end of the ray, facing you, Q / E turning it off that, Enter to put it
+-- there and C or Esc to leave it where it was. The sign post's keys and card, a controller's when one is in hand.
 --
 -- THE PREVIEW IS THE REAL PROMPT, drawn by whichever renderer is live and the only prompt on
 -- screen (setSolo), so what you see while aiming is the sign itself, at its real size, edge-on
@@ -135,7 +142,10 @@ end)
 local SIGN_GROUP = 'pe_sign'
 local SIGN_PREVIEW = 'pe_sign_preview'
 local SIGN_LIFT = 0.05          -- off the surface, so the badge does not z-fight the wall
-local SIGN_TURN_STEP = 15.0     -- degrees per wheel notch
+local SIGN_TURN = 60.0          -- degrees a second: Q / E, or a trigger all the way down (the sign post's)
+local SIGN_TURN_FINE = 15.0     -- with Alt
+-- On a pad, held while it places: Menu (named, so the pause menu stands aside), X's jump, Y's get-in.
+local SIGN_PAD_BLOCK = { controls = { 199, 22, 23 } }
 
 --- Aim a sign and hand the spot back: the one placing mode, for a saved property (placeSign,
 --- below) and for the wizard's draft alike.
@@ -155,67 +165,101 @@ function PropertyEditor.aimSign(opts)
     local what = opts.what or 'Sign'
     local scopeText = opts.forText or 'this property'
     local name = opts.name or 'Property'
+    local pad, padHeld = false, false
+
+    local function card()
+        return {
+            house = true, icon = 'place', title = what, sub = name,
+            rows = {
+                { label = 'For', value = scopeText },
+                { label = 'Aim', value = valid and ('facing %.0f°'):format(heading) or 'at a wall or the floor',
+                  tone = not valid and 'warn' or nil },
+            },
+            hints = {
+                { key = 'Enter', pad = 'a', text = 'Put it here', off = not valid },
+                { key = 'Q / E', pad = { 'lt', 'rt' }, text = 'Turn it' },
+                { key = 'Alt', pad = false, text = 'Turn slowly' },
+                { key = 'C', pad = 'b', text = 'Cancel' },
+            },
+        }
+    end
+
+    local function holdPad(on)
+        if on == padHeld then return end
+        padHeld = on
+        if on then ControlBlocks.hold('placeSignPad', SIGN_PAD_BLOCK) else ControlBlocks.release('placeSignPad') end
+    end
+    -- A press on the device in hand only: a pad's buttons are keys on a keyboard too, and the reverse.
+    local pressed = WhipKeyPressed
 
     local started = PropertyEditor.start({
         name = 'Place sign',
         solo = SIGN_GROUP,
-        hud = {
-            title = 'Place ' .. what,
-            sub = name,
-            rows = {
-                { label = 'For', value = scopeText },
-                { label = 'Aim', value = 'at a wall or the floor' },
-            },
-            hints = {
-                { key = 'E', text = 'Put it here' },
-                { key = 'Scroll', text = 'Turn it' },
-                { key = 'C', text = 'Cancel' },
-                { key = 'Esc', text = 'Back' },
-            },
-        },
-        onExit = function() Interactions.remove(SIGN_PREVIEW) end,
-        -- What is read, held off so it does not also fire underneath: the wheel (both pairs), attack, aim, cover
-        -- and melee. And C (26), the cancel, so it does not swing the camera round as well; read with the
-        -- disabled reader.
-        block = { controls = { 14, 15, 16, 17, 24, 25, 26, 37, 44, 140 } },
-        onFrame = function()
-            if IsDisabledControlJustPressed(0, 17) then turn = (turn + SIGN_TURN_STEP) % 360.0
-            elseif IsDisabledControlJustPressed(0, 16) then turn = (turn - SIGN_TURN_STEP) % 360.0 end
-
-            local cam = GetFinalRenderedCamCoord()
-            local fx, fy, fz = InteractGetCameraForward()
-            local ray = StartShapeTestRay(cam.x, cam.y, cam.z, cam.x + fx * reach, cam.y + fy * reach,
-                cam.z + fz * reach, 1 + 16, PlayerPedId(), 0)
-            local _, hit, coords, normal = GetShapeTestResult(ray)
-            valid = hit == 1
-            if valid then
-                local n = normal or vector3(0.0, 0.0, 1.0)
-                x, y, z = coords.x + n.x * SIGN_LIFT, coords.y + n.y * SIGN_LIFT, coords.z + n.z * SIGN_LIFT
-                -- Facing you: GTA heading of the direction back to the camera, plus the wheel.
-                local dx, dy = cam.x - x, cam.y - y
-                if dx * dx + dy * dy > 0.0001 then heading = (math.deg(math.atan(-dx, dy)) + turn) % 360.0 end
-                -- WHERE THE PROMPTS LOOK FOR IT, not only where it is drawn. `follow` (below) runs
-                -- only for a prompt already on screen, and the preview starts at your feet (or the
-                -- old spot) — off screen in first person or from across a room — so it never got
-                -- on screen and never moved: aiming at a wall showed nothing.
-                Interactions.updatePosition(SIGN_PREVIEW, x, y, z)
-                Interactions.updateHeading(SIGN_PREVIEW, heading)
-            end
-            EditorHud.update({ rows = {
-                { label = 'For', value = scopeText },
-                { label = 'Aim', value = valid and ('%.0f°'):format(heading) or 'nothing in reach',
-                  tone = valid and 'ok' or 'warn' },
-            } })
-
-            if valid and IsControlJustPressed(0, 38) then
-                if opts.onPlaced then
-                    local ok, err = pcall(opts.onPlaced, x, y, z, heading)
-                    if not ok then print('[whip_core:propedit] onPlaced errored: ' .. tostring(err)) end
-                end
-                return 'exit'
-            end
-            if IsDisabledControlJustPressed(0, 26) then return 'exit' end
+        hud = card(),
+        onExit = function()
+            holdPad(false)
+            Interactions.remove(SIGN_PREVIEW)
         end,
+        -- What is read, held off so it does not also fire underneath: the wheel, attack and aim (a pad's
+        -- triggers), cover, Q / E (44, 38), melee, Enter (201, 18), Alt (19). C (26) too.
+        block = { controls = { 14, 15, 16, 17, 24, 25, 26, 37, 38, 44, 140, 141, 142, 201, 18, 19, 257, 263, 264 } },
+        onFrame = (function()
+            local nextHud, lastValid = 0, nil
+            return function()
+                pad = WhipLastInputIsPad()
+                holdPad(pad)
+                local dt = GetFrameTime()
+
+                -- Turn it off facing you: Q / E held, or the triggers.
+                if pad then
+                    local t = WhipPadTrigger('rt') - WhipPadTrigger('lt')   -- RT turns it right, LT left
+                    if t ~= 0.0 then turn = (turn - t * SIGN_TURN * dt) % 360.0 end
+                else
+                    local rate = IsDisabledControlPressed(0, 19) and SIGN_TURN_FINE or SIGN_TURN
+                    if IsDisabledControlPressed(0, 44) then turn = (turn + rate * dt) % 360.0
+                    elseif IsDisabledControlPressed(0, 38) then turn = (turn - rate * dt) % 360.0 end
+                end
+
+                local cam = GetFinalRenderedCamCoord()
+                local fx, fy, fz = InteractGetCameraForward()
+                local ray = StartShapeTestRay(cam.x, cam.y, cam.z, cam.x + fx * reach, cam.y + fy * reach,
+                    cam.z + fz * reach, 1 + 16, PlayerPedId(), 0)
+                local _, hit, coords, normal = GetShapeTestResult(ray)
+                valid = hit == 1
+                if valid then
+                    local n = normal or vector3(0.0, 0.0, 1.0)
+                    x, y, z = coords.x + n.x * SIGN_LIFT, coords.y + n.y * SIGN_LIFT, coords.z + n.z * SIGN_LIFT
+                    -- Facing you: GTA heading of the direction back to the camera, plus the turn.
+                    local dx, dy = cam.x - x, cam.y - y
+                    if dx * dx + dy * dy > 0.0001 then heading = (math.deg(math.atan(-dx, dy)) + turn) % 360.0 end
+                    -- WHERE THE PROMPTS LOOK FOR IT, not only where it is drawn. `follow` (below) runs
+                    -- only for a prompt already on screen, and the preview starts at your feet (or the
+                    -- old spot) — off screen in first person or from across a room — so it never got
+                    -- on screen and never moved: aiming at a wall showed nothing.
+                    Interactions.updatePosition(SIGN_PREVIEW, x, y, z)
+                    Interactions.updateHeading(SIGN_PREVIEW, heading)
+                end
+
+                if valid and (pressed(201, 201) or (not pad and IsDisabledControlJustPressed(0, 18))) then
+                    if opts.onPlaced then
+                        local ok, err = pcall(opts.onPlaced, x, y, z, heading)
+                        if not ok then print('[whip_core:propedit] onPlaced errored: ' .. tostring(err)) end
+                    end
+                    return 'exit'
+                end
+                -- C / B: leave it where it was. Menu on a pad too (Esc is the mode's own).
+                if WhipCancelJustPressed() or (pad and pressed(199, 199)) then return 'exit' end
+
+                -- The card: at once when the aim finds or loses a surface, else five times a second.
+                local now = GetGameTimer()
+                if valid ~= lastValid then nextHud = 0 end
+                lastValid = valid
+                if now >= nextHud then
+                    nextHud = now + 200
+                    EditorHud.update(card())
+                end
+            end
+        end)(),
     })
     if not started then return false end
 
@@ -864,11 +908,13 @@ function PropertyEditor.showSpace(p)
 
     local started = PropertyEditor.start({
         name = 'Show space',
+        padBack = true,
         hud = {
-            title = 'Space',
-            sub = (p.name or ('Property #' .. tostring(p.id))) .. ' — blue; its neighbours grey',
+            house = true, icon = 'house', title = 'Space',
+            sub = (p.name or ('Property #' .. tostring(p.id))) .. ', in blue',
+            chip = { text = 'Saved', tone = 'ok' },
             rows = {},
-            hints = { { key = 'Esc', text = 'Back to the panel' } },
+            hints = { { key = 'Esc', pad = 'b', text = 'Back to the panel' } },
         },
         onFrame = (function()
             local nextAt = 0
@@ -882,7 +928,7 @@ function PropertyEditor.showSpace(p)
                 EditorHud.update({ rows = {
                     { label = 'Shapes', value = #shapes },
                     { label = 'Floor area', value = ('%.1f m²'):format(area) },
-                    { label = 'Neighbours', value = neighbours },
+                    { label = 'Neighbours', value = neighbours == 0 and 'none near' or ('%d, in grey'):format(neighbours) },
                     { label = 'You are', value = ('%.0f m away'):format(dist),
                       tone = dist > 150 and 'warn' or nil },
                 } })

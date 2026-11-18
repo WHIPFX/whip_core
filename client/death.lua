@@ -253,7 +253,7 @@ end
 ---@param skipRagdoll boolean  True when there is no fall to watch: loaded in dead, or a respawn refused
 ---@param reason 'reconnected'|'respawnRefused'|nil  why it is not a fresh death
 local function EnterDeathState(skipRagdoll, reason)
-    -- Already dead is not a new death: the reconnect-while-dead path waits 2000ms after playerLoaded,
+    -- Already dead is not a new death: the reconnect-while-dead path waits for the spawn to land,
     -- and the detection poll can fire first inside that window. This function starts the death
     -- screen's threads, so a second entry would run two countdowns.
     if isDead then return end
@@ -729,18 +729,46 @@ end)
 --- before stands down.
 local loadGen = 0
 
+-- The load that came in dead and is waiting for its ped to be put in the world (client/spawn.lua fires
+-- whip_core:player:spawned once it has landed). nil when none is.
+local deadLoad = nil
+
+--- Lay a dead load down, once. Not after a logout meanwhile (F8 `logout`, a satellite's LogoutPlayer):
+--- the next character would inherit the death screen.
+local function enterDeadLoad(myLoad)
+    if deadLoad ~= myLoad then return end
+    deadLoad = nil
+    if loadGen ~= myLoad or not PlayerLoaded then return end
+    EnterDeathState(true, 'reconnected')
+end
+
 RegisterNetEvent('whip_core:client:playerLoaded', function(data)
     loadGen = loadGen + 1
+    deadLoad = nil
     if data and data.isDead then
+        -- Laid down once the spawn has placed the ped (whip_core:player:spawned, below): this event is the start
+        -- of the load.
         local myLoad = loadGen
-        CreateThread(function()
-            Wait(2000)
-            -- Not after a logout inside the 2 s (F8 `logout`, a satellite's LogoutPlayer): the next
-            -- character would inherit the death screen.
-            if loadGen ~= myLoad or not PlayerLoaded then return end
-            EnterDeathState(true, 'reconnected')
-        end)
+        deadLoad = myLoad
+        -- A backstop in case the spawn never says so (it errored): dead, rather than standing up. Long enough for
+        -- the slowest real spawn (the appearance, then up to 10 s for the world and 2 s for the floor, client/spawn.lua),
+        -- so it never lays the body down before the spawn has placed it.
+        SetTimeout(60000, function() enterDeadLoad(myLoad) end)
     end
+end)
+
+AddEventHandler('whip_core:player:spawned', function()
+    local myLoad = deadLoad
+    if not myLoad then return end
+    -- The spawn snaps the ped's origin to the floor and lets go; the game stands it back up over a
+    -- few frames. Lay it down once it stands (origin a metre up), for at most 1.5 s.
+    local ped = PlayerPedId()
+    local by = GetGameTimer() + 1500
+    while GetGameTimer() < by and GetEntityHeightAboveGround(ped) < 0.8 do
+        Wait(50)
+        ped = PlayerPedId()
+    end
+    enterDeadLoad(myLoad)
 end)
 
 -- ============================================

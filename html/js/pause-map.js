@@ -162,17 +162,26 @@ export function blipTint(hex) {
     return 'url(#' + id + ')';
 }
 
-/** A blip's icon (img/blips/<sprite>.webp in its media pack) in its colour. */
-export function blipImage(sprite, colour) {
+/** A blip's icon (img/blips/<sprite>.webp in its media pack) in its colour. With a `number` (ShowBlip's: the stops
+ *  of a route, 1, 2, 3), the icon in a mark of the same size with the number in a badge at its corner; without, the
+ *  icon itself, as always. */
+export function blipImage(sprite, colour, number) {
     const img = document.createElement('img');
-    img.className = 'pmap-blip';
+    img.className = number == null ? 'pmap-blip' : 'pmap-blip-icon';
     img.src = assetUrl('img/blips/' + sprite + '.webp');
     img.draggable = false;
     img.alt = '';
     img.style.filter = blipTint(colour) + ' drop-shadow(0 1px 2px rgba(0,0,0,.8))';
     // An icon FiveM's list has no picture for: a dot in the blip's colour instead.
     img.onerror = () => { img.onerror = null; img.classList.add('pmap-dot'); img.removeAttribute('src'); img.style.background = colour || '#fff'; img.style.filter = ''; };
-    return img;
+    if (number == null) return img;
+    const mark = document.createElement('span');
+    mark.className = 'pmap-blip pmap-numbered';
+    const badge = document.createElement('span');
+    badge.className = 'pmap-blip-n';
+    badge.textContent = String(number);   // a whole number 0-99 (server/blips.lua), as text
+    mark.append(img, badge);
+    return mark;
 }
 
 /** Load the data and build the 3D map, once for the page. three.js and the renderer are imported here, not at the
@@ -637,7 +646,7 @@ export class PauseMap {
     /** A blip's colour filter (blipTint) and icon (blipImage, above): pause.js's legend draws its icons through these. */
     tint(hex) { return blipTint(hex); }
 
-    blipImage(sprite, colour) { return blipImage(sprite, colour); }
+    blipImage(sprite, colour, number) { return blipImage(sprite, colour, number); }
 
     /** A mark drawn from one of whip's own glyphs (an SVG, ours, never data), for what GTA has no blip icon for: a
      *  scenario's NPC, car, prop, door. A dark disc with the glyph in white, the size of a blip. */
@@ -676,7 +685,7 @@ export class PauseMap {
         // Picture marks are bigger, so a click finds them further out (bind's click).
         this.markScale = this.data.blips.some((b) => b.pic) ? 1.35 : 1;
         this.blipEls = this.data.blips.map((b) => {
-            const el = b.pic ? this.pictureMark(b) : b.glyph ? this.glyphMark(b.glyph) : this.blipImage(b.sprite, b.colour);
+            const el = b.pic ? this.pictureMark(b) : b.glyph ? this.glyphMark(b.glyph) : this.blipImage(b.sprite, b.colour, b.number);
             el.title = b.name || '';
             this.marks.appendChild(el);
             el._blip = b;
@@ -817,7 +826,13 @@ export class PauseMap {
         const end = () => { drag = null; turn = null; this.root.classList.remove('pmap-dragging'); };
         this.root.addEventListener('pointerup', end);
         this.root.addEventListener('pointercancel', end);
-        this.root.addEventListener('contextmenu', (e) => { if (this.turnable) e.preventDefault(); });
+        // A right CLICK clears the waypoint, as GTA's map does; a right-drag turns the map (above), and clears nothing.
+        this.root.addEventListener('contextmenu', (e) => {
+            if (this.turnable || this.interactive) e.preventDefault();
+            if (!this.interactive || !this.onWaypoint || !this.data.waypoint) return;
+            if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+            this.clearWaypoint();
+        });
         this.root.addEventListener('wheel', (e) => {
             if (!this.interactive) return;
             e.preventDefault();
@@ -854,11 +869,7 @@ export class PauseMap {
         const wp = this.data.waypoint;
         if (wp) {
             const [wx, wy] = this.screenOf(wp.x, wp.y);
-            if (Math.hypot(wx - sx, wy - sy) < 16) {
-                this.data.waypoint = null; this.data.route = null; this.render();
-                this.onWaypoint(null);
-                return;
-            }
+            if (Math.hypot(wx - sx, wy - sy) < 16) { this.clearWaypoint(); return; }
         }
         const at = this.worldAt(sx, sy);
         if (!at) return;
@@ -866,5 +877,12 @@ export class PauseMap {
         this.data.waypoint = { x, y };
         this.render();
         this.onWaypoint(x, y);
+    }
+
+    /** No waypoint (a right-click, Delete, or a double-click on it): off the map, and the game told. */
+    clearWaypoint() {
+        if (!this.data.waypoint) return;
+        this.data.waypoint = null; this.data.route = null; this.render();
+        if (this.onWaypoint) this.onWaypoint(null);
     }
 }

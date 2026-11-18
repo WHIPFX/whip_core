@@ -486,7 +486,7 @@ end
 SecureEvent('whip_core:server:selectCharacter', {
     rateLimit = 2000,
     requirePlayer = false,
-    params = { {'charId', 'id'}, {'spawnId', 'string', 40, 'last'} },
+    params = { {'charId', 'id'}, {'spawnId', 'string', SpawnChoices.ID_MAX, 'last'} },   -- server/spawn_choices.lua
 }, function(source, _, charId, spawnId)
     -- Loaded is asked first: EnsurePending would re-create a pending entry for a player who already
     -- has a character.
@@ -1441,9 +1441,8 @@ AddEventHandler('onResourceStart', function(resourceName)
     if not loaded('shops', Shops.loadAll) then return end
     Shops.seedFromConfig()
     -- Each shop's keeper (an NPC) and its prompt (server/shop_counters.lua): after the jobs, which
-    -- name who may manage its stock, and once a character has loaded (Character.afterFirstLoad: an NPC
-    -- made with nobody in the game loses its network id on Enhanced). A fault there costs the counters,
-    -- never the start-up.
+    -- name who may manage its stock, and once a character has loaded (Character.afterFirstLoad). A fault
+    -- there costs the counters, never the start-up.
     Character.afterFirstLoad(function()
         local countersOk, countersErr = pcall(Shops.openCounters)
         if not countersOk then print('[whip_core:shops] ERROR making the shop counters: ' .. tostring(countersErr)) end

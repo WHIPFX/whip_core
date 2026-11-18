@@ -29,6 +29,7 @@ import { padGlyph } from './pad-glyphs.js';
 import { NuiRouter } from './router.js';
 import { screenRect } from './pad-cursor.js';
 import { setPref } from './prefs.js';
+import { ICON_PATH } from './ui-icons.js';
 import { MinimapPreview, previewSpeedRange, minimapAspect } from './minimap.js';
 
 /** GTA's tabs in this order, by GTA's menu id; one GTA has that is not here comes after them, in GTA's order. */
@@ -58,10 +59,10 @@ const ICONS = {
     chat: '<path d="M5 5h14v10H9l-4 4z"/>',
     other: '<path d="M4 7h16M4 12h16M4 17h10"/>',
     out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>',
-    left: '<path d="M15 5l-7 7 7 7"/>',
-    right: '<path d="M9 5l7 7-7 7"/>',
+    left: ICON_PATH.back,
+    right: ICON_PATH.forward,
     to: '<path d="M5 12h13M13 6l6 6-6 6"/>',
-    down: '<path d="M6 9l6 6 6-6"/>',
+    down: ICON_PATH.down,
 };
 const GAME_ICON = { 1023: 'display', 1137: 'graphics', 1138: 'advanced', 1022: 'audio', 1136: 'camera', 1140: 'mouse',
     1024: 'pad', 1131: 'keys', 1146: 'editor' };
@@ -716,7 +717,7 @@ export class SettingsPage {
     }
 
     /** The minimap's preview up while the Minimap tab is, laid over its place in the inspector in true px (the
-     *  inspector is zoomed; a canvas is drawn unzoomed). */
+     *  inspector is scaled; a canvas is drawn unscaled). */
     syncPreview() {
         const cur = this.current();
         const want = this.isOpen && cur?.section === 'server' && cur.id === MINIMAP_GROUP && !!this.inspEl.querySelector('.st-mm-slot');
@@ -766,7 +767,7 @@ export class SettingsPage {
     dragTo(clientX) {
         const d = this.drag;
         if (!d) return;
-        // In screen pixels, as clientX is: the track is in the zoomed page, which FiveM's Chromium 103 can measure unzoomed.
+        // In screen pixels, as clientX is (the page is scaled by a transform, which getBoundingClientRect includes).
         const box = screenRect(d.track);
         const v = valueAt(d.row, box.width > 0 ? (clientX - box.left) / box.width : 0);
         if (v === d.value) return;

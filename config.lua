@@ -170,6 +170,7 @@ Config.Items = {
         usable   = false,
         cooldown = 0,
         prop     = 'prop_cs_business_card',
+        wallet   = true,   -- fits in a wallet, and is still found there (HasItem, FindItem)
     },
     cash = {
         name     = 'Cash',
@@ -683,6 +684,13 @@ Config.AtmProps = {
     'prop_fleeca_atm',
 }
 
+-- Cash machines the server should know besides GTA's own (server/atm_positions.lua): those a map mod or an MLO adds,
+-- as vector3 at the machine's base. Only IsNearAtm and GetNearestAtm read them (a resource checking a player stands at
+-- a machine); whip's own ATMs find machines by model, wherever they are.
+Config.AtmExtraPositions = {
+    -- vector3(149.9, -1040.7, 28.4),
+}
+
 -- How far out ATMs are looked for, in metres. Larger than the prompt range so a row of ATMs is found as you walk along it.
 Config.AtmSearchRange = 30.0
 
@@ -952,6 +960,17 @@ Config.Garages = {
 --                         Both can also be set in game by the shop's managers (Edit Shelf).
 Config.Shops = {
 }
+
+-- GTA's own convenience stores as shops: its nine 24/7s and five LTDs (server/gta_stores.lua), each with a keeper behind
+-- the till selling GtaStoreCatalog, a map icon, and the shelf screen, basket and checkout every shop has. Each is made
+-- once and then managed in /whip like any shop. Off unless server.cfg says `set whip_gta_stores true` (WHIP's txAdmin
+-- recipe does, for a new server), so a server that runs its own stores gets no second keeper. Also on /whip >
+-- Settings > World & gameplay: turning it on opens them at once; turning it off makes no more, and deletes none
+-- (delete them in /whip > Economy > Shops: one deleted is not made again).
+Config.GtaStores = GetConvar('whip_gta_stores', 'false') == 'true'
+
+-- What GTA's stores sell, item key = price in cash. A store's own catalog can be changed in /whip after it is made.
+Config.GtaStoreCatalog = { food = 50, drink = 30 }
 
 -- How many lines a shopping basket has (1 to 50). A line is one kind of item, as many as stack in a pocket slot.
 Config.ShopBasketSlots = 10

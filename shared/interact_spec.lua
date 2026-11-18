@@ -138,8 +138,10 @@ InteractSpec.ACTION_AT = {
     netId       = { place = true },
     vehiclePart = { place = true },
     aimBox      = { place = true },   -- where the player looks, on what they aim at (client/aim_box.lua)
+    aimModels   = { with = { 'aimBox' } },
     radial      = { place = true },
     model       = { place = true },
+    list        = { place = true },   -- another prompt's list, by an option in it: 'atm:balance' (client/interact.lua)
     heading     = { with = { 'coords', 'entity', 'netId', 'model' } },
     follow      = { with = { 'coords' } },
     offset      = { with = { 'entity', 'netId', 'model' } },
@@ -163,7 +165,7 @@ InteractSpec.POINT_AT = {
 }
 
 --- One of a point's options (and of a menu's, any level down).
-InteractSpec.POINT_OPTION = { id = true, label = true, icon = true, require = true, options = true }
+InteractSpec.POINT_OPTION = { id = true, label = true, icon = true, require = true, options = true, reach = true }
 
 --- The words a `require` may use, on an action and on a point.
 InteractSpec.REQUIRE = {

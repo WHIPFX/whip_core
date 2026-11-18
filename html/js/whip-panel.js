@@ -29,6 +29,7 @@ import { NuiRouter } from './router.js';
 import { nuiCallback } from './utils.js';
 import { createPadCursor } from './pad-cursor.js';
 import { PauseMap } from './pause-map.js';
+import { uiIcon } from './ui-icons.js';
 
 // ---- registry ----
 
@@ -851,7 +852,8 @@ function placeArea(host, opts, pick) {
             // The box scrolls at the map's height; its inside is zoomed to the panel's size.
             const inner = WP.el('div', 'wp-place-info-in');
             info.appendChild(inner);
-            const x = WP.el('button', 'wp-place-info-x', '×');
+            const x = WP.el('button', 'wp-place-info-x');
+            x.innerHTML = uiIcon('close');
             x.type = 'button';
             x.setAttribute('aria-label', 'Close this card');
             x.addEventListener('click', shut);
@@ -1034,6 +1036,16 @@ export const WP = {
         return b;
     },
 
+    /** The way back out of a page: a ghost button with the chevron WHIP's screens use for "back" (the Settings
+     *  page, the Object Viewer), then the label ('All items'). */
+    backBtn(label, action, arg) {
+        const b = WP.btn('', action, 'ghost', arg);
+        b.classList.add('wp-btn-back');
+        b.innerHTML = uiIcon('back');   // a fixed icon, no data
+        b.appendChild(document.createTextNode(label));
+        return b;
+    },
+
     /** Per-section toolbar: {left: [els], search: {inputAction, placeholder}, right: [els]}.
      *  Put it directly above the section's .wp-split and the shell moves it to the top of the
      *  list column (dockToolbars): the search on top, then left, then right. */
@@ -1167,7 +1179,7 @@ export const WP = {
             const on = picked.has(b.dataset.arg);
             b.classList.toggle('on', on);
             b.setAttribute('aria-checked', on ? 'true' : 'false');
-            b.textContent = on ? '✓' : '';
+            b.innerHTML = on ? uiIcon('check') : '';
         };
         const fillBar = (bar) => {
             const n = picked.size;
@@ -1443,8 +1455,8 @@ export const WP = {
                     + (n === i ? ' wp-step-current' : '')
                     + (status[s.key] ? ' wp-step-' + status[s.key] : '')
                     + (n > reached ? ' wp-step-locked' : '');
-                b.firstChild.textContent = status[s.key] === 'done' ? '✓'
-                    : status[s.key] === 'skipped' ? '–' : String(n + 1);
+                if (status[s.key] === 'done') b.firstChild.innerHTML = uiIcon('check');
+                else b.firstChild.textContent = status[s.key] === 'skipped' ? '–' : String(n + 1);
                 if (n === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
             });
             back.disabled = busy || i <= 0;

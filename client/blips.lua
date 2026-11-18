@@ -9,14 +9,42 @@
 local blips = {}   -- [wireId] = { point = blip, area = blip }
 
 --- [GTA blip handle] = its label. GTA lets nothing read a blip's name back, so the pause map
---- (client/pause.lua) asks here: whip's own blips have names on the map, others their sprite's.
+--- (client/pause.lua) asks here for whip's labels and those registered by other resources.
 local labelOf = {}
+local externalLabels = {}
+local labelReg = Registry.new('blipLabel', { store = externalLabels })
 
---- A whip blip's label, or nil for one whip did not make here.
+exports('SetBlipLabel', function(handle, label)
+    local owner = Registry.caller()
+    if type(handle) ~= 'number' or handle % 1 ~= 0 or handle <= 0 then
+        return false, 'blip handle must be a positive integer'
+    end
+    if label == nil then
+        if externalLabels[handle] == nil then return true end
+        return labelReg:remove(owner, handle)
+    end
+    if type(label) ~= 'string' or label == '' then return false, 'blip label must be a non-empty string' end
+    if not DoesBlipExist(handle) then return false, 'blip does not exist' end
+    if labelOf[handle] then return false, 'blip belongs to whip_core' end
+    return labelReg:add(owner, handle, label)
+end)
+
+--- A registered blip label, or nil.
 ---@param handle number
 ---@return string|nil
 function WhipBlipLabel(handle)
-    return labelOf[handle]
+    return labelOf[handle] or externalLabels[handle]
+end
+
+--- [GTA blip handle] = the number on it (ShowBlip's `number`). GTA lets nothing read that back either, so whip's own
+--- maps (client/pause.lua, client/minimap.lua) ask here.
+local numberOf = {}
+
+--- The number on a whip blip, or nil.
+---@param handle number
+---@return integer|nil
+function WhipBlipNumber(handle)
+    return numberOf[handle]
 end
 
 --- Name, for the pause map, a blip whip_core made outside this file (/w Reveal Players); nil forgets it.
@@ -31,7 +59,7 @@ local function kill(id)
     local b = blips[id]
     if not b then return end
     blips[id] = nil
-    if b.point then labelOf[b.point] = nil end
+    if b.point then labelOf[b.point] = nil; numberOf[b.point] = nil end
     if b.point and DoesBlipExist(b.point) then RemoveBlip(b.point) end
     if b.area and DoesBlipExist(b.area) then RemoveBlip(b.area) end
 end
@@ -54,6 +82,10 @@ local function make(id, w)
         SetBlipScale(b.point, w.scale or 0.9)
         SetBlipAsShortRange(b.point, w.shortRange == true)
         if w.flash then SetBlipFlashes(b.point, true) end
+        if w.number then
+            ShowNumberOnBlip(b.point, w.number)
+            numberOf[b.point] = w.number
+        end
         if w.label then
             BeginTextCommandSetBlipName('STRING')
             AddTextComponentSubstringPlayerName(w.label)

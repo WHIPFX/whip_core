@@ -16,11 +16,12 @@ local DEV_COMMANDS = {}
 --- its own `command.<name>` ACE) and the handler asks whip.devtools, and says so when refused.
 ---@param name string
 ---@param fn fun(source: number, args: table, raw: string)
-local function devCommand(name, fn)
-    DEV_COMMANDS[name] = true
+---@param help table|nil  { help = 'What it does', params = { { name = 'id', help = '...' } } } for the chat's suggestion
+local function devCommand(name, fn, help)
+    DEV_COMMANDS[name] = type(help) == 'table' and help or true
     RegisterCommand(name, function(source, args, raw)
         if source ~= 0 and not DevTools.isAllowed(source) then
-            ShowError(source, 'That command needs whip.devtools')
+            ShowError(source, DevTools.isEligible(source) and DevTools.OFF_REASON or 'That command needs whip.devtools')
             return
         end
         return fn(source, args, raw)
@@ -44,6 +45,34 @@ end
 ---@return string|nil
 exports('GetCommandAce', function(name)
     return DEV_COMMANDS[name] and 'whip.devtools' or nil
+end)
+
+-- ============================================
+-- Chat suggestions for the admin commands
+-- ============================================
+-- Staff get these as chat suggestions when their character loads, and again on whip_core's start: one event each,
+-- only to players holding whip.devtools. The handlers still check developer mode when a command is run.
+
+--- Send the admin commands to one player's chat, if they hold whip.devtools.
+---@param src number
+local function suggestCommandsTo(src)
+    src = tonumber(src)
+    if not src or not IsPlayerAceAllowed(src, 'whip.devtools') then return end
+    local list = {}
+    for name, info in pairs(DEV_COMMANDS) do
+        local help = type(info) == 'table' and info or nil
+        list[#list + 1] = { name = '/' .. name, help = help and help.help or '', params = help and help.params or nil }
+    end
+    TriggerClientEvent('chat:addSuggestions', src, list)
+end
+
+Character.onLife('loaded', function(e) suggestCommandsTo(e.source) end)
+
+-- A restart of whip_core: the commands are registered again, so the staff in the game get them again. After a
+-- moment, so every devCommand below (and in other files) has been made.
+CreateThread(function()
+    Wait(2000)
+    for _, id in ipairs(GetPlayers()) do suggestCommandsTo(id) end
 end)
 
 --- Where a command's lines go: the server console, or the chat of the admin who typed it.
@@ -86,6 +115,24 @@ devCommand('whip_pending', function(source)
     end
     say(('Total pending players: %d'):format(count))
 end)
+
+-- /vector2, /vector3, /vector4 and /heading — where you stand, on your clipboard, ready to paste into a config
+-- ("vector4(215.76, -810.12, 30.73, 157.48)"). Short forms: /vec (a vector4, the usual one), /vec2, /vec3, /vec4.
+-- In-game only. Your game reads the position and copies it, the same way /w → Coords does with G
+-- (tools/coords.lua whip_core:client:copyCoords): one format for both.
+local COPY_COMMANDS = {
+    vector2 = 'vector2', vector3 = 'vector3', vector4 = 'vector4', heading = 'heading',
+    vec = 'vector4', vec2 = 'vector2', vec3 = 'vector3', vec4 = 'vector4',
+}
+for name, kind in pairs(COPY_COMMANDS) do
+    devCommand(name, function(source)
+        if source == 0 then
+            print('[whip_core] This command must be run in-game')
+            return
+        end
+        TriggerClientEvent('whip_core:client:copyCoords', source, kind)
+    end, { help = kind == 'heading' and 'Copy the way you face (staff)' or ('Copy where you stand as a %s (staff)'):format(kind) })
+end
 
 -- /whip_save — Force save all players
 devCommand('whip_save', function(source)
@@ -582,3 +629,70 @@ devCommand('whip_statebag', function(source, args)
         say(('  %-14s = %s | %s'):format(key, tostring(state[key]), tostring(Sentinel.getTruth(id, key))))
     end
 end)
+
+-- /tp, /tpto and /tpm — move yourself while you build, test or help someone. In-game only (the console has no body).
+-- The move is the client's fade teleport (client/main.lua): behind a fade, onto the ground when no height is given,
+-- and with the car when you are driving one. Every teleport goes on the admin's activity log (DevTools.logTeleport).
+-- Going to a player is DevTools.goToPlayer (server/devtools.lua), shared with the Player Manager's Teleport To.
+-- The third argument of each is its line in the staff's chat suggestions (a devCommand without them ignores it).
+local TP_LIMIT_XY, TP_Z_MIN, TP_Z_MAX = 10000.0, -200.0, 2700.0
+
+--- The numbers in what was typed, however it was copied: "x y z h", "x, y, z", "vector3(x, y, z)", "vec4(...)".
+--- Words go first, so the 4 of vec4 is not one of them.
+---@param typed string
+---@return number[]
+local function typedNumbers(typed)
+    local out = {}
+    for n in typed:gsub('%a[%w_]*', ' '):gmatch('-?%d+%.?%d*') do out[#out + 1] = tonumber(n) end
+    return out
+end
+
+-- /tp x y [z] [heading] — to coordinates (no z: onto the ground there); /tp <serverId> — to a player
+devCommand('tp', function(source, args, raw)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local n = typedNumbers((raw or ''):gsub('^%S+%s*', ''))
+
+    -- One whole number: a player's server id (the same as /tpto <id>).
+    if #n == 1 and #args == 1 and math.type(n[1]) == 'integer' then
+        local ok, msg = DevTools.goToPlayer(source, n[1])
+        if not ok then reply(source, msg, 'error') end
+        return
+    end
+
+    if #n < 2 then
+        return reply(source, 'Use /tp x y [z] [heading], or /tp <server id>', 'error')
+    end
+    local x, y, z, h = n[1], n[2], n[3], n[4]
+    if math.abs(x) > TP_LIMIT_XY or math.abs(y) > TP_LIMIT_XY or (z and (z < TP_Z_MIN or z > TP_Z_MAX)) then
+        return reply(source, 'Those coordinates are off the map', 'error')
+    end
+    TriggerClientEvent('whip_core:client:fadeTeleport', source, x + 0.0, y + 0.0, z and z + 0.0, h and h + 0.0, true)
+    DevTools.logTeleport(source, ('to %.1f, %.1f%s'):format(x, y, z and (', %.1f'):format(z) or ''))
+end, { help = 'Teleport: to x y [z] [heading], or to a player by server id (staff)', params = { { name = 'x y [z] or id', help = 'Coordinates, or a server id' } } })
+
+-- /tpto <server id> — to a player. The same as /tp <id>, under a name that cannot be read as coordinates.
+devCommand('tpto', function(source, args)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    local id = math.tointeger(tonumber(args[1]))
+    if not id or id < 1 or args[2] ~= nil then
+        return reply(source, 'Use /tpto <server id>', 'error')
+    end
+    local ok, msg = DevTools.goToPlayer(source, id)
+    if not ok then reply(source, msg, 'error') end
+end, { help = 'Go to a player (staff)', params = { { name = 'id', help = 'Their server id' } } })
+
+-- /tpm — to your map waypoint, onto the ground there (the waypoint is on your game: it goes from there)
+devCommand('tpm', function(source)
+    if source == 0 then
+        print('[whip_core] This command must be run in-game')
+        return
+    end
+    TriggerClientEvent('whip_core:client:tpWaypoint', source)
+    DevTools.logTeleport(source, 'to their map waypoint')
+end, { help = 'Go to your map waypoint (staff)' })

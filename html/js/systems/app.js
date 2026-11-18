@@ -22,6 +22,7 @@
 
 import { NuiRouter } from '../router.js';
 import { nuiCallback, escapeHtml } from '../utils.js';
+import { uiIcon } from '../ui-icons.js';
 import { normalise, normaliseDef, History, makeNode, duplicateNodes, removeNodes, findNode, freeId, slug, isId,
     addLink, breakPin, problemCards, copyNodes, pasteNodes, makeComment, removeComment, findComment,
     placesOf, placeValue } from './doc.js';
@@ -934,16 +935,16 @@ function drawHead() {
         const on = ed.hub ? ed.hub.systems.filter((s) => s.on).length : 0;
         setHtml(head, '<div class="dr-head-main"><div class="dr-title">Systems Creator</div>'
             + `<div class="dr-sub">${n} system${n === 1 ? '' : 's'} · ${on} on</div></div>`
-            + '<button class="dr-icon" data-act="close" title="Close (Esc)">×</button>');
+            + '<button class="dr-icon" data-act="close" title="Close (Esc)">' + uiIcon('close') + '</button>');
         return;
     }
     const dirty = ed.history.isDirty(ed.doc);
     const testing = ed.test && ed.test.status === 'running';
-    setHtml(head, '<button class="dr-icon" data-act="back" title="Back to the list">‹</button>'
+    setHtml(head, '<button class="dr-icon" data-act="back" title="Back to the list">' + uiIcon('back') + '</button>'
         + `<div class="dr-head-main"><div class="dr-title">${e(ed.doc.name)}</div>`
         + `<div class="dr-sub">${e(ed.key)} · draft r${ed.baseRev}${ed.on ? ` · on r${ed.onRev}` : ''}`
         + `${dirty ? ' · <b class="dr-dirty">not saved</b>' : ''}${testing ? ' · <b class="sy-testing">testing</b>' : ''}</div></div>`
-        + '<button class="dr-icon" data-act="close" title="Close (Esc)">×</button>');
+        + '<button class="dr-icon" data-act="close" title="Close (Esc)">' + uiIcon('close') + '</button>');
     const bar = colEl.querySelector('.dr-bar');
     setHtml(bar, `<button class="dr-btn primary" data-act="save"${dirty ? '' : ' disabled'}>Save</button>`
         + '<button class="dr-btn" data-act="check">Check</button>'

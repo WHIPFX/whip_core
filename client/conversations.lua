@@ -5,8 +5,9 @@
 --     of four cells, cell k with answer k selected. One quad orbits the NPC on the camera's side; moving the selection
 --     is a UV switch.
 --   * Keys: the conversation is a prompt of its own ('conv') that follows the NPC and holds the focus
---     (Interactions.hold). Scroll moves, E answers; no NUI focus. It ends when the player walks away, a screen opens,
---     or they go down.
+--     (Interactions.hold). Scroll moves, E answers; the number keys (the hotbar's, as the player bound them) answer
+--     the answer with that number at once; on a pad the D-pad moves and A answers. No NUI focus. It ends when the
+--     player walks away, a screen opens, or they go down.
 --   * An answer whose reply the server sent ahead (`next`) shows it at once; otherwise the capsule dims until the
 --     server speaks.
 --   * An answer that takes an amount (`input`) is typed when chosen as every prompt's value is (Interactions.beginInput,
@@ -213,6 +214,19 @@ choose = function(optionId)
         c.waiting = true
     end
     paint()
+end
+
+--- A number key (client/inventory.lua's hotbar keys ask first): the answer the capsule shows with that number, as if
+--- scrolled to and pressed. True when a conversation took the key, so the hotbar slot is not used meanwhile.
+---@param n integer 1-5
+---@return boolean
+function Conversations.answerByNumber(n)
+    local c = conv
+    if not c or c.typing then return false end
+    local opt = (c.layer.options or {})[n]
+    if not opt then return false end
+    choose(opt.id)
+    return true
 end
 
 --- The ped's model box: centre and half-extents along its right and forward.

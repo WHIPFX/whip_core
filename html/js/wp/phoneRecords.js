@@ -26,12 +26,13 @@
 
 import { WP } from '../whip-panel.js';
 import { nuiCallback } from '../utils.js';
+import { ICON_PATH } from '../ui-icons.js';
 import { avatar } from './pickers.js';
 import { plural, ago, phoneNumber } from './format.js';
 
 // ---- fixed icons (no data in them) ----
 const ICON = {
-    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATH.back + '</svg>',
     msgs: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4c4.7 0 8.5 3 8.5 6.8S16.7 17.6 12 17.6c-.9 0-1.8-.1-2.6-.3L5.6 19.4l1.1-3.3C4.8 14.9 3.5 13 3.5 10.8 3.5 7 7.3 4 12 4z"/></svg>',
     recents: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     contacts: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8.5" r="4"/><path d="M4 20c.6-4 3.9-6.2 8-6.2s7.4 2.2 8 6.2z"/></svg>',

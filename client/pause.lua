@@ -98,6 +98,7 @@ local function readBlips()
                             x = c.x, y = c.y, sprite = sprite,
                             colour = hudHex(blipHudColour(b)),
                             name = WhipBlipLabel and WhipBlipLabel(b) or nil,
+                            number = WhipBlipNumber and WhipBlipNumber(b) or nil,
                         }
                     else
                         -- Usually one attached to something this client cannot see right now.
@@ -244,6 +245,28 @@ local function feed(gen)
 end
 
 -- ============================================
+-- Sounds
+-- ============================================
+
+-- GTA's own frontend sounds, the ones its pause menu makes: a tick moving between items, a click on choosing, the
+-- back sound on leaving, and the waypoint sound when one is set or cleared. The page names what happened
+-- (pauseSound below); only the names in this table play.
+local SOUNDSET = 'HUD_FRONTEND_DEFAULT_SOUNDSET'
+local SOUNDS = {
+    nav      = 'NAV_UP_DOWN',      -- up and down the menu
+    side     = 'NAV_LEFT_RIGHT',   -- across: the confirm's two answers, the legend in and out
+    select   = 'SELECT',           -- an item chosen, a screen opened
+    back     = 'BACK',             -- back to the menu, or out of it
+    waypoint = 'WAYPOINT_SET',     -- GTA plays it for a waypoint set and for one cleared
+}
+
+---@param what string  a key of SOUNDS
+local function sound(what)
+    local name = SOUNDS[what]
+    if name then PlaySoundFrontend(-1, name, SOUNDSET, true) end
+end
+
+-- ============================================
 -- Open and close
 -- ============================================
 
@@ -261,6 +284,7 @@ local function openMenu()
     if not IsGameInputFree() then return end   -- a screen, bar or mode has the keys: Esc is theirs
     open = true
     PauseMenuOpen = true
+    sound('select')
     Focus.take('pause', { screen = true })
     TriggerScreenblurFadeIn(200)
     -- Read at each open, so the switch in /whip → Settings → Experimental features shows at the next one.
@@ -285,7 +309,7 @@ local function pauseKeys()
     if esc or IsDisabledControlJustPressed(0, 199) then
         -- Open: Esc reaches here only with no screen holding the keyboard. Shut: only a pad's
         -- Start does — the open menu holds the keyboard, and the page answers Esc itself.
-        if open then closeMenu() return end
+        if open then sound('back') closeMenu() return end
         -- A key another block names is its exit (Esc out of /w, a camera, an editor), not this menu's.
         if ControlBlocks.heldByOthers(esc and 200 or 199, 'pauseKeys') then return end
         openMenu()
@@ -300,7 +324,14 @@ ControlBlocks.hold('pauseKeys', {}, pauseKeys)
 
 RegisterNUICallback('pauseResume', function(_, cb)
     cb('ok')
+    if open then sound('back') end
     closeMenu()
+end)
+
+--- A sound the page asks for while the menu is up (Sounds, above).
+RegisterNUICallback('pauseSound', function(data, cb)
+    cb('ok')
+    if open and type(data) == 'table' and type(data.name) == 'string' then sound(data.name) end
 end)
 
 --- One of GTA's own screens in place of the pause menu. GTA's settings menu, up under the Settings page, shuts with the
@@ -347,7 +378,10 @@ RegisterNUICallback('pauseWaypoint', function(data, cb)
         SetWaypointOff()
     elseif type(data.x) == 'number' and type(data.y) == 'number' then
         SetNewWaypoint(data.x + 0.0, data.y + 0.0)
+    else
+        return
     end
+    sound('waypoint')
     -- The route takes GTA a moment to plan; ask twice.
     SetTimeout(250, function() if open then push(true) end end)
     SetTimeout(1200, function() if open then push(true) end end)

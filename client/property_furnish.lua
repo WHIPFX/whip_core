@@ -1,6 +1,6 @@
 -- The Furnisher: fly around a property and place furniture, bounded by the property's space.
 -- Right mouse held: mouse looks, WASD flies. Released: the cursor clicks, drags the page's X / Y / Z markers
--- (R swaps them for rings), and the wheel scrolls the catalog. G cycles snapping.
+-- (R swaps them for rings), and the wheel scrolls the catalog. G cycles snapping, L locks to the world grid.
 -- The editor holds NUI focus with KeepInput, so the page reports text focus (furnishTyping) and key reads stand down.
 -- Ways out: Backspace (key mapping at the bottom), the Exit button, or /furnish again.
 -- Saves are wholesale: the server replaces the property's whole object list in one transaction.
@@ -169,6 +169,9 @@ local lastRz = 0.0
 local snapOn = false
 local moveStep = 1
 local turnStep = 1
+--- Grid lock (L): the arrows run along the world's X and Y, a move lands on the world grid at the snap step, a turn
+--- on whole steps of heading, and the page draws the grid under the selection. Snap is on while it is.
+local gridOn = false
 
 --- Was the last move the page asked for refused (outside the space)? Sent with the view; cleared when the drag ends.
 local blocked = false
@@ -191,6 +194,7 @@ local KEY_LOOK    = 25    -- right mouse — held, the camera listens; see the t
 local KEY_MODE    = 45    -- R  — the markers: move / rotate
 local KEY_SNAP    = 47    -- G  — cycle the snap step
 local KEY_DELETE  = 73    -- X  — remove the selection
+local KEY_GRID    = 182   -- L  — grid lock on / off
 
 --- Silenced, never read: disabled so none does its game job under the editor (E enters a vehicle, the wheel switches weapon).
 local SILENCED = {
@@ -202,11 +206,11 @@ local SILENCED = {
     257,              -- attack 2
 }
 
---- R, G, X and the silenced set, held off while the editor is up (ControlBlocks). The editor reads them with the disabled readers.
+--- R, G, X, L and the silenced set, held off while the editor is up (ControlBlocks). The editor reads them with the disabled readers.
 local KEYS_BLOCK = 'furnishKeys'
 
 local function keysSpec()
-    local list = { KEY_MODE, KEY_SNAP, KEY_DELETE }
+    local list = { KEY_MODE, KEY_SNAP, KEY_DELETE, KEY_GRID }
     for i = 1, #SILENCED do list[#list + 1] = SILENCED[i] end
     return { controls = list }
 end
@@ -352,7 +356,7 @@ local function turnSteps() return Config.FurnishTurnSteps or { 15.0, 45.0, 1.0 }
 local function moveAmount() local s = moveSteps() return s[moveStep] or s[1] or 0.25 end
 local function turnAmount() local s = turnSteps() return s[turnStep] or s[1] or 15.0 end
 
---- G, or the bar's snap chip: snap on at the first step, the next step, and past the last, off again.
+--- G, or the bar's snap chip: snap on at the first step, the next step, and past the last, off again (grid lock too).
 local function cycleSnap()
     if not snapOn then
         snapOn, moveStep, turnStep = true, 1, 1
@@ -360,8 +364,35 @@ local function cycleSnap()
         moveStep = moveStep + 1
         turnStep = math.min(turnStep + 1, #turnSteps())
     else
-        snapOn, moveStep, turnStep = false, 1, 1
+        snapOn, gridOn, moveStep, turnStep = false, false, 1, 1
     end
+end
+
+--- L, or the bar's Grid: grid lock on (snap with it, at the step it was on, else the first) or off (snap stays).
+local function toggleGrid()
+    gridOn = not gridOn
+    if gridOn and not snapOn then snapOn, moveStep, turnStep = true, 1, 1 end
+end
+
+--- `v` on the nearest line of a grid `step` apart (a step of 0 or less: as it is).
+---@param v number
+---@param step number
+---@return number
+local function toGrid(v, step)
+    if step <= 0 then return v end
+    return math.floor(v / step + 0.5) * step
+end
+
+--- The next line of a grid `step` apart from `v` going `dir` (1 or -1): a whole step on from one already on it.
+---@param v number
+---@param step number
+---@param dir number
+---@return number
+local function gridNext(v, step, dir)
+    if step <= 0 then return v + dir * step end
+    local n = v / step
+    local k = dir > 0 and math.floor(n + 1e-6) + 1 or math.ceil(n - 1e-6) - 1
+    return k * step
 end
 
 --- Did a ray hit? FiveM hands `hit` back as 1 on some builds and true on others.
@@ -622,8 +653,9 @@ local function pushState()
         max      = session and session.max or nil,
         -- What the markers do: 'move' (arrows) or 'rotate' (rings).
         mode     = mode,
-        -- Snap on or off, the step a drag snaps to, and the whole lists.
+        -- Snap on or off, the step a drag snaps to, and the whole lists. `grid`: locked to the world grid (L).
         snap      = snapOn,
+        grid      = gridOn,
         move      = moveAmount(),
         turn      = turnAmount(),
         moveSteps = moveSteps(),
@@ -713,6 +745,12 @@ local function aimAt(nx, ny)
     return from, dx, dy, dz
 end
 
+--- The base of a thing on the floor at z: a model by its lowest point, a marker by its kind's height.
+local function liftOf(it)
+    local K = KINDS[kindOf(it)]
+    return it.mark and (K.lift or 0.0) or (it.dims and -it.dims.mn.z or 0.0)
+end
+
 --- Several selected, to the markers: their middle (of those that move), the ones that move, and every one's place
 --- round the middle for the shape the page draws through them. `fixed` when none moves.
 local function groupOf(set)
@@ -729,6 +767,16 @@ local function groupOf(set)
         for _, it in ipairs(set) do sx, sy, sz = sx + it.x, sy + it.y, sz + it.z end
     end
     g.x, g.y, g.z = sx / #from, sy / #from, sz / #from
+    -- The lowest base among them (the floor the page's grid is drawn on), and the primary: a grid-locked move lands
+    -- it on the grid, the rest keeping their places round it.
+    local base = math.huge
+    for _, it in ipairs(from) do base = math.min(base, it.z - liftOf(it)) end
+    g.base = base
+    local prim = selected and items[selected]
+    g.ax, g.ay, g.az = g.x, g.y, g.z
+    for _, it in ipairs(movers) do
+        if it == prim then g.ax, g.ay, g.az = it.x, it.y, it.z break end
+    end
     local round = {}
     for _, it in ipairs(set) do
         round[#round + 1] = { it.x, it.y, it.z, math.atan(it.y - g.y, it.x - g.x) }
@@ -773,8 +821,8 @@ local function pushView()
         -- (Nothing moved since the last send: no group worked out, nothing sent.)
         local v = viewNow
         v[1], v[2], v[3], v[4], v[5], v[6], v[7] = c.x, c.y, c.z, rot.x, rot.z, kx, ky
-        v[8], v[9], v[10], v[11] = groupTurn, blocked and 1 or 0, selected, #set
-        local n = 11
+        v[8], v[9], v[10], v[11], v[12] = groupTurn, blocked and 1 or 0, selected, #set, gridOn and 1 or 0
+        local n = 12
         for _, m in ipairs(set) do
             v[n + 1], v[n + 2], v[n + 3], v[n + 4] = m.x, m.y, m.z, (m.door or m.playing) and 1 or 0
             n = n + 4
@@ -794,6 +842,9 @@ local function pushView()
             h = 0.0,
             n = g.fixed,
             g = g.shape,
+            w = gridOn,
+            f = g.z - g.base,
+            a = { g.ax, g.ay, g.az },
         })
         return
     end
@@ -817,8 +868,9 @@ local function pushView()
     v[1], v[2], v[3], v[4], v[5], v[6], v[7] = c.x, c.y, c.z, rot.x, rot.z, kx, ky
     v[8], v[9], v[10], v[11], v[12], v[13] = x, y, z, rx, ry, rz
     v[14], v[15], v[16], v[17], v[18] = blocked and 1 or 0, selected, tilt and 1 or 0, h, fixed and 1 or 0
-    if not viewMoved(18) then return end
-    keepView(18)
+    v[19] = gridOn and 1 or 0
+    if not viewMoved(19) then return end
+    keepView(19)
     SendNUIMessage({
         action = 'furnishView',
         c = { c.x, c.y, c.z },
@@ -830,6 +882,9 @@ local function pushView()
         t = tilt,
         h = h,
         n = fixed,
+        -- `w`: grid lock (world arrows, the grid drawn); `f`: how far its base is under its origin, the grid's floor.
+        w = gridOn,
+        f = liftOf(it),
     })
 end
 
@@ -984,7 +1039,7 @@ beginSession = function(rows)
 
     selected, picked, groupTurn = nil, {}, 0.0
     FurnishBuilder.reset()   -- (no door pick waiting, nothing to adopt)
-    mode, snapOn, moveStep, turnStep = 'move', false, 1, 1
+    mode, snapOn, gridOn, moveStep, turnStep = 'move', false, false, 1, 1
     lastRz = 0.0
     blocked = false
     quitArmedAt = nil
@@ -1267,19 +1322,15 @@ end
 local DRAG_REACH = 300.0
 local DROP_REACH = 50.0
 
---- The base of a thing on the floor at z: a model by its lowest point, a marker by its kind's height.
-local function liftOf(it)
-    local K = KINDS[kindOf(it)]
-    return it.mark and (K.lift or 0.0) or (it.dims and -it.dims.mn.z or 0.0)
-end
-
 --- Several selected, their middle dragged to `at` (the surface under the pointer): each keeps its place round the
 --- middle and stands on the ground there (nothing there: at `at`'s height).
 local function dragGroupTo(g, at, snapping)
     local x, y = at.x, at.y
     if snapping then
+        -- The primary lands on the grid, the middle keeping its place from it.
         local step = moveAmount()
-        if step > 0 then x, y = math.floor(x / step + 0.5) * step, math.floor(y / step + 0.5) * step end
+        local ox, oy = g.ax - g.x, g.ay - g.y
+        x, y = toGrid(x + ox, step) - ox, toGrid(y + oy, step) - oy
     end
     local to = {}
     for n, it in ipairs(g.movers) do
@@ -1345,7 +1396,7 @@ local function dragSelectedTo(data)
     local x, y = at.x, at.y
     if snapOn or data.snap == true then
         local step = moveAmount()
-        if step > 0 then x, y = math.floor(x / step + 0.5) * step, math.floor(y / step + 0.5) * step end
+        x, y = toGrid(x, step), toGrid(y, step)
     end
     moveSelected({ i = selected, x = x, y = y, z = at.z + lift })
 end
@@ -1440,8 +1491,8 @@ local function itemAt(nx, ny)
     return nil
 end
 
---- May several be selected at once? Only in the world builder, with the mouse.
-local function multiOk() return session ~= nil and session.page ~= nil and liveOf() == nil and not padOn end
+--- May several be selected at once? In any session but Dungeon Mode's, with the mouse.
+local function multiOk() return session ~= nil and liveOf() == nil and not padOn end
 
 --- Left Ctrl as the game reads it (INPUT_DUCK), or the page's `ctrl` on a click: either counts. Not on a pad.
 local KEY_ADD = 36
@@ -1488,6 +1539,46 @@ local function selectAt(nx, ny, add)
     else
         selectOne(i)
     end
+    pushState()
+end
+
+--- How far from the camera a box reaches: past it, the world builder's far-off things stay out of it.
+local BOX_REACH = 150.0
+
+--- A box dragged over the room (0-1 across and down, either corner first): everything within reach whose middle is
+--- inside it is selected, through walls as any editor's box is. `add` (Ctrl): joins what is selected instead of
+--- replacing it.
+local function selectBox(x0, y0, x1, y1, add)
+    local l, r, t, b = math.min(x0, x1), math.max(x0, x1), math.min(y0, y1), math.max(y0, y1)
+    local c, rot = FreeCam.getCoord(), FreeCam.getRot()
+    local kx, ky = viewKs()
+    local set, inSet = {}, {}
+    if add then
+        local prev = pickedNow() or (selected and items[selected] and { items[selected] }) or {}
+        for n = 1, #prev do
+            set[n] = prev[n]
+            inSet[prev[n]] = true
+        end
+    end
+    local count = #set
+    for i = 1, #items do
+        local it = items[i]
+        if not inSet[it] then
+            local mid = it.dims and (it.dims.mn.z + it.dims.mx.z) * 0.5 or 0.0
+            local px, py, pz = it.x, it.y, it.z + mid
+            local sx, sy = nil, nil
+            if (px - c.x) ^ 2 + (py - c.y) ^ 2 + (pz - c.z) ^ 2 <= BOX_REACH * BOX_REACH then
+                sx, sy = FurnishView.project(px, py, pz, c.x, c.y, c.z, rot.x, rot.z, kx, ky)
+            end
+            if sx and sx >= l and sx <= r and sy >= t and sy <= b then
+                count = count + 1
+                set[count] = it
+            end
+        end
+    end
+    groupTurn = 0.0
+    picked = count > 1 and set or {}
+    selected = count > 0 and rowOf(set[count]) or nil
     pushState()
 end
 
@@ -1571,15 +1662,24 @@ local function padNudge(nav)
     local v = nav == 'up' and 1 or nav == 'down' and -1 or 0
     if mode == 'rotate' then
         local step = turnAmount()
-        if h ~= 0 then moveSelected({ i = selected, rz = it.rz - h * step }) end
-        if v ~= 0 and KINDS[kindOf(it)].tilt then moveSelected({ i = selected, rx = it.rx + v * step }) end
+        -- Grid-locked: onto the next whole step that way, as the mouse's rings turn.
+        if h ~= 0 then
+            moveSelected({ i = selected, rz = gridOn and gridNext(it.rz, step, -h) or it.rz - h * step })
+        end
+        if v ~= 0 and KINDS[kindOf(it)].tilt then
+            moveSelected({ i = selected, rx = gridOn and gridNext(it.rx or 0.0, step, v) or it.rx + v * step })
+        end
     else
         local yaw = math.rad(FreeCam.getRot().z)
         local dx = -math.sin(yaw) * v + math.cos(yaw) * h
         local dy = math.cos(yaw) * v + math.sin(yaw) * h
         if math.abs(dx) >= math.abs(dy) then dx, dy = dx > 0 and 1 or -1, 0 else dx, dy = 0, dy > 0 and 1 or -1 end
         local step = moveAmount()
-        moveSelected({ i = selected, x = it.x + dx * step, y = it.y + dy * step, z = it.z })
+        local x, y = it.x + dx * step, it.y + dy * step
+        -- Grid-locked: the axis it moves on lands on the next grid line that way, as the mouse's arrows do.
+        if gridOn and dx ~= 0 then x = gridNext(it.x, step, dx) end
+        if gridOn and dy ~= 0 then y = gridNext(it.y, step, dy) end
+        moveSelected({ i = selected, x = x, y = y, z = it.z })
     end
     blocked = false
     pushState()
@@ -1781,6 +1881,10 @@ local function modeLoop()
                         cycleSnap()
                         pushState()
                     end
+                    if IsDisabledControlJustPressed(0, KEY_GRID) then
+                        toggleGrid()
+                        pushState()
+                    end
                     if IsDisabledControlJustPressed(0, KEY_DELETE) then
                         deleteSelected()
                     end
@@ -1818,20 +1922,39 @@ RegisterNUICallback('furnishPick', function(data, cb)
     placeNew(model, nil, { carry = true })
 end)
 
---- A left click on the room (not on a marker — the page keeps those): select what is under it.
-RegisterNUICallback('furnishClick', function(data, cb)
-    cb('ok')
-    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
-    local nx, ny = tonumber(data.x), tonumber(data.y)
+--- A left click on the room at (nx, ny), 0-1 across and down: select what is under it.
+local function clickRoom(nx, ny, ctrl)
     if not nx or not ny or nx < 0 or nx > 1 or ny < 0 or ny > 1 then return end
     -- (Dungeon Mode's options are open: a click elsewhere puts them away.)
     if paused then liveCall('away') return end
     -- (The world builder's More > Door: this click picks the door under the pointer.)
     if FurnishBuilder.click(nx, ny) then return end
     -- Ctrl held: adds to the selection, or takes away.
-    selectAt(nx, ny, data.ctrl == true or ctrlHeld())
+    selectAt(nx, ny, ctrl or ctrlHeld())
     -- (In Dungeon Mode, a click on nothing of the builder's is on the world's thing there.)
     if not selected and liveOf() then liveCall('click', aimAt(nx, ny)) end
+end
+
+--- A left click on the room (not on a marker — the page keeps those).
+RegisterNUICallback('furnishClick', function(data, cb)
+    cb('ok')
+    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
+    clickRoom(tonumber(data.x), tonumber(data.y), data.ctrl == true)
+end)
+
+--- A box dragged over the room: { x0, y0, x1, y1 } its corners (0-1 across and down), `ctrl` held as it started.
+RegisterNUICallback('furnishSelectBox', function(data, cb)
+    cb('ok')
+    if not FurnishModeActive or looking or type(data) ~= 'table' then return end
+    local x0, y0, x1, y1 = tonumber(data.x0), tonumber(data.y0), tonumber(data.x1), tonumber(data.y1)
+    if not (x0 and y0 and x1 and y1) then return end
+    -- No box where only one may be selected, or while a click means something else (a door pick, Dungeon Mode's
+    -- options): a click where it went down, as a press that barely moved is.
+    if paused or FurnishBuilder.picking() or not multiOk() then
+        clickRoom(x0, y0, data.ctrl == true)
+        return
+    end
+    selectBox(x0, y0, x1, y1, data.ctrl == true or ctrlHeld())
 end)
 
 --- One frame of a drag on a marker: { i, x, y, z } for an arrow, { i, rx | ry | rz } for a ring.
@@ -2006,6 +2129,14 @@ RegisterNUICallback('furnishSetMode', function(data, cb)
         mode = m
         pushState()
     end
+end)
+
+--- The bar's Grid: grid lock on or off, as L does.
+RegisterNUICallback('furnishToggleGrid', function(_, cb)
+    cb('ok')
+    if not FurnishModeActive then return end
+    toggleGrid()
+    pushState()
 end)
 
 --- The snap: `cycle` goes round as G does; or the steps by index into the config lists (outside them: ignored).
