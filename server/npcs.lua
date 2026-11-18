@@ -109,7 +109,6 @@ local recs     = {}    -- [npcId] = record, while it exists
 local byEnt    = {}    -- [entity] = npcId
 local retiring = {}    -- [entity] = { hash, netId } while its retire runs (CoreStop deletes these too)
 local nextId   = 0
-local madeAlone = {}   -- [owner] = true: told it made an NPC before any character loaded (Npcs.spawn)
 local _lifeHooks = {}
 
 -- ============================================
@@ -848,14 +847,6 @@ function Npcs.spawn(owner, def, opts)
     -- The registration first: a closed run tag refuses the NPC before any ped exists.
     local ok, why = reg:add(owner, id, rec, tag and { tag = tag } or nil)
     if not ok then return false, why end
-
-    -- Made with nobody in the game, on Enhanced its network id is handed out again later, to a player's
-    -- ped or a car (Character.afterFirstLoad). Said once per resource that does it.
-    if GamePlatform.enhanced and not Character.anyLoaded() and not madeAlone[owner] then
-        madeAlone[owner] = true
-        print(('^3[whip_core:npcs] %s made an NPC before any character loaded: on Enhanced its network id can go to a player or a car later. Make NPCs after whip_core:player:loaded.^7')
-            :format(tostring(owner)))
-    end
 
     local ent = CreatePed(4, rec.hash, x, y, z, h, true, true)
     if not ent or ent == 0 or not DoesEntityExist(ent) then

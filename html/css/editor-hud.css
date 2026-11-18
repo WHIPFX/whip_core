@@ -193,6 +193,12 @@
     text-overflow: ellipsis;
 }
 
+/* A long value (Verify's last problem) runs onto more lines instead of being cut. */
+.eh-r-value.wrap { white-space: normal; text-overflow: clip; }
+
+/* The tour's bar (Verify), under the head: the old box's bar, spaced as the readings are. */
+.eh-house .eh-progress { margin-top: 14px; }
+
 .eh-r-value.ok   { color: var(--ui-success); }
 .eh-r-value.warn { color: var(--ui-warning); }
 .eh-r-value.err  { color: var(--ui-error); }

@@ -981,9 +981,8 @@ end
 -- The floor is the lowest corner clicked; the wheel sets how high the space goes.
 
 local DRAW_KINDS = { 'rect', 'edge', 'poly' }
-local DRAW_TEXT = { rect = 'Rectangle, square to the interior', edge = 'Rectangle along a wall',
-                    poly = 'Outline, corner by corner' }
 local DRAW_NEEDS = { rect = 2, edge = 3 }
+local DRAW_SHORT = { rect = 'Rectangle', edge = 'Along a wall', poly = 'Outline' }   -- the card's chip
 
 --- The local shape these world points make, or nil while they do not make one yet.
 local function shapeFrom(kind, pts, height)
@@ -1072,15 +1071,35 @@ local function drawSpace()
         return shapeFrom(kind, with, d.drawHeight)
     end
 
-    local function rows(overlap)
+    local function nextKind()
+        for i, k in ipairs(DRAW_KINDS) do
+            if k == kind then return DRAW_KINDS[i % #DRAW_KINDS + 1] end
+        end
+        return DRAW_KINDS[1]
+    end
+
+    -- The card: the shape being drawn in the chip, the numbers under it, and the keys (a controller's when one is
+    -- in hand). The corner is the Interact key, as a mode's "E" is (WhipAcceptJustPressed).
+    local function card(overlap)
         local area = 0.0
         for _, s in ipairs(d.drawn) do area = area + Shapes.area(s) end
         return {
-            { label = 'Drawing', value = DRAW_TEXT[kind] },
-            { label = 'Corners', value = DRAW_NEEDS[kind] and ('%d / %d'):format(#pts, DRAW_NEEDS[kind]) or tostring(#pts) },
-            { label = 'Height', value = ('%.2f m'):format(d.drawHeight) },
-            { label = 'Shapes', value = ('%d  ·  %.1f m²'):format(#d.drawn, area), tone = #d.drawn > 0 and 'ok' or nil },
-            { label = 'Overlaps', value = overlap and (overlap.name or ('#' .. overlap.id)) or 'nothing', tone = overlap and 'warn' or nil },
+            house = true, icon = 'target', title = 'Draw the space', sub = d.name or 'New property',
+            chip = { text = DRAW_SHORT[kind] },
+            rows = {
+                { label = 'Corners', value = DRAW_NEEDS[kind] and ('%d of %d'):format(#pts, DRAW_NEEDS[kind]) or tostring(#pts) },
+                { label = 'Height', value = ('%.2f m'):format(d.drawHeight) },
+                { label = 'Shapes', value = ('%d  ·  %.1f m²'):format(#d.drawn, area), tone = #d.drawn > 0 and 'ok' or nil },
+                { label = 'Overlaps', value = overlap and (overlap.name or ('#' .. overlap.id)) or 'nothing', tone = overlap and 'warn' or nil },
+            },
+            hints = {
+                { key = Interactions.keyName(), pad = 'a', text = 'Corner here', off = not hit },
+                { key = 'R', pad = 'y', text = 'Next shape: ' .. DRAW_SHORT[nextKind()]:lower() },
+                { key = 'Scroll', pad = { 'dpad_up', 'dpad_down' }, text = 'Height' },
+                { key = 'X', pad = 'x', text = 'Undo', off = #pts == 0 and #d.drawn == 0 },
+                { key = 'Enter', pad = 'menu', text = 'Close the outline, or done' },
+                { key = 'C', pad = 'b', text = 'Throw away what you drew' },
+            },
         }
     end
 
@@ -1095,35 +1114,38 @@ local function drawSpace()
         EditorHud.status(('Shape %d added'):format(#d.drawn), 'ok')
     end
 
+    -- ON A PAD, held off while it draws: ☰ (199, Done: the block naming it makes the pause menu stand aside), X's
+    -- jump (22) and Y's getting into a vehicle (23). A keyboard keeps them.
+    local padHeld = false
+    local function holdPad(on)
+        if on == padHeld then return end
+        padHeld = on
+        if on then ControlBlocks.hold('pwDrawPad', { controls = { 199, 22, 23 } }) else ControlBlocks.release('pwDrawPad') end
+    end
+    -- A press on the device in hand only: a pad's buttons are keys on a keyboard too, and the reverse.
+    local pressed = WhipKeyPressed
+
     local started = PropertyEditor.start({
         name = 'Draw space',
         solo = 'pe_draw',
-        hud = {
-            title = 'Draw the space', sub = d.name or 'New property',
-            rows = rows(nil),
-            hints = {
-                { key = 'E', text = 'Corner here' },
-                { key = 'R', text = 'Rectangle / along a wall / outline' },
-                { key = 'Scroll', text = 'Height' },
-                { key = 'X', text = 'Undo' },
-                { key = 'Enter', text = 'Close the outline, or done' },
-                { key = 'C', text = 'Throw away what you drew' },
-                { key = 'Esc', text = 'Back' },
-            },
-        },
-        onExit = function() PropertyWizard.push() end,
+        hud = card(nil),
+        onExit = function()
+            holdPad(false)
+            PropertyWizard.push()
+        end,
         -- Held off for the mode by its block. C (26) too.
         block = { controls = { 14, 15, 16, 17, 24, 25, 26, 37, 44, 45, 73, 140, 141, 142, 201, 18, 257, 263, 264 } },
         onFrame = (function()
             local nextHud, overlap = 0, nil
             return function()
-                if IsDisabledControlJustPressed(0, 17) then d.drawHeight = math.min(20.0, d.drawHeight + 0.25)
-                elseif IsDisabledControlJustPressed(0, 16) then d.drawHeight = math.max(1.0, d.drawHeight - 0.25) end
-                if IsDisabledControlJustPressed(0, 45) then
-                    for i, k in ipairs(DRAW_KINDS) do
-                        if k == kind then kind = DRAW_KINDS[i % #DRAW_KINDS + 1] break end
-                    end
+                local pad = WhipLastInputIsPad()
+                holdPad(pad)
+                if pressed(17, 172) then d.drawHeight = math.min(20.0, d.drawHeight + 0.25)
+                elseif pressed(16, 173) then d.drawHeight = math.max(1.0, d.drawHeight - 0.25) end
+                if pressed(45, 204) then
+                    kind = nextKind()
                     pts = {}
+                    nextHud = 0
                 end
 
                 local cam = GetFinalRenderedCamCoord()
@@ -1134,7 +1156,9 @@ local function drawSpace()
                 hit = h == 1
                 if hit then hx, hy, hz = coords.x, coords.y, coords.z end
 
-                if hit and IsControlJustPressed(0, 38) then
+                -- Asked every frame, aimed or not: it keeps count of who is asking (client/controller.lua).
+                local corner = WhipAcceptJustPressed()
+                if hit and corner then
                     if #pts >= MAX_POINTS then
                         EditorHud.status(('An outline has at most %d corners'):format(MAX_POINTS), 'err')
                     else
@@ -1142,7 +1166,7 @@ local function drawSpace()
                         if DRAW_NEEDS[kind] and #pts >= DRAW_NEEDS[kind] then finishShape() end
                     end
                 end
-                if IsDisabledControlJustPressed(0, 73) then
+                if pressed(73, 203) then
                     if #pts > 0 then
                         pts[#pts] = nil
                     elseif #d.drawn > 0 then
@@ -1151,7 +1175,10 @@ local function drawSpace()
                         EditorHud.status('Last shape removed', 'ok')
                     end
                 end
-                if IsDisabledControlJustPressed(0, 201) or IsDisabledControlJustPressed(0, 18) then
+                -- Enter on a keyboard, ☰ on a pad (A is the corner there).
+                local doneKey = pad and pressed(nil, 199)
+                    or (not pad and (IsDisabledControlJustPressed(0, 201) or IsDisabledControlJustPressed(0, 18)))
+                if doneKey then
                     if kind == 'poly' and #pts >= 3 then
                         finishShape()
                     elseif #pts == 0 then
@@ -1160,7 +1187,7 @@ local function drawSpace()
                         EditorHud.status('Finish this shape first (X to undo its corners)', 'warn')
                     end
                 end
-                if IsDisabledControlJustPressed(0, 26) then
+                if WhipCancelJustPressed() then
                     d.drawn = before
                     return 'exit'
                 end
@@ -1191,7 +1218,7 @@ local function drawSpace()
                             if overlap then break end
                         end
                     end
-                    EditorHud.update({ rows = rows(overlap) })
+                    EditorHud.update(card(overlap))
                 end
             end
         end)(),
@@ -1258,15 +1285,20 @@ local function showDraft(what)
 
     local started = PropertyEditor.start({
         name = rooms and 'Show rooms' or 'Show draft',
+        padBack = true,
         hud = {
-            title = rooms and 'Rooms' or 'Space',
-            sub = rooms and 'Every room the interior has — one box each' or (d.name or 'New property') .. ' — blue; its neighbours grey',
+            house = true, icon = 'house', title = rooms and 'Rooms' or 'Space',
+            sub = rooms and 'One box for each room the interior has' or (d.name or 'New property') .. ', in blue',
+            chip = { text = 'Draft' },
+            -- What is done green, what is still missing amber.
             rows = rooms and { { label = 'Rooms', value = #d.rooms } } or {
                 { label = 'Doors', value = #unitDoors() },
-                { label = 'Outside sign', value = d.sign and (d.sign.post and 'on a sign post' or 'placed') or 'not yet' },
-                { label = 'Manager', value = d.manager and 'placed' or 'not yet' },
+                { label = 'Outside sign', value = d.sign and (d.sign.post and 'on a sign post' or 'placed') or 'not yet',
+                  tone = d.sign and 'ok' or 'warn' },
+                { label = 'Manager', value = d.manager and 'placed' or 'not yet', tone = d.manager and 'ok' or 'warn' },
+                { label = 'Neighbours', value = 'in grey' },
             },
-            hints = { { key = 'Esc', text = 'Back to the panel' } },
+            hints = { { key = 'Esc', pad = 'b', text = 'Back to the panel' } },
         },
         onFrame = function()
             if rooms then return end

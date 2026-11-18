@@ -145,9 +145,11 @@ local function confirm(ids)
     local shown = 0
     local started = PropertyEditor.start({
         name = 'Registered',
+        padBack = true,
         hud = {
-            title = 'Registered', sub = ('%d propert%s — their spaces, for a moment'):format(#ids, #ids == 1 and 'y' or 'ies'),
-            rows = {}, hints = { { key = 'Esc', text = 'Back to the panel' } },
+            house = true, icon = 'house', title = 'Registered', sub = 'Their spaces, for five seconds',
+            chip = { text = ('%d propert%s'):format(#ids, #ids == 1 and 'y' or 'ies'), tone = 'ok' },
+            rows = {}, hints = { { key = 'Esc', pad = 'b', text = 'Back to the panel' } },
         },
         onFrame = (function()
             local untilAt = GetGameTimer() + 5000
@@ -244,8 +246,10 @@ RegisterNUICallback('prShow', function(data, cb)
     if not tpl then return end
     local started = PropertyEditor.start({
         name = 'Show units',
-        hud = { title = 'Units', sub = tpl.label or 'Interior', rows = { { label = 'Units', value = #tpl.units } },
-                hints = { { key = 'Esc', text = 'Back to the panel' } } },
+        padBack = true,
+        hud = { house = true, icon = 'house', title = 'Units', sub = tpl.label or 'Interior', chip = { text = 'Template' },
+                rows = { { label = 'Units', value = #tpl.units } },
+                hints = { { key = 'Esc', pad = 'b', text = 'Back to the panel' } } },
     })
     if not started then return end
     for i, u in ipairs(tpl.units) do
@@ -266,6 +270,9 @@ end)
 -- placement for all of that template's units.
 
 local STAMP_READ_MS = 300
+-- On a pad, held while it flies: Menu (Done: named, so the pause menu stands aside), A (register) and the D-pad
+-- (the floor, the numbers).
+local STAMP_PAD_BLOCK = { controls = { 199, 201, 172, 173, 174, 175 } }
 
 local function registeredHere(place)
     local n = 0
@@ -275,19 +282,29 @@ local function registeredHere(place)
     return n
 end
 
+--- The copy the camera is in, as the card's chip: how many of its units are registered, amber until all are.
+local function stampChip()
+    local here = stamp and stamp.here
+    if not (here and here.tpl) then return { text = 'No copy here' } end
+    local total = #here.tpl.units
+    return { text = ('%d of %d here'):format(here.count, total), tone = here.count >= total and 'ok' or 'warn' }
+end
+
+--- The card's changing parts: its readings and its chip.
+local function stampPatch()
+    return { rows = stampRows(), chip = stampChip() }
+end
+
 function stampRows()
     local s = stamp --[[@as PropertyScaleStamp]]
     local here = s.here
     local rows = {}
     if not here then
-        rows[#rows + 1] = { label = 'Here', value = 'no interior — fly into one' }
+        rows[#rows + 1] = { label = 'Here', value = 'no interior: fly into one' }
     elseif not here.tpl then
         rows[#rows + 1] = { label = 'Here', value = 'an interior whip has no template for', tone = 'warn' }
     else
-        local total = #here.tpl.units
         rows[#rows + 1] = { label = 'Interior', value = here.tpl.label or ('#' .. here.tpl.templateId) }
-        rows[#rows + 1] = { label = 'Registered', value = ('%d of %d'):format(here.count, total),
-                            tone = here.count >= total and 'ok' or 'warn' }
         local names = unitsFor(here.tpl.units, s.form, false)
         if #names > 0 then
             rows[#rows + 1] = { label = 'Names', value = #names == 1 and names[1].name
@@ -326,25 +343,45 @@ local function startStamp(form)
     form.floor = floor and math.floor(floor) or nil
     stamp = { form = form, byHash = byHash, here = nil, made = 0, busy = false, nextRead = 0 }
 
+    local padHeld = false
+    local function holdPad(on)
+        if on == padHeld then return end
+        padHeld = on
+        if on then ControlBlocks.hold('stampPad', STAMP_PAD_BLOCK) else ControlBlocks.release('stampPad') end
+    end
+    -- A press on the device in hand only: a pad's buttons are keys on a keyboard too, and the reverse.
+    local pressed = WhipKeyPressed
+
     local started = PropertyEditor.start({
         name = 'Stamp mode',
         hud = {
-            title = 'Stamp', sub = (form.building ~= '' and form.building or 'No building') .. ' — fly through it',
+            house = true, icon = 'house', title = 'Stamp',
+            sub = form.building ~= '' and form.building or 'No building', chip = stampChip(),
             rows = stampRows(),
             hints = {
-                { key = 'WASD', text = 'Fly · Space/Ctrl up/down' },
-                { key = 'E', text = 'Register this one' },
-                { key = 'PgUp / PgDn', text = 'Floor' },
-                { key = 'Tab / Q', text = 'Next / previous numbers (they move on after each E)' },
-                { key = 'Esc', text = 'Done' },
+                { key = 'E', pad = 'a', text = 'Register this one' },
+                { key = 'PgUp / PgDn', pad = { 'dpad_up', 'dpad_down' }, text = 'Floor up / down' },
+                { key = 'Tab / Q', pad = { 'dpad_right', 'dpad_left' }, text = 'Next / previous numbers' },
+                { key = 'Esc', pad = 'menu', text = 'Done' },
+                { key = 'WASD',         pad = 'ls',           text = 'Move',      group = 'fly' },
+                { key = 'Mouse',        pad = 'rs',           text = 'Look',      group = 'fly' },
+                { key = 'Space / Ctrl', pad = { 'rt', 'lt' }, text = 'Up / down', group = 'fly' },
+                { key = 'Shift',        pad = 'l3',           text = 'Faster',    group = 'fly' },
             },
         },
-        onExit = function() stopStamp() end,
-        -- PgUp / PgDn (the floor) and E (register), held off for the mode by its block
-        block = { controls = { 10, 11, 38 } },
+        onExit = function()
+            holdPad(false)
+            stopStamp()
+        end,
+        -- PgUp / PgDn (the floor), Tab / Q (the numbers) and E (register), held off for the mode by its block
+        block = { controls = { 10, 11, 37, 38, 44 } },
         onFrame = function()
             local s = stamp
             if not s then return 'exit' end
+            local pad = WhipLastInputIsPad()
+            holdPad(pad)
+            -- Menu: done, as Esc is on a keyboard.
+            if pad and pressed(nil, 199) then return 'exit' end
             local now = GetGameTimer()
             if now >= s.nextRead then
                 s.nextRead = now + STAMP_READ_MS
@@ -370,26 +407,26 @@ local function startStamp(form)
                 else
                     s.here = nil
                 end
-                EditorHud.update({ rows = stampRows() })
+                EditorHud.update(stampPatch())
             end
 
-            if IsDisabledControlJustPressed(0, 10) then
+            if pressed(10, 172) then
                 s.form.floor = (s.form.floor or 0) + 1
-                EditorHud.update({ rows = stampRows() })
-            elseif IsDisabledControlJustPressed(0, 11) then
+                EditorHud.update(stampPatch())
+            elseif pressed(11, 173) then
                 s.form.floor = (s.form.floor or 1) - 1
-                EditorHud.update({ rows = stampRows() })
+                EditorHud.update(stampPatch())
             end
             local step = (s.here and s.here.tpl and #s.here.tpl.units) or 1
-            if IsDisabledControlJustPressed(0, 37) then
+            if pressed(37, 175) then
                 s.form.start = s.form.start + step
-                EditorHud.update({ rows = stampRows() })
-            elseif IsDisabledControlJustPressed(0, 44) then
+                EditorHud.update(stampPatch())
+            elseif pressed(44, 174) then
                 s.form.start = math.max(0, s.form.start - step)
-                EditorHud.update({ rows = stampRows() })
+                EditorHud.update(stampPatch())
             end
 
-            if IsDisabledControlJustPressed(0, 38) then
+            if pressed(38, 201) then
                 local here = s.here
                 if not (here and here.tpl) then
                     EditorHud.status('Fly into a copy of an interior whip knows first', 'warn')
@@ -410,7 +447,8 @@ local function startStamp(form)
         end,
     })
     if not started then stamp = nil return false, 'Could not start' end
-    FreeCam.start({ hidePed = true })
+    -- 'auto': the sticks and triggers fly it while a pad is in hand, the keys and mouse otherwise.
+    FreeCam.start({ hidePed = true, pad = 'auto' })
     return true
 end
 
@@ -522,8 +560,22 @@ local function tourRows()
         { label = 'Skipped', value = t.skipped },
         { label = 'Now', value = t.paused and 'paused' or t.state or '—' },
     }
-    if t.lastProblem then rows[#rows + 1] = { label = 'Last problem', value = t.lastProblem, tone = 'err' } end
+    if t.lastProblem then rows[#rows + 1] = { label = 'Last problem', value = t.lastProblem, tone = 'err', wrap = true } end
     return rows
+end
+
+--- The card's changing parts: the readings, where the tour is (the chip), and what Space does now.
+local function tourPatch()
+    local t = tour --[[@as PropertyScaleTour]]
+    return {
+        rows = tourRows(),
+        chip = { text = ('%d of %d'):format(math.max(t.index, 1), #t.ids) },
+        hints = {
+            { key = 'Space', pad = 'a', text = t.paused and 'Go on' or 'Pause' },
+            { key = '→', pad = 'dpad_right', text = 'Skip this one' },
+            { key = 'Esc', pad = 'b', text = 'Stop' },
+        },
+    }
 end
 
 local function runTour()
@@ -539,7 +591,9 @@ local function runTour()
             t.skipped = t.skipped + 1
         else
             t.current = info.name
-            EditorHud.update({ sub = info.name, progress = { done = i - 1, total = #t.ids }, rows = tourRows() })
+            local patch = tourPatch()
+            patch.sub, patch.progress = info.name, { done = i - 1, total = #t.ids }
+            EditorHud.update(patch)
             local problems, extra = verifyOne(info)
             if problems == nil then
                 t.skipped = t.skipped + 1
@@ -555,7 +609,9 @@ local function runTour()
                 end
             end
         end
-        EditorHud.update({ progress = { done = i, total = #t.ids }, rows = tourRows() })
+        local patch = tourPatch()
+        patch.progress = { done = i, total = #t.ids }
+        EditorHud.update(patch)
         Wait(300)
     end
 
@@ -582,30 +638,25 @@ local function startTour(ids)
     tour = { ids = ids, ok = 0, attention = 0, skipped = 0, paused = false, skip = false, stopped = false,
              start = { x = c.x, y = c.y, z = c.z }, heading = GetEntityHeading(ped), index = 0, modeLive = true }
 
+    local hud = tourPatch()
+    hud.house, hud.icon, hud.title, hud.sub = true, 'success', 'Verify', 'Starting…'
+    hud.progress = { done = 0, total = #ids }
     local started = PropertyEditor.start({
         name = 'Verify',
-        hud = {
-            title = ('Verify %d'):format(#ids), sub = 'Starting…',
-            progress = { done = 0, total = #ids },
-            rows = tourRows(),
-            hints = {
-                { key = 'Space', text = 'Pause / go on' },
-                { key = '→', text = 'Skip this one' },
-                { key = 'Esc', text = 'Stop' },
-            },
-        },
+        padBack = true,   -- B stops it, as Esc does
+        hud = hud,
         onExit = function()
             if tour then tour.stopped = true tour.modeLive = false end
         end,
-        -- Space (pause) and the right arrow (skip), held off for the mode by its block
-        block = { controls = { 22, 175 } },
+        -- Space (pause; A on a pad) and the right arrow (skip; the D-pad's right), held off for the mode by its block
+        block = { controls = { 22, 175, 201 } },
         onFrame = function()
             if not tour then return 'exit' end
-            if IsDisabledControlJustPressed(0, 22) then
+            if WhipKeyPressed(22, 201) then
                 tour.paused = not tour.paused
-                EditorHud.update({ rows = tourRows() })
+                EditorHud.update(tourPatch())
             end
-            if IsDisabledControlJustPressed(0, 175) then tour.skip = true end
+            if WhipKeyPressed(175, 175) then tour.skip = true end
         end,
     })
     if not started then tour = nil return false, 'Could not start' end

@@ -218,7 +218,7 @@ if (whyName) {
 }
 // Waits the scan cannot follow, by side: each is counted as waiting while it is still an export there. Add one only
 // after checking it by hand. GetScenarioStats waits on the database through the Director store's table of functions.
-const BY_HAND = { server: ['GetScenarioStats'], client: [], shared: [] };
+const BY_HAND = { server: ['GetScenarioStats', 'SetVehicleCustody'], client: [], shared: [] };
 
 const out = {};
 for (const side of ['server', 'client', 'shared']) {

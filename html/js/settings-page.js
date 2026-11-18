@@ -716,7 +716,7 @@ export class SettingsPage {
     }
 
     /** The minimap's preview up while the Minimap tab is, laid over its place in the inspector in true px (the
-     *  inspector is zoomed; a canvas is drawn unzoomed). */
+     *  inspector is scaled; a canvas is drawn unscaled). */
     syncPreview() {
         const cur = this.current();
         const want = this.isOpen && cur?.section === 'server' && cur.id === MINIMAP_GROUP && !!this.inspEl.querySelector('.st-mm-slot');
@@ -766,7 +766,7 @@ export class SettingsPage {
     dragTo(clientX) {
         const d = this.drag;
         if (!d) return;
-        // In screen pixels, as clientX is: the track is in the zoomed page, which FiveM's Chromium 103 can measure unzoomed.
+        // In screen pixels, as clientX is (the page is scaled by a transform, which getBoundingClientRect includes).
         const box = screenRect(d.track);
         const v = valueAt(d.row, box.width > 0 ? (clientX - box.left) / box.width : 0);
         if (v === d.value) return;

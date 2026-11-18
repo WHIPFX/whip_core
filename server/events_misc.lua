@@ -995,7 +995,7 @@ end)
 ---@param shopId number|nil
 ---@return boolean ok
 ---@return string|nil reason
-function Shops.openFor(source, player, shopId)
+function Shops.openFor(source, player, shopId, access)
     local def = Shops.getDef(shopId)
     if not def then
         TriggerClientEvent('whip_core:client:openShop', source, nil)
@@ -1009,7 +1009,7 @@ function Shops.openFor(source, player, shopId)
     end
 
     -- The session and its basket, before anything is drawn from them.
-    Shops.beginSession(source, shopId)
+    Shops.beginSession(source, shopId, access)
 
     local shopPayload = Shops.buildShopPayload(shopId, player.charId)
     if not shopPayload then
@@ -1033,6 +1033,33 @@ function Shops.openFor(source, player, shopId)
     Shops.talkOpened(source, shopId)   -- "What do you got?" (server/shop_talk.lua)
     return true
 end
+
+exports('OpenShop', function(source, ref, opts)
+    local caller = Registry.caller()
+    source = tonumber(source)
+    local player = source and Players[source]
+    if not player or player.isDead or player.closing then return false, 'Player not available' end
+    local def = Shops.find(ref)
+    if not def then return false, 'Shop not found' end
+    if Shops.ownerOf(def) ~= caller then return false, 'Shop belongs to another resource' end
+    opts = type(opts) == 'table' and opts or {}
+    if opts.authorize then
+        local ok, allowed = pcall(opts.authorize, source)
+        if not ok or allowed ~= true then return false, 'Not allowed' end
+    end
+    local coords = player:getCoords()
+    local virtual = def.settings and def.settings.virtual == true
+    local range = tonumber(opts.range) or 3.0
+    if range ~= range or range <= 0 or range > 20 then return false, 'range must be between 0 and 20' end
+    if not virtual and not IsPlayerNear(source, def.x, def.y, def.z, range) then return false, 'Too far away' end
+    return Shops.openFor(source, player, def.shopId, {
+        owner = caller, session = player.session, authorize = opts.authorize,
+        x = virtual and coords.x or def.x,
+        y = virtual and coords.y or def.y,
+        z = virtual and coords.z or def.z,
+        range = range
+    })
+end)
 
 --- Close Shop
 SecureEvent('whip_core:server:closeShop', {

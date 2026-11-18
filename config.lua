@@ -170,6 +170,7 @@ Config.Items = {
         usable   = false,
         cooldown = 0,
         prop     = 'prop_cs_business_card',
+        wallet   = true,   -- fits in a wallet, and is still found there (HasItem, FindItem)
     },
     cash = {
         name     = 'Cash',

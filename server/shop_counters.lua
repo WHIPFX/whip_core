@@ -70,6 +70,10 @@ end
 function Shops.openCounter(def)
     if type(def) ~= 'table' or not def.shopId then return end
     local shopId = def.shopId
+    if def.settings and def.settings.virtual then
+        Shops.closeCounter(shopId)
+        return
+    end
     -- Nothing to stand behind, or nowhere to stand: no counter.
     if not (def.npcModel or def.prop) or not (def.x and def.y and def.z) then
         Shops.closeCounter(shopId)

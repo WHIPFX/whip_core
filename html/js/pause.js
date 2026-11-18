@@ -339,8 +339,11 @@ root.querySelector('.pm-back').addEventListener('click', () => setMode('menu'));
 // NO BUTTON HERE TAKES THE KEYBOARD'S FOCUS: a focused button (even hidden) would be pressed again by the next Enter
 // or Space as well as the key scope's own action. The keys are the scope's (onKey); a click still clicks.
 root.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
-// The map beside the menu is a door to the map.
-root.querySelector('.pm-mapwrap').addEventListener('click', () => { if (mode === 'menu') setMode('map'); });
+// The map beside the menu is a door to the map. Not a click on one of its own controls: the Menu button sits inside
+// .pm-mapwrap, so its click (which has just set 'menu') bubbles here and would open the map again at once.
+root.querySelector('.pm-mapwrap').addEventListener('click', (e) => {
+    if (mode === 'menu' && !e.target.closest('button, .pm-legend')) setMode('map');
+});
 
 map.onWaypoint = (x, y) => nuiCallback('pauseWaypoint', x === null ? { clear: true } : { x, y });
 

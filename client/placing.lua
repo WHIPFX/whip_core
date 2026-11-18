@@ -405,6 +405,12 @@ startModeLoop = function()
     CreateThread(modeLoop)
 end
 
+-- A logout ends it: the mode outlived character select, and E then placed whatever the next character had in
+-- the slot this one picked.
+AddEventHandler('whip_core:player:logout', function()
+    if PlacingModeActive or placeSession then CancelPlaceMode('logout') end
+end)
+
 -- A restart mid-placement must not orphan a ghost in the world; the rest of the state
 -- dies with the Lua VM.
 AddEventHandler('onResourceStop', function(res)
