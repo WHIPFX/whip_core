@@ -68,7 +68,7 @@ function settings() {
     const u = MPS[speedUnit] || MPS.mph;
     const from = Math.max(0, num('mm.speedFrom', 0)) * u;
     return {
-        fps: Math.max(1, num('map.fps', 60)),
+        fps: Math.max(1, num('map.fps', 30)),
         footM: Math.max(10, num('mm.viewFoot', 230)),
         slowM: Math.max(10, num('mm.viewSlow', 290)),
         fastM: Math.max(10, num('mm.viewFast', 800)),

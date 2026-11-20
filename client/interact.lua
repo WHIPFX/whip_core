@@ -274,6 +274,38 @@ local function refreshOptions(data)
     return n
 end
 
+--- How long a prompt's condition and option conditions are believed, in ms. They were asked on every score pass (about
+--- 30 a second) for every prompt in reach, and in /whipcost they were most of what a prompt on screen costs. A press, a
+--- scroll, a new list (setOptions) or a prompt coming into reach asks again at once, and so does a press before it fires.
+--- A prompt hidden by its condition shows at most this much after the condition turns.
+local CONDITION_MS = 100
+
+--- Ask a prompt's condition and its options' conditions now, and remember the answer (conditionsOk reuses it).
+---@return boolean ok  the prompt may draw: its condition passes and at least one option is offerable
+local function askConditions(data, now)
+    local ok = true
+    if data.condition then
+        local good, result = pcall(data.condition)
+        -- A throwing condition fails closed, and is reported.
+        if not good then reportThrow(data.id, 'condition', result) end
+        ok = good and result and true or false
+    end
+    -- A prompt with no offerable option draws nothing.
+    if ok and refreshOptions(data) == 0 then ok = false end
+    data._condOk, data._condAt = ok, now
+    return ok
+end
+
+--- askConditions' answer, asked again only once it is CONDITION_MS old (or `fresh`, or the list was rebuilt).
+---@return boolean ok
+local function conditionsOk(data, now, fresh)
+    local at = data._condAt
+    if fresh or at == nil or data._availN == nil or now - at >= CONDITION_MS or now < at then
+        return askConditions(data, now)
+    end
+    return data._condOk == true
+end
+
 --- The option E would act on right now, or nil when the prompt has nothing to offer.
 local function selectedOption(data)
     local n = data._availN or 0
@@ -580,8 +612,9 @@ function Interactions.setOptions(id, options)
     data._src = options
 
     data._sel = 1
-    -- The next score frame rebuilds the available list.
+    -- The next score frame rebuilds the available list (and asks the conditions again: conditionsOk).
     data._availN = nil
+    data._condAt = nil
 end
 
 --- Every prompt of `group` builds its list again (an option added to or taken off one of its lists).
@@ -595,6 +628,7 @@ local function rebuildGroup(group)
                 icon = data.icon, label = data.label, callback = data.callback,
             }, id, group)
             data._availN = nil
+            data._condAt = nil
         end
     end
 end
@@ -1305,7 +1339,7 @@ local function promptBlock(id, want)
     if want then ControlBlocks.hold(id, PROMPT_BLOCKS[id]) else ControlBlocks.release(id) end
 end
 
--- Main interaction thread. Scoring runs about 30 times a second over the grid cells near the player;
+-- Main interaction thread. Scoring runs about 20 times a second over the grid cells near the player;
 -- the renderer's frame() runs every frame.
 
 CreateThread(function()
@@ -1318,7 +1352,9 @@ CreateThread(function()
 
     -- Prompts are scored about SCORE_MS apart while one is up, and never more often than every 2nd frame.
     -- A scroll, a typed digit or a press scores on the next pass.
-    local SCORE_MS = 30
+    -- 50 (about 20 a second): at 30 the scoring was the dearest part of a prompt on screen in /whipcost; focus
+    -- follows the camera within 50 ms, and positions are still refreshed every frame between score passes.
+    local SCORE_MS = 50
     local lastScoreAt, lastScoreFrame = nil, 0
     local scoreSoon = false
 
@@ -1334,6 +1370,9 @@ CreateThread(function()
     local removedIds   = {}
     -- What the renderer is handed while a hidden prompt is held.
     local heldScratch, heldChanges = {}, {}
+
+    -- A `follow` answering within these of its last answer counts as standing still (applyFollow, refreshEntry).
+    local FOLLOW_STILL_M, FOLLOW_STILL_DEG, FOLLOW_STILL_PASSES = 0.003, 0.2, 3
 
     local function rebuildNearby(px, py, range)
         local radius = math.ceil(range / CELL_SIZE)
@@ -1353,6 +1392,17 @@ CreateThread(function()
         local ok, fx_, fy_, fz_, fh, fpull, fwrap, fcentre, ftilt, ffit = pcall(data.follow)
         if not ok then reportThrow(data.id, 'follow', fx_) end
         if ok and fx_ then
+            -- Standing still (the same place and heading as last time, to a few millimetres): counted, so the
+            -- frames between score passes can leave it be (refreshEntry). Anything moving is followed every frame.
+            local ox, oy, oz, oh = data.x, data.y, data.z, data.heading
+            if ox and math.abs(fx_ - ox) < FOLLOW_STILL_M and math.abs(fy_ - oy) < FOLLOW_STILL_M
+                and math.abs(fz_ - oz) < FOLLOW_STILL_M
+                and (fh == oh or (fh and oh and math.abs(fh - oh) < FOLLOW_STILL_DEG))
+                and tonumber(ftilt) == data.tilt then
+                data._still = (data._still or 0) + 1
+            else
+                data._still = 0
+            end
             if gridCellKey(fx_, fy_) ~= data._cell then
                 gridRemove(data.id, data)
                 data.x, data.y, data.z = fx_, fy_, fz_
@@ -1370,8 +1420,11 @@ CreateThread(function()
     end
 
     --- Copy a registry record onto the entry a renderer reads. Every frame for everything visible.
-    local function refreshEntry(e, data)
-        if data.follow then
+    --- `scoring`: a score pass. Between them a prompt whose `follow` has answered the same place FOLLOW_STILL_PASSES
+    --- times running is not asked (a parked car's door circles); the next score pass asks again, and any move puts it
+    --- back on every frame.
+    local function refreshEntry(e, data, scoring)
+        if data.follow and (scoring or (data._still or 0) < FOLLOW_STILL_PASSES) then
             local costFollow = interactOpen and WhipCost.start() or nil
             applyFollow(data)
             WhipCost.stop('prompts, part: following what moves', costFollow)
@@ -1507,6 +1560,8 @@ CreateThread(function()
         -- Score about every SCORE_MS while a prompt is up; with none showing, every idle wake scores.
         local isScoreFrame = (not interactOpen) or scoreSoon
             or (frameCounter - lastScoreFrame >= 2 and (lastScoreAt == nil or now - lastScoreAt >= SCORE_MS))
+        -- A pass a press or scroll asked for asks every condition afresh (conditionsOk), so what it changed shows now.
+        local freshConditions = isScoreFrame and scoreSoon
         if isScoreFrame then lastScoreAt, lastScoreFrame, scoreSoon = now, frameCounter, false end
 
         -- What scoring reads, only on score frames. camPos and the forward go on to the renderer.
@@ -1623,18 +1678,10 @@ CreateThread(function()
 
                 if score >= 0 then
                     local costCond = interactOpen and WhipCost.start() or nil
-                    local conditionOk = true
-                    if data.condition then
-                        local ok, result = pcall(data.condition)
-                        -- A throwing condition fails closed, and is reported.
-                        if not ok then reportThrow(data.id, 'condition', result) end
-                        if ok then conditionOk = result else conditionOk = false end
-                    end
-
-                    -- A prompt with no offerable option draws nothing.
-                    if conditionOk and refreshOptions(data) == 0 then
-                        conditionOk = false
-                    end
+                    -- The condition and the options' conditions, believed for CONDITION_MS (conditionsOk), shown or
+                    -- not. A prompt coming into reach has no answer that recent, so it is asked at once; one hidden by its
+                    -- condition (a locked car's doors) shows at most CONDITION_MS after the condition turns.
+                    local conditionOk = conditionsOk(data, now, freshConditions)
                     -- Counted under the prompt's owner.
                     if costCond then WhipCost.stop(conditionCostName(data._owner), costCond) end
 
@@ -1684,7 +1731,7 @@ CreateThread(function()
                             end
 
                             local wasActive = e.active
-                            refreshEntry(e, data)
+                            refreshEntry(e, data, true)
 
                             -- The selected option's icon and label, not the prompt's own.
                             local sel = selectedOption(data)
@@ -1858,14 +1905,14 @@ CreateThread(function()
             -- Swap after `removed` is computed against the old set.
             visible = newVisible
             changed = stateChanges
-            WhipCost.stop('prompts, part: scoring (about 30 a second)', costScore)
+            WhipCost.stop('prompts, part: scoring (about 20 a second)', costScore)
 
         else
             -- Non-score frame: refresh positions so a moving point is drawn where it is now.
             for id, e in pairs(visible) do
                 local data = registry[id]
                 if data then
-                    refreshEntry(e, data)
+                    refreshEntry(e, data, false)
                 end
             end
         end
@@ -1947,6 +1994,13 @@ CreateThread(function()
             -- Whatever the press changes shows on the next pass.
             scoreSoon = true
             local data = registry[currentFocusId]
+
+            -- The conditions may be up to CONDITION_MS old: asked again before anything fires, and the press is
+            -- dropped when the prompt can no longer be used or the option under the cursor changed meanwhile.
+            if data and data._condAt and now - data._condAt > SCORE_MS then
+                local before = selectedOption(data)
+                if not askConditions(data, now) or selectedOption(data) ~= before then data = nil end
+            end
 
             -- The selected option's callback, else the prompt's own.
             local opt = data and selectedOption(data)

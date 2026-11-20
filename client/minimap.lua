@@ -81,7 +81,9 @@ PlayerPrefs.define({
     help = 'How often the minimap is drawn while it moves. Higher is smoother and costs more; standing still costs nothing.',
     options = { { value = 120, label = '120' }, { value = 60, label = '60' }, { value = 45, label = '45' },
         { value = 30, label = '30' }, { value = 15, label = '15' } },
-    default = 60,
+    -- 30 by default: on the move every pose is a message to the page, so 60 sent one nearly every frame in a car
+    -- (/whipcost: the minimap's dearest part after the blip scan). A player who wants it smoother picks 60 or more.
+    default = 30,
     page = true, forced = server('fps'),
 })
 
@@ -179,10 +181,10 @@ PlayerPrefs.define({
     visible = function() return PlayerPrefs.get('mm.tiltWithSpeed') == true end,
 })
 
-local poseMs = 16               -- the pose, at most this often: 1000 / map.fps
+local poseMs = 33               -- the pose, at most this often: 1000 / map.fps
 
 local function readFps()
-    poseMs = math.floor(1000 / (tonumber(PlayerPrefs.get('map.fps')) or 60))
+    poseMs = math.floor(1000 / (tonumber(PlayerPrefs.get('map.fps')) or 30))
 end
 readFps()
 PlayerPrefs.onChange('map.fps', readFps)
@@ -255,59 +257,155 @@ local function readRoute(slot)
     return #pts > 1 and pts or nil
 end
 
---- Every blip the radar would show, scanned SPRITES_PER_FRAME sprites a frame, into `list`: the calling loop's own,
---- kept between scans and REFILLED, an entry per blip whose fields are written over (a scan a second made a table for
---- every blip on the map, the minimap's biggest share of the memory whip_core makes). Answers whether anything in it
---- changed, the blips on moving things, and where those are; nil if `alive()` turned false meanwhile.
+--- The sprites with no blip at the last look are looked at again over this many scans (a slice of them each scan), the
+--- sprites that had one on every scan. The full scan asked GTA about every sprite every DATA_MS (a thousand natives a
+--- scan, the minimap's dearest part in /whipcost); this asks about a third of them. A blip of a sprite already on the
+--- map shows, moves and goes as before; one of a sprite not on the map yet shows within COLD_PASSES * DATA_MS.
+local COLD_PASSES = 3
+local COLD_PER_PASS = math.ceil((MAX_SPRITE + 1) / COLD_PASSES)
+
+--- One sprite's blips, read into `arr` (that sprite's entries, reused and written over). Answers whether any changed.
+---@param state table  the scan's own (see scanBlips)
+local function readSprite(state, sprite)
+    local arr = state.cache[sprite]
+    local k, changed = 0, false
+    local mov = state.mov
+    local b = GetFirstBlipInfoId(sprite)
+    while DoesBlipExist(b) do
+        local display = GetBlipInfoIdDisplay(b)
+        if not NEVER_SHOWN[display] and GetBlipAlpha(b) > 0 then
+            local c = GetBlipInfoIdCoord(b)
+            if finite(c.x) and finite(c.y) then
+                local x, y = tenth(c.x), tenth(c.y)
+                local colour = hudHex(blipHudColour(b))
+                local short = IsBlipShortRange(b) and true or false
+                local rot = rotationOf(b)
+                local flash = IsBlipFlashing(b) and true or nil
+                local number = WhipBlipNumber and WhipBlipNumber(b) or nil
+                if not arr then
+                    arr = {}
+                    state.cache[sprite] = arr
+                end
+                k = k + 1
+                local e = arr[k]
+                if not e then
+                    e = {}
+                    arr[k] = e
+                end
+                if e.id ~= b or e.x ~= x or e.y ~= y or e.sprite ~= sprite or e.colour ~= colour
+                    or e.short ~= short or e.rot ~= rot or e.flash ~= flash or e.number ~= number then
+                    e.id, e.x, e.y, e.sprite, e.colour, e.short, e.rot, e.flash, e.number =
+                        b, x, y, sprite, colour, short, rot, flash, number
+                    changed = true
+                end
+                mov[e] = MOVING[GetBlipInfoIdType(b)] or nil
+            end
+        end
+        b = GetNextBlipInfoId(sprite)
+    end
+    if arr then
+        for i = #arr, k + 1, -1 do
+            mov[arr[i]] = nil
+            arr[i] = nil
+            changed = true
+        end
+        if k == 0 then state.cache[sprite] = nil end
+    end
+    -- On the map or not: the hot list follows (rebuilt once, after the scan).
+    local hot = k > 0
+    if (state.hot[sprite] == true) ~= hot then
+        state.hot[sprite] = hot or nil
+        state.hotDirty = true
+    end
+    return changed
+end
+
+--- Every blip the radar would show, into `list`: the calling loop's own, kept between scans and REFILLED with the
+--- entries kept per sprite (a scan a second made a table for every blip on the map, the minimap's biggest share of the
+--- memory whip_core makes). The first scan asks about every sprite; each after it the sprites on the map plus a slice
+--- of the rest (COLD_PASSES), SPRITES_PER_FRAME sprites a frame. Answers whether anything in it changed, the blips on
+--- moving things, and where those are; nil if `alive()` turned false meanwhile.
 ---@param alive function
 ---@param list table  this loop's list, refilled in place
+---@param state table  this loop's own scan state, kept between scans ({} at first)
 ---@return boolean|nil changed
 ---@return table|nil movers
 ---@return table|nil moverAt  [blip] = { x, y }, the movers only
-local function scanBlips(alive, list)
+local function scanBlips(alive, list, state)
+    if not state.cache then
+        state.cache, state.hot, state.hotList, state.mov, state.cursor = {}, {}, {}, setmetatable({}, { __mode = 'k' }), 0
+    end
+    local changed = false
+    local inFrame = 0
+    local cost = WhipCost.start()
+
+    --- One sprite asked about; a frame's worth done, the next frame. False when the loop ended meanwhile.
+    local function one(sprite)
+        if SKIP_SPRITE[sprite] then return true end
+        if readSprite(state, sprite) then changed = true end
+        inFrame = inFrame + 1
+        if inFrame >= SPRITES_PER_FRAME then
+            WhipCost.stop('minimap: blip scan (a slice)', cost)
+            Wait(0)
+            if not alive() then return false end
+            inFrame = 0
+            cost = WhipCost.start()
+        end
+        return true
+    end
+
+    if not state.primed then
+        for sprite = 0, MAX_SPRITE do
+            if not one(sprite) then return nil end
+        end
+        state.primed = true
+    else
+        -- The sprites on the map at the last look (a snapshot: reading one may take it off), then a slice of the rest.
+        local hotList = state.hotList
+        for i = 1, #hotList do
+            if not one(hotList[i]) then return nil end
+        end
+        local hot = state.hot
+        local s = state.cursor
+        for _ = 1, COLD_PER_PASS do
+            if not hot[s] then
+                if not one(s) then return nil end
+            end
+            s = s + 1
+            if s > MAX_SPRITE then s = 0 end
+        end
+        state.cursor = s
+    end
+    WhipCost.stop('minimap: blip scan (a slice)', cost)
+
+    if state.hotDirty then
+        state.hotDirty = false
+        local hl = {}
+        for sprite in pairs(state.hot) do hl[#hl + 1] = sprite end
+        table.sort(hl)
+        state.hotList = hl
+    end
+
+    -- The list again, sprite by sprite in order (the same entries, so nothing moved reads as unchanged).
     local moving, at = {}, {}
-    local n, changed = 0, false
-    for s0 = 0, MAX_SPRITE, SPRITES_PER_FRAME do
-        local cost = WhipCost.start()
-        for sprite = s0, math.min(MAX_SPRITE, s0 + SPRITES_PER_FRAME - 1) do
-            if not SKIP_SPRITE[sprite] then
-                local b = GetFirstBlipInfoId(sprite)
-                while DoesBlipExist(b) do
-                    local display = GetBlipInfoIdDisplay(b)
-                    if not NEVER_SHOWN[display] and GetBlipAlpha(b) > 0 then
-                        local c = GetBlipInfoIdCoord(b)
-                        if finite(c.x) and finite(c.y) then
-                            local x, y = tenth(c.x), tenth(c.y)
-                            local colour = hudHex(blipHudColour(b))
-                            local short = IsBlipShortRange(b) and true or false
-                            local rot = rotationOf(b)
-                            local flash = IsBlipFlashing(b) and true or nil
-                            local number = WhipBlipNumber and WhipBlipNumber(b) or nil
-                            n = n + 1
-                            local e = list[n]
-                            if not e then
-                                e = {}
-                                list[n] = e
-                            end
-                            if e.id ~= b or e.x ~= x or e.y ~= y or e.sprite ~= sprite or e.colour ~= colour
-                                or e.short ~= short or e.rot ~= rot or e.flash ~= flash or e.number ~= number then
-                                e.id, e.x, e.y, e.sprite, e.colour, e.short, e.rot, e.flash, e.number =
-                                    b, x, y, sprite, colour, short, rot, flash, number
-                                changed = true
-                            end
-                            if MOVING[GetBlipInfoIdType(b)] then
-                                moving[#moving + 1] = b
-                                at[b] = { x, y }
-                            end
-                        end
-                    end
-                    b = GetNextBlipInfoId(sprite)
+    local n = 0
+    local mov, cache, hl = state.mov, state.cache, state.hotList
+    for i = 1, #hl do
+        local arr = cache[hl[i]]
+        if arr then
+            for j = 1, #arr do
+                local e = arr[j]
+                n = n + 1
+                if list[n] ~= e then
+                    list[n] = e
+                    changed = true
+                end
+                if mov[e] then
+                    moving[#moving + 1] = e.id
+                    at[e.id] = { e.x, e.y }
                 end
             end
         end
-        WhipCost.stop('minimap: blip scan (a slice)', cost)
-        Wait(0)
-        if not alive() then return nil end
     end
     -- Fewer than last time: the rest go
     for i = #list, n + 1, -1 do
@@ -379,6 +477,7 @@ PlayerPrefs.onChange('map.border', function() sendBox(false) end)
 local _pose = { action = 'minimapPose' }
 local function poseLoop(gen)
     local sent = false   -- nothing sent yet by this loop: the first pass always sends
+    local classVeh, classOf = 0, nil   -- a car's class does not change: asked once a car, not on every pose
     while gen == feedGen do
         local cost = WhipCost.start()
         local ped = PlayerPedId()
@@ -395,7 +494,8 @@ local function poseLoop(gen)
             or speed ~= p.speed or inVeh ~= p.inVehicle then
             sent = true
             p.x, p.y, p.heading, p.camYaw, p.speed, p.inVehicle = x, y, heading, camYaw, speed, inVeh
-            p.vehicleClass = inVeh and GetVehicleClass(veh) or nil
+            if inVeh and veh ~= classVeh then classVeh, classOf = veh, GetVehicleClass(veh) end
+            p.vehicleClass = inVeh and classOf or nil
             SendNUIMessage(p)
         end
         WhipCost.stop('minimap: pose', cost)
@@ -435,11 +535,12 @@ local function dataLoop(alive)
     -- This loop's own: the blip list (refilled by each scan), the message (refilled; SendNUIMessage serialises it before
     -- it returns), and what was last sent of the rest, compared value for value (not as one JSON string a pass).
     local list = {}
+    local scan = {}   -- the blip scan's own, kept between scans (scanBlips)
     local msg = { action = 'minimapData', blips = list }
     local sent = false
     local lastRoute, lastColour, lastWx, lastWy = nil, nil, nil, nil
     while alive() do
-        local changed, moving, at = scanBlips(alive, list)
+        local changed, moving, at = scanBlips(alive, list, scan)
         if changed == nil then return end
         movers, moverAt = moving --[[@as table]], at --[[@as table]]   -- they come with changed
 

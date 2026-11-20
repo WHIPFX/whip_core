@@ -356,7 +356,7 @@ Config.MapOptions = {
     inVehicle = 'player',
     forceMinimap = false,
     minimap = {
-        fps = 60, border = true, northUp = false, centre = false, markerSize = 100, markersUpright = true,
+        fps = 30, border = true, northUp = false, centre = false, markerSize = 100, markersUpright = true,
         viewFoot = 230, viewSlow = 290, viewFast = 800, speedFrom = 0, speedTo = 100,
         tiltFoot = 0, tiltVehicle = 38, tiltWithSpeed = false, tiltFast = 50,
     },
