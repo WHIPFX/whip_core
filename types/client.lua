@@ -790,17 +790,19 @@ function whip_core:IsRadialOpen() end
 
 ---@class WhipActionAt
 ---@field coords vector3|nil A prompt at a point
----@field heading number|nil With coords: stands like a sign facing this way; none turns to face you. With model: a sign at this turn from the prop's own facing
+---@field heading number|false|nil With coords: a sign at this world heading. With entity, netId, model or aimBox: a sign at this turn from the entity's facing; falls back to Config.PropPromptDefaultOffset. false faces the camera, overriding a default heading
 ---@field follow nil|fun(): number, number, number, number? With coords: where it is now, for something that moves
 ---@field entity number|nil A prompt riding on this entity (a prop, a local NPC); removed when it is gone (onGone says when)
 ---@field netId number|nil A prompt riding on this networked entity: off while it is not streamed in here, back on it when it is
----@field offset vector3|nil With entity or netId: from the entity's origin. With model: in the prop's own space (x across, y out of its face, z up)
----@field bone string|nil With entity or netId: ride this bone
+---@field offset vector3|nil With entity, netId, model or aimBox: from the entity's origin, in metres along its local X/Y/Z. Falls back to Config.PropPromptDefaultOffset; bones take precedence. Set radius to aim at the point without hitting the entity. World hits have no entity and ignore it
+---@field visualOffset vector3|nil With entity, netId, model or aimBox: label displacement from the interaction point, along entity-local X/Y/Z; does not move aim, reach or ctx.coords. Falls back to the model default
+---@field radius number|nil With entity, netId, model or aimBox: opts in to point aiming with this tolerance in metres (0.01 to 5). Reach is still measured from the player to the point
+---@field bone string|nil With entity or netId: ride this bone; offset does not move it, radius opts into point targeting
 ---@field vehiclePart 'hood'|'trunk'|'door_dside_f'|'door_pside_f'|'door_dside_r'|'door_pside_r'|'bike'|'bicycle'|'boat'|nil A choice on a car part's prompt; `hood` only while the bonnet is open; `bike`, `bicycle`, `boat` their one prompt each
 ---@field model string|string[]|nil A prompt on every prop of this model NAME (or any of a list of names) near the player — a hash is refused
 ---@field list string|nil Options added to ANOTHER prompt's list, right after one of its options: '<prompt group>:<option id>' — 'atm:balance' puts them under the ATM's Check Balance. Every list holding that option gets them (a submenu without it does not). ctx.entity / ctx.model: the prop that prompt is on
 ---@field faces 1|2|nil With model: 2 for a prop used from both sides
----@field perModel table<string, { offset: vector3|nil, heading: number|nil }>|nil With model: one model placed its own way; what an entry leaves out is the action's offset / heading. /actionplace <id> aims it and copies the line
+---@field perModel table<string, { offset: vector3|nil, heading: number|false|nil, visualOffset: vector3|nil, radius: number|nil }>|nil With model: one model placed its own way; missing fields use the action's placement, then model defaults. /promptoffset previews the point, label and radius, and prints them in F8
 ---@field radial boolean|nil The F1 wheel (a label is required; its slab shows `icon`, the pill under it `description`)
 ---@field aimBox 'vehicle'|'object'|'ped'|'world'|string[]|nil A prompt where the player looks on the box of the car / prop / person they aim at: flat on that side (wrapped round its corners) or over its top. Offered only while the look meets one in reach; ctx.entity is the thing, ctx.coords the point. 'world': the map itself (ground, walls) where the look meets it: ctx.entity nil, ctx.world true, ctx.normal the way the surface faces
 ---@field aimModels (string|number)[]|nil Only these entity models may offer an aimBox action; other models and world hits are rejected before callbacks

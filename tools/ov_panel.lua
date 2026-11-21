@@ -115,6 +115,8 @@ local ADMIN_ONLY = {
 local OPTIONS = {
     { key = 'copy', group = 'info', how = 'local', when = anything, label = 'Copy details',
       hint = 'The model\'s name, its hash and where it stands, to the clipboard.' },
+    { key = 'promptOffset', group = 'info', how = 'local', when = anything, label = 'Prompt offset',
+      hint = 'Place its interaction point and label, then print the offsets in F8.' },
 
     -- whip's saved cars
     { key = 'veh.garage', group = 'garage', how = 'act', when = savedCar, label = 'Return to garage',
@@ -703,6 +705,13 @@ local LOCAL = {}
 LOCAL.copy = function(p)
     ObjectViewer.copy(p.info)
     return { ok = true, text = 'Copied' }
+end
+
+LOCAL.promptOffset = function(p)
+    local back = stepAside()
+    local ok, why = PromptOffsetEditor.open(p.entity, back)
+    if not ok then back() UI.Notify(why, 'error') end
+    return { ok = ok == true, close = true }
 end
 
 LOCAL.drive = function(p)

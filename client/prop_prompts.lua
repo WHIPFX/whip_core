@@ -65,11 +65,15 @@ local function idFor(kind, x, y, z)
 end
 
 --- The offset figures for a model, always a full table. Order: the model's own (Config[offsetKey], or `offsets` for a
---- kind made in code), then the kind's one `offset`, then the default.
+--- kind made in code), then the kind's one `offset`, then the model default, then the kind's default.
 ---@return table { side, out, up, yaw? }
 local function offsetFor(spec, model)
     local all = (spec.offsetKey and Config[spec.offsetKey]) or spec.offsets or {}
-    return all[model] or spec.offset or all.default or spec.defaultOffset or { side = 0.0, out = 0.4, up = 0.3 }
+    local own = all[model] or spec.offset
+    if own then return own end
+    local default = PromptOffset.get(model)
+    if default then return default.prop end
+    return all.default or spec.defaultOffset or { side = 0.0, out = 0.4, up = 0.3 }
 end
 
 --- 1 for the first face, -1 for the second.
@@ -99,7 +103,7 @@ end
 ---@return number|nil degrees
 local function badgeHeading(spec, rec)
     local off = offsetFor(spec, rec.model)
-    if spec.billboard and off.yaw == nil then return nil end
+    if off.yaw == false or (spec.billboard and off.yaw == nil) then return nil end
     local base = (rec.entity and DoesEntityExist(rec.entity)) and GetEntityHeading(rec.entity) or 0.0
     local turned = (rec.face == 2) and 180.0 or 0.0
     return (base + (off.yaw or 0.0) + turned) % 360.0
@@ -175,6 +179,26 @@ local function addProp(spec, entity, model)
             }
             if type(extra) == 'table' then
                 for k, v in pairs(extra) do reg[k] = v end
+            end
+
+            local off = offsetFor(spec, model)
+            if off.visualOffset then
+                local x, y, z = PromptOffset.xyz(off.visualOffset)
+                local sign = faceSign(f)
+                reg.visual = PromptOffset.visual(function() return rec.entity end, vector3(sign*x, sign*y, z))
+            end
+            if off.radius then
+                reg.follow = function()
+                    if not DoesEntityExist(rec.entity) then return nil end
+                    rec.x, rec.y, rec.z = badgePosition(spec, rec)
+                    rec.badgeHeading = badgeHeading(spec, rec)
+                    return rec.x, rec.y, rec.z, rec.badgeHeading
+                end
+                reg.target = PromptOffset.target(function()
+                    if not DoesEntityExist(rec.entity) then return nil end
+                    rec.x, rec.y, rec.z = badgePosition(spec, rec)
+                    return rec.x, rec.y, rec.z, off.radius
+                end, reg.activeRange, reg.visibleRange)
             end
 
             Interactions.register(reg)

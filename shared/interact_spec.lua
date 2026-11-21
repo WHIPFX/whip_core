@@ -142,12 +142,14 @@ InteractSpec.ACTION_AT = {
     radial      = { place = true },
     model       = { place = true },
     list        = { place = true },   -- another prompt's list, by an option in it: 'atm:balance' (client/interact.lua)
-    heading     = { with = { 'coords', 'entity', 'netId', 'model' } },
+    heading     = { with = { 'coords', 'entity', 'netId', 'model', 'aimBox' } },
     follow      = { with = { 'coords' } },
-    offset      = { with = { 'entity', 'netId', 'model' } },
+    offset      = { with = { 'entity', 'netId', 'model', 'aimBox' } },
+    visualOffset = { with = { 'entity', 'netId', 'model', 'aimBox' } },
+    radius      = { with = { 'entity', 'netId', 'model', 'aimBox' } },
     bone        = { with = { 'entity', 'netId' } },
     faces       = { with = { 'model' } },
-    -- Per-model placement: { [model] = { offset, heading } }
+    -- Per-model placement: { [model] = { offset, heading, visualOffset, radius } }
     perModel    = { with = { 'model' } },
 }
 

@@ -15,15 +15,15 @@
 -- AT
 --   { coords = vec3, heading?, follow? }        a prompt at a point. heading: stands like a sign;
 --                                               none: faces you. follow: returns x, y, z, heading
---   { entity = handle, offset? = vec3, bone?, heading? }   a prompt riding on an entity; removed a few
+--   { entity = handle, offset? = vec3, bone?, heading?, visualOffset?, radius? }   a prompt riding on an entity; removed a few
 --                                               seconds after it is gone (`onGone` is told). heading: a
 --                                               sign at that yaw from the entity's own facing, turning
 --                                               with it (180: on its back); none: faces you
---   { netId = n, offset?, bone?, heading? }     the same by network id: off while the entity is not
+--   { netId = n, offset?, bone?, heading?, visualOffset?, radius? }     the same by network id: off while the entity is not
 --                                               streamed in here, back when it is
 --   { model = 'prop_x' | { ... }, offset?, heading?, faces?, perModel? }   a prompt on every prop of
 --                                               that model near the player. perModel:
---                                               { [model] = { offset, heading } }. onFound / onLost
+--                                               { [model] = { offset, heading, visualOffset, radius } }. onFound / onLost
 --                                               hear every one within 50 m
 --   { vehiclePart = 'hood' }                    an option on a car part's prompt: 'hood', 'trunk',
 --                                               'door_dside_f', ..., 'bike', 'bicycle', 'boat'
@@ -570,29 +570,27 @@ local function engineId(entry, o)
     return 'act:' .. entry.key
 end
 
-local function xyz(v)
-    if v == nil then return nil end
-    local x = tonumber(v.x or v[1])
-    local y = tonumber(v.y or v[2])
-    local z = tonumber(v.z or v[3])
-    if not (x and y and z) then return nil end
-    return x, y, z
-end
+local xyz = PromptOffset.xyz
 
 --- Where a prompt riding on an entity is now: its bone, else its offset, else its origin. nil if the entity is gone or not streamed in.
-local function ridePoint(at)
+local function ridePoint(at, placement)
     local ent = entityOf(at)
-    if not ent or not DoesEntityExist(ent) then return nil end
+    if not ent or not DoesEntityExist(ent) then
+        if placement then placement(nil) end
+        return nil
+    end
+    local ox, oy, oz, turn, radius
+    if placement then ox, oy, oz, turn, radius = placement(ent) end
+    local heading = turn and (GetEntityHeading(ent) + turn) % 360.0 or nil
     if at.bone then
         local idx = GetEntityBoneIndexByName(ent, tostring(at.bone))
         if idx ~= -1 then
             local p = GetWorldPositionOfEntityBone(ent, idx)
-            return p.x, p.y, p.z
+            return p.x, p.y, p.z, heading, at.radius
         end
     end
-    local ox, oy, oz = xyz(at.offset)
     local p = GetOffsetFromEntityInWorldCoords(ent, ox or 0.0, oy or 0.0, oz or 0.0)
-    return p.x, p.y, p.z
+    return p.x, p.y, p.z, heading, radius
 end
 
 --- Ticks (of 500ms) an entity may be missing before its action is removed.
@@ -610,7 +608,7 @@ local function startRiding()
         while next(riding) do
             local gone = {}
             for key, r in pairs(riding) do
-                local x, y, z = ridePoint(r.at)   -- (all three, or nil)
+                local x, y, z, heading = ridePoint(r.at, r.placement)   -- (all three, or nil)
                 if r.at.netId ~= nil then
                     if x then
                         if r.live then
@@ -620,6 +618,7 @@ local function startRiding()
                             local m = mounted[key]
                             if m and m.reg then
                                 m.reg.x, m.reg.y, m.reg.z = x, y, z
+                                m.reg.heading = heading
                                 if Interactions.register(m.reg) ~= false then r.live = true end
                             end
                         end
@@ -922,22 +921,16 @@ local function mountPrompt(entry)
     local def, at = entry.def, entry.def.at
     local pid = 'act:' .. entry.key
 
-    local x, y, z, follow
+    local x, y, z, heading, follow, placement, pointRadius
     local rides = at.entity ~= nil or at.netId ~= nil
     -- A riding prompt with a heading is a sign at that yaw FROM THE ENTITY'S OWN FACING, turning with it (a speaker's
     -- back on a car going round a corner); one without faces the player.
-    local turn = rides and tonumber(at.heading) or nil
     if rides then
-        x, y, z = ridePoint(at)
-        if turn then
-            follow = function()
-                local px, py, pz = ridePoint(at)
-                if not px then return nil end
-                -- (A point came back, so the entity is there.)
-                return px, py, pz, (GetEntityHeading(entityOf(at) --[[@as integer]]) + turn) % 360.0
-            end
-        else
-            follow = function() return ridePoint(at) end
+        placement, pointRadius = PromptOffset.follow(at.offset, at.heading, at.radius)
+        x, y, z, heading = ridePoint(at, placement)
+        follow = function()
+            local x, y, z, h = ridePoint(at, placement)
+            return x, y, z, h
         end
     else
         x, y, z = xyz(at.coords)
@@ -949,7 +942,7 @@ local function mountPrompt(entry)
     local function entityNow() return entityOf(at) end
     local function whereNow()
         if rides then
-            local rx, ry, rz = ridePoint(at)
+            local rx, ry, rz = ridePoint(at, placement)
             if rx then return rx, ry, rz end
         end
         return x, y, z
@@ -963,15 +956,26 @@ local function mountPrompt(entry)
     reg.id = pid
     reg.x, reg.y, reg.z = x, y, z
     -- A vector4's w is the heading, or a table's `w`, `heading` or [4]. (A riding prompt's: from its entity's facing.)
-    local ent = turn and entityOf(at) or nil
-    reg.heading = (turn and ent and DoesEntityExist(ent) and (GetEntityHeading(ent) + turn) % 360.0)
-        or tonumber(at.heading) or (function()
+    reg.heading = heading or tonumber(at.heading) or (function()
+        if at.heading == false then return nil end
         local c = at.coords
         if type(c) == 'vector4' then return c.w end
         if type(c) == 'table' then return tonumber(c.w or c.heading or c[4]) end
         return nil
     end)()
     reg.follow = follow
+    if rides then
+        reg.visual = PromptOffset.visual(entityNow, at.visualOffset)
+        if placement then
+            reg.target = PromptOffset.target(function(fresh)
+                if not fresh and not (at.bone and at.radius or (not at.bone and pointRadius())) then
+                    return 0.0, 0.0, 0.0
+                end
+                local px, py, pz, turn, radius = ridePoint(at, placement)
+                return px, py, pz, radius
+            end, def.reach, def.seeFrom)
+        end
+    end
     reg.options = options
     local live = false
     if x then
@@ -983,7 +987,7 @@ local function mountPrompt(entry)
     mounted[entry.key] = { kind = 'prompt', ids = { pid }, reg = reg }
     if rides then
         riding[entry.key] = { key = entry.key, pid = pid, at = at, owner = entry.owner, id = entry.id,
-                              def = def, live = live }
+                              def = def, live = live, placement = placement }
         startRiding()
     end
     return true
@@ -999,10 +1003,38 @@ local function aimBoxLook(a)
     local frame = GetFrameCount()
     if a.frame == frame then return a.on end
     a.frame = frame
+    a.point = a.find and a.find(a.out, a.range) or false
+    if a.point then
+        a.on = true
+        if a.about then a.about.world, a.about.normal = false, false end
+        return true
+    end
     a.on = AimBox.aim(a.kinds, a.flags, a.maxT, a.on and a.out.entity or nil, a.out)
     if a.on and a.models then
         local entity = a.out.entity
         a.on = entity ~= nil and entity ~= 0 and a.models[GetEntityModel(entity) & 0xFFFFFFFF] == true
+    end
+    if a.placement then
+        local o = a.out
+        local entity = a.on and o.entity or nil
+        local x, y, z, heading, radius = a.placement(entity)
+        if entity and (x or radius) then
+            local p = GetOffsetFromEntityInWorldCoords(entity, x or 0.0, y or 0.0, z or 0.0)
+            if radius then
+                a.sight = a.sight or {}
+                a.on = PromptOffset.check(p.x, p.y, p.z, radius, a.range, a.sight)
+                if not a.on then return false end
+                a.point = true
+                o.radius = radius
+            end
+            o.px, o.py, o.pz, o.x, o.y, o.z = p.x, p.y, p.z, p.x, p.y, p.z
+            o.heading, o.wrap = nil, nil
+        end
+        if entity and heading == false then
+            o.heading, o.wrap = nil, nil
+        elseif entity and heading ~= nil then
+            o.heading, o.wrap = (GetEntityHeading(o.entity) + heading) % 360.0, nil
+        end
     end
     -- With 'world' among the kinds: is it the map itself (ctx.world), and its facing (ctx.normal)
     local about = a.about
@@ -1045,7 +1077,10 @@ local function mountAimBox(entry)
             entry.aimModels[hash & 0xFFFFFFFF] = true
         end
     end
-    local a = { pid = pid, kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false, models = entry.aimModels,
+    local a = { pid = pid, placement = PromptOffset.follow(at.offset, at.heading, at.radius),
+                kinds = kinds, flags = flags, maxT = reach + 6.0, out = {}, on = false, models = entry.aimModels,
+                find = PromptOffset.finder(kinds, entry.aimModels, at.offset, at.heading, at.radius),
+                range = def.seeFrom or Config.InteractVisibleRange or 5.0,
                 about = kinds.world and { world = false, normal = false } or nil }
 
     local function entityNow() return a.on and a.out.entity or nil end
@@ -1060,6 +1095,28 @@ local function mountAimBox(entry)
 
     local reg = promptLook(entry)
     reg.id = pid
+    reg.visual = PromptOffset.visual(entityNow, at.visualOffset)
+    if a.find then
+        local sight = {}
+        reg.target = function(fresh)
+            if not a.on then return false end
+            if not a.point then return true end
+            local entity = a.out.entity
+            if not entity or not DoesEntityExist(entity) then return false end
+            if fresh then
+                local model = GetEntityModel(entity) & 0xFFFFFFFF
+                if a.models and not a.models[model] then return false end
+                local offset, turn, visual, radius = PromptOffset.resolve(model, at.offset, at.heading, at.visualOffset, at.radius)
+                local x, y, z = PromptOffset.xyz(offset)
+                if not radius then return false end
+                local p = GetOffsetFromEntityInWorldCoords(entity, x or 0.0, y or 0.0, z or 0.0)
+                a.out.x, a.out.y, a.out.z = p.x, p.y, p.z
+                local ok = PromptOffset.check(p.x, p.y, p.z, radius, reach, sight, true)
+                return ok, true
+            end
+            return true, true
+        end
+    end
     reg.onBlur = foldOnBlur(entry, pid, entityNow, whereNow, a.about, gate)
     local me = GetEntityCoords(PlayerPedId())
     reg.x, reg.y, reg.z = me.x, me.y, me.z
@@ -1090,17 +1147,22 @@ end
 local function mountProps(entry)
     local def, at = entry.def, entry.def.at
     local propKind = 'act:' .. entry.key
-    local ox, oy, oz = xyz(at.offset)
     -- Each model's own placing over the one `offset` for all; what an entry leaves out is the action's own.
     local offsets = {}
-    if type(at.perModel) == 'table' then
-        for model, p in pairs(at.perModel) do
-            if type(p) == 'table' then
-                local px, py, pz = xyz(p.offset)
-                offsets[tostring(model)] = { side = px or ox or 0.0, out = py or oy or 0.0, up = pz or oz or 0.0,
-                                             yaw = tonumber(p.heading) or tonumber(at.heading) }
-            end
-        end
+    local searchRange = 30.0
+    for _, model in ipairs(type(at.model) == 'table' and at.model or { at.model }) do
+        local p = type(at.perModel) == 'table' and at.perModel[model] or nil
+        if type(p) ~= 'table' then p = nil end
+        local turn = at.heading
+        if p and (p.heading == false or tonumber(p.heading)) then turn = p.heading end
+        local own = p and xyz(p.offset) and p.offset or at.offset
+        local visual = p and PromptOffset.xyz(p.visualOffset) and p.visualOffset or at.visualOffset
+        local radius = p and PromptOffset.radius(p.radius) and p.radius or at.radius
+        local offset, heading, visualOffset, pointRadius = PromptOffset.resolve(model, own, turn, visual, radius)
+        local x, y, z = xyz(offset)
+        offsets[model] = { side = x or 0.0, out = y or 0.0, up = z or 0.0, yaw = heading,
+                          visualOffset = visualOffset, radius = pointRadius }
+        if x then searchRange = math.max(searchRange, math.sqrt(x*x + y*y + z*z) + (def.seeFrom or Config.InteractVisibleRange or 5.0)) end
     end
     local found = {}   -- [prop id] = the ctx onFound was given, while the prop is tracked
 
@@ -1118,8 +1180,8 @@ local function mountProps(entry)
         kind      = propKind,
         faces     = (tonumber(at.faces) == 2) and 2 or 1,
         models    = type(at.model) == 'table' and at.model or { at.model },
-        offset    = { side = ox or 0.0, out = oy or 0.0, up = oz or 0.0, yaw = tonumber(at.heading) },
         offsets   = offsets,
+        searchRange = function() return searchRange end,
         -- A model with no heading of its own turns to face the player.
         billboard = true,
         group     = 'actions',
@@ -1298,6 +1360,9 @@ local function kindOf(at)
     if type(at) ~= 'table' then
         return nil, 'at says where the action is: { coords }, { entity }, { netId }, { model }, { vehiclePart }, { aimBox }, or { radial = true }'
     end
+    if at.radius ~= nil and not PromptOffset.radius(at.radius) then
+        return nil, 'at.radius must be between 0.01 and 5 metres'
+    end
     -- One place only: two is refused rather than guessed.
     local named = {}
     for _, k in ipairs({ 'coords', 'entity', 'netId', 'vehiclePart', 'aimBox', 'model', 'list' }) do
@@ -1310,6 +1375,9 @@ local function kindOf(at)
     end
     if at.aimBox ~= nil then
         if not AimBox.kinds(at.aimBox) then return nil, "at.aimBox is 'vehicle', 'object', 'ped' or 'world' (or a list of them)" end
+        if at.heading ~= nil and at.heading ~= false and (type(at.heading) ~= 'number' or at.heading ~= at.heading or math.abs(at.heading) == math.huge) then
+            return nil, 'at.heading must be a finite number or false'
+        end
         if at.aimModels ~= nil then
             if type(at.aimModels) ~= 'table' or #at.aimModels == 0 then
                 return nil, 'at.aimModels is a non-empty list of model names or hashes'
@@ -1599,11 +1667,7 @@ Actions.registry = reg
 local function autoId(def)
     local at = type(def.at) == 'table' and def.at or {}
     local x, y, z = xyz(at.coords)
-    -- Never index a function reference: it throws.
-    local ox, oy, oz
-    if not (type(at.offset) == 'table' and rawget(at.offset, '__cfx_functionReference') ~= nil) then
-        ox, oy, oz = xyz(at.offset)
-    end
+    local ox, oy, oz = xyz(at.offset)
     local opts = {}
     if type(def.options) == 'table' then
         for i, o in ipairs(def.options) do
@@ -1631,6 +1695,10 @@ local function autoId(def)
         local names = {}
         for i, m in ipairs(at.aimModels) do names[i] = tostring(m) end
         seed = seed .. '|aimModels:' .. table.concat(names, '+')
+    end
+    if at.visualOffset ~= nil or at.radius ~= nil then
+        local vx, vy, vz = PromptOffset.xyz(at.visualOffset)
+        seed = seed .. ('|visual:%.17g:%.17g:%.17g|radius:%s'):format(vx or 0, vy or 0, vz or 0, tostring(at.radius))
     end
     return ('auto:%08x'):format(GetHashKey(seed) & 0xFFFFFFFF)
 end
@@ -1766,7 +1834,7 @@ function Actions.get(owner, id)
         if t == 'number' or t == 'string' or t == 'boolean' then out.at[k] = v
         elseif t == 'vector3' then out.at[k] = { x = v.x, y = v.y, z = v.z }
         elseif t == 'vector4' then out.at[k] = { x = v.x, y = v.y, z = v.z, w = v.w }
-        elseif t == 'table' and rawget(v, '__cfx_functionReference') == nil then
+        elseif t == 'table' then
             local x, y, z = xyz(v)
             if x then out.at[k] = { x = x, y = y, z = z, w = tonumber(v.w or v.heading or v[4]) } end
         end

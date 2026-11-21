@@ -346,6 +346,7 @@ client_scripts {
     'client/director_spots.lua',
     -- After world_quad.lua.
     'client/director_talk.lua',
+    'client/prompt_offset.lua',
     -- Before atm.lua: it calls PropPrompts.define at file scope.
     'client/prop_prompts.lua',
     'client/atm.lua',
@@ -435,6 +436,7 @@ client_scripts {
     'tools/ov_move.lua',
     'tools/place_point.lua',   -- the settings page's Place (client/place_point.lua's PlacePoint)
     'tools/hand_edit.lua',
+    'tools/prompt_offset.lua',
     -- Before every tool that shows it.
     'tools/editor_hud.lua',
     -- Before the wizard, which calls it at runtime.

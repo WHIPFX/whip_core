@@ -1104,6 +1104,10 @@ Config.InteractCameraWeight = 0.4
 -- Doors only exist in 'world'. Swap live with /interactrenderer to compare.
 Config.InteractRenderer = 'world'
 
+Config.PropPromptDefaultOffset = {
+    -- ['sf_prop_impact_driver_01a'] = { offset = vector3(0.0, 0.0, 0.5563), heading = false },
+}
+
 -- Settings for the 'world' renderer only.
 Config.Interact3D = {
     -- The badge's height on screen, in pixels, at InteractActiveRange; its size in metres follows from the real FOV
