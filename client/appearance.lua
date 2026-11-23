@@ -143,9 +143,9 @@ end
 -- Tattoos
 -- Stored as a list of { collection, overlay } names, drawn in order (list: shared/tattoo_list.lua).
 -- No native removes one decoration, so changing the list clears all and re-applies the new list.
--- The scalp decoration goes on first: the one GTA Online puts under the haircut (shared/hair_decor.lua),
--- so the hair does not look glued on; on a cut without one, the chosen hair fade (`hairFade`,
--- shared/hair_fades.lua); with neither, the default fuzz. The cut's own follows the cut and is never saved.
+-- The hair fade (`hairFade`, shared/hair_fades.lua) is a decoration too and goes on first. With no fade
+-- chosen, a freemode ped gets the decoration GTA Online puts under its haircut (shared/hair_decor.lua), so
+-- the hair does not look glued on; it follows the cut and is never saved.
 
 --- The body letter HairDecor and the fades use for this ped, or nil for a non-freemode ped.
 local function freemodeBody(ped)
@@ -217,22 +217,20 @@ local function hairDecorFor(ped, body, drawable)
 end
 
 --- Put exactly this fade and these tattoos on a ped (nil or empty: none).
---- Call it after the hair is set. The scalp decoration, in order: the haircut's own (table or shop data),
---- else the chosen fade, else the default (HairDecor.fallback). A cut with its own keeps it over any fade.
+--- Call it after the hair is set: with no fade, the haircut's own decoration goes on (HairDecor).
 ---@param ped number
 ---@param tattoos table|nil  { { collection = 'mpBiker_overlays', overlay = 'MP_MP_Biker_Tat_000_M' }, ... }
 ---@param fade table|nil     { collection = 'multiplayer_overlays', overlay = 'NG_M_Hair_001' }
 local function applyTattoos(ped, tattoos, fade)
     ClearPedDecorationsLeaveScars(ped)
-    local col, ovl, src
-    local body = freemodeBody(ped)
-    if body then col, ovl, src = hairDecorFor(ped, body, GetPedDrawableVariation(ped, 2)) end
-    if col and (src == 'table' or src == 'shop') then
-        AddPedDecorationFromHashes(ped, GetHashKey(col), GetHashKey(ovl))
-    elseif type(fade) == 'table' and type(fade.collection) == 'string' and type(fade.overlay) == 'string' then
+    if type(fade) == 'table' and type(fade.collection) == 'string' and type(fade.overlay) == 'string' then
         AddPedDecorationFromHashes(ped, GetHashKey(fade.collection), GetHashKey(fade.overlay))
-    elseif col then
-        AddPedDecorationFromHashes(ped, GetHashKey(col), GetHashKey(ovl))
+    else
+        local body = freemodeBody(ped)
+        if body then
+            local col, ovl = hairDecorFor(ped, body, GetPedDrawableVariation(ped, 2))
+            if col then AddPedDecorationFromHashes(ped, GetHashKey(col), GetHashKey(ovl)) end
+        end
     end
     if type(tattoos) ~= 'table' then return end
     for _, t in ipairs(tattoos) do
@@ -243,7 +241,7 @@ local function applyTattoos(ped, tattoos, fade)
 end
 
 --- One string naming a fade, a tattoo list and the haircut, so two can be compared.
---- The haircut is in it because its decoration decides whether the fade goes on at all (applyTattoos).
+--- The haircut is in it because, with no fade, its decoration goes on with the tattoos (applyTattoos).
 local function tattooSig(tattoos, fade, hair)
     local parts = {}
     if type(tattoos) == 'table' then
@@ -252,7 +250,7 @@ local function tattooSig(tattoos, fade, hair)
         end
     end
     local f = type(fade) == 'table' and ((fade.collection or '') .. '/' .. (fade.overlay or '')) or ''
-    local h = type(hair) == 'table' and tostring(hair.style or 0) or ''
+    local h = (f == '' and type(hair) == 'table') and tostring(hair.style or 0) or ''
     return f .. '|' .. h .. '|' .. table.concat(parts, ',')
 end
 
