@@ -231,6 +231,7 @@ local synced = false   -- the start-up sync has run (the catalog is read): a fre
 
 function PropCatalog.syncImages()
     synced = true
+    WhipMedia.firstRead()
     local roots = {}
     for _, res in ipairs(WhipAssets.resources()) do
         local root = GetResourceState(res) ~= 'missing' and GetResourcePath(res) or nil

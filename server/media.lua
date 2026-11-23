@@ -21,6 +21,7 @@ local RETRY_MS = 60 * 1000        -- and this soon after a failed read, at start
 
 local index = nil        -- the index last read: { packs = { [pack] = { version, files = { [dir] = { names } } } } }
 local raw = nil          -- and its text
+local tried = false      -- the start's first read has been tried (read, failed or not needed)
 local warned = false     -- a failed read is said once, until one works
 local files = {}         -- [pack] = { ['img/props/x.webp'] = true }, from it
 local hooks = {}
@@ -73,6 +74,13 @@ end
 function WhipMedia.status()
     if not base() then return 'off' end
     return index and 'read' or 'unread'
+end
+
+--- Wait (up to 10 s) for the start's first read of the CDN's list, when there is no copy from a last start: the
+--- catalogs look for pictures once, then, rather than warning that there are none and looking again a moment later.
+function WhipMedia.firstRead()
+    local deadline = GetGameTimer() + 10000
+    while not tried and not index and GetGameTimer() < deadline do Wait(100) end
 end
 
 --- fn() when the CDN's list of pictures changes (a fresh index): the catalogs look again.
@@ -148,6 +156,7 @@ end
 CreateThread(function()
     while true do
         local read = fetch()
+        tried = true
         Wait(read and AGAIN_MS or RETRY_MS)
     end
 end)

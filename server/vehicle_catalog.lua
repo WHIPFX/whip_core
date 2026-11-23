@@ -100,6 +100,7 @@ end
 --- read), else on WHIP's CDN (server/media.lua).
 ---@return number pictured
 local function findPictures()
+    WhipMedia.firstRead()
     local roots = {}
     for _, res in ipairs(WhipAssets.resources()) do
         local root = GetResourceState(res) ~= 'missing' and GetResourcePath(res) or nil
