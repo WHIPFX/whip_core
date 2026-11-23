@@ -210,6 +210,8 @@ function PropCatalog.seedFromConfig()
     print(('[whip_core:props] seeded %d new prop(s), named %d'):format(added, named))
 end
 
+local syncing = false   -- syncImages is running (it waits between batches)
+
 --- Make every row's picture flag match the disk: img/props/<model>.webp in its media pack there and
 --- not empty means it has a picture.
 ---
@@ -227,10 +229,7 @@ end
 --- with neither keeps the flags as they are and says why.
 --- The folders are read whether or not their resources have started yet (start order does not matter); one
 --- missing or never started is the setup report's to say (server/setup_report.lua).
-local synced = false   -- the start-up sync has run (the catalog is read): a fresh CDN list may sync again
-
-function PropCatalog.syncImages()
-    synced = true
+local function syncNow()
     WhipMedia.firstRead()
     local roots = {}
     for _, res in ipairs(WhipAssets.resources()) do
@@ -295,10 +294,17 @@ function PropCatalog.syncImages()
     end
 end
 
--- The CDN's list of pictures changed (a picture pack's release): look again. Not before the start-up sync, which
--- reads the catalog first (player_lifecycle.lua).
+function PropCatalog.syncImages()
+    syncing = true
+    local ok, err = pcall(syncNow)
+    syncing = false
+    if not ok then print(('[whip_core:props] ERROR syncing picture flags: %s'):format(tostring(err))) end
+end
+
+-- The CDN's list of pictures changed (a picture pack's release): look again, once a look under way has ended.
 WhipMedia.onChange(function()
-    if synced then CreateThread(PropCatalog.syncImages) end
+    while syncing do Wait(100) end
+    PropCatalog.syncImages()
 end)
 
 -- ============================================

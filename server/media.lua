@@ -17,11 +17,13 @@ WhipMedia = {}
 local RES = GetCurrentResourceName()
 local CACHE = 'data/media-index.json'
 local AGAIN_MS = 60 * 60 * 1000   -- the index is read again this often
-local RETRY_MS = 60 * 1000        -- and this soon after a failed read, at start
+local RETRY_MS = 60 * 1000        -- and this soon after a failed read
+local ANSWER_MS = 30 * 1000       -- a read with no answer by then has failed
 
 local index = nil        -- the index last read: { packs = { [pack] = { version, files = { [dir] = { names } } } } }
 local raw = nil          -- and its text
 local tried = false      -- the start's first read has been tried (read, failed or not needed)
+local looked = false     -- the catalogs have looked for pictures: a change after that tells them to look again
 local warned = false     -- a failed read is said once, until one works
 local files = {}         -- [pack] = { ['img/props/x.webp'] = true }, from it
 local hooks = {}
@@ -76,14 +78,16 @@ function WhipMedia.status()
     return index and 'read' or 'unread'
 end
 
---- Wait (up to 10 s) for the start's first read of the CDN's list, when there is no copy from a last start: the
---- catalogs look for pictures once, then, rather than warning that there are none and looking again a moment later.
+--- The catalogs call this before they look for pictures. With no copy from a last start, it waits for the start's first
+--- read of the CDN's list to end (read, or failed: ANSWER_MS at most), so they look once, with the list, rather than
+--- warning that there are none. Any change to the list after this tells them to look again (onChange).
 function WhipMedia.firstRead()
-    local deadline = GetGameTimer() + 10000
-    while not tried and not index and GetGameTimer() < deadline do Wait(100) end
+    while not tried and not index do Wait(100) end
+    looked = true
 end
 
---- fn() when the CDN's list of pictures changes (a fresh index): the catalogs look again.
+--- fn() when the CDN's list of pictures changes after the catalogs looked (a pack's release, or a read that worked
+--- after one that failed). Called one after another on the media thread, so one may wait for its catalog's own look.
 ---@param fn function
 function WhipMedia.onChange(fn)
     hooks[#hooks + 1] = fn
@@ -125,9 +129,14 @@ end
 local function fetch()
     local b = base()
     if not b or not needed() then return true end
-    local p = promise.new()
-    PerformHttpRequest(b .. '/media/index.json', function(status, body) p:resolve({ status, body }) end,
-        'GET', '', { ['User-Agent'] = 'WHIP ' .. RES })
+    local p, answered = promise.new(), false
+    local function answer(status, body)
+        if answered then return end   -- (an answer after the time is up is left: the next read gets it)
+        answered = true
+        p:resolve({ status, body })
+    end
+    PerformHttpRequest(b .. '/media/index.json', answer, 'GET', '', { ['User-Agent'] = 'WHIP ' .. RES })
+    SetTimeout(ANSWER_MS, function() answer(0, nil) end)
     local status, body = table.unpack(Citizen.Await(p))
     local ok, idx = pcall(json.decode, body or '')
     if status ~= 200 or not ok or not valid(idx) then
@@ -146,9 +155,11 @@ local function fetch()
     raw = body
     SaveResourceFile(RES, CACHE, body, -1)
     publish()
-    for _, fn in ipairs(hooks) do
-        local ran, err = pcall(fn)
-        if not ran then print(('[whip_core:media] %s'):format(tostring(err))) end
+    if looked then
+        for _, fn in ipairs(hooks) do
+            local ran, err = pcall(fn)
+            if not ran then print(('[whip_core:media] %s'):format(tostring(err))) end
+        end
     end
     return true
 end

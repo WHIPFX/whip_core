@@ -96,10 +96,12 @@ local function addFromList()
     return added
 end
 
+local finding = false   -- findPictures is running (it waits between batches)
+
 --- Mark each row with whether it has a picture: on disk in its media pack when that is installed (opened, never
 --- read), else on WHIP's CDN (server/media.lua).
 ---@return number pictured
-local function findPictures()
+local function findNow()
     WhipMedia.firstRead()
     local roots = {}
     for _, res in ipairs(WhipAssets.resources()) do
@@ -137,6 +139,14 @@ local function findPictures()
     return pictured
 end
 
+local function findPictures()
+    finding = true
+    local ok, res = pcall(findNow)
+    finding = false
+    if not ok then print(('[whip_core:vehicles] ERROR finding pictures: %s'):format(tostring(res))) return 0 end
+    return res
+end
+
 --- Read the table, add the list, find the pictures. false: the read failed, and start-up halts (player_lifecycle.lua).
 function VehicleCatalog.loadAll()
     local ok, rows = pcall(MySQL.query.await, 'SELECT `model`, `displayName`, `class` FROM `vehicle_catalog`', {})
@@ -156,9 +166,10 @@ function VehicleCatalog.loadAll()
     return true
 end
 
--- The CDN's list of pictures changed (a picture pack's release): look again.
+-- The CDN's list of pictures changed (a picture pack's release): look again, once a look under way has ended.
 WhipMedia.onChange(function()
-    if next(VehicleCatalog.rows) then CreateThread(findPictures) end
+    while finding do Wait(100) end
+    findPictures()
 end)
 
 -- ============================================
