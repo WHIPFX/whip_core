@@ -107,6 +107,8 @@ server_scripts {
     'server/containers.lua',
     -- Before server/items/*.lua: wallet and duffle_bag call RegisterPanelItem.
     'server/panels.lua',
+    -- Before the catalogs: where each media pack's pictures come from (WHIP's CDN when it isn't installed).
+    'server/media.lua',
     -- The built-in list first: prop_catalog.lua seeds its table from it.
     'server/prop_catalog_seed.lua',
     'server/prop_catalog_seed_world.lua',

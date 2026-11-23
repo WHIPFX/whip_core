@@ -49,7 +49,7 @@ local function currentRenderer()
     return configuredRenderer()
 end
 
---- Tell the page its theme and inventory renderer.
+--- Tell the page its theme, inventory renderer and where the media packs' pictures come from.
 ---
 --- At load, and again when a character loads: at load the page may not be listening yet, and by the
 --- time a character is loaded it is. Both are safe to repeat: theme.js replaces its link, and
@@ -62,7 +62,16 @@ local function sendPageSettings()
     SendNUIMessage({ action = 'setTheme', resource = theme })
     -- The custom inventory renderer — see html/js/renderer-loader.js. Fails soft to whip's own.
     SendNUIMessage({ action = 'setInventoryRenderer', resource = configuredRenderer() })
+    -- Each media pack: its own pictures, or WHIP's CDN's (server/media.lua, html/js/assets.js)
+    SendNUIMessage({ action = 'whipAssetSources', sources = GlobalState.whipMedia })
 end
+
+-- The server changed where a pack's pictures come from (a pack started or stopped, a fresh CDN list): this page and
+-- the world pages that show pictures.
+AddStateBagChangeHandler('whipMedia', 'global', function(_, _, value)
+    SendNUIMessage({ action = 'whipAssetSources', sources = value })
+    DuiPage.sendAssetSources(value)
+end)
 
 --- Announce readiness locally.
 ---

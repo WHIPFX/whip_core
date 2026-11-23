@@ -221,7 +221,7 @@ function R.attach()
 
     -- The third browser: one picture for the focused prompt.
     previewPage = DuiPage.new({ name = 'interact3d', url = 'interact3d/preview.html', width = PREVIEW_W,
-        height = PREVIEW_H, txd = TXD_PREVIEW, tex = TEX_PREVIEW, without = 'prompts show no pictures' })
+        height = PREVIEW_H, txd = TXD_PREVIEW, tex = TEX_PREVIEW, assets = true, without = 'prompts show no pictures' })
     previewPage:ensure()
     previewSrc = nil
 

@@ -114,7 +114,7 @@ end
 --- painted again, in case it was not listening yet (a missed setup is a blank atlas).
 local page = DuiPage.new({
     name = 'worldmarks', url = 'interact3d/marks.html', width = ATLAS_W, height = ATLAS_H, txd = TXD, tex = TEX,
-    bootMs = BOOT_MS, setup = setupMessage, again = { RESEND_MS }, onAgain = forgetSlots,
+    bootMs = BOOT_MS, setup = setupMessage, again = { RESEND_MS }, onAgain = forgetSlots, assets = true,
     without = 'the world builder draws no marks',
 })
 

@@ -2,3 +2,5 @@
 settings.json
 server_settings.json
 /.githooks/__pycache__
+# The CDN's list of pictures, kept for a start without internet (server/media.lua).
+data/media-index.json

@@ -129,17 +129,22 @@ local function gather()
         end
     end
 
-    -- The asset packs: pictures, videos, the map.
-    local missing, stopped = {}, {}
+    -- The asset packs: pictures, videos, the map. One not running is served by WHIP's CDN when it has it
+    -- (server/media.lua).
+    local missing, stopped, here, cdn = {}, {}, {}, {}
     local packs = WhipAssets.resources()
     for _, res in ipairs(packs) do
         local s = GetResourceState(res)
-        if s == 'missing' then missing[#missing + 1] = res
-        elseif s ~= 'started' and s ~= 'starting' then stopped[#stopped + 1] = res end
+        if s == 'started' or s == 'starting' then here[#here + 1] = res
+        elseif WhipMedia.version(res) then cdn[#cdn + 1] = res
+        elseif s == 'missing' then missing[#missing + 1] = res
+        else stopped[#stopped + 1] = res end
     end
     if #missing > 0 then
-        add('fix', 'Not in the resources folder: %s. Players miss the pictures and videos in them: put them in your resources'
-            .. ' folder (a server made by WHIP\'s recipe keeps them in [assets]/[media])', table.concat(missing, ', '))
+        add('fix', 'Not in the resources folder: %s%s. Players miss the pictures and videos in them: put them in your'
+            .. ' resources folder (a server made by WHIP\'s recipe keeps them in [assets]/[media])',
+            table.concat(missing, ', '),
+            WhipMedia.status() == 'unread' and ', and WHIP\'s CDN could not be read (see the console above)' or '')
     end
     if #stopped > 0 then
         add('fix', 'In the resources folder but not started: %s. Start them with "ensure <name>" for each, or with the'
@@ -147,7 +152,10 @@ local function gather()
             table.concat(stopped, ', '))
     end
     if #missing == 0 and #stopped == 0 then
-        add('ok', 'Pictures and videos: %s', table.concat(packs, ', '))
+        local parts = {}
+        if #here > 0 then parts[#parts + 1] = table.concat(here, ', ') end
+        if #cdn > 0 then parts[#parts + 1] = ('%s from %s'):format(table.concat(cdn, ', '), Config.MediaBase) end
+        add('ok', 'Pictures and videos: %s', table.concat(parts, '; '))
     end
 
     -- The satellites, and the property packs.

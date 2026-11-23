@@ -5899,7 +5899,7 @@ if ok then exports.whip_core:SpawnVehicle(vehicleId, vector4(x, y, z, heading)) 
 <div class="export-card" data-search="getvehiclecatalog vehicle catalog model display name class image list dealership">
 <div class="export-header"><span class="export-name">GetVehicleCatalog()</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>The vehicle catalog, keyed by model: 930 cars from <code>server/vehicle_catalog_list.lua</code>, plus packs' cars from <a href="#registervehicles"><code>RegisterVehicles</code></a>. A car has a picture when a media pack has its <code>img/vehicles/&lt;model&gt;.webp</code>.</p>
+  <p>The vehicle catalog, keyed by model: 930 cars from <code>server/vehicle_catalog_list.lua</code>, plus packs' cars from <a href="#registervehicles"><code>RegisterVehicles</code></a>. A car has a picture when a media pack, or <a href="#media-packs">WHIP's CDN</a>, has its <code>img/vehicles/&lt;model&gt;.webp</code>.</p>
   <div class="return-info"><strong>Returns: </strong>a copy, <code>{ [model] = { model, displayName, class, hasImage, image, inGame } }</code>: <code>image</code> is a URL for your NUI or <code>false</code>; don't sell <code>inGame == false</code></div>
 </div></div>
 
@@ -5921,10 +5921,10 @@ end)</code></pre>
 <div class="export-card" data-search="getvehicleimage vehicle image url nui webp picture">
 <div class="export-header"><span class="export-name">GetVehicleImage(model)</span><span class="export-side side-server">SERVER</span></div>
 <div class="export-body">
-  <p>The URL of a vehicle's picture, from a media pack over <code>cfx-nui</code>, for any resource's NUI.</p>
+  <p>The URL of a vehicle's picture for any resource's NUI: from its media pack over <code>cfx-nui</code>, or from <a href="#media-packs">WHIP's CDN</a> when that pack isn't installed.</p>
   <table class="param-table"><tr><th>Param</th><th>Type</th><th>Description</th></tr>
   <tr><td>model</td><td>string</td><td>Model name, any case</td></tr></table>
-  <div class="return-info"><strong>Returns: </strong><code>string|nil</code>: e.g. <code>https://cfx-nui-whip_media_previews/img/vehicles/sultan.webp</code></div>
+  <div class="return-info"><strong>Returns: </strong><code>string|nil</code>: e.g. <code>https://cfx-nui-whip_media_previews/img/vehicles/sultan.webp</code>, or <code>https://media.whipfx.net/media/img/vehicles/sultan.webp?v=v1.0.0</code></div>
 </div></div>
 
 <div class="export-card" data-search="hasvehicleimage vehicle image picture exists check">
@@ -11569,7 +11569,7 @@ end)</code></pre>
 <p>To get the fix, replace the <code>oxmysql</code> folder with the latest <a href="https://github.com/WHIPFX/oxmysql/releases">release</a>, or apply <code>whip_core/dev/oxmysql-p001.diff</code> by hand.</p>
 
 <h3 id="first-download">A player's first download</h3>
-<p>A first join downloads about 510 MB, mostly WHIP's pictures and videos in 5 media packs of up to 145 MB each. A pack downloads again only when it changes.</p>
+<p>WHIP's pictures and videos come from <a href="#media-packs">WHIP's CDN</a>, each the first time a screen shows it. A server that installs the media packs instead sends them all on the first join, about 510 MB in 5 packs of up to 145 MB each; a pack downloads again only when it changes.</p>
 <div class="info-box warn"><strong>Enhanced cuts off slow downloads.</strong> An Enhanced server stops any one file after about two minutes, which cuts off players slower than about 1.2 MB/s. The Quick Start's <code>sv_resourceFileDownloadTimeout 600000</code> raises it to ten minutes. Legacy has no limit.</div>
 
 <h3>Legacy and Enhanced</h3>
@@ -11856,6 +11856,7 @@ end</code></pre>
 <tr><td><code>ZoneTrackInterval</code></td><td><a href="#server-zones">Zones (Server)</a></td></tr>
 <tr><td><code>SkillCheckHoldMs</code>, <code>SkillCheckMouseSpeed</code>, <code>SkillCheckDifficulty</code></td><td><a href="#ui-skillcheck"><code>SkillCheck</code></a></td></tr>
 <tr><td><code>Theme</code></td><td><a href="#guide-theming">Theming &amp; Skins</a></td></tr>
+<tr><td><code>MediaBase</code></td><td><a href="#media-packs">Media packs</a></td></tr>
 <tr><td><code>Sentinel</code></td><td><a href="#guide-sentinel">Sentinel</a></td></tr>
 <tr><td>Voice (whip_voice's <code>config.lua</code>)</td><td><a href="#voice">Voice</a></td></tr>
 </table>
@@ -11976,15 +11977,16 @@ end</code></pre>
 </table>
 <p>Sections with live data push other admins' edits and gameplay changes while you look. Editors that need the game screen suspend the panel and bring it back; anything that opens the inventory closes it.</p>
 
-<h3>Media packs</h3>
-<p>WHIP's pictures, videos and map files come in media packs of at most 256 MB, so players download each once:</p>
+<h3 id="media-packs">Media packs</h3>
+<p>WHIP's pictures, videos and map files come in media packs of at most 256 MB:</p>
 <ul>
 <li><code>whip_media_clothing_male</code>, <code>whip_media_clothing_female</code>: clothing pictures</li>
 <li><code>whip_media_props</code>: furniture (<code>img/props/&lt;model&gt;.webp</code>)</li>
 <li><code>whip_media_previews</code>: vehicles (<code>img/vehicles/&lt;model&gt;.webp</code>), NPCs, tattoos, emotes</li>
 <li><code>whip_media_map</code>: the map, blip icons and minimap tiles</li>
 </ul>
-<p>They start in any order. Players get a new picture when you restart its pack; whip_core reads which exist at its start. A full category continues in a new pack (<code>whip_media_props_2</code>): after adding, moving or renaming packs, run <code>node whip_core/dev/assets_index.mjs</code>.</p>
+<p>A pack that isn't installed comes from WHIP's CDN, <code>Config.MediaBase</code> (<code>https://media.whipfx.net</code>): both clothing packs, props and previews are there, and a player's game loads each picture the first time a screen shows it, rather than every pack on their first join. whip_core reads the CDN's list of pictures at its start and every hour after, so a pack's new release reaches a running server, and keeps a copy for a start without internet. <code>whip_media_map</code> must be installed: it streams textures to the game.</p>
+<p>To run without the CDN, put the packs in your resources folder (a server made by WHIP's recipe has <code>get-whip-media</code> for this): a pack that is installed and started serves its own pictures, and <code>Config.MediaBase = ''</code> turns the CDN off. Installed packs start in any order. Players get a new picture when you restart its pack; whip_core reads which exist at its start. A full category continues in a new pack (<code>whip_media_props_2</code>): after adding, moving or renaming packs, run <code>node whip_core/dev/assets_index.mjs</code>.</p>
 
 <h3>ACE permission</h3>
 <p>Without <code>whip.devtools</code> the commands do nothing, and the server checks the ACE again behind every action. A player with a WHIP <a href="#permissions">permission</a> that opens a section (Director access, say) gets <code>/whip</code> with only that section.</p>

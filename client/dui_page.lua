@@ -26,6 +26,8 @@
 --                                              -- mid-game can miss its first message), then onAgain()
 --       onAgain = fn, onGone = fn,             -- optional: after each resend / after the browser is given back
 --       bootMs = 700,                          -- optional: not up before this long after it is made
+--       assets = true,                         -- optional: the page shows media pack pictures (html/js/assets.js):
+--                                              -- it is told where they come from before its setup, and on a change
 --       without = 'spot markers will not draw',-- the refusal print's words; quiet = true prints nothing
 --   })
 --
@@ -115,6 +117,7 @@ local function waitUp(p, gen)
         if p.gen ~= gen then return end
         p.isUp = true
         local o = p.opts
+        if o.assets then sendNow(p, { action = 'whipAssetSources', sources = GlobalState.whipMedia }) end
         if o.setup then sendNow(p, hook(p, o.setup)) end
         local waiting = p.queue
         p.queue = {}
@@ -127,6 +130,15 @@ local function waitUp(p, gen)
             end)
         end
     end)
+end
+
+--- Tell every page made with `assets` where the media packs' pictures come from now (client/ready.lua, on a change of
+--- GlobalState.whipMedia). One not up yet is told when it is.
+---@param sources table|nil
+function DuiPage.sendAssetSources(sources)
+    for p in pairs(live) do
+        if p.isUp and p.opts.assets then sendNow(p, { action = 'whipAssetSources', sources = sources }) end
+    end
 end
 
 ---@param opts table  see the header

@@ -9,7 +9,10 @@
 --     WhipAssets.resourceFor('img/props/prop_bench_01a.webp')   -> 'whip_media_props'
 --     WhipAssets.url('img/props/prop_bench_01a.webp')           -> 'https://cfx-nui-whip_media_props/img/props/...'
 --
--- The NUI asks html/js/assets.js the same (whipAssetUrl). Shared: both sides ask.
+-- A pack that isn't running is served from WHIP's CDN instead (Config.MediaBase, server/media.lua):
+--     -> 'https://media.whipfx.net/media/img/props/prop_bench_01a.webp?v=v1.0.0'
+-- Where each pack comes from is GlobalState.whipMedia ({ base, packs = { [pack] = 'local' | '<tag>' } }), which
+-- server/media.lua keeps. The NUI asks html/js/assets.js the same (whipAssetUrl). Shared: both sides ask.
 
 --- The resource whose folder has `path` (inside it, as 'img/props/<model>.webp'), or nil when no area holds it.
 --- An area split over several resources goes by the name: the last whose run of names starts at or before it.
@@ -34,7 +37,13 @@ end
 function WhipAssets.url(path)
     local res = WhipAssets.resourceFor(path)
     if not res then return nil end
-    return ('https://cfx-nui-%s/%s'):format(res, (tostring(path):gsub('^/+', '')))
+    path = (tostring(path):gsub('^/+', ''))
+    local from = GlobalState.whipMedia
+    local v = type(from) == 'table' and type(from.packs) == 'table' and from.packs[res] or nil
+    if v and v ~= 'local' and type(from.base) == 'string' then
+        return ('%s/media/%s?v=%s'):format(from.base, path, v)
+    end
+    return ('https://cfx-nui-%s/%s'):format(res, path)
 end
 
 --- Every media pack, in the index's order (the order of the areas they hold).
