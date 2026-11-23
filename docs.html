@@ -3501,7 +3501,7 @@ AddEventHandler('whip_core:player:logout', function() setWalk(0) end)   -- loggi
 <h3>Respawning and reviving</h3>
 <p>The death screen counts down <code>Config.RespawnTime</code> (10 seconds, also in <code>/whip</code> → Settings → Config), then shows <strong>Hold E to respawn</strong> (<kbd>A</kbd> on a controller). Holding it 1.5 seconds respawns them at a random hospital from <code>Config.RespawnLocations</code> (<code>vector4</code>s), with damage modifiers back to normal; the server refuses an earlier respawn.</p>
 <p><kbd>H</kbd> (<kbd>Y</kbd> on a controller) hides and shows the screen; respawning needs it showing. Themes recolour it with <code>--ui-death-curtain</code>.</p>
-<p>Admins revive with <code>/whip_revive &lt;charId&gt;</code> (console, or in game with <code>whip.devtools</code>), or themselves with <code>/whip_reviveme</code> (in game, <code>whip.devtools</code>). No item is needed. Every revive and respawn sets health to 200 and armour to 0 and starts the 10-second spawn guard, when low hunger and thirst cost no health.</p>
+<p>Admins revive with <code>/whip_revive &lt;charId&gt;</code> (console, or in game with <code>whip.devtools</code>), or themselves with <code>/whip_reviveme</code> (in game, <code>whip.devtools</code>). No item is needed. <code>/whip_heal &lt;charId&gt;</code> fills a character's health, food and drink, and <code>/whip_kill &lt;charId&gt;</code> downs them through the normal death flow (both console, or in game with <code>whip.devtools</code>). The Player Manager has the same three as Revive, Heal and Kill. Every revive and respawn sets health to 200 and armour to 0 and starts the 10-second spawn guard, when low hunger and thirst cost no health.</p>
 
 <h3>Holding a respawn</h3>
 
@@ -11975,6 +11975,7 @@ end</code></pre>
 <tr><td>Vehicles</td><td>Every car the account's characters own, with state, garage and fuel. Click one to open it on the Vehicles page</td></tr>
 <tr><td>Their game</td><td>Online only: a picture of their screen (WHIP's screens, not other resources') and their map position. <strong>Capture Player's Game</strong> takes a new one; pictures are kept 5 minutes and each is logged</td></tr>
 <tr><td>Teleport To, Bring Here</td><td>Online only. Teleport To goes as <code>/tpto</code> does: behind a fade, the ground there loaded first, refused for a player in another world (routing bucket), and on your activity log</td></tr>
+<tr><td>Revive, Heal, Kill</td><td>Online only. Revive brings a downed player up where they lie, fed and watered; Heal fills health, food and drink for one who is up; Kill downs them through the normal death flow (Noclip and God Mode go off first), refused for staff of your rank or above. Each goes on their activity log, naming you</td></tr>
 <tr><td>Open Inventory</td><td>Online or offline (loaded from the database); asks which character first</td></tr>
 <tr><td>Kick</td><td>With a reason; adds an admin note</td></tr>
 <tr><td>Temp Ban, Perma Ban, Unban</td><td>See Bans below</td></tr>
