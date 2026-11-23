@@ -68,7 +68,7 @@ end
 function WhipMedia.onCdn(path)
     local pack = WhipAssets.resourceFor(path)
     local set = pack and WhipMedia.version(pack) and files[pack]
-    return set ~= nil and set ~= false and set[(tostring(path):gsub('^/+', ''))] == true
+    return set ~= nil and set ~= false and set[(tostring(path):gsub('^/+', ''):lower())] == true
 end
 
 --- 'off' (no Config.MediaBase), 'read' (its list is known, from now or the last start) or 'unread'.

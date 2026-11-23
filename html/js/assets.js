@@ -41,7 +41,10 @@
         if (!res) return null;
         const p = String(path).replace(/^\/+/, '');
         const v = sources && sources.packs && sources.packs[res];
-        if (v && v !== 'local' && sources.base) return sources.base + '/media/' + p + '?v=' + encodeURIComponent(v);
+        // In lower case, as the CDN keeps them (shared/assets.lua says why)
+        if (v && v !== 'local' && sources.base) {
+            return sources.base + '/media/' + p.toLowerCase() + '?v=' + encodeURIComponent(v);
+        }
         return 'https://cfx-nui-' + res + '/' + p;
     };
 })();

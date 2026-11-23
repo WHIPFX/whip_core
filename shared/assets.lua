@@ -41,7 +41,9 @@ function WhipAssets.url(path)
     local from = GlobalState.whipMedia
     local v = type(from) == 'table' and type(from.packs) == 'table' and from.packs[res] or nil
     if v and v ~= 'local' and type(from.base) == 'string' then
-        return ('%s/media/%s?v=%s'):format(from.base, path, v)
+        -- In lower case, as the CDN keeps them: a pack on Windows answers any case, and the character editor asks
+        -- for 'male_11_Male_Heist_002_00.webp' where the file is 'male_11_male_heist_002_00.webp'.
+        return ('%s/media/%s?v=%s'):format(from.base, path:lower(), v)
     end
     return ('https://cfx-nui-%s/%s'):format(res, path)
 end
