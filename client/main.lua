@@ -99,8 +99,9 @@ local function groundUnder(ent, x, y)
 end
 
 --- A teleport behind a fade: fade, move, wait for the ground, fade back. Waits are bounded, so the screen always returns.
---- No z: onto the ground there. withVehicle: a car this player drives comes along (/tp, /tpm in server/commands.lua).
+--- No z: onto the ground there. withVehicle: a car this player drives comes along (/tp, /tpm, /back, /bring in server/commands.lua).
 local fadeTeleporting = false
+local lastTeleportFrom = nil
 local function fadeTeleport(x, y, z, heading, withVehicle)
     x, y, z = tonumber(x), tonumber(y), tonumber(z)
     if not (x and y) or fadeTeleporting then return end
@@ -114,6 +115,8 @@ local function fadeTeleport(x, y, z, heading, withVehicle)
     local veh = withVehicle and GetVehiclePedIsIn(ped, false) or 0
     local car = veh ~= 0 and GetPedInVehicleSeat(veh, -1) == ped and veh or nil
     local ent = car or ped
+    local prev = GetEntityCoords(ent)
+    lastTeleportFrom = { x = prev.x, y = prev.y, z = prev.z, heading = GetEntityHeading(ent) }
     PedHold.set('fadeTeleport', { frozen = true })
     if car then FreezeEntityPosition(car, true) end
     if not z then
@@ -148,6 +151,38 @@ RegisterNetEvent('whip_core:client:tpWaypoint', function()
     if not DoesBlipExist(blip) then return UI.Notify('Set a waypoint on the map first', 'error') end
     local c = GetBlipInfoIdCoord(blip)
     fadeTeleport(c.x, c.y, nil, nil, true)
+end)
+
+-- /back: return to where you stood before your last teleport
+RegisterNetEvent('whip_core:client:tpBack', function()
+    if not lastTeleportFrom then
+        return UI.Notify('No previous teleport location', 'error')
+    end
+    local dest = lastTeleportFrom
+    fadeTeleport(dest.x, dest.y, dest.z, dest.heading, true)
+end)
+
+-- /car: wait briefly for the spawned networked vehicle to stream in, then seat the admin in the driver seat
+RegisterNetEvent('whip_core:client:seatInVehicle', function(netId)
+    if type(netId) ~= 'number' then return end
+    CreateThread(function()
+        local veh, deadline = 0, GetGameTimer() + 3000
+        while GetGameTimer() < deadline do
+            if NetworkDoesNetworkIdExist(netId) then
+                veh = NetworkGetEntityFromNetworkId(netId)
+                if veh ~= 0 and DoesEntityExist(veh) then break end
+            end
+            Wait(50)
+        end
+        if veh == 0 or not DoesEntityExist(veh) then return end
+        local ped = PlayerPedId()
+        SetPedIntoVehicle(ped, veh, -1)
+        SetVehicleEngineOn(veh, true, true, false)
+    end)
+end)
+
+RegisterNetEvent('whip_core:client:playerLogout', function()
+    lastTeleportFrom = nil
 end)
 
 -- NUI callbacks
