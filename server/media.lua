@@ -2,15 +2,17 @@
 -- WHIP's pictures from its CDN (Config.MediaBase, media.whipfx.net)
 -- ============================================
 --
--- A media pack that is running serves its own pictures, as it always has (https://cfx-nui-<pack>/...). One that
--- isn't comes from the CDN: WHIPFX/txAdmin-recipe publishes the picture packs there (tools/media.py), each picture
--- once at media/<path>, asked for with ?v=<the pack's tag> so a release is a new address. Its media/index.json says
--- each pack's tag and files. It is read at start and every hour after (a pack's release reaches a running server),
--- and kept in data/media-index.json so a start without internet still knows it.
+-- A media pack that is running serves its own pictures, as it always has (https://cfx-nui-<pack>/...), and a picture
+-- missing from it (a pack older than whip_core) comes from the CDN. A pack that isn't running comes from the CDN.
+-- WHIPFX/txAdmin-recipe publishes the picture packs there (tools/media.py), each picture once at media/<path>, asked
+-- for with ?v=<the pack's tag> so a release is a new address. Its media/index.json says each pack's tag and files. It
+-- is read at start and every hour after (a pack's release reaches a running server), and kept in data/media-index.json
+-- so a start without internet still knows it.
 --
 -- Everyone reads the result from GlobalState.whipMedia = { base = 'https://media.whipfx.net', packs = { [pack] =
--- 'local' | '<tag>' } }: WhipAssets.url (shared/assets.lua) and the pages (html/js/assets.js) build each address
--- from it. A pack with neither has no pictures (the setup report says so).
+-- 'local' | '<tag>' }, cdn = { [pack] = '<tag>' } }: WhipAssets.url (shared/assets.lua) and the pages
+-- (html/js/assets.js) build each address from it, and `cdn` is what the CDN has of every pack, for the fallback. A
+-- pack with neither has no pictures (the setup report says so).
 
 WhipMedia = {}
 
@@ -61,8 +63,8 @@ function WhipMedia.version(pack)
     return type(e) == 'table' and e.version and tostring(e.version) or nil
 end
 
---- Is there a picture at `path` ('img/props/x.webp') on the CDN? For a pack that isn't installed: one that is reads
---- its own folder.
+--- Is there a picture at `path` ('img/props/x.webp') on the CDN? The catalogs ask when a pack isn't installed, or
+--- when an installed one hasn't got that picture.
 ---@param path string
 ---@return boolean
 function WhipMedia.onCdn(path)
@@ -95,18 +97,19 @@ end
 
 --- Say where each pack comes from (GlobalState.whipMedia), when that changed.
 local function publish()
-    local b, packs = base(), {}
+    local b, packs, cdn = base(), {}, {}
     for _, pack in ipairs(WhipAssets.resources()) do
-        if running(pack) then packs[pack] = 'local' else packs[pack] = WhipMedia.version(pack) end
+        cdn[pack] = WhipMedia.version(pack)
+        if running(pack) then packs[pack] = 'local' else packs[pack] = cdn[pack] end
     end
     local was = GlobalState.whipMedia
-    local same = type(was) == 'table' and was.base == b and type(was.packs) == 'table'
+    local same = type(was) == 'table' and was.base == b and type(was.packs) == 'table' and type(was.cdn) == 'table'
     if same then
         for _, pack in ipairs(WhipAssets.resources()) do
-            if was.packs[pack] ~= packs[pack] then same = false break end
+            if was.packs[pack] ~= packs[pack] or was.cdn[pack] ~= cdn[pack] then same = false break end
         end
     end
-    if not same then GlobalState.whipMedia = { base = b, packs = packs } end
+    if not same then GlobalState.whipMedia = { base = b, packs = packs, cdn = cdn } end
 end
 
 -- The copy from the last start, so a start without internet still has it.
@@ -117,18 +120,10 @@ do
 end
 publish()
 
---- Does any pack need the CDN (one not in the resources folder)?
-local function needed()
-    for _, pack in ipairs(WhipAssets.resources()) do
-        if GetResourceState(pack) == 'missing' then return true end
-    end
-    return false
-end
-
 --- Read the index from the CDN: true once it is read (changed or not).
 local function fetch()
     local b = base()
-    if not b or not needed() then return true end
+    if not b then return true end
     local p, answered = promise.new(), false
     local function answer(status, body)
         if answered then return end   -- (an answer after the time is up is left: the next read gets it)

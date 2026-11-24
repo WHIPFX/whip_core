@@ -261,9 +261,9 @@ local function syncNow()
         if f then
             onDisk = (f:seek('end') or 0) > 0
             f:close()
-        elseif row and not root then
-            onDisk = WhipMedia.onCdn(path)
         end
+        -- Not in its pack (none installed, or one older than whip_core): the CDN's, if it has it
+        if row and not onDisk then onDisk = WhipMedia.onCdn(path) end
         if row and onDisk ~= hasImage(row) then
             if onDisk then gained[#gained + 1] = model else lost[#lost + 1] = model end
         end

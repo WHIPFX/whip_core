@@ -48,6 +48,18 @@ function WhipAssets.url(path)
     return ('https://cfx-nui-%s/%s'):format(res, path)
 end
 
+--- The URL of `path` on WHIP's CDN, whether or not its pack is installed, or nil when the CDN hasn't got its pack:
+--- for a picture an installed pack is missing (server/vehicle_catalog.lua).
+---@param path string
+---@return string|nil
+function WhipAssets.cdnUrl(path)
+    local res = WhipAssets.resourceFor(path)
+    local from = GlobalState.whipMedia
+    local v = res and type(from) == 'table' and type(from.cdn) == 'table' and from.cdn[res] or nil
+    if not v or type(from.base) ~= 'string' then return nil end
+    return ('%s/media/%s?v=%s'):format(from.base, (tostring(path):gsub('^/+', '')):lower(), v)
+end
+
 --- Every media pack, in the index's order (the order of the areas they hold).
 ---@return string[]
 function WhipAssets.resources()

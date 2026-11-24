@@ -27,7 +27,8 @@
         return found;
     }
 
-    // Where each pack comes from (GlobalState.whipMedia, server/media.lua): { base, packs: { [pack]: 'local' | tag } }.
+    // Where each pack comes from (GlobalState.whipMedia, server/media.lua): { base, packs: { [pack]: 'local' | tag },
+    // cdn: { [pack]: tag } }.
     // Sent by client/ready.lua (this page) and client/dui_page.lua (a world page made with `assets`). A pack that
     // isn't running loads from WHIP's CDN, at the pack's tag so a release is a new address.
     let sources = null;
@@ -47,4 +48,22 @@
         }
         return 'https://cfx-nui-' + res + '/' + p;
     };
+
+    // A picture or video that won't load from an installed pack (a pack older than whip_core, say) gets one more try
+    // from the CDN, at the version the CDN has. Caught on the way down: these errors don't bubble. A fallback that
+    // works stops the error there; one that fails too reaches the page's own handlers.
+    window.addEventListener('error', function (e) {
+        const el = e.target;
+        if (!el || (el.tagName !== 'IMG' && el.tagName !== 'VIDEO') || el.dataset.whipCdn) return;
+        const m = /^https:\/\/cfx-nui-([^/]+)\/([^?#]+)/.exec(el.currentSrc || el.getAttribute('src') || '');
+        const v = m && sources && sources.cdn && sources.cdn[m[1]];
+        if (!v || !sources.base) return;
+        el.dataset.whipCdn = '1';
+        e.stopPropagation();
+        el.src = sources.base + '/media/' + m[2].toLowerCase() + '?v=' + encodeURIComponent(v);
+        if (el.tagName === 'VIDEO') {
+            const played = el.play();
+            if (played && played.catch) played.catch(function () {});
+        }
+    }, true);
 })();

@@ -120,16 +120,18 @@ local function findNow()
         local root = res and roots[res]
         if res and not root and not WhipMedia.version(res) then noPack = res end
         local f = row and root and io.open(root .. '/' .. path, 'rb')
-        local onDisk = false
+        local onDisk, onCdn = false, false
         if f then
             onDisk = (f:seek('end') or 0) > 0
             f:close()
-        elseif res and not root then
-            onDisk = WhipMedia.onCdn(path)
         end
+        if not onDisk and res then onCdn = WhipMedia.onCdn(path) end
         if row then
-            row.hasImage = onDisk
-            if onDisk then pictured = pictured + 1 end
+            row.hasImage = onDisk or onCdn
+            -- Its pack is installed but hasn't got it: its address is the CDN's (imageUrl), as another resource's
+            -- page has no fallback of its own
+            row.cdnImage = root ~= nil and not onDisk and onCdn or nil
+            if row.hasImage then pictured = pictured + 1 end
         end
     end
     if noPack then
@@ -181,6 +183,8 @@ end)
 ---@param key string  lower-case model
 ---@return string|false
 local function imageUrl(key)
+    local row = VehicleCatalog.rows[key]
+    if row and row.cdnImage then return WhipAssets.cdnUrl(IMG_DIR .. key .. IMG_EXT) or false end
     return WhipAssets.url(IMG_DIR .. key .. IMG_EXT) or false
 end
 
