@@ -466,7 +466,9 @@ nui_callback_strict_mode 'true'
 
 files {
     'html/index.html',
-    -- A glob: the file does not exist until the first change, and a plain missing name warns at every start.
+    -- A glob: settings.json does not exist until whip_core writes it on its first start, and a plain missing name
+    -- warns at every start. settings.empty.json ({}) is there so the glob matches on that first start too: one that
+    -- matches nothing warns.
     'settings*.json',
     -- Globs, so a new file cannot 404 in game. html/js/package.json is deliberately not matched.
     'html/css/*.css',
