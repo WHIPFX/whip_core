@@ -8,7 +8,7 @@
    The house look (DESIGN.md): solid night glass with the corner glow, the title in the display face.
    It takes no focus and no clicks, like the /w menu.
 
-   THE CORNER IS SHARED. A job's objective cards live at the top right too, so the
+   THE CORNER IS SHARED. Notifications and a job's objective cards live at the top right too, so the
    pane says how tall it is (--dbg-h, screen pixels, on <html>) and they move down under it (ui.css).
 
      import { DebugPanel } from './debug-panel.js';

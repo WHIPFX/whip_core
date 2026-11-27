@@ -72,7 +72,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
        TWO SURFACES, AND ONLY ONE OF THEM IS OPTIONAL
 
        A notification prefers the PLAYER CAPSULE at the bottom left: the text replaces the gauges
-       and the mic bubble becomes a coloured status disc. The stack at the top centre is the fallback.
+       and the mic bubble becomes a coloured status disc. The stack in the top-right corner is the fallback.
 
        THE STACK IS NOT LEGACY. #status-hud \u2014 and so the capsule \u2014 fades out whenever a UI is open
        or the player is dead (WhipRefreshHudVisibility in client/hud.lua), and the inventory's own
@@ -127,7 +127,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
     }
 
     /* ========================================
-       THE STACK: top centre, the newest on top.
+       THE STACK: the top-right corner, the newest on top.
 
        Each notice is the HUD's capsule with its disc, the objective cards' markup (§10). The disc is
        the type's colour and drains as the notice's time runs: the colour clips away from the top and
@@ -147,6 +147,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
         let y = 0;
         for (const n of stack) {
             if (n.out) continue;
+            n.h = n.slot.offsetHeight;
             n.y = y;
             n.slot.style.transform = 'translateY(' + y + 'px)';
             n.slot.style.opacity = '1';
@@ -202,6 +203,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
             replay(same.countEl, 'ui-notif-bump');
             if (type === 'error') replay(same.card, 'ui-notif-shake');
             stackArm(same, duration);
+            stackLayout();   // the count can wrap the text onto another line
             return;
         }
 
@@ -235,14 +237,6 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
         const live = stack.filter(function(m) { return !m.out; });
         while (live.length > MAX_NOTIFS) stackDrop(live.pop());
     }
-
-    // A ShowText capsule at the top centre is the stack's neighbour: the stack moves down under it.
-    const topText = document.getElementById('ui-drawtext');
-    topText.addEventListener('whip:drawtext', function(e) {
-        const cap = e.detail.shown && topText.classList.contains('ui-drawtext-top') && topText.querySelector('.dt-cap');
-        const push = cap ? cap.offsetTop + cap.offsetHeight + STACK_GAP - notifContainer.offsetTop : 0;
-        document.documentElement.style.setProperty('--ui-notif-push', push + 'px');
-    });
 
     /**
      * Put one notification into the capsule and start its timer.
@@ -1578,7 +1572,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
         c.el.style.setProperty('--dt-p', String(c.total > 0 ? left / c.total : 0));
     }
 
-    /** The tick runs while a card's clock does; --obj-n is how many cards are up, for what sits under them. */
+    /** The tick runs while a card's clock does; the notifications stack under the cards (--obj-n). */
     function objSettle() {
         const running = () => Array.from(_objCards.values()).some((c) => c.endsAt != null && c.endsAt > Date.now());
         if (running() && !_objTick) {

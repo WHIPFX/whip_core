@@ -42,35 +42,35 @@
    ======================================== */
 
 /* ----------------------------------------------------------------------------
-   THE STACK AT THE TOP CENTRE, AT THE CAPSULES' SCALE (--ui-scale × 1.25, as the ShowText capsule
-   and the objective cards). Each card is the HUD capsule with its disc (ui.js §1): it reads as the
-   same object as the player capsule a notice prefers.
+   THE STACK IN THE TOP-RIGHT CORNER, AT THE CAPSULES' SCALE (--ui-scale × 1.25, as the objective
+   cards above it). Each card is the HUD capsule with its disc (ui.js §1): it reads as the same object
+   as the player capsule a notice prefers. Cards are placed by ui.js with transforms
+   (.ui-notif-slot), the newest on top, under the objective cards.
 
-   Cards are placed by ui.js with transforms (.ui-notif-slot), the newest on top. Under a ShowText
-   capsule at the top the whole stack moves down (--ui-notif-push, set by ui.js).
+   Every card is the column's width (389px: 360px on screen at 1080p), so the stack reads as one
+   column whatever each notice says.
    ---------------------------------------------------------------------------- */
 
 #ui-notifications {
     position: fixed;
-    top: 12px;
-    left: 0;
-    right: 0;
+    /* Under the objective cards while a job has any (§10; ui.js sets --obj-n): a card is 85px and the
+       column's gap 8px at this same scale. And under the debug panel while it is up (--dbg-h, its
+       height in SCREEN pixels, debug-panel.js): divided by this zoom to be the same distance on screen. */
+    top: calc(12px + var(--obj-n, 0) * 93px + var(--dbg-h, 0px) / (var(--ui-scale) * 1.25));
+    transition: top 0.3s var(--ui-ease);
+    right: 16px;
+    width: 389px;
     z-index: 950;
     pointer-events: none;
     font-family: var(--ui-font);
     zoom: calc(var(--ui-scale) * 1.25);
-    transform: translateY(var(--ui-notif-push, 0px));
-    transition: transform 0.3s var(--ui-ease);
 }
 
 .ui-notif-slot {
     position: absolute;
     top: 0;
-    left: 0;
     right: 0;
-    margin: 0 auto;
-    width: max-content;
-    max-width: min(560px, calc(100% - 32px));
+    width: 100%;
     will-change: transform, opacity;
     transition: opacity 0.3s var(--ui-ease), transform 0.45s var(--ui-ease);
 }
@@ -933,7 +933,7 @@ html[data-input="pad"].pad-hints-up .ui-drawtext-bottom .dt-cap {
    show at once. The same capsule (.sh-capsule, the .sh-stat disc, the §9 body) at the same scale: the
    disc holds the objective's flag and drains as the clock runs (--dt-p, ui.js §10), the objective is
    the title, the job's name and the clock are the row. One card per job, the newest on top, a column
-   in the top-right corner; what else sits there moves down under them (--obj-n). A changed
+   in the top-right corner; the notification stack moves down under them (--obj-n). A changed
    objective lights the ring Signal Blue for a moment (.fresh): it needs you. */
 #ui-objectives {
     position: fixed;
