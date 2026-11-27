@@ -33,9 +33,15 @@ local previewLastTattooSig = nil -- tattooSig of the tattoos the last preview pu
 
 -- Default appearance template
 
+--- The prop slots a freemode ped wears: hat, glasses, ear, watch, bracelet. Not contiguous (3, 4, 5 are unused).
+local PROP_SLOTS = { 0, 1, 2, 6, 7 }
+
+--- A new character's look. Every clothing slot and prop is spelled out, as the creator's page fills them in
+--- (normalizeAppearance in html/js/creator.js): left empty, the ped kept the clothes the game gave it while the
+--- creator showed them, but a save stored the first item of each slot, and the character came back in other clothes.
 local function GetDefaultAppearance(gender)
     local model = (gender == 'female') and 'mp_f_freemode_01' or 'mp_m_freemode_01'
-    return {
+    local a = {
         model = model,
         headBlend = {
             mom = 0, dad = 0, grandparent = 0,
@@ -61,6 +67,9 @@ local function GetDefaultAppearance(gender)
         components = {},
         props = {},
     }
+    for i = 0, 11 do a.components[tostring(i)] = { drawable = 0, texture = 0 } end
+    for _, i in ipairs(PROP_SLOTS) do a.props[tostring(i)] = { drawable = -1, texture = 0 } end
+    return a
 end
 
 -- Overlay index mapping (GTA overlay IDs)
@@ -77,9 +86,6 @@ local OVERLAY_IDS = {
     moles      = 9,
     chestHair  = 10,
 }
-
---- The prop slots a freemode ped wears: hat, glasses, ear, watch, bracelet. Not contiguous (3, 4, 5 are unused).
-local PROP_SLOTS = { 0, 1, 2, 6, 7 }
 
 -- Overlays that support color (type 1 = hair colors, type 2 = makeup colors)
 local OVERLAY_COLOR_TYPE = {
