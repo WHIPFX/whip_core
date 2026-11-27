@@ -72,7 +72,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
        TWO SURFACES, AND ONLY ONE OF THEM IS OPTIONAL
 
        A notification prefers the PLAYER CAPSULE at the bottom left: the text replaces the gauges
-       and the mic bubble becomes a coloured status disc. The top-right stack is the fallback.
+       and the mic bubble becomes a coloured status disc. The stack in the top-right corner is the fallback.
 
        THE STACK IS NOT LEGACY. #status-hud \u2014 and so the capsule \u2014 fades out whenever a UI is open
        or the player is dead (WhipRefreshHudVisibility in client/hud.lua), and the inventory's own
@@ -90,7 +90,7 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
        Anything that arrives while the capsule is unavailable for some other reason never enters
        the queue at all.
 
-       EXCEPT A LOAD. While the screen is black for a load the capsule and the top-right stack are
+       EXCEPT A LOAD. While the screen is black for a load the capsule and the stack are
        both under the black (only the logo is over it: curtain.js). So a notice that arrives then
        WAITS in the queue, and the load's end drains it (onLoadingEnd, below) — which always
        happens, because the load's end is the curtain lifting. The staleness rule still applies: a
@@ -126,39 +126,116 @@ import { openPadKeyboard } from './pad-keyboard.js';   // whip's keyboard (and, 
             || '<span class="cap-bubble-glyph">' + (NOTIF_ICONS[type] || NOTIF_ICONS.info) + '</span>';
     }
 
-    /** Render one notification into the top-right stack. The original behaviour, unchanged. */
+    /* ========================================
+       THE STACK: the top-right corner, the newest on top.
+
+       Each notice is the HUD's capsule with its disc, the objective cards' markup (§10). The disc is
+       the type's colour and drains as the notice's time runs: the colour clips away from the top and
+       the glyph turns from ink on the colour to the colour on the dark core where it has gone
+       (.ui-notif-ink, css/ui.css §1). The same text and type again while it is up counts on its card
+       (×2) and restarts its time instead of stacking a copy.
+
+       Cards are absolutely placed and moved with transforms from their measured heights, so the stack
+       closes up and opens without a layout per frame.
+       ======================================== */
+
+    /** The cards on screen, the newest first: { slot, card, countEl, wipes, key, count, h, y, out, timer }. */
+    const stack = [];
+    const STACK_GAP = 8;
+
+    function stackLayout() {
+        let y = 0;
+        for (const n of stack) {
+            if (n.out) continue;
+            n.h = n.slot.offsetHeight;
+            n.y = y;
+            n.slot.style.transform = 'translateY(' + y + 'px)';
+            n.slot.style.opacity = '1';
+            y += n.h + STACK_GAP;
+        }
+    }
+
+    /** Play a one-shot class again from its start. */
+    function replay(el, cls) {
+        el.classList.remove(cls);
+        void el.offsetWidth;
+        el.classList.add(cls);
+    }
+
+    /** Start (or restart) a card's time: the timer that drops it and the disc's drain, both `ms` long. */
+    function stackArm(n, ms) {
+        clearTimeout(n.timer);
+        n.timer = setTimeout(function() { stackDrop(n); }, ms);
+        for (const w of n.wipes) {
+            w.style.transition = 'none';
+            w.style.clipPath = 'inset(0 0 0 0)';
+            void w.offsetWidth;
+            w.style.transition = 'clip-path ' + ms + 'ms linear';
+            w.style.clipPath = 'inset(100% 0 0 0)';
+        }
+    }
+
+    function stackDrop(n) {
+        if (n.out) return;
+        n.out = true;
+        clearTimeout(n.timer);
+        n.slot.style.transform = 'translateY(' + (n.y - 6) + 'px) scale(0.92)';
+        n.slot.style.opacity = '0';
+        setTimeout(function() {
+            n.slot.remove();
+            const i = stack.indexOf(n);
+            if (i >= 0) stack.splice(i, 1);
+        }, 350);
+        stackLayout();
+    }
+
+    /** Render one notification into the stack. */
     function renderToStack(data) {
-        const el = document.createElement('div');
-        el.className = 'ui-notif ui-notif-' + (data.type || 'info');
-
-        const icon = notifGlyph(data.type) || NOTIF_ICONS[data.type] || NOTIF_ICONS.info;
-        el.innerHTML =
-            '<span class="ui-notif-icon">' + icon + '</span>' +
-            '<span class="ui-notif-text">' + esc(data.text) + '</span>';
-
-        notifContainer.appendChild(el);
-
-        // Trigger entrance animation next frame
-        requestAnimationFrame(function() {
-            el.classList.add('visible');
-        });
-
+        const type = NOTIF_COLORS[data.type] ? data.type : 'info';
+        const text = String(data.text || '');
+        const key = type + '\u0000' + text;
         const duration = data.duration || 3000;
 
-        // Remove after duration
-        setTimeout(function() {
-            el.classList.remove('visible');
-            el.classList.add('exiting');
-            setTimeout(function() {
-                if (el.parentNode) el.parentNode.removeChild(el);
-            }, 300);
-        }, duration);
-
-        // Limit visible count
-        const children = notifContainer.children;
-        while (children.length > MAX_NOTIFS) {
-            notifContainer.removeChild(children[0]);
+        const same = stack.find(function(n) { return !n.out && n.key === key; });
+        if (same) {
+            same.count += 1;
+            same.countEl.textContent = '×' + same.count;
+            replay(same.countEl, 'ui-notif-bump');
+            if (type === 'error') replay(same.card, 'ui-notif-shake');
+            stackArm(same, duration);
+            stackLayout();   // the count can wrap the text onto another line
+            return;
         }
+
+        const glyph = notifIcon(type);
+        const slot = document.createElement('div');
+        slot.className = 'ui-notif-slot';
+        slot.innerHTML = '<div class="sh-capsule ui-notif ui-notif-' + type + '">'
+            + '<div class="sh-stat dt-disc ui-notif-icon"><div class="sh-disc"><div class="sh-fill"></div></div>'
+            + '<div class="sh-icon">' + glyph + '</div>'
+            + '<div class="ui-notif-ink"><div class="sh-icon">' + glyph + '</div></div></div>'
+            + '<span class="ui-notif-text"></span><span class="ui-notif-count"></span></div>';
+        // textContent, not innerHTML: this string can carry an item name a player chose.
+        slot.querySelector('.ui-notif-text').textContent = text;
+        notifContainer.appendChild(slot);
+
+        const n = {
+            slot: slot, card: slot.firstChild, countEl: slot.querySelector('.ui-notif-count'),
+            wipes: [slot.querySelector('.sh-fill'), slot.querySelector('.ui-notif-ink')],
+            key: key, count: 1, h: slot.offsetHeight, y: 0, out: false, timer: null,
+        };
+
+        // Entrance: from just above its place at the top, then the layout brings it (and the rest) in.
+        slot.style.transform = 'translateY(-10px) scale(0.9)';
+        slot.style.opacity = '0';
+        void slot.offsetWidth;
+        stack.unshift(n);
+        stackLayout();
+        if (type === 'error') setTimeout(function() { replay(n.card, 'ui-notif-shake'); }, 250);
+        stackArm(n, duration);
+
+        const live = stack.filter(function(m) { return !m.out; });
+        while (live.length > MAX_NOTIFS) stackDrop(live.pop());
     }
 
     /**

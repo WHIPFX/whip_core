@@ -42,140 +42,128 @@
    ======================================== */
 
 /* ----------------------------------------------------------------------------
-   TWICE THE SIZE, VIA zoom, FOR THE SAME REASON status-hud.css DOES IT.
+   THE STACK IN THE TOP-RIGHT CORNER, AT THE CAPSULES' SCALE (--ui-scale × 1.25, as the objective
+   cards above it). Each card is the HUD capsule with its disc (ui.js §1): it reads as the same object
+   as the player capsule a notice prefers. Cards are placed by ui.js with transforms
+   (.ui-notif-slot), the newest on top, under the objective cards.
 
-   Every number below this block is the size it already was. The stack is scaled as one
-   object instead, which is how #status-hud gets its 1.25, and it is what keeps a
-   notification's padding, icon, radius, border width and type in the proportions they
-   were designed in. Doubling eleven declarations by hand is eleven chances to get one
-   wrong, and the next person to tune the padding would be working in a scale nothing
-   else in this file uses.
-
-   THE OFFSETS ARE HALVED TO COMPENSATE. top/right live inside the zoomed coordinate
-   space, so 24px at zoom 2 would sit 48px off the corner. 12px puts it back where it has
-   always been: the stack got bigger, it did not move.
-
-   STILL MULTIPLIED BY --ui-scale. That token is the theme contract and the player's own
-   HUD scale still applies on top of this; doubling is a decision inside it, not a
-   replacement for it.
+   Every card is the column's width (389px: 360px on screen at 1080p), so the stack reads as one
+   column whatever each notice says.
    ---------------------------------------------------------------------------- */
 
 #ui-notifications {
     position: fixed;
-    /* Under the objective cards while a job has any (§10; ui.js sets --obj-n): one card is 85px at the
-       cards' scale (×1.25), 53px at this one (×2), and the rest is air. And under the debug panel while
-       it is up (--dbg-h, its height in SCREEN pixels, debug-panel.js): divided by this zoom to be the
-       same distance on screen. */
-    top: calc(12px + var(--obj-n, 0) * 55px + var(--dbg-h, 0px) / (var(--ui-scale) * 2));
+    /* Under the objective cards while a job has any (§10; ui.js sets --obj-n): a card is 85px and the
+       column's gap 8px at this same scale. And under the debug panel while it is up (--dbg-h, its
+       height in SCREEN pixels, debug-panel.js): divided by this zoom to be the same distance on screen. */
+    top: calc(12px + var(--obj-n, 0) * 93px + var(--dbg-h, 0px) / (var(--ui-scale) * 1.25));
     transition: top 0.3s var(--ui-ease);
-    right: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    right: 16px;
+    width: 389px;
     z-index: 950;
     pointer-events: none;
-
-    /* Halved with the offsets, so the RENDERED width stays the 380px it always was
-       rather than becoming 760px and spanning a third of the screen. */
-    max-width: 190px;
-
-    zoom: calc(var(--ui-scale) * 2);
-}
-
-.ui-notif {
-    display: flex;
-    /* CENTRED, NOT TOP-ALIGNED. With the icon a filled block rather than a floating chip,
-       a single-line notification with the glyph pinned to the top reads as misaligned.
-       Multi-line text still grows downward from a centred icon, which is what the eye
-       expects of a badge-and-label pair. */
-    align-items: center;
-    gap: 12px;
-    padding: 14px 18px;
-    border-radius: var(--ui-radius-pop);
     font-family: var(--ui-font);
-    font-size: 13.5px;
-    font-weight: var(--ui-fw-medium);
-    line-height: 1.45;
-    color: var(--ui-text);
-    /* Flat: the house style is one colour and an opacity, and the inset highlight in --ui-shadow
-       gives the top edge its lift. */
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-border);
-    box-shadow: var(--ui-shadow);
-    pointer-events: auto;
+    zoom: calc(var(--ui-scale) * 1.25);
+}
+
+.ui-notif-slot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
     will-change: transform, opacity;
-
-    /* entrance start state */
-    opacity: 0;
-    transform: translateX(50px) scale(0.96);
-    transition: opacity 0.35s var(--ui-ease),
-                transform 0.35s var(--ui-ease),
-                box-shadow 0.35s ease;
+    transition: opacity 0.3s var(--ui-ease), transform 0.45s var(--ui-ease);
 }
 
-.ui-notif.visible {
+/* Two classes: status-hud.css loads after this file, and .sh-capsule's own gap and padding would win. */
+.sh-capsule.ui-notif {
+    position: relative;
+    gap: 0;
+    padding-right: 24px;
+}
+
+.ui-notif-success { --ui-notif-color: var(--ui-success); }
+.ui-notif-error   { --ui-notif-color: var(--ui-error); }
+.ui-notif-info    { --ui-notif-color: var(--ui-info); }
+.ui-notif-warning { --ui-notif-color: var(--ui-warning); }
+
+/* The disc comes with its card: none of .sh-stat's own reveal. */
+.ui-notif .sh-stat.ui-notif-icon {
+    flex: 0 0 auto;
+    animation: none;
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: none;
 }
 
-.ui-notif.exiting {
-    opacity: 0;
-    transform: translateX(40px) scale(0.97);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+/* THE DISC IS THE CLOCK. The type's colour fills it and ui.js clips it away from the top over the
+   notice's time. The glyph is drawn twice: in the type's colour on the dark core, and in ink inside
+   .ui-notif-ink, clipped with the fill, so the mark stays readable on both halves as the line passes.
+   No difference blend: against a coloured fill it gives the wrong colour (status-hud.css #capsuleBubble). */
+.ui-notif .ui-notif-icon .sh-fill {
+    height: 100%;
+    background: var(--ui-notif-color);
+    transition: none;
 }
 
-/* ----------------------------------------------------------------------------
-   THE ICON IS A FILLED BLOCK, NOT A TINTED CHIP: a solid block of the type colour, dark glyph on
-   top, hard corners (an instrument face, against the rounded surface). State lives in a filled
-   element, as on the status HUD and the dev menu, not in an edge stripe. A filled green square
-   and a filled red one tell apart at any distance; two 12% washes do not.
-   ---------------------------------------------------------------------------- */
+.sh-capsule.ui-notif .sh-stat .sh-icon {
+    width: 31px;
+    height: 31px;
+    mix-blend-mode: normal;
+    color: var(--ui-notif-color);
+}
 
-.ui-notif-icon {
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: var(--ui-fw-bold);
-    flex-shrink: 0;
+.ui-notif-ink {
+    position: absolute;
+    inset: 6.5px;           /* the disc's own box (status-hud.css .sh-disc) */
+    border-radius: 50%;
+    z-index: 2;
+    pointer-events: none;
+}
 
-    /* HARD. See the note above — this is the instrument face against the soft panel. */
-    border-radius: 0;
-
-    /* The dark whip ground, the same value the old gear box put under the white pill, so
-       a glyph on a filled block is the same colour everywhere it appears. */
+.sh-capsule.ui-notif .ui-notif-ink .sh-icon {
     color: rgb(10, 12, 18);
 }
 
-/* A drawn mark (the error's `fail` cross, js/glyphs.js) in place of a character: about the character's size. */
-.ui-notif-icon svg {
-    display: block;
-    width: 18px;
-    height: 18px;
-}
-
 .ui-notif-text {
-    flex: 1;
-    /* Optically centred against a 30px icon rather than nudged with a magic number. The
-       old `padding-top: 4px` was tuned for a 14px line inside a 30px chip and stopped
-       being right the moment either changed. */
-    align-self: center;
-    padding-top: 0;
+    max-width: 440px;
+    margin-left: 12px;
+    font-size: calc(var(--sh-ring-size) * 0.33);
+    font-weight: var(--ui-fw-medium);
+    line-height: 1.25;
+    color: var(--ui-text);
+    text-shadow: var(--ui-shadow-text);
+    overflow-wrap: anywhere;
 }
 
-/* ---- Type variants ----
+/* How many times the same notice came while it was up. */
+.ui-notif-count {
+    flex: 0 0 auto;
+    margin-left: 10px;
+    padding: 1px 7px;
+    border-radius: var(--ui-radius-pill);
+    background: var(--ui-text);
+    color: rgb(10, 12, 18);
+    font-size: calc(var(--sh-ring-size) * 0.26);
+    font-weight: var(--ui-fw-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+}
 
-   ONE DECLARATION EACH NOW. The surface, border and shadow are the shared .ui-notif
-   ground and no variant overrides them — the type is carried entirely by the icon,
-   which is the point of the block above. A variant that only sets a colour cannot
-   drift from the others. */
+.ui-notif-count:empty {
+    display: none;
+}
 
-.ui-notif-success .ui-notif-icon { background: var(--ui-success); }
-.ui-notif-error   .ui-notif-icon { background: var(--ui-error); }
-.ui-notif-info    .ui-notif-icon { background: var(--ui-info); }
-.ui-notif-warning .ui-notif-icon { background: var(--ui-warning); }
+.ui-notif-bump {
+    animation: uiNotifBump 0.35s var(--ui-ease-bounce);
+}
+
+@keyframes uiNotifBump {
+    40% { transform: scale(1.25); }
+}
+
+.ui-notif-shake {
+    animation: uiShake 0.45s ease;
+}
 
 /* ========================================
    2. PROGRESS BAR — see the DRAWTEXT section
