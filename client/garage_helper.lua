@@ -222,9 +222,9 @@ local function sweep()
         -- The rule is bayRule (above): private garages never, on foot every bay (a car in it or not:
         -- what a car in the bay takes away is the bay's own prompt), and a bay taken only by the car
         -- I drive is mine.
-        local usable = bayRule(spotId, s, inSpotId, onFoot)
-
-        if (dx * dx + dy * dy + dz * dz) <= rangeSq and usable then
+        -- Range first: the rule (occupancy, garage access) is asked only of the few bays near enough to show,
+        -- not of every bay on the map four times a second.
+        if (dx * dx + dy * dy + dz * dz) <= rangeSq and bayRule(spotId, s, inSpotId, onFoot) then
             local e = live[spotId]
             if not e then
                 -- Starts invisible so it fades UP rather than snapping in at full strength.

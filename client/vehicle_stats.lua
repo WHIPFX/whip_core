@@ -365,13 +365,19 @@ local function runHeld(w, name, entity, value, dt)
 
     -- A number back is this client's gauge reading for the stat on this car (Vehicles.statReading). Anything else
     -- clears it, and the gauge falls back to the provider or the replicated value.
+    -- Answers true only when the reading CHANGED (a new number, or one cleared): the capsule is repainted for that
+    -- alone, not on every tick that hands back the same figure (a settled turbo returns the same boost for seconds).
     ret = tonumber(ret)
     if ret ~= nil and ret == ret and ret ~= math.huge and ret ~= -math.huge then
         w.reading = w.reading or {}
+        if w.reading[entity] == ret then return false end
         w.reading[entity] = ret
         return true
     end
-    if w.reading then w.reading[entity] = nil end
+    if w.reading and w.reading[entity] ~= nil then
+        w.reading[entity] = nil
+        return true
+    end
     return false
 end
 
@@ -418,6 +424,9 @@ local function reapHolders()
     end
 end
 
+--- Read-only stand-in for a stat nobody holds: one table, not a new one each pass for each such stat.
+local NO_HOLDERS = setmetatable({}, { __newindex = function() error('NO_HOLDERS is read-only', 2) end })
+
 CreateThread(function()
     local lastReap = 0
 
@@ -452,7 +461,7 @@ CreateThread(function()
             local sweepCost = WhipCost.start()
 
             for name, watchers in pairs(_watchers) do
-                local holders = _holders[name] or {}
+                local holders = _holders[name] or NO_HOLDERS
 
                 for _, w in pairs(watchers) do
                     local active = w.active
@@ -503,11 +512,14 @@ CreateThread(function()
                                     fireLifecycle(w, name, 'onStart', driving, value)
                                 end
                                 if due then
-                                    local gaveReading = runHeld(w, name, driving, value, dt)
+                                    local readingChanged = runHeld(w, name, driving, value, dt)
 
-                                    -- The gauge, at the satellite's cadence: a local reading may have changed. Throttled by the HUD.
-                                    if gaveReading or (Vehicles.hasStatDisplay and Vehicles.hasStatDisplay(name)) then
-                                        Vehicles.refreshHudThrottled()
+                                    -- The gauge, at the satellite's cadence: only when its reading changed (or a display
+                                    -- provider may have). Throttled by the HUD: a repaint the throttle turned away is owed,
+                                    -- and paid on the next tick, so a changed reading is never left undrawn.
+                                    if readingChanged or w.repaintOwed
+                                        or (Vehicles.hasStatDisplay and Vehicles.hasStatDisplay(name)) then
+                                        w.repaintOwed = not Vehicles.refreshHudThrottled()
                                     end
                                 end
                             end
@@ -517,8 +529,9 @@ CreateThread(function()
                                     active[entity] = true
                                     fireLifecycle(w, name, 'onStart', entity, value)
                                 end
-                                if due and runHeld(w, name, entity, value, dt) then
-                                    Vehicles.refreshHudThrottled()   -- a reading to draw (runHeld)
+                                if due and (runHeld(w, name, entity, value, dt) or w.repaintOwed) then
+                                    -- A changed reading to draw (runHeld); owed again if the throttle turned it away.
+                                    w.repaintOwed = not Vehicles.refreshHudThrottled()
                                 end
                             end
                         end

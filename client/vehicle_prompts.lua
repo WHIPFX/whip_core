@@ -1011,6 +1011,7 @@ local SIGHT_FLAGS   = 1 | 16          -- the map (interiors included) and object
 local SIGHT_OPTIONS = 4               -- ignore no-collision only: glass blocks
 local SIGHT_SLACK2  = 0.05 * 0.05     -- squared metres: a ray stopping this close to the point reached it
 local SIGHT_FOR_MS  = 200             -- an answer lasts this long
+local SIGHT_STUCK_MS = 1000           -- async probes not back after this long are dropped and asked again
 
 local function rayReaches(fx, fy, fz, tx, ty, tz, ped)
     local ray = StartExpensiveSynchronousShapeTestLosProbe(fx, fy, fz, tx, ty, tz, SIGHT_FLAGS, ped, SIGHT_OPTIONS)
@@ -1020,25 +1021,66 @@ local function rayReaches(fx, fy, fz, tx, ty, tz, ped)
     return dx * dx + dy * dy + dz * dz <= SIGHT_SLACK2
 end
 
---- [prompt id] = { untilAt, yes }
+--- [prompt id] = { untilAt, yes, up = ray, low = ray, upYes, lowYes, tx, ty, tz }
 local sightCache = {}
 
+--- An async probe's answer: nil while it is not ready, else whether it reached the point (rayReaches' rule). A probe
+--- the game lost (status 0) counts as reaching, as a sync probe with no hit does.
+local function rayAnswer(ray, tx, ty, tz)
+    local status, hit, at = GetShapeTestResult(ray)
+    if status == 1 then return nil end
+    if status ~= 2 or hit ~= 1 then return true end
+    local dx, dy, dz = at.x - tx, at.y - ty, at.z - tz
+    return dx * dx + dy * dy + dz * dz <= SIGHT_SLACK2
+end
+
 --- Can the player see this part's point on this car? The dearest question, so it is asked last and cached.
----@return boolean
+---
+--- The first answer for a prompt is a synchronous probe (so a part never shows late); every answer after it comes from
+--- two ASYNC probes, started when the last answer is SIGHT_FOR_MS old and read on a later pass, the old answer standing
+--- meanwhile. The synchronous "expensive" probes, two a part every 200 ms, were the dearest thing a car's prompts did.
 local function partInSight(id, part, veh)
     local now = GetGameTimer()
     local c = sightCache[id]
+
+    -- Probes in flight: read them; the old answer stands until both are in.
+    if c and c.up then
+        if c.upYes == nil then c.upYes = rayAnswer(c.up, c.tx, c.ty, c.tz) end
+        if c.lowYes == nil then c.lowYes = rayAnswer(c.low, c.tx, c.ty, c.tz) end
+        if c.upYes ~= nil and c.lowYes ~= nil then
+            c.yes = c.upYes or c.lowYes
+            c.untilAt = now + SIGHT_FOR_MS
+            c.up, c.low, c.upYes, c.lowYes = nil, nil, nil, nil
+        elseif now - (c.startedAt or now) > SIGHT_STUCK_MS then
+            -- Never came back: dropped, and asked again on the next pass.
+            c.up, c.low, c.upYes, c.lowYes, c.untilAt = nil, nil, nil, nil, 0
+        end
+        return c.yes
+    end
     if c and now < c.untilAt then return c.yes end
-    local yes = false
+
     local ped = PlayerPedId()
     local x, y, z = partPoint(part, veh, isDetached(part, veh))
-    if x and ped ~= 0 then
-        local p = GetEntityCoords(ped)   -- the pelvis, about 1 m up
-        yes = rayReaches(p.x, p.y, p.z + 0.6, x, y, z, ped) or rayReaches(p.x, p.y, p.z - 0.5, x, y, z, ped)
+    if not x or ped == 0 then
+        if c then c.untilAt, c.yes = now + SIGHT_FOR_MS, false
+        else sightCache[id] = { untilAt = now + SIGHT_FOR_MS, yes = false } end
+        return false
     end
-    if c then c.untilAt, c.yes = now + SIGHT_FOR_MS, yes
-    else sightCache[id] = { untilAt = now + SIGHT_FOR_MS, yes = yes } end
-    return yes
+    local p = GetEntityCoords(ped)   -- the pelvis, about 1 m up
+
+    if not c then
+        -- Never asked: at once, so the part shows the moment it can.
+        local yes = rayReaches(p.x, p.y, p.z + 0.6, x, y, z, ped) or rayReaches(p.x, p.y, p.z - 0.5, x, y, z, ped)
+        sightCache[id] = { untilAt = now + SIGHT_FOR_MS, yes = yes }
+        return yes
+    end
+
+    -- Asked before: the next answer by async probes, read on a later pass.
+    c.tx, c.ty, c.tz = x, y, z
+    c.up = StartShapeTestLosProbe(p.x, p.y, p.z + 0.6, x, y, z, SIGHT_FLAGS, ped, SIGHT_OPTIONS)
+    c.low = StartShapeTestLosProbe(p.x, p.y, p.z - 0.5, x, y, z, SIGHT_FLAGS, ped, SIGHT_OPTIONS)
+    c.upYes, c.lowYes, c.startedAt = nil, nil, now
+    return c.yes
 end
 
 --- Has this part anything to offer: options of its own, or a resource's? The filler has none of its own.

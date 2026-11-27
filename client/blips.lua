@@ -98,6 +98,8 @@ local function make(id, w)
         end
     end
     blips[id] = b
+    -- The minimap's blip scan reads every sprite on its next pass, so this one shows at once (client/minimap.lua).
+    if MinimapRescan then MinimapRescan() end
 end
 
 RegisterNetEvent('whip_core:client:blip', function(id, w)
